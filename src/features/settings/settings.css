@@ -1,0 +1,65 @@
+/* Settings feature — control room. Fleet telemetry strip + tabbed panels. */
+
+.settings {
+  height: 100%;
+  min-height: 0;
+  padding: 28px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: #f4f4f4;
+  background: #0e0e0e;
+}
+.settings__header h1 { margin: 6px 0 3px; font-size: 26px; font-weight: 600; letter-spacing: -0.015em; font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif; }
+.settings__header p { margin: 0; font-size: 14px; color: rgba(244, 244, 244, 0.6); }
+.settings__eyebrow {
+  font: 600 10px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  color: #85ed75;
+}
+
+/* Fleet telemetry strip */
+.fleet {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: rgba(21, 21, 21, 0.75);
+  border: 1px solid #2a2a2a;
+  border-radius: 0;
+  padding: 12px 6px;
+  overflow: hidden;
+}
+.fleet__cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 16px;
+  border-right: 1px solid #2a2a2a;
+}
+.fleet__cell:last-child { border-right: 0; }
+.fleet__cell label {
+  font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.14em;
+  color: rgba(244, 244, 244, 0.45);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.fleet__cell b {
+  font: 15px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: #f4f4f4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fleet__cell b small { font-size: 10px; color: rgba(244, 244, 244, 0.6); font-weight: 500; }
+.fleet__cell--ok b { color: #85ed75; }
+.fleet__cell--warn b { color: #f3bc56; }
+
+.settings__body { flex: 1; min-height: 0; overflow-y: auto; max-width: 880px; }
+
+@media (max-width: 900px) {
+  .settings { padding: 20px; }
+  .fleet__cell { padding: 0 10px; }
+}

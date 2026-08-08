@@ -1,0 +1,56 @@
+{
+  "piece": "P4 Bridge + IPC Contract Enrichment (worker)",
+  "status": "DONE",
+  "scope": "src/ipc/contract.ts, src/ipc/client.ts, bridge/src/rpc.ts, bridge/src/connection.ts",
+  "touched_features": "none (all src/features/ preserved; src-tauri untouched)",
+  "contract_changes": {
+    "ConnectionState": "added schedules?: ScheduleInfo[], heartbeats?: HeartbeatInfo[], autonomousConfig?: AutonomousConfig, costStats?: CostStats (goals already present)",
+    "new_types": "ScheduleInfo, HeartbeatInfo, AutonomousConfig, CostStats, SessionTree, SessionTreeNode, RefinementResult (contract); Settings.auth?: Record<string,string> for login/logout key storage",
+    "new_commands": "exportSession({format?}), shareSession(), getSessionTree(), cloneSession(), nameSession({name}), sideQuestion({text}) — added to IpcCommand, IpcClient, TauriIpcClient, MockIpcClient, and bridge RPC dispatch",
+    "new_event": "IpcEvent refinement_result (mapped from daemon refine_complete/refine_failed)",
+    "event_mapping": "goal_update + session_info_changed + heartbeats_changed refresh the live snapshot; refine_complete/refine_failed -> refinement_result event; side_question_event already forwarded (verified)",
+    "login/logout": "now persist/remove provider API keys in the SettingsStore (daemon exposes no auth via AgentConnection)"
+  },
+  "mapping": {
+    "mapGoals": "reads daemon GoalState (goalId/objective/status/active); returns undefined for idle/empty goals",
+    "mapHeartbeats": "from state.heartbeat (single AgentCronJob) -> HeartbeatInfo",
+    "mapAutonomousConfig": "graceful — reads state.autonomousConfig only if the daemon ever adds it",
+    "enrichConnectionState": "async, called from getState: fetches listCronJobs -> schedules, listHeartbeats -> heartbeats, getSessionStats -> costStats; all best-effort",
+    "mapSessionTree": "maps daemon session tree -> SessionTree"
+  },
+  "environment_fix": "bridge/node_modules/@earendil-works/{pi-coding-agent,pi-agent-core} symlinks pointed at a non-existent .prime-pieces/prime-agent-ref; repointed to C:/Users/Cayleb/Desktop/workspace/prime-agent-ref so the bridge build can resolve daemon types. Was breaking the baseline build.",
+  "verified": [
+    "cd bridge && npm run build -> clean (0 errors)",
+    "npm run build (frontend, tsc strict + vite) -> clean (0 errors)",
+    "compiled bridge dist imports cleanly (connection/rpc exports present)",
+    "new commands typed in contract and implemented in both TauriIpcClient and MockIpcClient"
+  ],
+  "handoff": "output sent to critic 699fb21f-5242-41ee-a2ce-b9b347980ebc with expectReply: true",
+  "round2_fixes": [
+    "[defect 3] cloneSession return shape reconciled across contract/client/mock/rpc: all now Promise<{ activeSessionId?: string }>; rpc extracts the new session id via getState() after conn.fork(); mock returns {activeSessionId}.",
+    "[defect 4] enrichConnectionState applied to every snapshot path via emitEnrichedSnapshot(): connect-time initial snapshot, session_replaced, session_resynced, refreshSnapshotEvent (goal_update/session_info_changed/heartbeats_changed), createSessionWithConfig re-attach. Live event-driven state no longer drops schedules/heartbeats/costStats.",
+    "[item 1] autonomousConfig graceful-undefined on live path; comment added: 'autonomous config NOT available through AgentConnection — requires daemon API extension.' Orchestrator accepted as graceful-undefined (follow-up daemon-capability work).",
+    "[item 2] login/logout now also mirror API keys into ~/.prime/agent/auth.json (orchestrator-authorized option B): read+merge upsert, targeted removal, mkdir recursive, only on explicit login/logout. Verified via redirected-HOME probe: merge preserves other providers, logout removes only target."
+  ],
+  "round3_commands": [
+    "addSchedule({cron,prompt}) -> conn.addCronJob(cron,prompt) -> ScheduleInfo",
+    "removeSchedule({id}) -> conn.cancelCronJob(id) -> ScheduleInfo",
+    "setHeartbeat({schedule,prompt?}) -> conn.setHeartbeat(schedule,prompt??'') -> ScheduleInfo|undefined",
+    "removeHeartbeat({}) -> conn.updateHeartbeat('clear') -> ScheduleInfo|undefined",
+    "navigateTree({entryId}) -> conn.navigateTree(entryId) -> NavigateTreeResult",
+    "startSideQuestion({text}) -> conn.startSideQuestion(genId,text) -> {id}",
+    "exportToHtml({outputPath?}) -> conn.exportToHtml -> {outputPath}",
+    "exportToJsonl({outputPath?}) -> conn.exportToJsonl -> {outputPath}",
+    "setSessionName({name}) -> conn.setSessionName(name)",
+    "getContextTree() -> conn.getContextTree() -> ContextTreeNode",
+    "(getSessionTree already present; shareSession keeps -32601 'not yet supported by daemon'; NO goal command per orchestrator — frontend uses ipc.prompt('/goal ...'))"
+  ],
+  "rebuild_after_round3": "bridge build clean, frontend build clean",
+  "round4_final": {
+    "verdict": "critic: contract PASS, bar PASS (one minor fixed before merge)",
+    "minor_fix": "getContextTree now maps the ROOT node's contextUsage.tokens (was dropped); verified root->500, child->120 via probe.",
+    "item1": "autonomousConfig graceful-undefined on live path (dead mapper + comment); orchestrator accepted; follow-up daemon-capability.",
+    "item2": "login/logout auth.json mirror functionally reaches the file the daemon reads; interim/stub of a real auth flow; remains escalated.",
+    "rebuild_after_round4": "bridge build clean, frontend build clean"
+  }
+}

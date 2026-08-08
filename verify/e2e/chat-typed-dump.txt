@@ -1,0 +1,268 @@
+window "Prime Agent"
+  group
+    group
+      group "Prime Agent"
+        group
+        group "Prime Agent - Web content"
+          group
+            group
+              static_text "Untitled"
+              group
+                button "Minimize"
+                button "Maximize"
+                button "Restore"
+                button "Close"
+              group
+                group
+                group
+                  toolbar "App bar"
+                    group
+                      button
+                      alert
+                      static_text
+                      static_text
+                      group
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      alert
+                      group
+                        button
+                          alert
+                        button
+                          alert
+                        button
+                          alert
+                        button
+                          alert
+                        button
+                          alert
+                        button
+                          alert
+                        button
+                          alert
+                      group
+                        button "Search instead"
+                          alert
+                        button
+                          alert
+                        button "Open in app"
+                          alert
+                        button "App available. Install "
+                          alert
+                        button "Show translate options"
+                          alert
+                        button "Zoom: 100%"
+                          alert
+                        button "Third-party cookies blocked"
+                          alert
+                        button "Save card"
+                          alert
+                        button "Save card"
+                          alert
+                        button "View your virtual card number"
+                          alert
+                        button "Add virtual card"
+                          alert
+                        button "Enable mandatory re-authentication"
+                          alert
+                        button "Update automatic profile switching preferences for this site"
+                          alert
+                        button "View your virtual card number"
+                          alert
+                        button "Buy now pay later"
+                          alert
+                        button "Save address?"
+                          alert
+                        button "More actions"
+                          alert
+                        group
+                          group
+                      static_text
+                  group
+                  group
+                group "Infobar Container"
+                group
+                  group
+                    group
+                      group
+                        group
+                          web_area
+                            group
+                          group
+                          group
+                          group "Chrome Legacy Window"
+                            web_area "Prime Agent" value="http://localhost:1420/"
+                              group
+                                group
+                                  group
+                                    image
+                                    static_text "PRIME"
+                                    static_text "AGENT // WINDOWS"
+                                    static_text "ENGINE LIVE"
+                                    static_text "AGENTS"
+                                    static_text "0"
+                                    static_text "live"
+                                    static_text "MODEL"
+                                    static_text "deepseek-v4-flash:0731-cloud"
+                                    static_text "/ "
+                                    static_text "ollama-cloud"
+                                    static_text "CTX"
+                                    static_text "0"
+                                    static_text "/"
+                                    static_text "1000k"
+                                    static_text "0"
+                                    static_text "%"
+                                    button "Show engine terminal"
+                                      image
+                                    image
+                                  group
+                                    group
+                                      static_text "COMMAND RAIL"
+                                    group
+                                      button "Chat"
+                                        image
+                                        static_text "Chat"
+                                      button "Sessions"
+                                        image
+                                        static_text "Sessions"
+                                      button "Agents"
+                                        image
+                                        static_text "Agents"
+                                      button "Inbox"
+                                        image
+                                        static_text "Inbox"
+                                      button "Settings"
+                                        image
+                                        static_text "Settings"
+                                    static_text "COMMAND"
+                                    static_text "⌘K"
+                                    image
+                                    static_text "PRIME"
+                                    static_text "v0.1.0 · 2026-08-06"
+                                  group
+                                    group
+                                      group
+                                        group
+                                          group
+                                            static_text "CHAT"
+                                            static_text "Conversation"
+                                            status "Connected"
+                                            static_text "CONNECTED"
+                                            button "Export session to HTML"
+                                              image
+                                            button "Share as GitHub gist"
+                                              image
+                                            button "Copy last assistant message"
+                                              image
+                                            button "New session"
+                                              image
+                                              static_text "New session"
+                                            group
+                                              button "ollama-cloud DeepSeek V4 Flash (0731) via Ollama Cloud"
+                                                static_text "ollama-cloud"
+                                                static_text "DeepSeek V4 Flash (0731) via Ollama Cloud"
+                                                image
+                                          static_text "CONTEXT"
+                                          static_text "0"
+                                          static_text " tokens"
+                                          static_text "/ "
+                                          static_text "1M"
+                                          progress_bar "Context usage" value="0"
+                                          static_text "0"
+                                          static_text " messages"
+                                          group
+                                            text_field "Message input" value="e2e test message"
+                                            button "Send message"
+                                              image
+                                          static_text "Enter"
+                                          static_text "send"
+                                          static_text "Alt"
+                                          static_text "Enter"
+                                          static_text "follow-up"
+                                          static_text "@"
+                                          static_text "file"
+                                          static_text "!"
+                                          static_text "shell"
+                                          static_text "Shift"
+                                          static_text "+ Enter newline"
+                                          static_text "ready"
+                          group
+                          group
+                          group
+                          group
+                        group
+                          web_area
+                            group
+                          group
+                          group
+                          web_area
+                            group
+                          group
+                          group
+                          group
+                          group
+                        group
+                          group
+                            static_text "Open in split screen"
+                        group
+                      group
+                      group
+                    group "Side pane"
+                  group "Side pane"
+                    web_area
+                      group
+                    group
+                group
+                  group
+                  group
+                  group
+                  group
+                  group
+                group
+                  group
+                  slider "Side Panel Resize Handle (draggable)" value="0"
+                tab_group "Tab bar"
+                  group
+                    tab_group
+                      tab "Prime Agent"
+                        button "Mute tab"
+                        button "Collaborator profile photo"
+                        button "Collaborator profile photo"
+                        button "Collaborator profile photo"
+                        button "Collaborator profile photo"
+                        button "Close tab"
+                      group
+                      group
+                        group
+                          group
+                        group
+                      group
+                    group
+                  button "New Tab"
+                  group
+                group
+                group
+                group
+                group
+            group
+            group
+  group value="Prime Agent"
+    menu_bar "System"
+      menu_item "System"
+    button "Minimize"
+    button "Restore"
+    button "Close"

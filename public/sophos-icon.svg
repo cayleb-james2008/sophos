@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0e0e0e"/>
+  <!-- Sigma (sum of knowledge) — sharp geometric mark -->
+  <rect x="96" y="128" width="320" height="48" fill="#f4f4f4"/>
+  <polygon points="416,128 416,176 96,384 96,336" fill="#f4f4f4"/>
+  <rect x="96" y="336" width="320" height="48" fill="#f4f4f4"/>
+  <!-- Terminal-green accent dot -->
+  <rect x="416" y="64" width="40" height="40" fill="#85ed75"/>
+</svg>

@@ -1,0 +1,191 @@
+/* Sophos — global styles for the stark terminal-minimal command center. */
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #0e0e0e;
+  color: #f4f4f4;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* ---- Typography: Geist (display/body) and Geist Mono (data) are loaded via
+   the @fontsource packages imported in main.tsx, which declare the proper
+   @font-face rules with woff2 sources. No local @font-face override here — a
+   src: local() for a family that is not installed system-wide errors and
+   shadows the web font. ---- */
+
+/* ---- Scrollbars (hairline, sharp) ---- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 0;
+  border: 2px solid #0e0e0e;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2c2c2c;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- Focus ring (keyboard only, terminal green) ---- */
+:focus-visible {
+  outline: none;
+}
+.pa-focus-ring:focus-visible {
+  box-shadow: 0 0 0 1px #0e0e0e, 0 0 0 2px rgba(133, 237, 117, 0.85);
+}
+
+/* ---- Motion keyframes ---- */
+@keyframes pa-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pa-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+/* Live status pulse — a crisp instrument "heartbeat" */
+@keyframes pa-beat {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  45% {
+    opacity: 0.55;
+    transform: scale(0.78);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes pa-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  80%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes pa-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pa-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pa-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pa-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pa-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes pa-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pa-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes pa-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

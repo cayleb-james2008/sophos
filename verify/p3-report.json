@@ -1,0 +1,96 @@
+{
+  "startedAt": "2026-08-08T00:29:22.353Z",
+  "checks": [
+    {
+      "name": "Goals: 'Set goal' input renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Goals: active goal from mock renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Goals: set-goal adds a goal row",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Autonomous: budget inputs render",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Autonomous: Start button renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Autonomous: starts → Stop button appears",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Heartbeats: empty state renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Heartbeats: add creates a heartbeat row",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Schedules: empty state renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Schedules: add creates a schedule row",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Refinement: empty state renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Refinement: 'Refine now' button renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Refinement: refine now adds an entry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Advanced: runtime telemetry still renders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "W4: daemon-unreachable shows inline error banner",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "W4: no unhandled promise rejection on daemon-unreachable",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "errors": [],
+  "consoleErrors": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://localhost:1432/favicon.ico"
+    }
+  ],
+  "pageErrors": [],
+  "failedRequests": [],
+  "ok": true,
+  "finishedAt": "2026-08-08T00:29:43.241Z"
+}

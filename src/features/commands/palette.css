@@ -1,0 +1,157 @@
+/* Command palette — the ⌘K command center overlay. Terminal-minimal: sharp
+   corners, hairline #2a2a2a borders, opacity-based text hierarchy on #f4f4f4,
+   Geist Mono, and terminal green #85ed75 as the sole accent. */
+
+.palette {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 11vh;
+}
+.palette__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 14, 14, 0.72);
+  backdrop-filter: blur(6px);
+  animation: pa-fade-in 140ms ease;
+}
+.palette__panel {
+  position: relative;
+  width: 620px;
+  max-width: calc(100vw - 48px);
+  background: #151515;
+  border: 1px solid #2a2a2a;
+  border-radius: 0;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(133, 237, 117, 0.12);
+  overflow: hidden;
+  animation: pa-scale-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Prompt */
+.palette__prompt {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 15px 18px;
+  border-bottom: 1px solid #2a2a2a;
+  background: #0e0e0e;
+}
+.palette__glyph {
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 19px;
+  line-height: 1;
+  color: #85ed75;
+  text-shadow: 0 0 12px rgba(133, 237, 117, 0.4);
+  transition: text-shadow 0.2s ease, color 0.2s ease;
+}
+.palette__glyph--typing {
+  color: #9fff8a;
+  text-shadow: 0 0 18px rgba(133, 237, 117, 0.9), 0 0 34px rgba(133, 237, 117, 0.4);
+}
+.palette__input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: #f4f4f4;
+  font-family: inherit;
+  font-size: 16px;
+  padding: 2px 0;
+}
+.palette__input::placeholder { color: rgba(244, 244, 244, 0.3); }
+
+/* List */
+.palette__list {
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 8px;
+}
+.palette__grouphead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 12px 4px;
+  font: 600 9px/1.2 'Geist Mono', ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  color: rgba(244, 244, 244, 0.45);
+  text-transform: uppercase;
+}
+.palette__grouphead span:last-child {
+  min-width: 15px;
+  height: 15px;
+  border-radius: 0;
+  background: #2a2a2a;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  color: rgba(244, 244, 244, 0.6);
+}
+.palette__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(244, 244, 244, 0.6);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.palette__row--active {
+  background: linear-gradient(90deg, rgba(133, 237, 117, 0.22), rgba(133, 237, 117, 0.06));
+  border-color: rgba(133, 237, 117, 0.4);
+  color: #f4f4f4;
+}
+.palette__rowicon {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 0;
+  background: #151515;
+  color: rgba(244, 244, 244, 0.45);
+}
+.palette__row--active .palette__rowicon {
+  background: rgba(133, 237, 117, 0.2);
+  color: #9fff8a;
+}
+.palette__rowmeta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.palette__rowlabel { font-size: 13.5px; font-weight: 500; }
+.palette__row--active .palette__rowlabel { font-weight: 600; }
+.palette__rowdesc { font-size: 11px; color: rgba(244, 244, 244, 0.45); }
+.palette__rowhint {
+  font: 9px 'Geist Mono', ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  color: rgba(244, 244, 244, 0.45);
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.palette__row--active .palette__rowhint { opacity: 1; }
+
+.palette__empty {
+  padding: 30px 16px;
+  text-align: center;
+  color: rgba(244, 244, 244, 0.45);
+  font-size: 13px;
+}
+
+/* Footer */
+.palette__foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid #2a2a2a;
+  background: #0e0e0e;
+}
+.palette__hint { display: inline-flex; align-items: center; gap: 6px; }
+.palette__count { margin-left: auto; font: 10px 'Geist Mono', ui-monospace, monospace; color: rgba(244, 244, 244, 0.45); }

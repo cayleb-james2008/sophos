@@ -1,0 +1,27 @@
+{
+  "name": "@prime-agent/bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node bridge sidecar — owns the daemon connection and exposes the JSON-RPC IPC contract to the Rust shell.",
+  "type": "module",
+  "main": "./dist/bridge/src/index.js",
+  "types": "./dist/bridge/src/index.d.ts",
+  "bin": {
+    "prime-agent-bridge": "./dist/bridge/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:watch": "tsc -p tsconfig.json --watch",
+    "clean": "shx rm -rf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "file:../../prime-agent-ref/node_modules/@earendil-works/pi-agent-core",
+    "@earendil-works/pi-coding-agent": "file:../../prime-agent-ref/packages/coding-agent"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "shx": "^0.3.4",
+    "typescript": "^5.6.0"
+  }
+}
