@@ -118,7 +118,8 @@ node scripts/bundle.mjs
 
 # 2. Build the native installer:
 npm run tauri build
-# → src-tauri/target/release/Sophos_0.1.0_x64-setup.exe
+# → src-tauri/target/release/bundle/nsis/Sophos_0.1.0_x64-setup.exe
+#   (native binary at src-tauri/target/release/prime-agent-windows.exe)
 ```
 
 The `bundle.mjs` manifest is written to `resources/.bundle-manifest.json`.
@@ -189,7 +190,16 @@ The E2E harness tries named-pipe first and falls back to TCP automatically.
 The NSIS `makensis` step may abort on a deeply-nested `@mistralai` resource
 path exceeding Windows `MAX_PATH` (260 chars). This is **non-blocking** — the
 native binary, frontend, and bundle are all built; only the final `.exe`
-wrapper fails. Workarounds:
+wrapper fails.
+
+> **Verified 2026-08-08:** the build succeeded end-to-end from this worktree
+> (`src-tauri/target/release/bundle/nsis/Sophos_0.1.0_x64-setup.exe`, ~93 MB).
+> The blocker only triggers when the staged path pushes the deepest
+> `@mistralai` file past 260 chars — the current `prime-agent-windows`
+> worktree path keeps it at ~221 chars. If you ever hit it, shorten the
+> worktree path or apply a workaround below.
+
+Workarounds:
 
 1. Strip `.d.ts`/`.d.ts.map`/`.map` files from `resources/node_modules/`
    before bundling (runtime-irrelevant — TypeScript types are dev-only).
