@@ -1,4 +1,4 @@
-// Prime Agent — Windows. The command-center app shell: routes between the
+// Sophos — Windows-native port of Prime Intellect's Prime Agent. The command-center app shell: routes between the
 // views (Chat / Sessions / Agents / Settings) inside the Shell frame, and
 // hosts the global ⌘K command palette + new-session modal. Feature modules
 // (P4/P5) mount into these views.

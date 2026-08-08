@@ -463,7 +463,7 @@ export class MockIpcClient implements IpcClient {
     return [
       { id: "session-0", title: "Refactor auth module", status: "active", cwd: "C:\\work\\api-service", createdAt: new Date(Date.now() - 3600000).toISOString(), updatedAt: new Date().toISOString() },
       { id: "session-1", title: "Migrate to new config schema", status: "saved", cwd: "C:\\work\\infra", createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString() },
-      { id: "session-2", title: "Prime Agent — Windows", status: "idle", cwd: "C:\\work\\prime-agent-windows", createdAt: new Date(Date.now() - 172800000).toISOString() },
+      { id: "session-2", title: "Sophos — Windows", status: "idle", cwd: "C:\\work\\sophos", createdAt: new Date(Date.now() - 172800000).toISOString() },
     ];
   }
   async listAgents(): Promise<AgentInfo[]> {
