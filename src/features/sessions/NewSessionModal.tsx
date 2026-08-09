@@ -6,16 +6,19 @@
 import { useEffect, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Modal, Button, Input, TextArea, Text } from "../../design";
-import { useIpc } from "../../ipc/client";
+import { useIpc, isTauri } from "../../ipc/client";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
-// Try to open a native folder picker via the Tauri dialog plugin. Returns the
-// chosen path, or null if the plugin isn't available / the user cancelled.
+// Open a native folder picker via the Tauri dialog plugin. Returns the chosen
+// path, or null if not running in Tauri / the user cancelled / the call failed.
 async function pickFolder(): Promise<string | null> {
+  if (!isTauri) return null;
   try {
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const selected = await open({ directory: true, multiple: false });
+    const selected = await openDialog({ directory: true, multiple: false });
     return typeof selected === "string" ? selected : null;
-  } catch {
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[new-session] folder picker failed:", err);
     return null;
   }
 }
