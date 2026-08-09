@@ -10,6 +10,7 @@ import { DaemonStatusBanner } from "../features/settings/DaemonStatusBanner";
 import { EnginePanel } from "../features/engine/EnginePanel";
 import { RefinementGateProvider } from "../features/longrunning/useRefinementGate";
 import { RefinementGateBanner } from "../features/longrunning/RefinementGateBanner";
+import { RunGuardBanner } from "../features/longrunning/RunGuardBanner";
 import type { View } from "./nav";
 
 export function Shell({
@@ -37,6 +38,7 @@ export function Shell({
       <SystemBar engineOpen={engineOpen} onToggleEngine={() => setEngineOpen(!engineOpen)} />
       <RefinementGateProvider />
       <RefinementGateBanner />
+      <RunGuardBanner />
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         <Sidebar active={active} onNavigate={onNavigate} />
         <main

@@ -10,6 +10,7 @@ import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
 import { useIpc } from "../../ipc/client";
 import { HeartbeatIcon, PlusIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
+import { estimateNextDue } from "./nextDue";
 
 export interface Heartbeat {
   id: string;
@@ -180,6 +181,9 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
                     {h.prompt}
                   </Text>
                 ) : null}
+                <Text variant="micro" tone="dim" mono>
+                  next run (est.): {estimateNextDue(h.interval) ?? "—"} · last fired: not reported by daemon
+                </Text>
               </div>
               <Badge tone={h.status === "active" ? "success" : "warning"} dot>
                 {h.status === "active" ? "Active" : "Paused"}

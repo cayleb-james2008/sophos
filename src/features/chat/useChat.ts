@@ -102,6 +102,23 @@ export function useChat() {
   // ---- Context / usage stats ------------------------------------------
   const [contextStats, setContextStats] = useState<ContextStats | null>(null);
 
+  // A2b: coalesce high-frequency context/usage events. A burst (e.g. the
+  // child_usage_attributed flood in #1054) would otherwise trigger a state
+  // update per event and lock the UI. We accumulate into a ref and flush at
+  // most once per 150ms window, applying the latest values.
+  const pendingStats = useRef<ContextStats | null>(null);
+  const statsTimer = useRef<number | null>(null);
+  const flushStats = useCallback(() => {
+    if (statsTimer.current != null) return;
+    statsTimer.current = window.setTimeout(() => {
+      statsTimer.current = null;
+      if (pendingStats.current) {
+        setContextStats((prev) => ({ ...(prev ?? {}), ...pendingStats.current }));
+        pendingStats.current = null;
+      }
+    }, 150);
+  }, []);
+
   // Keep busyRef in sync so the (callback-stable) queue flush can read it.
   // NOTE: busyRef is updated by `send` (set true synchronously before work
   // starts) and by the busy-transition effect (set to `busy`). It must NOT be
@@ -144,6 +161,7 @@ export function useChat() {
   useEffect(() => {
     return () => {
       simCleanup.current?.();
+      if (statsTimer.current != null) window.clearTimeout(statsTimer.current);
     };
   }, []);
 
@@ -315,12 +333,14 @@ export function useChat() {
         const tokens = typeof e.tokens === "number" ? e.tokens : undefined;
         const contextWindow = typeof e.contextWindow === "number" ? e.contextWindow : undefined;
         const messages = typeof e.messages === "number" ? e.messages : undefined;
-        setContextStats((prev) => ({
-          ...(prev ?? {}),
+        // Coalesce into the 150ms flush window (A2b).
+        pendingStats.current = {
+          ...(pendingStats.current ?? {}),
           ...(tokens != null ? { tokens } : {}),
           ...(contextWindow != null ? { contextWindow } : {}),
           ...(messages != null ? { messages } : {}),
-        }));
+        };
+        flushStats();
         return;
       }
       case "session_status":
