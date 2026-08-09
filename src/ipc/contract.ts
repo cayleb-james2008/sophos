@@ -300,6 +300,8 @@ export interface AgentMessage {
 export interface Settings {
   shellPath?: string;
   sessionDir?: string;
+  /** Default working directory for new sessions — persisted when the user picks "save as default". */
+  defaultCwd?: string;
   defaultProvider?: string;
   defaultModel?: string;
   theme?: "dark" | "light" | "system";
