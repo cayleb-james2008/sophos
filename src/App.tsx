@@ -16,26 +16,45 @@ import { CommandPalette } from "./features/commands/CommandPalette";
 import { NewSessionModal } from "./features/sessions/NewSessionModal";
 import { UnreadProvider } from "./ipc/unread";
 
-type ViewProps = { onNewSession?: () => void };
+type ViewProps = {
+  onNewSession?: () => void;
+  onSetupProviders?: () => void;
+};
 
-const VIEWS: Record<View, React.ComponentType<ViewProps>> = {
+const VIEWS: Record<Exclude<View, "settings">, React.ComponentType<ViewProps>> = {
   chat: ChatView,
   sessions: SessionsView,
   agents: AgentsView,
   inbox: InboxView,
-  settings: SettingsView,
 };
 
 export default function App() {
   const [view, setView] = useState<View>("chat");
   const [newOpen, setNewOpen] = useState(false);
-  const ActiveView = VIEWS[view];
+  // Which Settings tab to open when the Settings view mounts. The first-run
+  // onboarding (U1) deep-links straight to Providers; sidebar navigation
+  // resets to General.
+  const [settingsTab, setSettingsTab] = useState("general");
+  const ActiveView = VIEWS[view as Exclude<View, "settings">];
+
+  const handleNavigate = (v: View) => {
+    if (v === "settings") setSettingsTab("general");
+    setView(v);
+  };
+  const handleSetupProviders = () => {
+    setSettingsTab("providers");
+    setView("settings");
+  };
 
   return (
     <UnreadProvider>
-      <Shell active={view} onNavigate={setView}>
+      <Shell active={view} onNavigate={handleNavigate}>
         <ViewTransition transitionKey={view}>
-          <ActiveView onNewSession={() => setNewOpen(true)} />
+          {view === "settings" ? (
+            <SettingsView initialTab={settingsTab} />
+          ) : (
+            <ActiveView onNewSession={() => setNewOpen(true)} onSetupProviders={handleSetupProviders} />
+          )}
         </ViewTransition>
       </Shell>
       <CommandPalette onNavigate={setView} onNewSession={() => setNewOpen(true)} />

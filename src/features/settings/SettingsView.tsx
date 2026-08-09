@@ -12,8 +12,8 @@ import { AdvancedPanel } from "./AdvancedPanel";
 import { FleetStrip } from "./FleetStrip";
 import "./settings.css";
 
-export function SettingsView() {
-  const [tab, setTab] = useState("general");
+export function SettingsView({ initialTab = "general" }: { initialTab?: string }) {
+  const [tab, setTab] = useState(initialTab);
 
   return (
     <main className="settings">
