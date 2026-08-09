@@ -9,6 +9,7 @@ import { tokens } from "../design/tokens";
 import { Text, Tooltip, IconButton } from "../design";
 import { useConnectionState, useIpc } from "../ipc/client";
 import type { AgentInfo } from "../ipc/contract";
+import { useRefinementGate } from "../features/longrunning/useRefinementGate";
 import { ChevronDownIcon, TerminalIcon, SigmaGlyph } from "./icons";
 
 function statusKind(status: { kind: string }): "connecting" | "connected" | "disconnected" | "reconnecting" {
@@ -93,6 +94,20 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
   const tokensUsed = state.context?.tokens ?? 0;
   const window = state.context?.contextWindow ?? 0;
   const pct = window > 0 ? Math.min(100, Math.round((tokensUsed / window) * 100)) : 0;
+
+  // A4: always-visible autonomous + refine indicators (terminal green = active).
+  const autoActive = state.autonomousConfig?.active ?? false;
+  const autoBudget = state.autonomousConfig
+    ? [
+        state.autonomousConfig.maxTurns != null ? `${state.autonomousConfig.maxTurns} turns` : null,
+        state.autonomousConfig.maxTokens != null ? `${(state.autonomousConfig.maxTokens / 1000).toFixed(0)}k tok` : null,
+        state.autonomousConfig.maxTime ? `${state.autonomousConfig.maxTime}` : null,
+      ]
+        .filter((x): x is string => Boolean(x))
+        .join(" · ")
+    : null;
+  const gate = useRefinementGate();
+  const refinePending = gate.pending != null;
 
   return (
     <header
@@ -238,6 +253,60 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
             / {provider}
           </Text>
         </div>
+
+        {/* Autonomous — always-visible opt-in indicator (A4) */}
+        <Tooltip content={autoActive ? `Autonomous active${autoBudget ? ` · ${autoBudget}` : ""}` : "Autonomous off — opt-in"} side="bottom">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: tokens.space.sm,
+              padding: "6px 12px",
+              borderRight: `1px solid ${tokens.color.border}`,
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: autoActive ? tokens.color.accent : tokens.color.textDim,
+                flexShrink: 0,
+              }}
+            />
+            <Text variant="micro" tone={autoActive ? "accent" : "dim"} mono uppercase style={{ letterSpacing: "0.08em" }}>
+              AUTO
+            </Text>
+          </div>
+        </Tooltip>
+
+        {/* Refine — always-visible review-gate indicator (A1/A4) */}
+        <Tooltip content={refinePending ? "Refinement awaiting your review" : "No refinement pending"} side="bottom">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: tokens.space.sm,
+              padding: "6px 12px",
+              borderRight: `1px solid ${tokens.color.border}`,
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: refinePending ? tokens.color.accent : tokens.color.textDim,
+                flexShrink: 0,
+              }}
+            />
+            <Text variant="micro" tone={refinePending ? "accent" : "dim"} mono uppercase style={{ letterSpacing: "0.08em" }}>
+              REFINE
+            </Text>
+          </div>
+        </Tooltip>
 
         {/* Context usage */}
         <div
