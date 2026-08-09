@@ -122,6 +122,11 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
 
       {/* Description + the one action the operator needs. */}
       <div style={section}>
+        <Text variant="label" weight="semibold" tone={active ? "success" : "default"}>
+          {active
+            ? "Autonomous mode is running — stop it to hand control back."
+            : "Autonomous mode is off — start it to let the agent continue without human input."}
+        </Text>
         <Text variant="body" tone="muted">
           Bounded host policy that continues the session without human input until configured quality gates
           pass or a continuation, turn, token, or wall-clock limit is reached. Opt-in — the agent never acts on

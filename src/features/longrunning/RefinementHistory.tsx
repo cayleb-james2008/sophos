@@ -94,6 +94,11 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
       </div>
 
       <div style={section}>
+        <Text variant="label" weight="semibold" tone={pending ? "accent" : "default"}>
+          {pending
+            ? "One proposed change awaits your review — apply or discard it below."
+            : "No pending changes — run a refine pass when ready."}
+        </Text>
         <Text variant="body" tone="muted">
           Refinement iterates on the agent's own instructions to tighten them against the goal. A proposed
           change is held for your review — apply it only if you approve. Roll back a prior pass if it regressed.

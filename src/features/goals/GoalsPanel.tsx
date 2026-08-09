@@ -159,6 +159,11 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
         <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg, padding: tokens.space.lg }}>
           {/* State + action: set a goal up front, then the list. */}
           <div style={section}>
+            <Text variant="label" weight="semibold" tone={activeCount > 0 ? "success" : "default"}>
+              {activeCount > 0
+                ? `${activeCount} active goal${activeCount > 1 ? "s" : ""} in progress — manage or set another.`
+                : "No active goals — set one to start."}
+            </Text>
             <Text variant="body" tone="muted">
               A goal is a durable objective the agent keeps working toward across turns until it's completed,
               paused, budget-limited, or cleared. Set one to start — it persists even when you detach, and the

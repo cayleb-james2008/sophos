@@ -84,6 +84,11 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
 
       {/* State + action: add a schedule up front. */}
       <div style={section}>
+        <Text variant="label" weight="semibold" tone={activeCount > 0 ? "success" : "default"}>
+          {activeCount > 0
+            ? `${activeCount} schedule${activeCount > 1 ? "s" : ""} armed — add or remove below.`
+            : "No schedules — add a cron above."}
+        </Text>
         <Text variant="body" tone="muted">
           Schedule a one-time or recurring prompt for the agent. Use a standard cron expression (e.g. "0 9 * * 1-5")
           plus the prompt to deliver when the schedule fires.

@@ -97,6 +97,11 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
 
       {/* State + action: set a heartbeat up front. */}
       <div style={section}>
+        <Text variant="label" weight="semibold" tone={activeCount > 0 ? "success" : "default"}>
+          {activeCount > 0
+            ? `${activeCount} active heartbeat${activeCount > 1 ? "s" : ""} set — add or remove below.`
+            : "No heartbeat set — set an interval above."}
+        </Text>
         <Text variant="body" tone="muted">
           A heartbeat is a visible recurring instruction for the current session, delivered on an interval
           (e.g. "every 10m"). Only one user heartbeat is active at a time.
