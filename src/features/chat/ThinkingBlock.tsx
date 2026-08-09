@@ -31,6 +31,7 @@ export function ThinkingBlock({
     <div
       style={{
         border: `1px solid ${tokens.color.border}`,
+        borderLeft: `3px solid ${tokens.color.info}`,
         borderRadius: tokens.radius.md,
         background: tokens.color.bgElevated,
         overflow: "hidden",
@@ -57,7 +58,7 @@ export function ThinkingBlock({
           textAlign: "left",
         }}
       >
-        <ThinkingIcon color={tokens.color.accentHover} />
+        <ThinkingIcon color={tokens.color.info} />
         <Text variant="micro" tone="muted" mono uppercase>
           Thinking
         </Text>
@@ -108,11 +109,12 @@ export function ThinkingBlock({
         >
           <div
             style={{
-              borderLeft: `2px solid ${tokens.color.accentBorder}`,
+              borderLeft: `2px solid ${tokens.color.info}`,
               paddingLeft: tokens.space.md,
               color: tokens.color.textDim,
               fontFamily: tokens.font.sans,
               fontSize: tokens.font.size.sm,
+              fontStyle: "italic",
               lineHeight: tokens.font.leading.relaxed,
               whiteSpace: "pre-wrap",
             }}

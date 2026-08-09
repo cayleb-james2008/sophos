@@ -38,6 +38,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
     <div
       style={{
         border: `1px solid ${tokens.color.border}`,
+        borderLeft: `3px solid ${tokens.color.tool}`,
         borderRadius: tokens.radius.md,
         background: tokens.color.bgElevated,
         overflow: "hidden",
@@ -53,7 +54,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
           borderBottom: hasOutput || hasInput ? `1px solid ${tokens.color.border}` : "none",
         }}
       >
-        <ToolIcon color={call.status === "error" ? tokens.color.danger : tokens.color.info} />
+        <ToolIcon color={call.status === "error" ? tokens.color.danger : tokens.color.tool} />
         <span
           style={{
             fontFamily: tokens.font.mono,

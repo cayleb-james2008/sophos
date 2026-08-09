@@ -22,6 +22,7 @@ export function ViewScaffold({
         display: "flex",
         flexDirection: "column",
         height: "100%",
+        overflowY: "auto",
         padding: tokens.space.xl,
         gap: tokens.space.xl,
       }}

@@ -46,14 +46,15 @@ export function Shell({
             flexDirection: "column",
           }}
         >
-          <div style={{ flex: 1, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
             {/* Stark near-black surface — no grid, no wash */}
 
-            {/* Scrollable content: daemon banner + routed view */}
-            <div style={{ position: "relative", height: "100%", overflowY: "auto", display: "flex", flexDirection: "column" }}>
-              <DaemonStatusBanner />
-              <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>{children}</div>
-            </div>
+            {/* View area: fixed-height flex column. Each routed view owns its own
+                scroll (the Chat view's MessageList scrolls; ViewScaffold views
+                scroll via overflowY:auto). This lets the view area shrink cleanly
+                when the Engine terminal opens below — no overlap. */}
+            <DaemonStatusBanner />
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>{children}</div>
           </div>
 
           {/* Engine terminal panel — bottom collapsible */}
