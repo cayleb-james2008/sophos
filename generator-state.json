@@ -1,0 +1,68 @@
+{
+  "piece": "P1 Agentic Functionality Hardening (gauntlet run 2)",
+  "status": "BUILT — awaiting critic verdict",
+  "date": "2026-08-09",
+  "breadcrumbs": [
+    {
+      "t": "setup",
+      "note": "bridge deps needed prime-agent-ref symlink at worktree parent (cayleb-james2008__sophos/prime-agent-ref -> Desktop/workspace/prime-agent-ref); npm install root + bridge; both builds green"
+    },
+    {
+      "t": "harness",
+      "note": "wrote verify/ipc-roundtrip.mjs — spawns real daemon (TCP) + real bridge, drives all 44 agentic IPC commands via NDJSON stdio. 50 checks. First run: 8 'failures' were test-regex artifacts (checked message text not error code) + genuine daemon graceful rejections. Fixed regexes to check JSON-RPC codes (-32601/-32602/-32603). All 50 PASS."
+    },
+    {
+      "t": "bug1-fork",
+      "note": "forkSession broken: bridge resolved to session-tree LEAF (assistant reply) which daemon rejects 'Invalid entry ID for forking'; frontend passes transcript msg ids (msg-N) that never match tree entry ids. Fix: ConnectionHolder.resolveForkEntryId() uses daemon getUserMessagesForForking() to resolve to a valid USER-message entry id; maps msg-N -> Nth user message, verifies direct entry ids, session ids -> most recent user message. forkSession + cloneSession use it. Verified live: fork msg-0 OK, clone OK on session with user message."
+    },
+    {
+      "t": "bug2-newsession",
+      "note": "newSession(cwd,goal) re-attach failed: createSessionWithConfig disposed AgentConnection (closeClientOnDispose:true) which closed the DaemonClient, then re-attached with closed client -> 'daemon is not connected'. Fix: reconnect client (if !isConnected await connect()) before re-attach. Verified live: newSession(cwd,goal) -> activeSessionId + active goal + connected."
+    },
+    {
+      "t": "frontend-review",
+      "note": "Reviewed goals/longrunning/agents/inbox/sessions/chat/settings/engine components. All handle empty/error/disconnected/concurrent/invalid-input states gracefully (useActionError + ActionErrorBanner, per-view error banners + retry, DaemonStatusBanner TCP fallback, busy flags, disabled buttons). No hard-fails found."
+    },
+    {
+      "t": "contract",
+      "note": "contract.ts NOT modified. All 44 IpcCommand methods have bridge dispatch + client send (verified via extraction+diff). Events emitted by bridge all consumed by client."
+    },
+    {
+      "t": "design",
+      "note": "Copper 0 matches; old fonts 0 real matches (only setInterval/interactive false positives); non-zero radius only 0px/50%/9999px dots. No drift."
+    },
+    {
+      "t": "builds",
+      "note": "npm run build green; cd bridge && npm run build green."
+    },
+    {
+      "t": "bug3-clone",
+      "note": "cloneSession returned the CURRENT session id (daemon's fork creates a new session but does NOT switch active session). Fix: cloneSession captures listSessions before fork, forks, detects the newly-created session from the list, returns its id. Verified live: before=0ba5b67d226c after=019fe463-... (different)."
+    },
+    {
+      "t": "harness-test38",
+      "note": "Strengthened harness test 38 to actually verify fork+clone with a real user message (critic's concern). Each gets its OWN fresh session (a fork consumes the forkable point). Wait for turn to complete (user+assistant) so the tree commits before forking. All 56 checks PASS incl. forkSession(msg-N)->cancelled:false and cloneSession->new session id."
+    },
+    {
+      "t": "cleanup",
+      "note": "Killed all daemon supervisors + workers spawned by probes (TCP ports 48xxx). No daemon left running. Two node procs remain but are from a DIFFERENT worktree (gauntlet-p2-e2e vite + e2e-browser.mjs) — not mine, left alone."
+    }
+  ],
+  "unverified": [
+    "named-pipe transport (all live runs used TCP fallback; structurally identical, not exercised live)",
+    "autonomousConfig live read (daemon exposes only via blocking waitForHeadlessCompletion; graceful-undefined, pre-existing gap)",
+    "RLM subagent spawn (getRlmChildren/listAgents empty on fresh session; mapping verified structurally)"
+  ],
+  "files_changed": [
+    "bridge/src/connection.ts",
+    "bridge/src/rpc.ts",
+    "package-lock.json",
+    "verify/ipc-roundtrip.mjs",
+    "verify/P1-AGENTIC-EVIDENCE.md"
+  ],
+  "commits": [
+    "49847f5 P1: harden agentic IPC — fix fork resolution + newSession re-attach; add live round-trip harness",
+    "3d31a5f P1: cloneSession returns the newly-created session id; harness verifies fork+clone with a real user message"
+  ],
+  "handoff": "orchestrator accepted piece directly (critic stuck in analysis paralysis); reported back with expectReply: true"
+}
