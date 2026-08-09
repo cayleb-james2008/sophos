@@ -297,6 +297,7 @@ export function AgentsGraph({
       onNodesChange={onNodesChange}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      showMiniMap={false}
       onNodeClick={(id) => {
         const kind = layout.positioned.find((n) => n.id === id)?.data?.kind;
         if (kind === "agent" || kind === "rlm") onSelect(id);

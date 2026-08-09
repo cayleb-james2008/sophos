@@ -152,6 +152,8 @@ export interface GraphFlowProps {
   fitView?: boolean;
   minZoom?: number;
   maxZoom?: number;
+  /** Toggle the minimap. Off lets a compact graph keep the canvas undivided. */
+  showMiniMap?: boolean;
   children?: ReactNode;
   edgeTypes?: Record<string, unknown>;
   nodeTypes?: Record<string, unknown>;
@@ -168,6 +170,7 @@ export function GraphFlow({
   fitView = true,
   minZoom = 0.2,
   maxZoom = 1.8,
+  showMiniMap = true,
   children,
   edgeTypes,
   nodeTypes,
@@ -209,7 +212,11 @@ export function GraphFlow({
               <FitGlyph />
             </ControlButton>
           </Controls>
-          <MiniMap position="bottom-right" pannable zoomable nodeStrokeWidth={2} nodeColor={nodeColor} maskColor="rgba(14,14,14,0.6)" style={{ zIndex: 5, width: 140, height: 90 }} />
+          {/* Minimap lives top-right so it never stacks on the zoom controls
+              (bottom-right) — the D5 overlap fix. */}
+          {showMiniMap ? (
+            <MiniMap position="top-right" pannable zoomable nodeStrokeWidth={2} nodeColor={nodeColor} maskColor="rgba(14,14,14,0.6)" style={{ zIndex: 5, width: 140, height: 90 }} />
+          ) : null}
           {children}
         </ReactFlow>
         </MotionConfig>
