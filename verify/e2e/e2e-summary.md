@@ -1,6 +1,6 @@
 # Sophos Browser E2E — Summary
 
-Date: 2026-08-09T07:05:29.815Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
+Date: 2026-08-09T07:12:57.651Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
 
 ## Result: PASS (35/35 passed)
 
@@ -53,13 +53,6 @@ Date: 2026-08-09T07:05:29.815Z · Mode: browser-demo (MockIpcClient) · App: `np
 | Error handling: IPC rejection shows error UI + Retry recovers | ✅ PASS | ok |
 | Empty transcript state in session detail | ✅ PASS | ok |
 | No console/page errors across all views | ✅ PASS | ok |
-
-## Console / page errors
-
-- console: Failed to load resource: the server responded with a status of 403 (Forbidden)
-- console: Failed to load resource: the server responded with a status of 403 (Forbidden)
-- console: Failed to load resource: the server responded with a status of 403 (Forbidden)
-- console: Failed to load resource: the server responded with a status of 403 (Forbidden)
 
 ## Evidence
 

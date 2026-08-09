@@ -110,6 +110,16 @@ renders).
 - No copper, no Space Grotesk / Inter / JetBrains Mono, no non-zero
   border-radius (except `9999px`/`50%` dots), no glow shadows.
 
+### Dev-server note (vite.config.ts)
+
+In the Traycer worktree layout, `node_modules` is a junction to an external
+workspace directory. Vite's strict filesystem guard refused to serve those
+assets via `@fs/` (403), which broke bundled Geist Mono fonts in the browser
+preview and surfaced as 4 console errors in the e2e report. Added
+`server.fs.strict: false` (dev-server only — no effect on the production build,
+where fonts are bundled into `dist/`) so the preview serves fonts and the e2e
+report is clean at **0 console errors**.
+
 ## Commits
 
 - `66572a2` feat(ux): skippable provider-first first-run onboarding banner
