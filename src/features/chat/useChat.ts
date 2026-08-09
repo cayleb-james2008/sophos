@@ -16,8 +16,40 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useIpc, useIpcEvent, useConnectionState, isTauri } from "../../ipc/client";
-import type { ContextStats, SessionEvent, TranscriptMessage } from "../../ipc/contract";
+import type { ContextStats, SessionEvent, ToolCall, TranscriptMessage } from "../../ipc/contract";
 import { demoSeed, simulateResponse } from "./demo";
+
+/**
+ * Parse the daemon's message content — a string OR an array of content blocks
+ * ({type:"text"|"thinking"|"toolCall"|...}). Returns the flattened text,
+ * thinking, and tool calls so the live event handler can render them.
+ */
+function parseContentBlocks(content: unknown): { text: string; thinking: string; toolCalls: ToolCall[] } {
+  let text = "";
+  let thinking = "";
+  const toolCalls: ToolCall[] = [];
+  if (Array.isArray(content)) {
+    for (const part of content) {
+      if (part && typeof part === "object") {
+        const p = part as Record<string, unknown>;
+        const type = p.type;
+        if (type === "text" && typeof p.text === "string") text += p.text;
+        else if (type === "thinking" && typeof p.thinking === "string") thinking += p.thinking;
+        else if (type === "toolCall") {
+          toolCalls.push({
+            id: typeof p.id === "string" ? p.id : `tc-${Date.now()}-${toolCalls.length}`,
+            name: typeof p.name === "string" ? p.name : "tool",
+            input: typeof p.arguments === "string" ? p.arguments : p.arguments !== undefined ? JSON.stringify(p.arguments) : undefined,
+            status: "running" as const,
+          });
+        }
+      }
+    }
+  } else if (typeof content === "string") {
+    text = content;
+  }
+  return { text, thinking, toolCalls };
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -156,7 +188,48 @@ export function useChat() {
       }
       case "message_delta":
       case "message": {
-        const text = typeof e.text === "string" ? e.text : typeof e.content === "string" ? e.content : "";
+        // The daemon emits `message` as a full snapshot with `message.content`
+        // (string | content-block array). Parse it into text/thinking/toolCalls.
+        const raw = (e.message as Record<string, unknown> | undefined) ?? e;
+        const parsed = parseContentBlocks(raw.content);
+        const text = parsed.text;
+        setMessages((msgs) => {
+          const target = msgs.find((m) => m.id === streamingId.current) ?? [...msgs].reverse().find((m) => m.role === "assistant");
+          if (!target) {
+            return [
+              ...msgs,
+              {
+                id: `a-${Date.now()}`,
+                role: "assistant",
+                content: text,
+                thinking: parsed.thinking || undefined,
+                toolCalls: parsed.toolCalls.length > 0 ? parsed.toolCalls : undefined,
+                timestamp: nowIso(),
+                status: "streaming",
+              },
+            ];
+          }
+          return msgs.map((m) =>
+            m.id === target.id
+              ? {
+                  ...m,
+                  // Only set content if the message is new/empty — the daemon
+                  // streams text via separate `text` events, so a full `message`
+                  // snapshot must not clobber already-streamed content.
+                  content: m.content ? m.content : text,
+                  thinking: parsed.thinking || m.thinking,
+                  toolCalls: parsed.toolCalls.length > 0 ? parsed.toolCalls : m.toolCalls,
+                  status: "streaming",
+                }
+              : m,
+          );
+        });
+        return;
+      }
+      case "text": {
+        // Streaming text delta from the daemon — append to the assistant message.
+        const text = typeof e.text === "string" ? e.text : "";
+        if (!text) return;
         setMessages((msgs) => {
           const target = msgs.find((m) => m.id === streamingId.current) ?? [...msgs].reverse().find((m) => m.role === "assistant");
           if (!target) {
@@ -166,22 +239,22 @@ export function useChat() {
             ];
           }
           return msgs.map((m) =>
-            m.id === target.id
-              ? { ...m, content: kind === "message_delta" ? `${m.content}${text}` : text, status: "streaming" }
-              : m,
+            m.id === target.id ? { ...m, content: `${m.content}${text}`, status: "streaming" } : m,
           );
         });
         return;
       }
       case "thinking":
       case "thinking_delta": {
-        const text = typeof e.text === "string" ? e.text : typeof e.content === "string" ? e.content : "";
+        // The daemon emits `thinking` with a `thinking` field (string).
+        const text = typeof e.thinking === "string" ? e.thinking : typeof e.text === "string" ? e.text : "";
+        if (!text) return;
         setMessages((msgs) => {
           const target = msgs.find((m) => m.id === streamingId.current) ?? [...msgs].reverse().find((m) => m.role === "assistant");
           if (!target) return msgs;
           return msgs.map((m) =>
             m.id === target.id
-              ? { ...m, thinking: kind === "thinking_delta" ? `${m.thinking ?? ""}${text}` : text }
+              ? { ...m, thinking: kind === "thinking_delta" ? `${m.thinking ?? ""}${text}` : `${m.thinking ?? ""}${text}` }
               : m,
           );
         });
