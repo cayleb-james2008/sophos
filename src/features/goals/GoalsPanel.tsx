@@ -5,23 +5,18 @@
 // It is fully self-contained (reads its own IPC state), so it can be mounted
 // anywhere in the shell.
 //
-// MOUNT NOTE (for the orchestrator): this panel belongs in the Chat view area —
-// as a right-hand rail beside the conversation, or a slide-in overlay. ChatView.tsx
-// is intentionally NOT edited here (it is owned by another agent in parallel). To
-// mount: wrap the chat surface so <GoalsPanel /> renders beside <ChatView />, e.g.
-//   <div style={{ display: "flex", height: "100%" }}>
-//     <div style={{ flex: 1, minWidth: 0 }}><ChatView /></div>
-//     <GoalsPanel />
-//   </div>
-// or slide it in as an overlay from a toggle in the chat header. The panel handles
-// its own empty / loading states and needs no props.
+// B2/B3: reshaped to the same flat, ruled layout as the other long-running
+// panels — one card, hairline `#2a2a2a` rules, the active-goal state and the
+// "Set goal" action leading, and plain rows instead of nested bordered boxes.
+// The dashed empty state is kept. Goals are durable and only completion marks
+// them done.
 
 import { useEffect, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input, IconButton, type BadgeTone } from "../../design";
 import { useIpc, useConnectionState } from "../../ipc/client";
 import type { Goal } from "../../ipc/contract";
-import { TargetIcon, PlusIcon, ChevronRightIcon, XIcon } from "../sessions/icons";
+import { PlusIcon, ChevronRightIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "../longrunning/useActionError";
 import { useStall } from "../longrunning/useStall";
 
@@ -46,6 +41,14 @@ export interface GoalsPanelProps {
   /** Optional header title override. */
   title?: string;
 }
+
+const section: React.CSSProperties = {
+  borderTop: `1px solid ${tokens.color.line}`,
+  paddingTop: tokens.space.lg,
+  display: "flex",
+  flexDirection: "column",
+  gap: tokens.space.md,
+};
 
 export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Goals" }: GoalsPanelProps) {
   const ipc = useIpc();
@@ -117,19 +120,8 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
   };
 
   return (
-    <Card
-      variant="raised"
-      padding="none"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        minWidth: 280,
-        maxWidth: 360,
-        alignSelf: "flex-start",
-        overflow: "hidden",
-      }}
-    >
-      {/* Header */}
+    <Card variant="raised" padding="none" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Header — the active-goal state answer. */}
       <div
         style={{
           display: "flex",
@@ -139,30 +131,13 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
           borderBottom: open ? `1px solid ${tokens.color.border}` : "none",
         }}
       >
-        <span
-          style={{
-            width: 30,
-            height: 30,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: tokens.radius.md,
-            background: tokens.color.accentSoft,
-            border: `1px solid ${tokens.color.accentBorder}`,
-            color: tokens.color.accentHover,
-          }}
-        >
-          <TargetIcon size={15} />
-        </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <Text variant="label" weight="semibold">
             {title}
           </Text>
-          {activeCount > 0 ? (
-            <Text variant="micro" tone="dim">
-              {activeCount} active
-            </Text>
-          ) : null}
+          <Text variant="micro" tone="dim" style={{ marginLeft: tokens.space.sm }}>
+            {activeCount > 0 ? `${activeCount} active` : "no active goals"}
+          </Text>
         </div>
         <Badge tone={activeCount > 0 ? "success" : "neutral"} dot>
           {goals.length}
@@ -182,171 +157,183 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
 
       {open ? (
         <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg, padding: tokens.space.lg }}>
-          {/* Error feedback (e.g. daemon unreachable) */}
-          {error ? (
-            <ActionErrorBanner message={error} />
-          ) : null}
+          {/* State + action: set a goal up front, then the list. */}
+          <div style={section}>
+            <Text variant="label" weight="semibold" tone={activeCount > 0 ? "success" : "default"}>
+              {activeCount > 0
+                ? `${activeCount} active goal${activeCount > 1 ? "s" : ""} in progress — manage or set another.`
+                : "No active goals — set one to start."}
+            </Text>
+            <Text variant="body" tone="muted">
+              A goal is a durable objective the agent keeps working toward across turns until it's completed,
+              paused, budget-limited, or cleared. Set one to start — it persists even when you detach, and the
+              agent keeps prompting on it after ordinary turns.
+            </Text>
 
-          {/* A2: stalled-goal warning with recovery actions */}
-          {stalled ? (
-            <div
-              role="alert"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: tokens.space.md,
-                padding: `${tokens.space.sm} ${tokens.space.md}`,
-                borderRadius: tokens.radius.md,
-                background: tokens.color.warning + "14",
-                border: `1px solid ${tokens.color.warning}40`,
+            {error ? <ActionErrorBanner message={error} /> : null}
+
+            {/* A2: stalled-goal warning with recovery actions */}
+            {stalled ? (
+              <div
+                role="alert"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: tokens.space.md,
+                  padding: `${tokens.space.sm} ${tokens.space.md}`,
+                  borderRadius: tokens.radius.md,
+                  background: tokens.color.warning + "14",
+                  border: `1px solid ${tokens.color.warning}40`,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                  <Text variant="label" weight="semibold" tone="warning">
+                    No progress reported for 5+ min
+                  </Text>
+                  <Text variant="micro" tone="muted">
+                    The active goal may be stalled. Nudge it or pause to stop the loop.
+                  </Text>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => void nudge()} disabled={busy}>
+                  Nudge
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<XIcon size={12} />}
+                  onClick={() => {
+                    const active = goals.find((g) => g.status === "active");
+                    if (active) void update("pause", active.id);
+                  }}
+                  disabled={busy}
+                >
+                  Pause
+                </Button>
+              </div>
+            ) : null}
+
+            {/* Set goal */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                clearError();
+                void setGoal();
               }}
+              style={{ display: "flex", gap: tokens.space.sm, alignItems: "flex-end" }}
             >
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-                <Text variant="label" weight="semibold" tone="warning">
-                  No progress reported for 5+ min
+              <div style={{ flex: 1 }}>
+                <Input
+                  label="Set goal"
+                  placeholder="e.g. Ship the release and verify every artifact"
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <Button size="md" loading={busy} icon={<PlusIcon size={13} />} disabled={!objective.trim()}>
+                Set
+              </Button>
+            </form>
+          </div>
+
+          {/* List — plain ruled rows, not nested bordered boxes. */}
+          <div style={section}>
+            <Text variant="micro" tone="dim" uppercase>
+              Goals
+            </Text>
+            {goals.length === 0 ? (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: tokens.space.sm,
+                  padding: tokens.space.lg,
+                  borderRadius: tokens.radius.md,
+                  background: tokens.color.bgElevated,
+                  border: `1px dashed ${tokens.color.borderStrong}`,
+                }}
+              >
+                <Text variant="label" tone="muted">
+                  No active goals
                 </Text>
-                <Text variant="micro" tone="muted">
-                  The active goal may be stalled. Nudge it or pause to stop the loop.
+                <Text variant="micro" tone="dim">
+                  A goal is a durable objective the agent keeps working toward across turns until it's completed,
+                  paused, budget-limited, or cleared. Set one above to start — it persists even when you detach,
+                  and the agent keeps prompting on it after ordinary turns.
                 </Text>
               </div>
-              <Button variant="outline" size="sm" onClick={() => void nudge()} disabled={busy}>
-                Nudge
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                icon={<XIcon size={12} />}
-                onClick={() => {
-                  const active = goals.find((g) => g.status === "active");
-                  if (active) void update("pause", active.id);
-                }}
-                disabled={busy}
-              >
-                Pause
-              </Button>
-            </div>
-          ) : null}
-
-          {/* Set goal */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              clearError();
-              void setGoal();
-            }}
-            style={{ display: "flex", gap: tokens.space.sm, alignItems: "flex-end" }}
-          >
-            <div style={{ flex: 1 }}>
-              <Input
-                label="Set goal"
-                placeholder="e.g. Ship the release and verify every artifact"
-                value={objective}
-                onChange={(e) => setObjective(e.target.value)}
-                disabled={busy}
-              />
-            </div>
-            <Button size="md" loading={busy} icon={<PlusIcon size={13} />} disabled={!objective.trim()}>
-              Set
-            </Button>
-          </form>
-
-          {/* List */}
-          {goals.length === 0 ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: tokens.space.sm,
-                padding: tokens.space.lg,
-                borderRadius: tokens.radius.md,
-                background: tokens.color.bgElevated,
-                border: `1px dashed ${tokens.color.borderStrong}`,
-              }}
-            >
-              <Text variant="label" tone="muted">
-                No active goals
-              </Text>
-              <Text variant="micro" tone="dim">
-                A goal is a durable objective the agent keeps working toward across turns until it's completed,
-                paused, budget-limited, or cleared. Set one above to start — it persists even when you detach,
-                and the agent keeps prompting on it after ordinary turns.
-              </Text>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-              {goals.map((g) => {
-                const b = goalBadge(g.status);
-                return (
-                  <div
-                    key={g.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: tokens.space.md,
-                      padding: tokens.space.md,
-                      borderRadius: tokens.radius.md,
-                      background: tokens.color.bgElevated,
-                      border: `1px solid ${tokens.color.border}`,
-                    }}
-                  >
-                    <span
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.md }}>
+                {goals.map((g) => {
+                  const b = goalBadge(g.status);
+                  return (
+                    <div
+                      key={g.id}
                       style={{
-                        marginTop: 3,
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        flexShrink: 0,
-                        background:
-                          g.status === "active"
-                            ? tokens.color.success
-                            : g.status === "paused"
-                              ? tokens.color.warning
-                              : g.status === "completed"
-                                ? tokens.color.accentHover
-                                : tokens.color.textDim,
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: tokens.space.md,
                       }}
-                    />
-                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-                      <Text variant="label" weight="medium" style={{ lineHeight: tokens.font.leading.normal }}>
-                        {g.objective}
-                      </Text>
-                      <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
-                        <Badge tone={b.tone} dot>
-                          {b.label}
-                        </Badge>
-                        {g.progress ? (
-                          <Text variant="micro" tone="dim" mono style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {g.progress}
-                          </Text>
-                        ) : null}
-                      </div>
-                      <div style={{ display: "flex", gap: tokens.space.sm, marginTop: 2 }}>
-                        {g.status === "active" ? (
-                          <Button variant="ghost" size="sm" onClick={() => void update("pause", g.id)} disabled={busy}>
-                            Pause
-                          </Button>
-                        ) : null}
-                        {g.status === "paused" ? (
-                          <Button variant="accent-soft" size="sm" onClick={() => void update("resume", g.id)} disabled={busy}>
-                            Resume
-                          </Button>
-                        ) : null}
-                        {g.status !== "cleared" ? (
-                          <Button variant="ghost" size="sm" icon={<XIcon size={12} />} onClick={() => void update("clear", g.id)} disabled={busy}>
-                            Clear
-                          </Button>
-                        ) : null}
+                    >
+                      <span
+                        style={{
+                          marginTop: 3,
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          flexShrink: 0,
+                          background:
+                            g.status === "active"
+                              ? tokens.color.success
+                              : g.status === "paused"
+                                ? tokens.color.warning
+                                : g.status === "completed"
+                                  ? tokens.color.accentHover
+                                  : tokens.color.textDim,
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                        <Text variant="label" weight="medium" style={{ lineHeight: tokens.font.leading.normal }}>
+                          {g.objective}
+                        </Text>
+                        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+                          <Badge tone={b.tone} dot>
+                            {b.label}
+                          </Badge>
+                          {g.progress ? (
+                            <Text variant="micro" tone="dim" mono style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {g.progress}
+                            </Text>
+                          ) : null}
+                        </div>
+                        <div style={{ display: "flex", gap: tokens.space.sm, marginTop: 2 }}>
+                          {g.status === "active" ? (
+                            <Button variant="ghost" size="sm" onClick={() => void update("pause", g.id)} disabled={busy}>
+                              Pause
+                            </Button>
+                          ) : null}
+                          {g.status === "paused" ? (
+                            <Button variant="accent-soft" size="sm" onClick={() => void update("resume", g.id)} disabled={busy}>
+                              Resume
+                            </Button>
+                          ) : null}
+                          {g.status !== "cleared" ? (
+                            <Button variant="ghost" size="sm" icon={<XIcon size={12} />} onClick={() => void update("clear", g.id)} disabled={busy}>
+                              Clear
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
 
-          <Text variant="micro" tone="dim">
-            Goals persist across turns. Only explicit completion marks a goal done — pausing and clearing are available here.
-          </Text>
+            <Text variant="micro" tone="dim">
+              Goals persist across turns. Only explicit completion marks a goal done — pausing and clearing are available here.
+            </Text>
+          </div>
         </div>
       ) : null}
     </Card>

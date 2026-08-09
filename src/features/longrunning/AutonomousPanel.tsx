@@ -9,12 +9,17 @@
 // the mode is clearly opt-in (Start is explicit; the SystemBar carries an
 // always-visible AUTO indicator). Falls back gracefully to local state in
 // browser/demo mode.
+//
+// B2/B3: flattened onto the GeneralPanel rhythm — one flat card, hairline
+// `#2a2a2a` rules (not stacked bordered boxes), and the state answer (Active /
+// Not running badge) + primary Start/Stop action lead before the budget
+// controls. Green is used only as the live/active signal.
 
 import { useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input } from "../../design";
 import { useIpc, useConnectionState } from "../../ipc/client";
-import { ZapIcon, PlayIcon, CheckIcon, ShieldIcon, XIcon } from "../sessions/icons";
+import { ShieldIcon, PlayIcon, CheckIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
 import { useStall } from "./useStall";
 
@@ -36,6 +41,14 @@ export interface AutonomousPanelProps {
   /** Read-only quality gates surfaced from the daemon. */
   gates?: QualityGate[];
 }
+
+const section: React.CSSProperties = {
+  borderTop: `1px solid ${tokens.color.line}`,
+  paddingTop: tokens.space.lg,
+  display: "flex",
+  flexDirection: "column",
+  gap: tokens.space.md,
+};
 
 export function AutonomousPanel({ defaultActive = false, gates = [] }: AutonomousPanelProps) {
   const ipc = useIpc();
@@ -97,161 +110,146 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
 
   return (
     <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-      {/* Header + status */}
+      {/* State answer up top: is this on? */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-          <span
-            style={{
-              width: 34,
-              height: 34,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: tokens.radius.md,
-              background: active ? tokens.color.accentSoft : tokens.color.bgOverlay,
-              border: `1px solid ${active ? tokens.color.accentBorder : tokens.color.border}`,
-              color: active ? tokens.color.accentHover : tokens.color.textDim,
-            }}
-          >
-            <ZapIcon size={16} />
-          </span>
-          <Text variant="label" weight="semibold">
-            Autonomous mode
-          </Text>
-        </div>
+        <Text variant="label" weight="semibold">
+          Autonomous mode
+        </Text>
         <Badge tone={active ? "success" : "neutral"} dot>
-          {active ? "Active" : "Inactive"}
+          {active ? "Active" : "Not running"}
         </Badge>
       </div>
 
-      <Text variant="body" tone="muted">
-        Bounded host policy that continues the session without human input until configured quality gates
-        pass or a continuation, turn, token, or wall-clock limit is reached. Opt-in — the agent never acts on
-        its own unless you start it.
-      </Text>
+      {/* Description + the one action the operator needs. */}
+      <div style={section}>
+        <Text variant="label" weight="semibold" tone={active ? "success" : "default"}>
+          {active
+            ? "Autonomous mode is running — stop it to hand control back."
+            : "Autonomous mode is off — start it to let the agent continue without human input."}
+        </Text>
+        <Text variant="body" tone="muted">
+          Bounded host policy that continues the session without human input until configured quality gates
+          pass or a continuation, turn, token, or wall-clock limit is reached. Opt-in — the agent never acts on
+          its own unless you start it.
+        </Text>
 
-      {!active ? (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: tokens.space.sm,
-            padding: tokens.space.lg,
-            borderRadius: tokens.radius.md,
-            background: tokens.color.bgElevated,
-            border: `1px dashed ${tokens.color.borderStrong}`,
-          }}
-        >
-          <Text variant="label" tone="muted">
-            Not running
-          </Text>
-          <Text variant="micro" tone="dim">
-            Autonomous mode is off. Start it explicitly to let the agent continue without human input. While
-            active, the SystemBar shows a green AUTO indicator and the budget above is enforced. Expect it to
-            stop when a quality gate passes or a limit is reached.
-          </Text>
-        </div>
-      ) : null}
-
-      {error ? <ActionErrorBanner message={error} /> : null}
-
-      {/* A2: stalled-loop warning with recovery actions */}
-      {stalled ? (
-        <div
-          role="alert"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: tokens.space.md,
-            padding: `${tokens.space.sm} ${tokens.space.md}`,
-            borderRadius: tokens.radius.md,
-            background: tokens.color.warning + "14",
-            border: `1px solid ${tokens.color.warning}40`,
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-            <Text variant="label" weight="semibold" tone="warning">
-              No progress reported for 5+ min
-            </Text>
-            <Text variant="micro" tone="muted">
-              The autonomous loop may be stalled. Nudge it or stop to halt the run.
-            </Text>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => void nudge()} disabled={busy}>
-            Nudge
-          </Button>
-          <Button variant="ghost" size="sm" icon={<XIcon size={12} />} onClick={() => void stop()} disabled={busy}>
-            Stop
-          </Button>
-        </div>
-      ) : null}
-
-      {/* A4: daemon's active budget, read-only */}
-      {daemonBudget ? (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: tokens.space.sm,
-            padding: `${tokens.space.sm} ${tokens.space.md}`,
-            borderRadius: tokens.radius.md,
-            background: tokens.color.bgElevated,
-            border: `1px solid ${tokens.color.border}`,
-          }}
-        >
-          <ShieldIcon size={13} style={{ color: tokens.color.accentHover, flexShrink: 0 }} />
-          <Text variant="micro" tone="muted" mono>
-            Active budget: {daemonBudget}
-          </Text>
-        </div>
-      ) : null}
-
-      {/* Budget inputs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: tokens.space.md }}>
-        <Input
-          label="Max turns"
-          type="number"
-          min={1}
-          placeholder="e.g. 20"
-          value={maxTurns}
-          onChange={(e) => setMaxTurns(e.target.value)}
-          disabled={active || busy}
-        />
-        <Input
-          label="Max tokens"
-          type="number"
-          min={1}
-          placeholder="e.g. 200000"
-          value={maxTokens}
-          onChange={(e) => setMaxTokens(e.target.value)}
-          disabled={active || busy}
-        />
-        <Input
-          label="Max time (min)"
-          type="number"
-          min={1}
-          placeholder="e.g. 90"
-          value={maxTime}
-          onChange={(e) => setMaxTime(e.target.value)}
-          disabled={active || busy}
-        />
-      </div>
-
-      {/* Controls */}
-      <div style={{ display: "flex", gap: tokens.space.sm }}>
         {active ? (
-          <Button variant="danger" size="md" icon={<XIcon size={13} />} onClick={() => void stop()} loading={busy}>
-            Stop autonomous
-          </Button>
+          <div style={{ display: "flex", gap: tokens.space.sm }}>
+            <Button variant="danger" size="md" icon={<XIcon size={13} />} onClick={() => void stop()} loading={busy}>
+              Stop autonomous
+            </Button>
+            <Button variant="outline" size="md" onClick={() => void nudge()} disabled={busy}>
+              Nudge
+            </Button>
+          </div>
         ) : (
           <Button variant="primary" size="md" icon={<PlayIcon size={13} />} onClick={() => void start()} loading={busy}>
             Start autonomous
           </Button>
         )}
+
+        {!active ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: tokens.space.sm,
+              padding: tokens.space.lg,
+              borderRadius: tokens.radius.md,
+              background: tokens.color.bgElevated,
+              border: `1px dashed ${tokens.color.borderStrong}`,
+            }}
+          >
+            <Text variant="label" tone="muted">
+              Not running
+            </Text>
+            <Text variant="micro" tone="dim">
+              Autonomous mode is off. Start it explicitly to let the agent continue without human input. While
+              active, the SystemBar shows a green AUTO indicator and the budget above is enforced. Expect it to
+              stop when a quality gate passes or a limit is reached.
+            </Text>
+          </div>
+        ) : null}
+
+        {error ? <ActionErrorBanner message={error} /> : null}
+
+        {/* A2: stalled-loop warning with recovery actions */}
+        {stalled ? (
+          <div
+            role="alert"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: tokens.space.md,
+              padding: `${tokens.space.sm} ${tokens.space.md}`,
+              borderRadius: tokens.radius.md,
+              background: tokens.color.warning + "14",
+              border: `1px solid ${tokens.color.warning}40`,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+              <Text variant="label" weight="semibold" tone="warning">
+                No progress reported for 5+ min
+              </Text>
+              <Text variant="micro" tone="muted">
+                The autonomous loop may be stalled. Nudge it or stop to halt the run.
+              </Text>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void nudge()} disabled={busy}>
+              Nudge
+            </Button>
+            <Button variant="ghost" size="sm" icon={<XIcon size={12} />} onClick={() => void stop()} disabled={busy}>
+              Stop
+            </Button>
+          </div>
+        ) : null}
       </div>
 
-      {/* Quality gates (read-only) */}
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+      {/* Budget config — the controls come after the state + action. */}
+      <div style={section}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Text variant="micro" tone="dim" uppercase>
+            Budget
+          </Text>
+          {daemonBudget ? (
+            <Text variant="micro" tone="muted" mono>
+              Active budget: {daemonBudget}
+            </Text>
+          ) : null}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: tokens.space.md }}>
+          <Input
+            label="Max turns"
+            type="number"
+            min={1}
+            placeholder="e.g. 20"
+            value={maxTurns}
+            onChange={(e) => setMaxTurns(e.target.value)}
+            disabled={active || busy}
+          />
+          <Input
+            label="Max tokens"
+            type="number"
+            min={1}
+            placeholder="e.g. 200000"
+            value={maxTokens}
+            onChange={(e) => setMaxTokens(e.target.value)}
+            disabled={active || busy}
+          />
+          <Input
+            label="Max time (min)"
+            type="number"
+            min={1}
+            placeholder="e.g. 90"
+            value={maxTime}
+            onChange={(e) => setMaxTime(e.target.value)}
+            disabled={active || busy}
+          />
+        </div>
+      </div>
+
+      {/* Quality gates (read-only) — plain ruled rows, not stacked boxes. */}
+      <div style={section}>
         <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
           <ShieldIcon size={13} />
           <Text variant="micro" tone="dim" uppercase>
@@ -266,18 +264,7 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
             {gates.map((g) => (
-              <div
-                key={g.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: tokens.space.sm,
-                  padding: tokens.space.sm,
-                  borderRadius: tokens.radius.md,
-                  background: tokens.color.bgElevated,
-                  border: `1px solid ${tokens.color.border}`,
-                }}
-              >
+              <div key={g.id} style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
                 <CheckIcon size={13} style={{ color: tokens.color.success, flexShrink: 0 }} />
                 <Text variant="micro" mono>
                   {g.command}
