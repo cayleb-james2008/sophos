@@ -222,38 +222,39 @@
   color: #ef4444;
 }
 
-/* Context-usage ring (sessions) */
-.pg-ring {
-  position: relative;
-  width: 46px;
-  height: 46px;
+/* Compact context readout on session nodes (S5) — a small bar + `CTX n%`,
+   consistent with the SystemBar's context meter. Reads as part of the card's
+   rhythm, not a bolted-on circular widget. */
+.pg-ctx {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
 }
-.pg-ring__track {
-  fill: none;
-  stroke: #2a2a2a;
-  stroke-width: 2.5;
+.pg-ctx__bar {
+  position: relative;
+  width: 34px;
+  height: 4px;
+  background: #202020;
+  border-radius: 0;
+  overflow: hidden;
 }
-.pg-ring__fill {
-  fill: none;
-  stroke: #85ed75;
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+.pg-ctx__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #85ed75;
 }
-.pg-ring__label {
-  fill: #f4f4f4;
+.pg-ctx__fill--danger {
+  background: #ef4444;
+}
+.pg-ctx__pct {
   font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  font-size: 10px;
-  text-anchor: middle;
-  font-weight: 500;
-}
-.pg-ring__sub {
-  fill: rgba(244, 244, 244, 0.45);
-  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  font-size: 7px;
-  text-anchor: middle;
+  font-size: 9px;
+  color: rgba(244, 244, 244, 0.6);
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 /* Unread / attention pill */

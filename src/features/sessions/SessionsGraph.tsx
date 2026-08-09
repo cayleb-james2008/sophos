@@ -56,9 +56,7 @@ function SessionNode({ data, selected }: NodeProps<SessionGraphNode>) {
       width={data.kind === "goal" ? GOAL_W : data.kind === "rlm" ? RLM_W : WIDTH}
       selected={selected}
       corner={
-        data.ring ? (
-          <ContextRing tokens={data.ring.tokens} window={data.ring.window} messages={data.ring.messages} />
-        ) : undefined
+        data.ring ? <CtxReadout tokens={data.ring.tokens} window={data.ring.window} /> : undefined
       }
       actions={
         data.kind === "session"
@@ -79,31 +77,19 @@ function SessionNode({ data, selected }: NodeProps<SessionGraphNode>) {
   );
 }
 
-function ContextRing({ tokens: t, window: w, messages }: { tokens?: number; window?: number; messages?: number }) {
-  const r = 18;
-  const c = 2 * Math.PI * r;
-  const frac = t && w ? Math.min(1, t / w) : 0;
-  const offset = c * (1 - frac);
+/* Compact context readout on session nodes (S5) — a small bar + `CTX n%`,
+   consistent with the SystemBar's context meter. Reads as part of the card's
+   rhythm (a status readout in the head), not a bolted-on circular widget. */
+function CtxReadout({ tokens: t, window: w }: { tokens?: number; window?: number }) {
+  const pct = t && w ? Math.min(100, Math.round((t / w) * 100)) : 0;
+  const danger = pct > 85;
   return (
-    <svg width="46" height="46" viewBox="0 0 46 46" className="pg-ring" role="img" aria-label={`Context ${frac * 100}% used`}>
-      <circle className="pg-ring__track" cx="23" cy="23" r={r} />
-      <circle
-        className="pg-ring__fill"
-        cx="23"
-        cy="23"
-        r={r}
-        strokeDasharray={c}
-        strokeDashoffset={offset}
-        transform="rotate(-90 23 23)"
-      />
-      <text className="pg-ring__label" x="23" y="25">
-        {formatTokens(t)}
-      </text>
-      <text className="pg-ring__sub" x="23" y="34">
-        {w ? `/${formatTokens(w)}` : "—"}
-      </text>
-      {messages !== undefined ? <text className="pg-ring__sub" x="23" y="7"></text> : null}
-    </svg>
+    <span className="pg-ctx" title={`Context ${formatTokens(t)} / ${formatTokens(w)} tokens`}>
+      <span className="pg-ctx__bar">
+        <span className={`pg-ctx__fill${danger ? " pg-ctx__fill--danger" : ""}`} style={{ width: `${pct}%` }} />
+      </span>
+      <span className="pg-ctx__pct">CTX {pct}%</span>
+    </span>
   );
 }
 
