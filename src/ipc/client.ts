@@ -569,7 +569,23 @@ export class MockIpcClient implements IpcClient {
   async markMessageRead(): Promise<void> {}
   async compact(_prompt?: string): Promise<void> {}
   async retry(): Promise<void> {}
-  async refine(): Promise<void> {}
+  async refine(): Promise<void> {
+    // Browser preview: emit a demo refinement_result so the review-and-approve
+    // gate (A1) is demonstrable without a live daemon. The proposed change is
+    // held pending until the user explicitly applies or discards it.
+    this.emit({
+      type: "refinement_result",
+      result: {
+        id: `refine-${Date.now()}`,
+        summary: "Tighten the session instructions against the stated goal.",
+        rationale: "The current instructions drift from the objective; this pass realigns them.",
+        expectedOutcome: "More focused continuations on the active goal.",
+        appliedEdits: [
+          { id: "edit-1", action: "update", kind: "instruction", title: "Session instructions", applied: false },
+        ],
+      },
+    });
+  }
   async exportSession(format?: string): Promise<{ exportedPath?: string }> {
     // Browser preview: report the requested format without a real export.
     return { exportedPath: format === "jsonl" ? "mock://session-export.jsonl" : "mock://session-export.html" };

@@ -10,6 +10,7 @@ import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
 import { useIpc } from "../../ipc/client";
 import { CalendarIcon, PlusIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
+import { estimateNextDue } from "./nextDue";
 
 export interface ScheduleEntry {
   id: string;
@@ -137,7 +138,8 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
             No schedules
           </Text>
           <Text variant="micro" tone="dim">
-            Add a cron schedule above to have the agent prompted on a recurring cadence.
+            A schedule delivers a prompt to the agent on a cron cadence (e.g. "0 9 * * 1-5"). Add one above to
+            run recurring or one-time prompts. Scheduled jobs persist and continue while the UI is detached.
           </Text>
         </div>
       ) : (
@@ -170,6 +172,9 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
                 </Text>
                 <Text variant="micro" tone="dim" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {s.prompt}
+                </Text>
+                <Text variant="micro" tone="dim" mono>
+                  next run (est.): {estimateNextDue(s.cron) ?? "—"} · last fired: not reported by daemon
                 </Text>
               </div>
               <IconButton title="Remove schedule" onClick={() => void remove(s.id)} tone="danger" size="sm" disabled={busy}>

@@ -164,7 +164,7 @@ export function AgentsView() {
             <div className="ag-graphblank">
               <div className="ag-graphblank__card">
                 <b>No agents in range</b>
-                <span>Attach a daemon-backed agent or spawn an RLM child to appear in the fleet graph.</span>
+                <span>The fleet graph shows daemon-backed agents and RLM children. Attach an agent or spawn an RLM child to appear here. Agents appear when they connect; expect live status and message relay once one is present.</span>
               </div>
             </div>
           ) : null}

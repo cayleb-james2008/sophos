@@ -23,6 +23,7 @@ import { useIpc, useConnectionState } from "../../ipc/client";
 import type { Goal } from "../../ipc/contract";
 import { TargetIcon, PlusIcon, ChevronRightIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "../longrunning/useActionError";
+import { useStall } from "../longrunning/useStall";
 
 function goalBadge(status: Goal["status"]): { label: string; tone: BadgeTone } {
   switch (status) {
@@ -64,6 +65,17 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
   }, [connGoals]);
 
   const activeCount = goals.filter((g) => g.status === "active").length;
+
+  // A2: stalled-goal detection — no progress reported for 5+ min while active.
+  const stalled = useStall(activeCount > 0, JSON.stringify(goals), 5 * 60 * 1000);
+
+  const nudge = async () => {
+    setBusy(true);
+    await run(async () => {
+      await ipc.steer("Continue the active goal and report progress");
+    }, "Could not nudge the goal (daemon unreachable?)");
+    setBusy(false);
+  };
 
   const setGoal = async () => {
     const text = objective.trim();
@@ -175,6 +187,46 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
             <ActionErrorBanner message={error} />
           ) : null}
 
+          {/* A2: stalled-goal warning with recovery actions */}
+          {stalled ? (
+            <div
+              role="alert"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: tokens.space.md,
+                padding: `${tokens.space.sm} ${tokens.space.md}`,
+                borderRadius: tokens.radius.md,
+                background: tokens.color.warning + "14",
+                border: `1px solid ${tokens.color.warning}40`,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                <Text variant="label" weight="semibold" tone="warning">
+                  No progress reported for 5+ min
+                </Text>
+                <Text variant="micro" tone="muted">
+                  The active goal may be stalled. Nudge it or pause to stop the loop.
+                </Text>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => void nudge()} disabled={busy}>
+                Nudge
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<XIcon size={12} />}
+                onClick={() => {
+                  const active = goals.find((g) => g.status === "active");
+                  if (active) void update("pause", active.id);
+                }}
+                disabled={busy}
+              >
+                Pause
+              </Button>
+            </div>
+          ) : null}
+
           {/* Set goal */}
           <form
             onSubmit={(e) => {
@@ -215,7 +267,9 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
                 No active goals
               </Text>
               <Text variant="micro" tone="dim">
-                Set a goal above and the agent will keep working toward it across turns until it's completed, paused, budget-limited, or cleared.
+                A goal is a durable objective the agent keeps working toward across turns until it's completed,
+                paused, budget-limited, or cleared. Set one above to start — it persists even when you detach,
+                and the agent keeps prompting on it after ordinary turns.
               </Text>
             </div>
           ) : (

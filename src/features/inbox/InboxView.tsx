@@ -166,7 +166,7 @@ export function InboxView() {
             <div className="inbox__graphblank">
               <div className="inbox__graphblank__card">
                 <b>No relay traffic yet</b>
-                <span>Agents appear here when they connect. Send a message to open a coordination line.</span>
+                <span>The relay shows messages between you and peer agents. Agents appear here when they connect; send a message to open a coordination line. Expect unread messages to stay highlighted until read.</span>
               </div>
             </div>
           ) : !selected ? (
