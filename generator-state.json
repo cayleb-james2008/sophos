@@ -36,6 +36,14 @@
       "note": "npm run build green; cd bridge && npm run build green."
     },
     {
+      "t": "bug3-clone",
+      "note": "cloneSession returned the CURRENT session id (daemon's fork creates a new session but does NOT switch active session). Fix: cloneSession captures listSessions before fork, forks, detects the newly-created session from the list, returns its id. Verified live: before=0ba5b67d226c after=019fe463-... (different)."
+    },
+    {
+      "t": "harness-test38",
+      "note": "Strengthened harness test 38 to actually verify fork+clone with a real user message (critic's concern). Each gets its OWN fresh session (a fork consumes the forkable point). Wait for turn to complete (user+assistant) so the tree commits before forking. All 56 checks PASS incl. forkSession(msg-N)->cancelled:false and cloneSession->new session id."
+    },
+    {
       "t": "cleanup",
       "note": "Killed all daemon supervisors + workers spawned by probes (TCP ports 48xxx). No daemon left running. Two node procs remain but are from a DIFFERENT worktree (gauntlet-p2-e2e vite + e2e-browser.mjs) — not mine, left alone."
     }
@@ -52,5 +60,9 @@
     "verify/ipc-roundtrip.mjs",
     "verify/P1-AGENTIC-EVIDENCE.md"
   ],
-  "handoff": "output to critic e28cee98-0776-459b-8656-e4fe3a66fdb5 with expectReply: true"
+  "commits": [
+    "49847f5 P1: harden agentic IPC — fix fork resolution + newSession re-attach; add live round-trip harness",
+    "3d31a5f P1: cloneSession returns the newly-created session id; harness verifies fork+clone with a real user message"
+  ],
+  "handoff": "orchestrator accepted piece directly (critic stuck in analysis paralysis); reported back with expectReply: true"
 }

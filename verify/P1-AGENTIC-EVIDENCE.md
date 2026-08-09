@@ -11,7 +11,7 @@ The daemon (`node <coding-agent>/dist/bundle/cli.js --mode daemon`, TCP-loopback
 transport) was started live and the **real bridge sidecar** was spawned against it
 exactly as the Rust shell does. Every agentic IPC command was driven through the
 bridge's NDJSON stdio surface and its round-trip confirmed. Harness:
-`verify/ipc-roundtrip.mjs` (50 checks, all PASS).
+`verify/ipc-roundtrip.mjs` (56 checks, all PASS).
 
 | Feature | Command(s) | Live result |
 | --- | --- | --- |
@@ -58,6 +58,14 @@ bridge's NDJSON stdio surface and its round-trip confirmed. Harness:
      (`if (!client.isConnected) await client.connect()`) before re-attaching.
    - Verified live: `newSession({cwd, goal})` → `{cancelled:false, activeSessionId}`,
      goal active, status connected.
+
+3. **`cloneSession` returned the wrong session id** — the daemon's `fork` creates a
+   new session but does **not** switch the active session, so `cloneSession` read
+   back the current session id via `getState()` (a false "same session" result).
+   - Fix: `cloneSession` now captures the session list before forking, forks, then
+     detects the newly-created session from the list and returns its id.
+   - Verified live: `cloneSession` on a session with a user message → a NEW
+     session id (different from the current), e.g. `before=0ba5b67d226c after=019fe463-…`.
 
 ## Edge cases handled (frontend)
 
@@ -106,9 +114,9 @@ gracefully (clear message / disabled action / explained) rather than hard-failin
 | File | Change |
 | --- | --- |
 | `bridge/src/connection.ts` | Added `resolveForkEntryId()`; fixed `createSessionWithConfig()` to reconnect the client before re-attach |
-| `bridge/src/rpc.ts` | `forkSession` + `cloneSession` now resolve to a valid user-message fork point |
+| `bridge/src/rpc.ts` | `forkSession` + `cloneSession` now resolve to a valid user-message fork point; `cloneSession` returns the newly-created session id (detected via `listSessions`) |
 | `package-lock.json` | Rebrand name fix (`prime-agent-windows` → `sophos`) applied by `npm install` |
-| `verify/ipc-roundtrip.mjs` | New live round-trip harness (50 checks) |
+| `verify/ipc-roundtrip.mjs` | New live round-trip harness (56 checks, incl. fork+clone verification with a real user message) |
 
 ## Still unverified / needs a live run
 
