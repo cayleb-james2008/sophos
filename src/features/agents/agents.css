@@ -336,27 +336,50 @@
 .ag-detail__id { margin-left: auto; font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.3); letter-spacing: 0.12em; white-space: nowrap; }
 
 .ag-detail__body {
-  flex: 1;
+  flex: none;
+  max-height: 58%;
   min-height: 0;
   overflow: auto;
-  padding: 22px 26px;
+  padding: 6px 0 12px;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 0;
 }
+/* Definition-list rows: label above value, hairline-divided, full rail width.
+   No nested card-in-card boxes — a quiet stack that reads editorial. Values
+   wrap at word boundaries (overflow-wrap: anywhere only splits an opaque id
+   when it alone exceeds the line; it never shreds human-readable text). */
 .ag-detail__row {
   display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px 12px;
-  background: rgba(21, 21, 21, 0.6);
-  border: 1px solid #2a2a2a;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 26px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #2a2a2a;
   border-radius: 0;
 }
+.ag-detail__row:last-child { border-bottom: 0; }
+.ag-detail__rowhead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
 .ag-detail__rowicon { display: flex; align-items: center; color: rgba(244, 244, 244, 0.45); flex: none; }
-.ag-detail__row label { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.45); text-transform: uppercase; letter-spacing: 0.08em; }
-.ag-detail__rowvalue--mono { font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: #f4f4f4; word-break: break-all; }
-.ag-detail__row span:last-child { margin-left: auto; font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: #f4f4f4; word-break: break-all; }
+.ag-detail__row label {
+  font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: rgba(244, 244, 244, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.ag-detail__rowvalue {
+  font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: #f4f4f4;
+  overflow-wrap: anywhere;
+}
+.ag-detail__rowvalue--mono { letter-spacing: 0.02em; }
 
 .ag-detail__actions { flex: none; display: flex; gap: 9px; padding: 12px 22px; border-top: 1px solid #2a2a2a; }
 
