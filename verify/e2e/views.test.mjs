@@ -145,8 +145,7 @@ export const views = [
     name: "Settings Long-running panels render (Goals/Autonomous/Heartbeats/Schedules/Refinement)",
     fn: async ({ page, shot, expect }) => {
       await navTo(page, "Settings");
-      await page.click('button[role="tab"]:has-text("Advanced")');
-      await page.waitForTimeout(500);
+      // Long-running is its own top-level Settings entry (B1 flatten).
       await page.click('button[role="tab"]:has-text("Long-running")');
       await page.waitForTimeout(500);
       for (const tab of ["Goals", "Autonomous", "Heartbeats", "Schedules", "Refinement"]) {

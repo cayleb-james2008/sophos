@@ -9,6 +9,7 @@ import { GeneralPanel } from "./GeneralPanel";
 import { ProvidersPanel } from "./ProvidersPanel";
 import { SkillsPanel } from "./SkillsPanel";
 import { AdvancedPanel } from "./AdvancedPanel";
+import { LongRunningPanel } from "./LongRunningPanel";
 import { FleetStrip } from "./FleetStrip";
 import "./settings.css";
 
@@ -32,6 +33,7 @@ export function SettingsView({ initialTab = "general" }: { initialTab?: string }
           { id: "providers", label: "Providers" },
           { id: "skills", label: "Skills" },
           { id: "advanced", label: "Advanced" },
+          { id: "longrunning", label: "Long-running" },
         ]}
         activeId={tab}
         onChange={setTab}
@@ -42,6 +44,7 @@ export function SettingsView({ initialTab = "general" }: { initialTab?: string }
         {tab === "providers" ? <ProvidersPanel /> : null}
         {tab === "skills" ? <SkillsPanel /> : null}
         {tab === "advanced" ? <AdvancedPanel /> : null}
+        {tab === "longrunning" ? <LongRunningPanel /> : null}
       </div>
     </main>
   );

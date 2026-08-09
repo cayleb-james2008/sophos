@@ -4,21 +4,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Text, Card, Badge, Button, Spinner, Tabs, type BadgeTone } from "../../design";
+import { Text, Card, Badge, Button, Spinner, type BadgeTone } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { AgentInfo, ContextStats, RlmChild, Settings } from "../../ipc/contract";
 import { GaugeIcon, LayersIcon, RefreshIcon, ZapIcon, PlugIcon, CpuIcon, LinkIcon, ShieldIcon } from "../sessions/icons";
 import { formatTokens } from "../sessions/format";
-import { AutonomousPanel } from "../longrunning/AutonomousPanel";
-import { HeartbeatsPanel } from "../longrunning/HeartbeatsPanel";
-import { SchedulesPanel } from "../longrunning/SchedulesPanel";
-import { RefinementHistory } from "../longrunning/RefinementHistory";
-import { GoalsPanel } from "../goals/GoalsPanel";
 
 export function AdvancedPanel() {
   const ipc = useIpc();
-  const [section, setSection] = useState<"runtime" | "longrunning">("runtime");
-  const [lrTab, setLrTab] = useState("autonomous");
   const [context, setContext] = useState<ContextStats>({});
   const [children, setChildren] = useState<RlmChild[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -72,23 +65,15 @@ export function AdvancedPanel() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-      {/* Section tabs: runtime telemetry vs. long-running agents (goals/
-          autonomous/heartbeats/schedules/refinement). */}
-      <Tabs
-        variant="pill"
-        items={[
-          { id: "runtime", label: "Runtime telemetry" },
-          { id: "longrunning", label: "Long-running" },
-        ]}
-        activeId={section}
-        onChange={(id) => setSection(id as "runtime" | "longrunning")}
-      />
+      <Text variant="micro" tone="dim" uppercase style={{ letterSpacing: "0.12em" }}>
+        Runtime telemetry
+      </Text>
 
       {loading ? (
         <div style={{ display: "flex", justifyContent: "center", padding: tokens.space["3xl"] }}>
           <Spinner size={22} />
         </div>
-      ) : section === "runtime" ? (
+      ) : (
         <>
           <TrustModelCard />
           <DaemonTransportCard />
@@ -99,29 +84,6 @@ export function AdvancedPanel() {
           <McpServersCard servers={mcpServers} onChange={(next) => void ipc.setSettings({ ...settings, mcpServers: next } as Record<string, unknown>).then(() => refresh())} />
           <ExtensionsCard extensions={extensions} onChange={(next) => void ipc.setSettings({ ...settings, extensions: next } as Record<string, unknown>).then(() => refresh())} />
         </>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-          <Text variant="micro" tone="dim" uppercase style={{ letterSpacing: "0.12em" }}>
-            Long-running &amp; background agents
-          </Text>
-          <Tabs
-            variant="underline"
-            items={[
-              { id: "goals", label: "Goals" },
-              { id: "autonomous", label: "Autonomous" },
-              { id: "heartbeats", label: "Heartbeats" },
-              { id: "schedules", label: "Schedules" },
-              { id: "refinement", label: "Refinement" },
-            ]}
-            activeId={lrTab}
-            onChange={setLrTab}
-          />
-          {lrTab === "goals" ? <GoalsPanel /> : null}
-          {lrTab === "autonomous" ? <AutonomousPanel /> : null}
-          {lrTab === "heartbeats" ? <HeartbeatsPanel /> : null}
-          {lrTab === "schedules" ? <SchedulesPanel /> : null}
-          {lrTab === "refinement" ? <RefinementHistory /> : null}
-        </div>
       )}
     </div>
   );
