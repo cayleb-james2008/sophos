@@ -1,6 +1,6 @@
 # Sophos Browser E2E — Summary
 
-Date: 2026-08-09T07:12:57.651Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
+Date: 2026-08-09T07:35:07.307Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
 
 ## Result: PASS (35/35 passed)
 
