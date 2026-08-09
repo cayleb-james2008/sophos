@@ -1,8 +1,8 @@
 # Sophos Browser E2E — Summary
 
-Date: 2026-08-09T16:47:25.666Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
+Date: 2026-08-09T16:56:50.110Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
 
-## Result: PASS (35/35 passed)
+## Result: PASS (36/36 passed)
 
 ## Views
 
@@ -33,6 +33,7 @@ Date: 2026-08-09T16:47:25.666Z · Mode: browser-demo (MockIpcClient) · App: `np
 | Command palette (⌘K) opens, lists commands, closes | ✅ PASS | ok |
 | Model selector switches model | ✅ PASS | ok |
 | Provider login flow (Connect → modal → submit → connected) | ✅ PASS | ok |
+| Managed provider exposes a copyable OAuth link + API-key alternative | ✅ PASS | ok |
 | Provider logout does not error | ✅ PASS | ok |
 | Export session shows toast | ✅ PASS | ok |
 | Session Resume / Fork actions from detail | ✅ PASS | ok |
@@ -81,6 +82,8 @@ Date: 2026-08-09T16:47:25.666Z · Mode: browser-demo (MockIpcClient) · App: `np
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-model-selector-switches-model-flow-model.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-provider-login-flow-connect-modal-submit-connected--flow-login-modal.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-provider-login-flow-connect-modal-submit-connected--flow-login-connected.png`
+  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-managed-provider-exposes-a-copyable-oauth-link-api-key-alternative-flow-oauth-copy-link.png`
+  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-managed-provider-exposes-a-copyable-oauth-link-api-key-alternative-flow-oauth-copied.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-provider-logout-does-not-error-flow-provider-logout.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-export-session-shows-toast-flow-export.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-session-resume-fork-actions-from-detail-flow-session-actions.png`

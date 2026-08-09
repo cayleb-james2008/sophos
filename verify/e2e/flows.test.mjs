@@ -171,6 +171,53 @@ export const flows = [
   },
   {
     section: "Flows",
+    // Guards the surface a design review once reported as missing: the OAuth
+    // sign-in block renders ONLY for a `kind: "subscription"` provider in the
+    // disconnected Connect modal. The mock ships `prime-intellect` as a
+    // disconnected managed provider precisely so this path is reachable by
+    // ordinary clicking — no mock patching here, deliberately.
+    name: "Managed provider exposes a copyable OAuth link + API-key alternative",
+    fn: async ({ page, shot, expect }) => {
+      await navTo(page, "Settings");
+      await page.click('button[role="tab"]:has-text("Providers")', { force: true });
+      await page.waitForTimeout(600);
+
+      // The managed provider is present and labelled as such.
+      await expect(await page.locator("text=Prime Intellect").count() > 0, "managed provider (Prime Intellect) missing");
+      await expect(await page.locator("text=Managed").count() > 0, "Managed badge missing");
+
+      // It ships disconnected, so it offers Connect.
+      const connect = page.locator('button:has-text("Connect")').last();
+      await expect(await connect.count() > 0, "Connect button missing for the disconnected managed provider");
+      await connect.click();
+      await page.waitForTimeout(800);
+
+      // The modal offers BOTH paths: a copyable OAuth link and an API key.
+      const dialog = page.locator('div[role="dialog"]');
+      await expect(await dialog.count() > 0, "Connect modal did not open");
+      const modalText = (await dialog.first().innerText()).toUpperCase();
+      await expect(modalText.includes("SIGN IN WITH OAUTH"), "OAuth sign-in section missing for a managed provider");
+      await expect(await page.locator('button:has-text("Copy")').count() > 0, "copyable OAuth link missing");
+      await expect(modalText.includes("API KEY"), "API-key alternative not offered");
+      await shot("flow-oauth-copy-link");
+
+      // The copy control confirms rather than failing silently.
+      await page.locator('button:has-text("Copy")').first().click();
+      await page.waitForTimeout(600);
+      await expect(await page.locator('button:has-text("Copied")').count() > 0, "copy did not confirm with 'Copied'");
+      await shot("flow-oauth-copied");
+
+      // Leave no modal open for the next test.
+      const cancel = page.locator('div[role="dialog"] button:has-text("Cancel")').first();
+      if (await cancel.count() > 0) await cancel.click();
+      await page.waitForTimeout(300);
+      await page.keyboard.press("Escape").catch(() => {});
+      await page.waitForTimeout(200);
+      return true;
+    },
+  },
+  {
+    section: "Flows",
     name: "Provider logout does not error",
     fn: async ({ page, shot, expect }) => {
       await navTo(page, "Settings");

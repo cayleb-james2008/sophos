@@ -84,26 +84,41 @@ loop genuinely cannot complete without a human decision.
 
 ---
 
-## 3. Honest finding — the OAuth path is unreachable in demo mode
+## 3. Honest finding — RESOLVED (follow-up completed 2026-08-09)
 
-Worth recording rather than glossing over:
+**The finding, as originally recorded:** every provider in `MockIpcClient`
+shipped as `kind: "api_key"` (4 of 4) and `connected: true`, with no
+`kind: "subscription"` provider anywhere. Because the OAuth CopyField renders
+only for a managed provider in the disconnected Connect modal, that surface was
+**unreachable in browser-demo mode by any navigation path** — precisely why the
+critic never saw it and reported it absent. The capture above proved the
+component correct *when given the state*, but not *reachable*.
 
-**Every provider in `MockIpcClient` ships as `kind: "api_key"` (4 of 4) and
-`connected: true`. There is no `kind: "subscription"` provider anywhere in the
-mock.** Because the OAuth CopyField renders only for a managed provider in the
-disconnected Connect modal, that surface is **unreachable in browser-demo mode**
-at any navigation path — which is precisely why the critic never saw it and
-reported it as absent.
+**Now fixed.** `MockIpcClient.getProviders()` ships a fifth provider —
+`prime-intellect`, `kind: "subscription"`, deliberately **disconnected** — so the
+OAuth path is reachable by ordinary clicking. Two supporting changes:
 
-The capture above proves the component **works correctly when given the state**.
-It does **not** prove a real user on a live daemon reaches it, because that
-depends on the daemon reporting a subscription provider.
+- **Provider order is preserved.** `ollama-cloud` stays at index 0 because the
+  existing e2e login-flow test patches the first entry; the new provider is
+  appended, not inserted.
+- **`login`/`logout` are no longer no-ops.** They were empty methods, so the
+  demo UI could claim a state change that never happened. They now flip real
+  session state, making the Connect → modal → connected round-trip honest.
 
-**Recommended follow-up (not done here — it is a product change, not evidence):**
-add one `kind: "subscription"` provider to the demo mock so the OAuth path is
-exercisable in the browser preview and covered by the standing e2e suite. That
-would convert this from "proven under a test patch" to "proven on the default
-path".
+**Verified reachable with NO mock patching** (pure user navigation):
+Providers tab → "Prime Intellect" card shows a **Managed** badge → **Connect** →
+modal shows the OAuth sign-in section, the copyable link, the **API key**
+alternative, and the copy control confirms with **Copied**. 0 console errors.
+
+**Now covered by the standing suite.** New test
+`[Flows] Managed provider exposes a copyable OAuth link + API-key alternative`
+in `verify/e2e/flows.test.mjs` asserts the whole path on the **default** mock
+(no patch, by design) — managed provider present + badge, Connect opens the
+modal, OAuth section present, copyable link present, API-key alternative
+offered, and the copy control confirms. Stable **3/3** in isolation.
+
+This converts the surface from *"proven under a test patch"* to *"proven on the
+default path and regression-guarded"*. Suite: **35 → 36 tests, all passing.**
 
 ---
 

@@ -526,15 +526,45 @@ export class MockIpcClient implements IpcClient {
     return this.mockModels;
   }
   async getProviders(): Promise<ProviderInfo[]> {
+    // Order matters: index 0 stays `ollama-cloud` because the e2e login-flow
+    // test patches the first entry to drive the disconnected Connect modal.
+    //
+    // `prime-intellect` is a **subscription** provider and ships DISCONNECTED
+    // on purpose. The OAuth sign-in block in the Connect modal renders only for
+    // `kind: "subscription"`, so with an all-api_key, all-connected mock the
+    // copyable OAuth link was unreachable in browser-demo mode by any amount of
+    // clicking — which is exactly why a design review reported it missing.
+    // Shipping one managed provider makes that path reachable normally and
+    // keeps it covered by the standing suite.
     return [
-      { id: "ollama-cloud", name: "Ollama Cloud", kind: "api_key", connected: true, models: [] },
-      { id: "openrouter", name: "OpenRouter", kind: "api_key", connected: true, models: [] },
-      { id: "minimax", name: "MiniMax", kind: "api_key", connected: true, models: [] },
-      { id: "opencode", name: "Codex (OpenCode)", kind: "api_key", connected: true, models: [] },
+      { id: "ollama-cloud", name: "Ollama Cloud", kind: "api_key", connected: !this.mockLoggedOut.has("ollama-cloud"), models: [] },
+      { id: "openrouter", name: "OpenRouter", kind: "api_key", connected: !this.mockLoggedOut.has("openrouter"), models: [] },
+      { id: "minimax", name: "MiniMax", kind: "api_key", connected: !this.mockLoggedOut.has("minimax"), models: [] },
+      { id: "opencode", name: "Codex (OpenCode)", kind: "api_key", connected: !this.mockLoggedOut.has("opencode"), models: [] },
+      {
+        id: "prime-intellect",
+        name: "Prime Intellect",
+        kind: "subscription",
+        connected: this.mockLoggedIn.has("prime-intellect"),
+        models: [],
+      },
     ];
   }
-  async login(): Promise<void> {}
-  async logout(): Promise<void> {}
+  /** Providers the demo user has explicitly signed into this session. */
+  private mockLoggedIn = new Set<string>();
+  /** Providers the demo user has explicitly signed out of this session. */
+  private mockLoggedOut = new Set<string>();
+  async login(provider: string): Promise<void> {
+    // Make the demo honest: signing in actually flips the provider to
+    // connected, so the Connect → modal → connected round-trip is real rather
+    // than a no-op that leaves the UI lying about its state.
+    this.mockLoggedIn.add(provider);
+    this.mockLoggedOut.delete(provider);
+  }
+  async logout(provider: string): Promise<void> {
+    this.mockLoggedOut.add(provider);
+    this.mockLoggedIn.delete(provider);
+  }
   async getSettings(): Promise<Settings> {
     return { ...this.mockSettings, modelConfig: { ...(this.mockSettings.modelConfig ?? {}) } };
   }

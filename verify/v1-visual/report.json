@@ -126,16 +126,16 @@
       "glow": [],
       "accentCount": 21,
       "borderColors": {
-        "rgb(42, 42, 42)": 27,
-        "rgb(44, 44, 44)": 10,
-        "rgba(133, 237, 117, 0.4)": 4,
-        "rgba(0, 0, 0, 0)": 10,
+        "rgb(42, 42, 42)": 29,
+        "rgb(44, 44, 44)": 11,
+        "rgba(133, 237, 117, 0.4)": 5,
+        "rgba(0, 0, 0, 0)": 12,
         "rgb(239, 68, 68)": 1
       },
       "fonts": {
         "Times New Roman": 23,
-        "Geist": 296,
-        "Geist Mono": 64,
+        "Geist": 327,
+        "Geist Mono": 65,
         "Arial": 26
       },
       "bodyBg": "rgb(14, 14, 14)",
