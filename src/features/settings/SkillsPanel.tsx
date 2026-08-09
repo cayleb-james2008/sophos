@@ -175,16 +175,13 @@ export function SkillsPanel() {
                 </Button>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: tokens.space.sm, borderTop: `1px solid ${tokens.color.border}`, paddingTop: tokens.space.lg }}>
-                <Button variant="ghost" onClick={refresh} disabled={saving}>
-                  Cancel
-                </Button>
-                <Button variant="primary" onClick={saveSkillPaths} loading={saving} disabled={saving}>
-                  Save changes
-                </Button>
-              </div>
             </div>
 
+            {/* Reference documentation sits ABOVE the action row so the card
+                reads state → controls → reference → commit, and the primary
+                action is the last thing in the card — the same rule card 1
+                follows with Reload (vision-critic D7: one action was inside its
+                card, the other stranded mid-card above the help text). */}
             <Text variant="micro" tone="dim">
               Discovery locations (precedence: CLI → settings → packages → project → global → built-in):
               <br />
@@ -198,6 +195,15 @@ export function SkillsPanel() {
               <br />
               • Packages: <Text mono>skills/</Text> in npm/git packages
             </Text>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: tokens.space.sm, borderTop: `1px solid ${tokens.color.border}`, paddingTop: tokens.space.lg }}>
+              <Button variant="ghost" onClick={refresh} disabled={saving}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={saveSkillPaths} loading={saving} disabled={saving}>
+                Save changes
+              </Button>
+            </div>
           </Card>
         </>
       )}

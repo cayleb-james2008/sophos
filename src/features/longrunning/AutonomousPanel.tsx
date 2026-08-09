@@ -148,21 +148,22 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
           </Button>
         )}
 
+        {/* Flattened to a hairline-ruled section rather than a dashed box with
+            its own fill (vision-critic D5): a bordered container nested inside
+            the card was the last box-in-box on this surface, and its "Not
+            running" heading repeated the status badge in the card header. The
+            DNA divides with hairlines and whitespace, so this is now an
+            explanatory note under a rule, not a second container. */}
         {!active ? (
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               gap: tokens.space.sm,
-              padding: tokens.space.lg,
-              borderRadius: tokens.radius.md,
-              background: tokens.color.bgElevated,
-              border: `1px dashed ${tokens.color.borderStrong}`,
+              paddingTop: tokens.space.lg,
+              borderTop: `1px solid ${tokens.color.border}`,
             }}
           >
-            <Text variant="label" tone="muted">
-              Not running
-            </Text>
             <Text variant="micro" tone="dim">
               Autonomous mode is off. Start it explicitly to let the agent continue without human input. While
               active, the SystemBar shows a green AUTO indicator and the budget above is enforced. Expect it to

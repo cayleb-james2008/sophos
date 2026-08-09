@@ -210,21 +210,27 @@ export function MessageRow({ message }: { message: TranscriptMessage }) {
 
   return (
     <div style={{ display: "flex", gap: tokens.space.md, padding: `${tokens.space.sm} 0` }}>
-      {/* Avatar chip */}
+      {/* Avatar chip — a brand mark, not a status signal, so it must not be the
+          loudest accent object on the page (vision-critic D9). A solid green
+          fill made it exactly that. Soft accent wash + hairline accent border +
+          full-opacity glyph keeps the identity while returning green to its job
+          as a signal for live/active state. */}
       <div
         style={{
           flexShrink: 0,
           width: 30,
           height: 30,
           borderRadius: tokens.radius.md,
-          background: tokens.color.accent,
+          background: tokens.color.accentSoft,
+          border: `1px solid ${tokens.color.accentBorder}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           marginTop: 2,
+          boxSizing: "border-box",
         }}
       >
-        <SophosMark color={tokens.color.textInverse} />
+        <SophosMark color={tokens.color.accentHover} />
       </div>
 
       {/* Body */}

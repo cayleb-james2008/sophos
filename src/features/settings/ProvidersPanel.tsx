@@ -11,7 +11,7 @@
 
 import { useRef, useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Text, Card, Badge, Button, Modal, Input, StatusDot, Spinner } from "../../design";
+import { Text, Card, Badge, Button, Modal, Input, Spinner } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { ModelInfo, ProviderInfo } from "../../ipc/contract";
 import { useModels, modelKey } from "../providers/useModels";
@@ -128,14 +128,18 @@ function ProviderCard({
             </Text>
           </div>
         </div>
-        <Badge tone={provider.connected ? "success" : "neutral"} dot>
-          {provider.connected ? "Connected" : "Offline"}
-        </Badge>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
-        <Badge tone={managed ? "accent" : "neutral"}>{managed ? "Managed" : "API key"}</Badge>
-        <StatusDot state={provider.connected ? "connected" : "idle"} size={6} />
+        {/* One convention for state, applied to every card (vision-critic D11):
+            connection state is ALWAYS the top-right badge, and the kind badge
+            (Managed / API key) sits beside it. Previously the kind badge lived
+            on a separate row below with a StatusDot that repeated the same
+            connection state a second time, so different cards appeared to use
+            different visual languages for "state". */}
+        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, flexShrink: 0 }}>
+          <Badge tone={managed ? "accent" : "neutral"}>{managed ? "Managed" : "API key"}</Badge>
+          <Badge tone={provider.connected ? "success" : "neutral"} dot>
+            {provider.connected ? "Connected" : "Offline"}
+          </Badge>
+        </div>
       </div>
 
       {/* Models — each row can expand into a runtime-config adjuster */}
