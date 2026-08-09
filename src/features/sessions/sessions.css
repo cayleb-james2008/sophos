@@ -25,38 +25,38 @@
 .sessions__eyebrow {
   font: 600 10px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.16em;
-  color: #85ed75;
-}
-.pulse {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #85ed75;
-  box-shadow: none;
-  margin-right: 7px;
-  animation: pa-pulse 2s infinite;
+  color: rgba(244, 244, 244, 0.45);
 }
 
+/* One restrained header band: heading left, hairline-separated telemetry right.
+   No boxed telemetry card, no animated pulse — the graph below is the object. */
+.sessions__headband {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
 .sessions__telemetry {
   display: flex;
   align-items: center;
-  gap: 13px;
-  background: rgba(21, 21, 21, 0.75);
-  border: 1px solid #2a2a2a;
-  border-radius: 0;
-  padding: 10px 14px;
+  gap: 12px;
   font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   color: rgba(244, 244, 244, 0.6);
   white-space: nowrap;
 }
-.sessions__telemetry b { color: #f4f4f4; }
-.sessions__telemetry i { width: 1px; height: 15px; background: #2a2a2a; }
-.sessions__sync { color: #85ed75; }
+.sessions__telemetry b { color: #f4f4f4; font-weight: 600; }
+.sessions__telemetry i { width: 1px; height: 14px; background: #2a2a2a; }
+.sessions__sync { color: rgba(244, 244, 244, 0.6); }
 
+/* Toolbar: view switch + actions on one restrained row (not two bands). */
+.sessions__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .sessions__actions {
   display: flex;
-  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -359,10 +359,6 @@
 
 /* ---- P3 additions: context / goals / rlm / transcript / degradation ---- */
 
-.pulse--down {
-  background: #ef4444;
-  box-shadow: none;
-}
 .sessions__sync--down { color: #ef4444; }
 
 .sessions__daemon-down {
@@ -853,7 +849,6 @@
   align-items: center;
   gap: 2px;
   padding: 3px;
-  align-self: flex-start;
   background: rgba(21, 21, 21, 0.75);
   border: 1px solid #2a2a2a;
   border-radius: 0;

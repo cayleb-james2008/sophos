@@ -118,27 +118,29 @@ export function SessionsView({ onNewSession }: { onNewSession?: () => void }) {
 
   return (
     <main className="sessions">
-      {/* Header + fleet telemetry */}
+      {/* One restrained header band: heading + hairline-separated telemetry.
+          No animated pulse, no boxed telemetry card — the graph below is the
+          primary object (S3). */}
       <header className="sessions__header">
-        <div>
-          <div className="sessions__eyebrow">
-            <span className={`pulse ${daemonDown ? "pulse--down" : ""}`} /> SESSION GRAPH
-          </div>
+        <div className="sessions__heading">
+          <div className="sessions__eyebrow">SESSION GRAPH</div>
           <h1>Session command center</h1>
           <p>Live topology of sessions, their goals, and subagents — select a session node to inspect.</p>
         </div>
-        <div className="sessions__telemetry">
-          <span>
-            <b>{activeCount}</b> active
-          </span>
-          <i />
-          <span>
-            <b>{savedCount}</b> saved
-          </span>
-          <i />
-          <span className={daemonDown ? "sessions__sync--down" : "sessions__sync"}>
-            ● {daemonDown ? "daemon offline" : `last activity ${lastActivity}`}
-          </span>
+        <div className="sessions__headband">
+          <div className="sessions__telemetry">
+            <span>
+              <b>{activeCount}</b> active
+            </span>
+            <i />
+            <span>
+              <b>{savedCount}</b> saved
+            </span>
+            <i />
+            <span className={daemonDown ? "sessions__sync--down" : "sessions__sync"}>
+              {daemonDown ? "daemon offline" : `last activity ${lastActivity}`}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -174,34 +176,37 @@ export function SessionsView({ onNewSession }: { onNewSession?: () => void }) {
         </div>
       )}
 
-      {/* Actions */}
-      <div className="sessions__actions">
-        <Button variant="ghost" icon={<RefreshIcon size={14} />} onClick={() => void refresh()} loading={loading}>
-          Refresh
-        </Button>
-        <Button variant="primary" icon={<PlusIcon size={14} />} onClick={handleNew} disabled={daemonDown}>
-          New session
-        </Button>
-      </div>
+      {/* Toolbar: view switch + actions on one restrained row (not two bands) */}
+      <div className="sessions__toolbar">
+        {/* View switch: graph vs context tree */}
+        <div className="sessions__modeswitch" role="tablist" aria-label="Session view">
+          <button
+            role="tab"
+            aria-selected={viewMode === "graph"}
+            className={`sessions__modeswitch-btn${viewMode === "graph" ? " sessions__modeswitch-btn--active" : ""}`}
+            onClick={() => setViewMode("graph")}
+          >
+            Graph
+          </button>
+          <button
+            role="tab"
+            aria-selected={viewMode === "tree"}
+            className={`sessions__modeswitch-btn${viewMode === "tree" ? " sessions__modeswitch-btn--active" : ""}`}
+            onClick={() => setViewMode("tree")}
+          >
+            <TreeIcon size={12} /> Tree
+          </button>
+        </div>
 
-      {/* View switch: graph vs context tree */}
-      <div className="sessions__modeswitch" role="tablist" aria-label="Session view">
-        <button
-          role="tab"
-          aria-selected={viewMode === "graph"}
-          className={`sessions__modeswitch-btn${viewMode === "graph" ? " sessions__modeswitch-btn--active" : ""}`}
-          onClick={() => setViewMode("graph")}
-        >
-          Graph
-        </button>
-        <button
-          role="tab"
-          aria-selected={viewMode === "tree"}
-          className={`sessions__modeswitch-btn${viewMode === "tree" ? " sessions__modeswitch-btn--active" : ""}`}
-          onClick={() => setViewMode("tree")}
-        >
-          <TreeIcon size={12} /> Tree
-        </button>
+        {/* Actions */}
+        <div className="sessions__actions">
+          <Button variant="ghost" icon={<RefreshIcon size={14} />} onClick={() => void refresh()} loading={loading}>
+            Refresh
+          </Button>
+          <Button variant="primary" icon={<PlusIcon size={14} />} onClick={handleNew} disabled={daemonDown}>
+            New session
+          </Button>
+        </div>
       </div>
 
       {/* Console: node graph + inspector */}
