@@ -445,6 +445,72 @@ async function main() {
       record("prompt missing text: invalidParams", INVALID_PARAMS.test(e.message), e.message);
     }
 
+    // 38) FORK + CLONE with a real user message — the actual fix.
+    // The daemon only forks from USER-message entries. A fresh session has no
+    // user messages, so the earlier forkSession/cloneSession checks correctly
+    // degrade. Here we create fresh sessions, send a prompt, wait for the turn
+    // to complete, then verify forkSession(msg-N) resolves to a valid fork
+    // point and cloneSession creates a NEW session (different activeSessionId).
+    // Each gets its OWN fresh session because a fork consumes the forkable point.
+    const waitForTurn = async () => {
+      let tx = [];
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        tx = await client.send("getTranscript");
+        if (Array.isArray(tx) && tx.some((m) => m.role === "user") && tx.some((m) => m.role === "assistant")) break;
+      }
+      await new Promise((r) => setTimeout(r, 2000)); // let the session tree commit the entry
+      return Array.isArray(tx) ? tx.find((m) => m.role === "user") : undefined;
+    };
+
+    // --- cloneSession on a fresh session with a user message ---
+    try {
+      const ns = await client.send("newSession", { cwd, goal: "P1 clone verification" });
+      const freshId = ns?.activeSessionId;
+      record("clone: fresh session created", typeof freshId === "string" && freshId.length > 0, freshId);
+      await new Promise((r) => setTimeout(r, 1500));
+      await client.send("prompt", { text: "Reply with the single word: pong" });
+      const userMsg = await waitForTurn();
+      if (!userMsg) {
+        record("clone: user message present", false, "no user message in transcript");
+      } else {
+        record("clone: user message present", true, `id=${userMsg.id}`);
+        try {
+          const before = await client.send("getState");
+          const cl = await client.send("cloneSession", {});
+          const newId = cl?.activeSessionId;
+          record("cloneSession: creates a new session", typeof newId === "string" && newId.length > 0 && newId !== before?.activeSessionId, `before=${before?.activeSessionId} after=${newId}`);
+        } catch (e) {
+          record("cloneSession: creates a new session", false, e.message);
+        }
+      }
+    } catch (e) {
+      record("clone: setup", false, e.message);
+    }
+
+    // --- forkSession(msg-N) on a fresh session with a user message ---
+    try {
+      const ns = await client.send("newSession", { cwd, goal: "P1 fork verification" });
+      const freshId = ns?.activeSessionId;
+      record("fork: fresh session created", typeof freshId === "string" && freshId.length > 0, freshId);
+      await new Promise((r) => setTimeout(r, 1500));
+      await client.send("prompt", { text: "Reply with the single word: pong" });
+      const userMsg = await waitForTurn();
+      if (!userMsg) {
+        record("fork: user message present", false, "no user message in transcript");
+      } else {
+        record("fork: user message present", true, `id=${userMsg.id}`);
+        try {
+          const f = await client.send("forkSession", { pathOrId: userMsg.id });
+          record("forkSession(msg-N): resolves to a valid fork point", !!f && f.cancelled === false, JSON.stringify(f));
+        } catch (e) {
+          record("forkSession(msg-N): resolves to a valid fork point", false, e.message);
+        }
+      }
+    } catch (e) {
+      record("fork: setup", false, e.message);
+    }
+
     client.close();
   } finally {
     try { bridge?.kill(); } catch {}

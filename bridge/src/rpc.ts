@@ -493,17 +493,21 @@ export class RpcServer {
 
       case "cloneSession": {
         // No first-class clone on the daemon's AgentConnection. A fork of the
-        // most recent user message is the closest primitive. After a
-        // successful fork the daemon switches to the new session, so read
-        // back its id via getState.
+        // most recent user message is the closest primitive. The daemon's fork
+        // creates a new session but does NOT switch the active session, so we
+        // detect the newly-created session from the session list and return its
+        // id (not the current one).
         const conn = this.requireConn();
         const entryId = await this.holder.resolveForkEntryId(conn, "");
         if (typeof entryId === "string" && entryId) {
           try {
+            const before = await connListSessions(conn);
+            const beforeIds = new Set(before.map((s) => s.id));
             const res = await conn.fork(entryId);
             if (!res?.cancelled) {
-              const st = await conn.getState();
-              const activeSessionId = st.activeSessionId ?? st.sessionId;
+              const after = await connListSessions(conn);
+              const newSession = after.find((s) => !beforeIds.has(s.id));
+              const activeSessionId = newSession?.id ?? (await conn.getState()).activeSessionId;
               return { activeSessionId };
             }
           } catch {
