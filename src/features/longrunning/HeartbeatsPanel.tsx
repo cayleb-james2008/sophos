@@ -145,7 +145,9 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
             No heartbeats set
           </Text>
           <Text variant="micro" tone="dim">
-            Set an interval above to have the agent periodically check in on the session.
+            A heartbeat is a visible recurring instruction delivered on an interval (e.g. "every 10m"). Set
+            one above to have the agent periodically check in on the session. Only one user heartbeat is
+            active at a time, and it persists while the session runs.
           </Text>
         </div>
       ) : (

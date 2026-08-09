@@ -138,7 +138,8 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
             No schedules
           </Text>
           <Text variant="micro" tone="dim">
-            Add a cron schedule above to have the agent prompted on a recurring cadence.
+            A schedule delivers a prompt to the agent on a cron cadence (e.g. "0 9 * * 1-5"). Add one above to
+            run recurring or one-time prompts. Scheduled jobs persist and continue while the UI is detached.
           </Text>
         </div>
       ) : (

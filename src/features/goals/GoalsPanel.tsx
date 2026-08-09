@@ -267,7 +267,9 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
                 No active goals
               </Text>
               <Text variant="micro" tone="dim">
-                Set a goal above and the agent will keep working toward it across turns until it's completed, paused, budget-limited, or cleared.
+                A goal is a durable objective the agent keeps working toward across turns until it's completed,
+                paused, budget-limited, or cleared. Set one above to start — it persists even when you detach,
+                and the agent keeps prompting on it after ordinary turns.
               </Text>
             </div>
           ) : (

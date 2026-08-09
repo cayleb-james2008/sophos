@@ -130,6 +130,29 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
         its own unless you start it.
       </Text>
 
+      {!active ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: tokens.space.sm,
+            padding: tokens.space.lg,
+            borderRadius: tokens.radius.md,
+            background: tokens.color.bgElevated,
+            border: `1px dashed ${tokens.color.borderStrong}`,
+          }}
+        >
+          <Text variant="label" tone="muted">
+            Not running
+          </Text>
+          <Text variant="micro" tone="dim">
+            Autonomous mode is off. Start it explicitly to let the agent continue without human input. While
+            active, the SystemBar shows a green AUTO indicator and the budget above is enforced. Expect it to
+            stop when a quality gate passes or a limit is reached.
+          </Text>
+        </div>
+      ) : null}
+
       {error ? <ActionErrorBanner message={error} /> : null}
 
       {/* A2: stalled-loop warning with recovery actions */}
