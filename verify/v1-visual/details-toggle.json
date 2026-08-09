@@ -1,0 +1,69 @@
+{
+  "checks": [
+    {
+      "name": "essential 'Engine Live' visible at rest",
+      "ok": true
+    },
+    {
+      "name": "essential 'Model' visible at rest",
+      "ok": true
+    },
+    {
+      "name": "essential 'Ctx' visible at rest",
+      "ok": true
+    },
+    {
+      "name": "secondary 'Directory' hidden at rest",
+      "ok": true
+    },
+    {
+      "name": "secondary 'Session cost' hidden at rest",
+      "ok": true
+    },
+    {
+      "name": "secondary 'Autonomous' hidden at rest",
+      "ok": true
+    },
+    {
+      "name": "secondary 'Refinement' hidden at rest",
+      "ok": true
+    },
+    {
+      "name": "resting bar is compact (9 lines <= 12)",
+      "ok": true
+    },
+    {
+      "name": "details panel opens",
+      "ok": true
+    },
+    {
+      "name": "secondary 'Directory' reachable in panel",
+      "ok": true
+    },
+    {
+      "name": "secondary 'Session cost' reachable in panel",
+      "ok": true
+    },
+    {
+      "name": "secondary 'Autonomous' reachable in panel",
+      "ok": true
+    },
+    {
+      "name": "secondary 'Refinement' reachable in panel",
+      "ok": true
+    },
+    {
+      "name": "Escape closes panel",
+      "ok": true
+    },
+    {
+      "name": "outside click closes panel",
+      "ok": true
+    },
+    {
+      "name": "app still interactive",
+      "ok": true
+    }
+  ],
+  "consoleErrors": []
+}

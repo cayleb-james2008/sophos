@@ -1,10 +1,22 @@
 // SystemBar — the live engine-telemetry strip. THE signature element of the
-// Sophos frame: a thin, always-visible readout of the engine's live state
-// (daemon status with a pulsing dot, active agents, model, context usage).
-// Reads directly from the IPC connection state + agent list so it is
-// genuinely live, not decoration.
+// Sophos frame. Reads directly from the IPC connection state + agent list so
+// it is genuinely live, not decoration.
+//
+// Density doctrine (vision-critic defect D17, 2026-08-09): the reference
+// (primeintellect.ai) is stark and editorial, not a flight-deck instrument.
+// Nine adjacent segmented cells read as a cockpit, so the bar now shows only
+// what a user must see at a glance:
+//
+//   ALWAYS   engine status · model · context %
+//   ALERTS   AUTO / REFINE — surfaced inline ONLY while they demand attention
+//            (autonomous running, refinement awaiting review); silent otherwise
+//   DETAILS  agents · cwd · full context tokens · cost breakdown — behind a
+//            single toggle, one click away
+//
+// Nothing was removed from the product; secondary telemetry moved one click
+// away so the resting state is calm.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { tokens } from "../design/tokens";
 import { Text, Tooltip, IconButton } from "../design";
 import { useConnectionState, useIpc } from "../ipc/client";
@@ -74,6 +86,47 @@ function formatCost(n?: number): string {
   return `$${n.toFixed(2)}`;
 }
 
+/**
+ * One line of secondary telemetry inside the Details panel. Ruled with a
+ * hairline rather than boxed — the reference uses borders as the divider, not
+ * nested cards.
+ */
+function DetailRow({
+  label,
+  value,
+  title,
+  accent,
+  last,
+}: {
+  label: string;
+  value: string;
+  title?: string;
+  accent?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <div
+      title={title}
+      style={{
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "space-between",
+        gap: tokens.space.xl,
+        padding: `8px ${tokens.space.md}`,
+        borderBottom: last ? "none" : `1px solid ${tokens.color.border}`,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.08em" }}>
+        {label}
+      </Text>
+      <Text variant="micro" tone={accent ? "accent" : "muted"} mono style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+        {value}
+      </Text>
+    </div>
+  );
+}
+
 export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean; onToggleEngine: () => void }) {
   const state = useConnectionState();
   const ipc = useIpc();
@@ -129,16 +182,9 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
   const tokensUsed = state.context?.tokens ?? 0;
   const window = state.context?.contextWindow ?? 0;
   const pct = window > 0 ? Math.min(100, Math.round((tokensUsed / window) * 100)) : 0;
+  // Cost accounting is rendered as discrete rows in the Details panel, so no
+  // hover-title summary string is needed here any more.
   const cost = state.costStats;
-  const costTitle = [
-    cost?.sessionCost != null ? `Session ${formatCost(cost.sessionCost)}` : null,
-    cost?.totalCost != null ? `Total ${formatCost(cost.totalCost)}` : null,
-    cost?.inputTokens != null || cost?.outputTokens != null
-      ? `${formatTokens(cost.inputTokens ?? 0)} in / ${formatTokens(cost.outputTokens ?? 0)} out`
-      : null,
-  ]
-    .filter((x): x is string => Boolean(x))
-    .join(" · ");
 
   // A4: always-visible autonomous + refine indicators (terminal green = active).
   const autoActive = state.autonomousConfig?.active ?? false;
@@ -153,6 +199,29 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
     : null;
   const gate = useRefinementGate();
   const refinePending = gate.pending != null;
+
+  // Secondary telemetry lives behind a toggle (D17). Close on outside click and
+  // on Escape so it never traps focus.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const detailsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!detailsOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (detailsRef.current && !detailsRef.current.contains(e.target as Node)) setDetailsOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setDetailsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [detailsOpen]);
 
   return (
     <header
@@ -254,28 +323,6 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
           </div>
         </Tooltip>
 
-        {/* Active agents */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            gap: tokens.space.sm,
-            padding: "6px 12px",
-            borderRight: `1px solid ${tokens.color.border}`,
-            whiteSpace: "nowrap",
-          }}
-        >
-          <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.08em" }}>
-            Agents
-          </Text>
-          <span style={{ fontFamily: tokens.font.display, fontSize: 14, fontWeight: 600, color: runningAgents > 0 ? tokens.color.accent : tokens.color.text, lineHeight: 1 }}>
-            {runningAgents}
-          </span>
-          <Text variant="micro" tone="dim" mono>
-            live
-          </Text>
-        </div>
-
         {/* Model */}
         <div
           style={{
@@ -299,153 +346,170 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
           </Text>
         </div>
 
-        {/* Current working directory (research F3) — truncated, full path on hover */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: tokens.space.sm,
-            padding: "6px 12px",
-            borderRight: `1px solid ${tokens.color.border}`,
-            whiteSpace: "nowrap",
-            minWidth: 0,
-          }}
-        >
-          <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.08em" }}>
-            CWD
-          </Text>
-          <span title={cwd ?? "No working directory"} style={{ display: "inline-flex", minWidth: 0 }}>
-            <Text
-              variant="micro"
-              tone="muted"
-              mono
-              style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}
+        {/* Context usage — the percentage only; the token counts live in Details */}
+        <Tooltip content={`Context ${formatTokens(tokensUsed)} / ${formatTokens(window)}`} side="bottom">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: tokens.space.sm,
+              padding: "6px 12px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.08em" }}>
+              Ctx
+            </Text>
+            <span
+              style={{
+                position: "relative",
+                width: 52,
+                height: 4,
+                background: tokens.color.surface2,
+                borderRadius: 0,
+                overflow: "hidden",
+              }}
             >
-              {cwd ? truncatePath(cwd) : "—"}
-            </Text>
-          </span>
-        </div>
-
-        {/* Autonomous — always-visible opt-in indicator (A4) */}
-        <Tooltip content={autoActive ? `Autonomous active${autoBudget ? ` · ${autoBudget}` : ""}` : "Autonomous off — opt-in"} side="bottom">
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: tokens.space.sm,
-              padding: "6px 12px",
-              borderRight: `1px solid ${tokens.color.border}`,
-              whiteSpace: "nowrap",
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: autoActive ? tokens.color.accent : tokens.color.textDim,
-                flexShrink: 0,
-              }}
-            />
-            <Text variant="micro" tone={autoActive ? "accent" : "dim"} mono uppercase style={{ letterSpacing: "0.08em" }}>
-              AUTO
+              <span
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: `${pct}%`,
+                  background: pct > 85 ? tokens.color.warn : tokens.color.accent,
+                  transition: `width ${tokens.motion.base} ${tokens.motion.ease}`,
+                }}
+              />
+            </span>
+            <Text variant="micro" tone="dim" mono>
+              {pct}%
             </Text>
           </div>
         </Tooltip>
-
-        {/* Refine — always-visible review-gate indicator (A1/A4) */}
-        <Tooltip content={refinePending ? "Refinement awaiting your review" : "No refinement pending"} side="bottom">
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: tokens.space.sm,
-              padding: "6px 12px",
-              borderRight: `1px solid ${tokens.color.border}`,
-              whiteSpace: "nowrap",
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: refinePending ? tokens.color.accent : tokens.color.textDim,
-                flexShrink: 0,
-              }}
-            />
-            <Text variant="micro" tone={refinePending ? "accent" : "dim"} mono uppercase style={{ letterSpacing: "0.08em" }}>
-              REFINE
-            </Text>
-          </div>
-        </Tooltip>
-
-        {/* Context usage */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: tokens.space.sm,
-            padding: "6px 12px",
-            whiteSpace: "nowrap",
-          }}
-        >
-          <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.08em" }}>
-            Ctx
-          </Text>
-          <Text variant="micro" tone="muted" mono>
-            {formatTokens(tokensUsed)}/{formatTokens(window)}
-          </Text>
-          <span
-            style={{
-              position: "relative",
-              width: 52,
-              height: 4,
-              background: tokens.color.surface2,
-              borderRadius: 0, // sharp — P2 critic fix
-              overflow: "hidden",
-            }}
-          >
-            <span
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: `${pct}%`,
-                background: pct > 85 ? tokens.color.warn : tokens.color.accent,
-                transition: `width ${tokens.motion.base} ${tokens.motion.ease}`,
-              }}
-            />
-          </span>
-          <Text variant="micro" tone="dim" mono>
-            {pct}%
-          </Text>
-        </div>
-
-        {/* Session cost (research F4) — session cost, full accounting on hover */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: tokens.space.sm,
-            padding: "6px 12px",
-            whiteSpace: "nowrap",
-          }}
-        >
-          <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.08em" }}>
-            Cost
-          </Text>
-          <span title={costTitle || "No cost data"}>
-            <Text variant="micro" tone="muted" mono>
-              {formatCost(cost?.sessionCost)}
-            </Text>
-          </span>
-        </div>
       </div>
 
-      {/* Right cluster: engine toggle */}
+      {/* Attention-only alerts. Autonomous and refinement are silent while idle
+          and only claim space in the bar when they genuinely need the user
+          (D4/D17: green is a signal, not decoration). */}
+      {(autoActive || refinePending) && (
+        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, flexShrink: 0 }}>
+          {autoActive && (
+            <Tooltip content={`Autonomous active${autoBudget ? ` · ${autoBudget}` : ""}`} side="bottom">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: tokens.space.sm,
+                  padding: "5px 10px",
+                  border: `1px solid ${tokens.color.accentBorder}`,
+                  background: tokens.color.accentSoft,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: tokens.color.accent, flexShrink: 0 }} />
+                <Text variant="micro" tone="accent" mono uppercase style={{ letterSpacing: "0.08em" }}>
+                  AUTO
+                </Text>
+              </div>
+            </Tooltip>
+          )}
+          {refinePending && (
+            <Tooltip content="Refinement awaiting your review" side="bottom">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: tokens.space.sm,
+                  padding: "5px 10px",
+                  border: `1px solid ${tokens.color.accentBorder}`,
+                  background: tokens.color.accentSoft,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: tokens.color.accent, flexShrink: 0 }} />
+                <Text variant="micro" tone="accent" mono uppercase style={{ letterSpacing: "0.08em" }}>
+                  REFINE
+                </Text>
+              </div>
+            </Tooltip>
+          )}
+        </div>
+      )}
+
+      {/* Right cluster: details toggle + engine toggle */}
       <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md, flexShrink: 0 }}>
+        {/* Secondary telemetry — one click away, not always on screen (D17) */}
+        <div ref={detailsRef} style={{ position: "relative" }}>
+          <Tooltip content={detailsOpen ? "Hide details" : "Session details — agents, directory, cost"} side="bottom">
+            <button
+              type="button"
+              aria-expanded={detailsOpen}
+              aria-label="Session details"
+              onClick={() => setDetailsOpen((v) => !v)}
+              className="pa-focus-ring"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: tokens.space.sm,
+                padding: "5px 10px",
+                background: detailsOpen ? tokens.color.surface2 : "transparent",
+                border: `1px solid ${detailsOpen ? tokens.color.borderStrong : tokens.color.border}`,
+                borderRadius: tokens.radius.sm,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: `background ${tokens.motion.fast} ${tokens.motion.ease}`,
+              }}
+            >
+              <Text variant="micro" tone={detailsOpen ? "default" : "dim"} mono uppercase style={{ letterSpacing: "0.08em" }}>
+                Details
+              </Text>
+              <span
+                style={{
+                  display: "inline-flex",
+                  transform: detailsOpen ? "rotate(180deg)" : "none",
+                  transition: `transform ${tokens.motion.fast} ${tokens.motion.ease}`,
+                }}
+              >
+                <ChevronDownIcon size={11} color={detailsOpen ? tokens.color.text : tokens.color.textDim} />
+              </span>
+            </button>
+          </Tooltip>
+
+          {detailsOpen && (
+            <div
+              role="dialog"
+              aria-label="Session details"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                right: 0,
+                minWidth: 300,
+                background: tokens.color.bgOverlay,
+                border: `1px solid ${tokens.color.border}`,
+                borderRadius: tokens.radius.sm,
+                zIndex: 40,
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <DetailRow label="Agents" value={`${runningAgents} live`} accent={runningAgents > 0} />
+              <DetailRow label="Directory" value={cwd ? truncatePath(cwd, 34) : "—"} title={cwd ?? "No working directory"} />
+              <DetailRow label="Context" value={`${formatTokens(tokensUsed)} / ${formatTokens(window)} · ${pct}%`} />
+              <DetailRow label="Session cost" value={formatCost(cost?.sessionCost)} />
+              {cost?.totalCost != null && <DetailRow label="Total cost" value={formatCost(cost.totalCost)} />}
+              {(cost?.inputTokens != null || cost?.outputTokens != null) && (
+                <DetailRow
+                  label="Tokens"
+                  value={`${formatTokens(cost?.inputTokens ?? 0)} in / ${formatTokens(cost?.outputTokens ?? 0)} out`}
+                />
+              )}
+              <DetailRow label="Autonomous" value={autoActive ? autoBudget || "active" : "off"} accent={autoActive} />
+              <DetailRow label="Refinement" value={refinePending ? "awaiting review" : "none pending"} accent={refinePending} last />
+            </div>
+          )}
+        </div>
+
         <Tooltip content={engineOpen ? "Hide engine terminal" : "Show engine terminal"} side="bottom">
           <IconButton
             title={engineOpen ? "Hide engine terminal" : "Show engine terminal"}
@@ -456,7 +520,6 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
             <TerminalIcon size={15} color={engineOpen ? tokens.color.accentHover : tokens.color.textDim} />
           </IconButton>
         </Tooltip>
-        <ChevronDownIcon size={12} color={tokens.color.textDim} />
       </div>
     </header>
   );
