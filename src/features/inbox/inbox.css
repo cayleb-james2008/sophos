@@ -33,16 +33,23 @@
   margin-right: 7px;
   animation: pulse 2s infinite;
 }
+/* Plain inline telemetry, matching `.ag-telemetry` and `.sessions__telemetry`
+   (vision-critic D4). Inbox was the last header still wrapping its at-a-glance
+   counts in a filled, bordered box, which read as flight-deck chrome — most
+   obviously when the canvas is empty and the box is the loudest thing on the
+   screen. The other two graph views render the identical information as bare
+   text. */
 .inbox__telemetry {
   display: flex;
   align-items: center;
   gap: 13px;
-  background: rgba(21, 21, 21, 0.75);
-  border: 1px solid #2a2a2a;
+  background: transparent;
+  border: 0;
   border-radius: 0;
-  padding: 10px 14px;
+  padding: 0;
   font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   color: rgba(244, 244, 244, 0.6);
+  white-space: nowrap;
 }
 .inbox__telemetry b { color: #f4f4f4; }
 .inbox__telemetry i { width: 1px; height: 15px; background: #2a2a2a; }

@@ -303,23 +303,13 @@ export function AgentsGraph({
         if (kind === "agent" || kind === "rlm") onSelect(id);
       }}
     >
-      <div className="pg-legend">
-        <span>
-          <i className="pg-legend__swatch" style={{ background: tokens.color.ok }} />
-          <b>{rows.filter((r) => r.status === "running").length}</b> running
-        </span>
-        <span>
-          <i className="pg-legend__swatch" style={{ background: tokens.color.textDim }} />
-          idle / saved
-        </span>
-        <span>
-          <i className="pg-legend__swatch" style={{ background: tokens.color.err }} />
-          error
-        </span>
-        <span style={{ color: tokens.color.textDim }}>
-          total <b>{rows.length}</b>
-        </span>
-      </div>
+      {/* Legend removed so the fleet graph is the single dominant object
+          (vision-critic D2). Sessions dropped its equivalent legend in the
+          later redesign and scored higher for it; Agents was redesigned first
+          and never got the back-port. The counts it showed (running / total)
+          are already in the header band, and the status colours are read from
+          the nodes themselves — so this was duplicated chrome, not
+          information. */}
     </GraphFlow>
   );
 }

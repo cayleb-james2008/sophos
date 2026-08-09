@@ -54,9 +54,9 @@
       "banned_color": [],
       "banned_font": [],
       "glow": [],
-      "accentCount": 34,
+      "accentCount": 33,
       "borderColors": {
-        "rgb(42, 42, 42)": 24,
+        "rgb(42, 42, 42)": 23,
         "rgba(0, 0, 0, 0)": 3,
         "rgb(44, 44, 44)": 20,
         "rgba(133, 237, 117, 0.4)": 2,
@@ -65,7 +65,7 @@
       },
       "fonts": {
         "Times New Roman": 23,
-        "Geist": 330,
+        "Geist": 320,
         "Geist Mono": 79,
         "Arial": 44,
         "monospace": 1
@@ -81,7 +81,7 @@
       "glow": [],
       "accentCount": 11,
       "borderColors": {
-        "rgb(42, 42, 42)": 17,
+        "rgb(42, 42, 42)": 16,
         "rgba(0, 0, 0, 0)": 2,
         "rgb(239, 68, 68)": 1,
         "rgb(44, 44, 44)": 6
@@ -173,9 +173,8 @@
       "glow": [],
       "accentCount": 21,
       "borderColors": {
-        "rgb(42, 42, 42)": 29,
+        "rgb(42, 42, 42)": 30,
         "rgb(44, 44, 44)": 14,
-        "rgba(243, 188, 86, 0.4)": 1,
         "rgba(0, 0, 0, 0)": 14,
         "rgba(133, 237, 117, 0.4)": 1,
         "rgb(133, 237, 117)": 1,

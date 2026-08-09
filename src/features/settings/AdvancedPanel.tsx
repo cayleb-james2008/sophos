@@ -109,12 +109,15 @@ function TrustModelCard() {
             alignItems: "center",
             justifyContent: "center",
             borderRadius: tokens.radius.md,
-            // Caution, not success: terminal green is the "all good / live"
-            // signal, so a trust warning must not borrow it. Amber is the
-            // design system's semantic caution tone (--chart-2).
-            background: "rgba(243,188,86,0.12)",
-            border: `1px solid rgba(243,188,86,0.4)`,
-            color: tokens.color.warning,
+            // The amber caution tone belongs on the "Not a sandbox" pill — the
+            // actual warning — and nowhere else on this card. Washing the icon
+            // tile in amber too tipped the whole card warmer than any other
+            // surface in the app (vision-critic D6), so the tile uses the
+            // neutral treatment every other section icon uses and the pill
+            // carries the signal alone.
+            background: tokens.color.surface2,
+            border: `1px solid ${tokens.color.border}`,
+            color: tokens.color.textMuted,
           }}
         >
           <ShieldIcon size={16} />
