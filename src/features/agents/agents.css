@@ -467,8 +467,9 @@
   font: 13px/1.5 inherit;
 }
 .ag-composer__area::placeholder { color: rgba(244, 244, 244, 0.3); }
-.ag-composer__foot { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #2a2a2a; padding-top: 9px; }
-.ag-composer__foot > span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.45); letter-spacing: 0.05em; }
+.ag-composer__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #2a2a2a; padding-top: 9px; flex-wrap: nowrap; }
+.ag-composer__foot > span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.45); letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ag-composer__foot .ag-sendbtn { flex: none; white-space: nowrap; }
 
 .ag-footer { padding: 0 2px; }
 
