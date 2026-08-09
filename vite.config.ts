@@ -8,6 +8,15 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    // In the Traycer worktree layout, `node_modules` is a junction to an
+    // external directory (the source workspace's node_modules). Vite's strict
+    // filesystem guard refuses to serve those assets via `@fs/` (403), which
+    // breaks bundled fonts in the browser preview. Relax the guard for the
+    // local dev server only — no effect on the production build, where fonts
+    // are bundled into `dist/`.
+    fs: {
+      strict: false,
+    },
     watch: {
       ignored: ["**/src-tauri/**", "**/bridge/**"],
     },
