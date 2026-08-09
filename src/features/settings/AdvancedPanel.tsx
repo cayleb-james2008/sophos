@@ -275,9 +275,11 @@ function ContextCard({ context, onCompact }: { context: ContextStats; onCompact:
               alignItems: "center",
               justifyContent: "center",
               borderRadius: tokens.radius.md,
-              background: tokens.color.accentSoft,
-              border: `1px solid ${tokens.color.accentBorder}`,
-              color: tokens.color.accentHover,
+              // Neutral: a section icon carries no status, so it must not wear
+              // the accent. Green stays reserved for live/active/attention.
+              background: tokens.color.surface2,
+              border: `1px solid ${tokens.color.border}`,
+              color: tokens.color.textMuted,
             }}
           >
             <GaugeIcon size={16} />

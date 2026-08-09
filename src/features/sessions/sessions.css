@@ -814,12 +814,14 @@
   background: rgba(14, 14, 14, 0.35);
   backdrop-filter: blur(2px);
 }
+/* No box-in-box: the graph canvas already provides the frame. Matches the
+   Inbox and Agents empty states. */
 .sessions__graphblank__card {
   text-align: center;
   max-width: 320px;
   padding: 22px 26px;
-  background: #151515;
-  border: 1px solid #2a2a2a;
+  background: transparent;
+  border: none;
   border-radius: 0;
   color: rgba(244, 244, 244, 0.6);
   font-size: 12.5px;

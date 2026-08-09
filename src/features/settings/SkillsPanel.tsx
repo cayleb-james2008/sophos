@@ -83,19 +83,25 @@ export function SkillsPanel() {
       ) : (
         <>
           <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            {/* Header row: the icon tile is neutral, not accent-washed — green
+                is a status signal, and a section icon carries no status. The
+                Reload control is vertically centred against the 34px tile so
+                the title does not read as pulled off-centre (vision-critic
+                D5). */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 34 }}>
               <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
                 <span
                   style={{
                     width: 34,
                     height: 34,
+                    flexShrink: 0,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     borderRadius: tokens.radius.md,
-                    background: tokens.color.accentSoft,
-                    border: `1px solid ${tokens.color.accentBorder}`,
-                    color: tokens.color.accentHover,
+                    background: tokens.color.surface2,
+                    border: `1px solid ${tokens.color.border}`,
+                    color: tokens.color.textMuted,
                   }}
                 >
                   <BookIcon size={16} />
