@@ -169,7 +169,6 @@ export function Tabs({ items, activeId, onChange, variant = "underline", style }
                   height: 2,
                   borderRadius: 0, // sharp — P4 critic fix
                   background: tokens.color.accent,
-                  boxShadow: `0 0 8px ${tokens.color.accent}66`,
                 }}
               />
             ) : null}

@@ -438,7 +438,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function GoalStatusDot({ status }: { status: Goal["status"] }) {
   const color =
     status === "active" ? tokens.color.ok : status === "completed" ? tokens.color.info : status === "paused" ? tokens.color.warn : tokens.color.textDim;
-  return <span className="goal__dot" style={{ background: color, boxShadow: `0 0 6px ${color}88` }} />;
+  return <span className="goal__dot" style={{ background: color }} />;
 }
 
 function goalTone(status: Goal["status"]): "success" | "accent" | "warning" | "neutral" {

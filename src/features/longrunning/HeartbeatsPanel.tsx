@@ -169,7 +169,6 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
                   borderRadius: "50%",
                   flexShrink: 0,
                   background: h.status === "active" ? tokens.color.success : tokens.color.warning,
-                  boxShadow: h.status === "active" ? `0 0 8px ${tokens.color.success}66` : undefined,
                 }}
               />
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>

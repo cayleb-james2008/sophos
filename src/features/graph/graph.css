@@ -92,7 +92,7 @@
 /* ---- Selection / attribution ---- */
 .react-flow__node.selected .pg-node {
   border-color: rgba(133, 237, 117, 0.55);
-  box-shadow: 0 0 0 1px rgba(133, 237, 117, 0.2), 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 1px rgba(133, 237, 117, 0.2);
 }
 .react-flow__attribution {
   display: none;
@@ -219,7 +219,7 @@
 }
 .pg-btn--danger:hover {
   background: rgba(239, 68, 68, 0.12);
-  color: #f87171;
+  color: #ef4444;
 }
 
 /* Context-usage ring (sessions) */
@@ -274,7 +274,7 @@
 .pg-pill--err {
   background: rgba(239, 68, 68, 0.12);
   border-color: rgba(239, 68, 68, 0.45);
-  color: #f87171;
+  color: #ef4444;
 }
 .pg-pill--ok {
   background: rgba(133, 237, 117, 0.1);

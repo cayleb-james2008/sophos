@@ -490,7 +490,6 @@ export function Composer({
                 cursor: canSend ? "pointer" : "not-allowed",
                 opacity: canSend ? 1 : 0.6,
                 transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
-                boxShadow: canSend ? `0 0 16px ${tokens.color.accent}44` : undefined,
               }}
               onMouseEnter={(e) => {
                 if (canSend) e.currentTarget.style.background = "#f4f4f4";

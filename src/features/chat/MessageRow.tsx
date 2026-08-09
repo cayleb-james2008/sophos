@@ -51,7 +51,6 @@ function StreamingCaret() {
         background: tokens.color.accentHover,
         borderRadius: 0,
         animation: "pa-blink 0.9s step-end infinite",
-        boxShadow: `0 0 8px ${tokens.color.accent}66`,
       }}
     />
   );

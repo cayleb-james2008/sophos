@@ -29,7 +29,7 @@
   height: 6px;
   border-radius: 50%;
   background: #85ed75;
-  box-shadow: 0 0 12px #85ed75;
+  box-shadow: none;
   margin-right: 7px;
   animation: pulse 2s infinite;
 }
@@ -49,10 +49,10 @@
 .inbox__sync { color: #85ed75; }
 .inbox__error {
   padding: 9px 13px;
-  border: 1px solid #8a3a3a;
-  background: #2a1515;
+  border: 1px solid rgba(239,68,68,0.4);
+  background: rgba(239,68,68,0.12);
   border-radius: 0;
-  color: #e98989;
+  color: #ef4444;
   font-size: 12px;
 }
 .inbox__error button {
@@ -136,7 +136,7 @@
   border: 2px solid #0e0e0e;
   box-sizing: content-box;
 }
-.status--running { background: #85ed75; box-shadow: 0 0 7px rgba(133, 237, 117, 0.6); }
+.status--running { background: #85ed75; box-shadow: none; }
 .status--idle { background: #f3bc56; }
 .status--saved { background: rgba(244, 244, 244, 0.3); }
 .agent__meta {
@@ -329,7 +329,7 @@
   letter-spacing: 0.05em;
 }
 @keyframes pulse {
-  50% { opacity: 0.45; box-shadow: 0 0 3px #85ed75; }
+  50% { opacity: 0.45; box-shadow: none; }
 }
 @keyframes shimmer {
   to { background-position: -200% 0; }

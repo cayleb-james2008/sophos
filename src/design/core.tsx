@@ -442,10 +442,10 @@ export function Badge({
   const tones: Record<BadgeTone, CSS> = {
     neutral: { background: tokens.color.bgOverlay, color: tokens.color.textMuted },
     accent: { background: tokens.color.accentSoft, color: tokens.color.accentHover },
-    success: { background: "rgba(34,197,94,0.12)", color: tokens.color.success },
-    warning: { background: "rgba(245,158,11,0.12)", color: tokens.color.warning },
+    success: { background: "rgba(133,237,117,0.12)", color: tokens.color.success },
+    warning: { background: "rgba(243,188,86,0.12)", color: tokens.color.warning },
     danger: { background: "rgba(239,68,68,0.12)", color: tokens.color.danger },
-    info: { background: "rgba(14,165,233,0.12)", color: tokens.color.info },
+    info: { background: "rgba(139,124,246,0.12)", color: tokens.color.info },
   };
   const dotColors: Record<BadgeTone, string> = {
     neutral: tokens.color.textDim,
@@ -555,7 +555,7 @@ export function StatusDot({
           height: size,
           borderRadius: "50%",
           background: color,
-          boxShadow: `0 0 0 3px ${color}22, 0 0 12px ${color}55`,
+          boxShadow: `0 0 0 3px ${color}22`,
           animation: isPulsing ? "pa-pulse 1.2s ease-in-out infinite" : undefined,
         }}
       />

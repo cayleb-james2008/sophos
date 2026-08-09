@@ -1,0 +1,9 @@
+P3 screenshot probe report
+==========================
+
+Console lines (3):
+  [debug] [vite] connecting...
+  [debug] [vite] connected.
+  [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+
+Page errors (0):

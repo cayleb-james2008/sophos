@@ -162,7 +162,6 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
                   borderRadius: "50%",
                   flexShrink: 0,
                   background: s.active === false ? tokens.color.textDim : tokens.color.success,
-                  boxShadow: s.active !== false ? `0 0 8px ${tokens.color.success}66` : undefined,
                 }}
               />
               <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>

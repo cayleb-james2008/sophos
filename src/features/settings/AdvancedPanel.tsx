@@ -301,7 +301,6 @@ function ContextCard({ context, onCompact }: { context: ContextStats; onCompact:
               width: `${pct}%`,
               borderRadius: tokens.radius.full,
               background: `linear-gradient(90deg, ${tokens.color.accent}, ${tokens.color.accentHover})`,
-              boxShadow: `0 0 12px ${tokens.color.accent}66`,
               transition: `width ${tokens.motion.slow} ${tokens.motion.easeOut}`,
             }}
           />
@@ -418,7 +417,6 @@ function RlmChildrenCard({ children, onRefresh }: { children: RlmChild[]; onRefr
                           : c.status === "done"
                             ? tokens.color.accentHover
                             : tokens.color.textDim,
-                    boxShadow: c.status === "running" ? `0 0 8px ${tokens.color.success}66` : undefined,
                   }}
                 />
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
@@ -524,7 +522,6 @@ function AgentsCard({
                         : a.status === "saved"
                           ? tokens.color.accentHover
                           : tokens.color.textDim,
-                    boxShadow: a.status === "running" ? `0 0 8px ${tokens.color.success}66` : undefined,
                   }}
                 />
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
@@ -565,7 +562,7 @@ function DaemonDiagnosticsCard({ status, onRefresh }: { status: { connected: boo
               alignItems: "center",
               justifyContent: "center",
               borderRadius: tokens.radius.md,
-              background: status.connected ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
+              background: status.connected ? "rgba(133,237,117,0.12)" : "rgba(239,68,68,0.12)",
               border: `1px solid ${status.connected ? tokens.color.success : tokens.color.danger}`,
               color: status.connected ? tokens.color.success : tokens.color.danger,
             }}

@@ -38,7 +38,7 @@ export function ActionErrorBanner({ message }: { message: string }) {
         gap: tokens.space.sm,
         padding: `${tokens.space.sm} ${tokens.space.md}`,
         borderRadius: tokens.radius.md,
-        background: "rgba(208,90,90,0.10)",
+        background: "rgba(239,68,68,0.12)",
         border: `1px solid ${tokens.color.danger}55`,
         color: tokens.color.danger,
       }}

@@ -1,0 +1,44 @@
+{
+  "body": {
+    "bg": "rgb(14, 14, 14)",
+    "color": "rgb(244, 244, 244)",
+    "font": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+  },
+  "sweep": {
+    "radius": [],
+    "colors": [
+      "rgb(255, 255, 255)",
+      "rgb(244, 244, 244)",
+      "rgb(14, 14, 14)",
+      "rgb(21, 21, 21)",
+      "rgb(32, 32, 32)",
+      "rgb(44, 44, 44)",
+      "rgba(244, 244, 244, 0.45)",
+      "rgb(133, 237, 117)",
+      "rgba(244, 244, 244, 0.6)",
+      "rgb(42, 42, 42)",
+      "rgb(159, 255, 138)",
+      "rgba(133, 237, 117, 0.12)",
+      "rgba(243, 188, 86, 0.08)",
+      "rgb(243, 188, 86)",
+      "rgba(244, 244, 244, 0.9)",
+      "rgb(17, 17, 17)",
+      "rgb(239, 68, 68)",
+      "rgb(20, 20, 20)",
+      "rgba(14, 14, 14, 0.78)"
+    ],
+    "fonts": [
+      "\"Times New Roman\"",
+      "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif",
+      "\"Geist Mono\", \"Geist Mono Fallback\", ui-monospace, monospace",
+      "Arial"
+    ],
+    "accentCount": 11
+  },
+  "findings": {
+    "radius_violations": [],
+    "banned_color": [],
+    "banned_font": [],
+    "banned_gray": []
+  }
+}

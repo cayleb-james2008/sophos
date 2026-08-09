@@ -37,7 +37,7 @@
   height: 6px;
   border-radius: 50%;
   background: #85ed75;
-  box-shadow: 0 0 12px #85ed75;
+  box-shadow: none;
   animation: pa-pulse 2s infinite;
 }
 
@@ -62,17 +62,17 @@
   align-items: center;
   gap: 10px;
   padding: 10px 13px;
-  border: 1px solid #8a3a3a;
-  background: #2a1515;
+  border: 1px solid rgba(239,68,68,0.4);
+  background: rgba(239,68,68,0.12);
   border-radius: 0;
-  color: #e98989;
+  color: #ef4444;
   font-size: 12px;
 }
 .ag-errorbanner__action {
   margin-left: auto;
   background: none;
-  border: 1px solid #5a3030;
-  color: #e98989;
+  border: 1px solid rgba(239,68,68,0.45);
+  color: #ef4444;
   border-radius: 0;
   padding: 4px 10px;
   cursor: pointer;
@@ -191,7 +191,7 @@
 }
 .ag-agent--selected .ag-agent__edge {
   background: #85ed75;
-  box-shadow: 0 0 10px rgba(133, 237, 117, 0.5);
+  box-shadow: none;
 }
 .ag-agent__avatar {
   width: 32px;
@@ -272,17 +272,17 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid #8a3a3a;
-  background: #2a1515;
+  border: 1px solid rgba(239,68,68,0.4);
+  background: rgba(239,68,68,0.12);
   border-radius: 0;
-  color: #e98989;
+  color: #ef4444;
   font-size: 12px;
 }
 .ag-railerror__retry {
   margin-left: auto;
   background: none;
-  border: 1px solid #5a3030;
-  color: #e98989;
+  border: 1px solid rgba(239,68,68,0.45);
+  color: #ef4444;
   border-radius: 0;
   padding: 3px 9px;
   cursor: pointer;
@@ -451,11 +451,11 @@
 
 /* ---- Status dots ---- */
 .ag-status { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: rgba(244, 244, 244, 0.3); }
-.ag-status--running { background: #85ed75; box-shadow: 0 0 7px rgba(133, 237, 117, 0.6); }
+.ag-status--running { background: #85ed75; box-shadow: none; }
 .ag-status--idle { background: #f3bc56; }
-.ag-status--saved { background: #85ed75; box-shadow: 0 0 7px rgba(133, 237, 117, 0.5); }
-.ag-status--done { background: #38bdf8; box-shadow: 0 0 7px rgba(56, 189, 248, 0.5); }
-.ag-status--error { background: #ef4444; box-shadow: 0 0 7px rgba(239, 68, 68, 0.6); }
+.ag-status--saved { background: #85ed75; box-shadow: none; }
+.ag-status--done { background: #38bdf8; box-shadow: none; }
+.ag-status--error { background: #ef4444; box-shadow: none; }
 
 @media (max-width: 900px) {
   .ag-main { padding: 20px; }

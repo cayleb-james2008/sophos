@@ -250,7 +250,6 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
                               : g.status === "completed"
                                 ? tokens.color.accentHover
                                 : tokens.color.textDim,
-                        boxShadow: g.status === "active" ? `0 0 8px ${tokens.color.success}66` : undefined,
                       }}
                     />
                     <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
