@@ -17,45 +17,48 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 20px;
+  gap: 24px;
 }
-.ag-header h1 { margin: 6px 0 3px; font-size: 26px; font-weight: 600; letter-spacing: -0.015em; font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif; }
+.ag-heading { min-width: 0; }
+.ag-header h1 { margin: 6px 0 3px; font-size: 24px; font-weight: 600; letter-spacing: -0.015em; font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif; }
 .ag-header p { margin: 0; font-size: 14px; color: rgba(244, 244, 244, 0.6); }
 
 .ag-eyebrow {
   font: 600 10px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.16em;
-  color: #85ed75;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  text-transform: uppercase;
+  color: rgba(244, 244, 244, 0.45);
 }
 
-.ag-pulse {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #85ed75;
-  box-shadow: none;
-  animation: pa-pulse 2s infinite;
+/* Right side of the header: quiet telemetry (hairline-separated, no box) with
+   the runtime model folded in beneath it — one band, not three. */
+.ag-headband {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
-
 .ag-telemetry {
   display: flex;
   align-items: center;
-  gap: 13px;
-  background: rgba(21, 21, 21, 0.75);
-  border: 1px solid #2a2a2a;
-  border-radius: 0;
-  padding: 10px 14px;
+  gap: 12px;
   font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   color: rgba(244, 244, 244, 0.6);
   white-space: nowrap;
 }
-.ag-telemetry b { color: #f4f4f4; }
-.ag-telemetry i { width: 1px; height: 15px; background: #2a2a2a; }
-.ag-sync { color: #85ed75; }
+.ag-telemetry b { color: #f4f4f4; font-weight: 600; }
+.ag-telemetry i { width: 1px; height: 14px; background: #2a2a2a; }
+.ag-model {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.05em;
+  color: rgba(244, 244, 244, 0.45);
+}
+.ag-model__label { text-transform: uppercase; }
+.ag-model__value { color: #f4f4f4; font-weight: 600; }
+.ag-model__provider { color: rgba(244, 244, 244, 0.45); }
 
 .ag-errorbanner {
   display: flex;
@@ -79,22 +82,6 @@
   font: 600 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.1em;
 }
-
-.ag-modelbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(21, 21, 21, 0.6);
-  border: 1px solid #2a2a2a;
-  border-radius: 0;
-  padding: 6px 12px;
-  font: 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.45);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.ag-modelbar__value { color: #f4f4f4; font-weight: 600; }
-.ag-modelbar__provider { color: #85ed75; margin-left: auto; }
 
 .ag-console {
   min-height: 0;
@@ -296,8 +283,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: linear-gradient(rgba(32, 32, 32, 0.82), rgba(21, 21, 21, 0.95)),
-    repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(255, 255, 255, 0.012) 32px);
+  background: #151515;
 }
 .ag-detailwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ag-detail__loading { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
@@ -470,8 +456,6 @@
 .ag-composer__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #2a2a2a; padding-top: 9px; flex-wrap: nowrap; }
 .ag-composer__foot > span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.45); letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ag-composer__foot .ag-sendbtn { flex: none; white-space: nowrap; }
-
-.ag-footer { padding: 0 2px; }
 
 /* ---- Status dots ---- */
 .ag-status { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: rgba(244, 244, 244, 0.3); }
