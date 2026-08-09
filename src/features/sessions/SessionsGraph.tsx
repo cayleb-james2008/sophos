@@ -139,7 +139,6 @@ export function SessionsGraph({
   sessions,
   enrichment,
   activeSessionId,
-  daemonDown,
   onSelect,
   onResume,
   onFork,
@@ -248,24 +247,7 @@ export function SessionsGraph({
         const kind = layout.positioned.find((n) => n.id === id)?.data?.kind;
         if (kind === "session") onSelect(id);
       }}
-    >
-      <div className="pg-legend">
-        <span>
-          <i className="pg-legend__swatch" style={{ background: tokens.color.ok }} />active session
-        </span>
-        <span>
-          <i className="pg-legend__swatch" style={{ background: tokens.color.textDim }} />saved / background
-        </span>
-        <span>
-          <i className="pg-legend__swatch" style={{ background: tokens.color.accent }} />context ring
-        </span>
-        {daemonDown ? (
-          <span style={{ color: tokens.color.err }}>
-            <i className="pg-legend__swatch" style={{ background: tokens.color.err }} />daemon offline
-          </span>
-        ) : null}
-      </div>
-    </GraphFlow>
+    />
   );
 }
 
