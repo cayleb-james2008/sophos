@@ -74,41 +74,47 @@ export function AgentsView() {
 
   return (
     <main className="ag-main">
-      {/* Header + fleet telemetry */}
+      {/* One restrained header band: heading + quiet telemetry + runtime model
+          merged together. No separate stats rail, no full-width model strip —
+          the fleet graph below is the primary object. */}
       <header className="ag-header">
-        <div>
-          <div className="ag-eyebrow">
-            <span className="ag-pulse" />
-            AGENT FLEET GRAPH
-          </div>
+        <div className="ag-heading">
+          <div className="ag-eyebrow">AGENT FLEET</div>
           <h1>Agent command center</h1>
           <p>Live topology of the agent fleet — select a node to attach, message, and monitor.</p>
         </div>
 
-        <div className="ag-telemetry">
-          <span>
-            <b>{running}</b> running
-          </span>
-          <i />
-          <span>
-            <b>{rows.length}</b> total
-          </span>
-          <i />
-          <span>
-            <b>{totalUnread}</b> unread
-          </span>
-          <i />
-          <StatusDot state={toDot(connectionStatus)} />
-          <Text variant="micro" tone="muted" mono uppercase>
-            {connectionStatus.kind}
-          </Text>
-          <Button variant="ghost" size="sm" icon={<RefreshIcon size={13} />} onClick={() => void refresh()}>
-            Refresh
-          </Button>
+        <div className="ag-headband">
+          <div className="ag-telemetry">
+            <span>
+              <b>{running}</b> running
+            </span>
+            <i />
+            <span>
+              <b>{rows.length}</b> total
+            </span>
+            <i />
+            <span>
+              <b>{totalUnread}</b> unread
+            </span>
+            <i />
+            <StatusDot state={toDot(connectionStatus)} />
+            <Text variant="micro" tone="muted" mono uppercase>
+              {connectionStatus.kind}
+            </Text>
+            <Button variant="ghost" size="sm" icon={<RefreshIcon size={13} />} onClick={() => void refresh()}>
+              Refresh
+            </Button>
+          </div>
+          <div className="ag-model">
+            <span className="ag-model__label">RUNTIME MODEL</span>
+            <span className="ag-model__value">{connectionModel?.model ?? "—"}</span>
+            <span className="ag-model__provider">{connectionModel?.provider ?? ""}</span>
+          </div>
         </div>
       </header>
 
-      {/* Connection error banner */}
+      {/* Connection error banner — only when the relay degrades */}
       {error ? (
         <div className="ag-errorbanner" role="alert">
           <span>⚡</span>
@@ -118,13 +124,6 @@ export function AgentsView() {
           </button>
         </div>
       ) : null}
-
-      {/* Model context line */}
-      <div className="ag-modelbar">
-        <span className="ag-modelbar__label">RUNTIME MODEL</span>
-        <span className="ag-modelbar__value">{connectionModel?.model ?? "—"}</span>
-        <span className="ag-modelbar__provider">{connectionModel?.provider ?? ""}</span>
-      </div>
 
       {/* Console: node graph + inspector */}
       <section className="ag-console ag-console--graph">
@@ -201,13 +200,6 @@ export function AgentsView() {
           )}
         </div>
       </section>
-
-      {/* Footer command hint */}
-      <footer className="ag-footer">
-        <Text variant="micro" tone="dim" mono>
-          RELAY ACTIVE · click a node to attach or message · ⌘K global command
-        </Text>
-      </footer>
     </main>
   );
 }

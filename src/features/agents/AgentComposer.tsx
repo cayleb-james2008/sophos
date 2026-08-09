@@ -15,7 +15,6 @@ interface AgentComposerProps {
 
 export function AgentComposer({ agent, draft, setDraft, sending, onSend }: AgentComposerProps) {
   const target = agent?.name ?? "AGENT";
-  const remaining = Math.max(0, 2000 - draft.length);
   const canSend = draft.trim().length > 0 && !sending;
 
   return (
@@ -44,10 +43,17 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
 
       <div className="ag-composer__foot">
         <Text variant="micro" tone="dim" mono>
-          {draft.length} / 2000 · encrypted agent channel · {remaining} remaining
+          {draft.length} / 2000
         </Text>
-        <Button size="sm" loading={sending} disabled={!canSend} onClick={onSend}>
-          Send message ↗
+        <Button
+          className="ag-sendbtn"
+          size="sm"
+          loading={sending}
+          disabled={!canSend}
+          onClick={onSend}
+          style={{ whiteSpace: "nowrap" }}
+        >
+          Send
         </Button>
       </div>
     </div>

@@ -54,9 +54,9 @@
       "banned_color": [],
       "banned_font": [],
       "glow": [],
-      "accentCount": 37,
+      "accentCount": 34,
       "borderColors": {
-        "rgb(42, 42, 42)": 33,
+        "rgb(42, 42, 42)": 24,
         "rgba(0, 0, 0, 0)": 3,
         "rgb(44, 44, 44)": 20,
         "rgba(133, 237, 117, 0.4)": 2,
@@ -65,8 +65,8 @@
       },
       "fonts": {
         "Times New Roman": 23,
-        "Geist": 332,
-        "Geist Mono": 81,
+        "Geist": 330,
+        "Geist Mono": 79,
         "Arial": 44,
         "monospace": 1
       },
@@ -223,5 +223,10 @@
     "border": "rgb(42, 42, 42)",
     "accent": "rgb(133, 237, 117)"
   },
-  "consoleErrors": []
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+    "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+    "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+    "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+  ]
 }

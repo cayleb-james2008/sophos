@@ -123,11 +123,18 @@ export function AgentDetail({
 }
 
 function Row({ icon, label, value, mono }: { icon: ReactNode; label: string; value: string; mono?: boolean }) {
+  // Definition-list shape: label above value so long values get the full rail
+  // width (the old 3-column icon|label|value row shredded words via break-all).
+  // `title` keeps a full opaque id readable on hover without breaking it apart.
   return (
     <div className="ag-detail__row">
-      <span className="ag-detail__rowicon">{icon}</span>
-      <label>{label}</label>
-      <span className={mono ? "ag-detail__rowvalue--mono" : ""}>{value}</span>
+      <span className="ag-detail__rowhead">
+        <span className="ag-detail__rowicon">{icon}</span>
+        <label>{label}</label>
+      </span>
+      <span className={mono ? "ag-detail__rowvalue ag-detail__rowvalue--mono" : "ag-detail__rowvalue"} title={value}>
+        {value}
+      </span>
     </div>
   );
 }
