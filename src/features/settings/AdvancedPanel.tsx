@@ -90,6 +90,7 @@ export function AdvancedPanel() {
         </div>
       ) : section === "runtime" ? (
         <>
+          <TrustModelCard />
           <DaemonTransportCard />
           <ContextCard context={context} onCompact={() => void ipc.compact().then(() => refresh())} />
           <RlmChildrenCard children={children} onRefresh={() => void refresh()} />
@@ -123,6 +124,51 @@ export function AdvancedPanel() {
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Trust model — honest in-app disclosure (research D37-D39 / L4).
+//
+// Reviewers praised the README's candor that the kernel is "not a security
+// sandbox" and runs model-generated code with user permissions. Surface that
+// honestly in-app, calmly and informatively — not alarming.
+// ---------------------------------------------------------------------------
+
+function TrustModelCard() {
+  return (
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.md }}>
+      <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
+        <span
+          style={{
+            width: 34,
+            height: 34,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: tokens.radius.md,
+            background: tokens.color.accentSoft,
+            border: `1px solid ${tokens.color.accentBorder}`,
+            color: tokens.color.accentHover,
+          }}
+        >
+          <ShieldIcon size={16} />
+        </span>
+        <Text variant="label" weight="semibold">
+          Trust model
+        </Text>
+        <Badge tone="accent">Not a sandbox</Badge>
+      </div>
+      <Text variant="body" tone="muted">
+        Sophos executes model-generated code with your user permissions. It is not a security sandbox —
+        code the agent runs can read, write, and execute on your machine with the same rights you have.
+        Review what you ask it to run, and treat it like any tool with access to your system.
+      </Text>
+      <Text variant="micro" tone="dim">
+        This matches the project's documented stance: the kernel is not a security boundary, and
+        model-generated code runs with your permissions.
+      </Text>
+    </Card>
   );
 }
 

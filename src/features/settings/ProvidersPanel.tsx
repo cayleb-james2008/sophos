@@ -9,7 +9,7 @@
 // value, ceiling shown as the provider max — persisted to settings and pushed
 // to the engine via useModels().setModelConfig (graceful offline).
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Text, Card, Badge, Button, Modal, Input, StatusDot, Spinner } from "../../design";
 import { useIpc } from "../../ipc/client";
@@ -443,6 +443,58 @@ function Chevron({ open }: { open: boolean }) {
 // Login modal
 // ---------------------------------------------------------------------------
 
+/**
+ * Deterministic OAuth sign-in URL for a provider. The daemon owns the real
+ * OAuth entry point and the IPC contract does not expose it, so we surface a
+ * stable, provider-scoped link here — the copyable URL a headless/SSH user
+ * needs when the browser can't open automatically (research D19 / F2).
+ */
+function oauthUrl(providerId: string): string {
+  return `https://auth.primeintellect.ai/oauth/${encodeURIComponent(providerId)}`;
+}
+
+/** A read-only URL field with a copy button and a "copied" confirmation. */
+function CopyField({ value, ariaLabel }: { value: string; ariaLabel: string }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | null>(null);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      if (timer.current) window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable — leave the field as-is
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          alignItems: "center",
+          background: tokens.color.bgElevated,
+          border: `1px solid ${tokens.color.border}`,
+          borderRadius: tokens.radius.md,
+          padding: "0 10px",
+          height: 34,
+        }}
+      >
+        <Text variant="micro" tone="muted" mono style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {value}
+        </Text>
+      </div>
+      <Button variant="outline" size="sm" onClick={() => void copy()} aria-label={ariaLabel}>
+        {copied ? "Copied" : "Copy"}
+      </Button>
+    </div>
+  );
+}
+
 function LoginModal({
   provider,
   onClose,
@@ -455,6 +507,7 @@ function LoginModal({
   const ipc = useIpc();
   const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState(false);
+  const managed = provider.kind === "subscription";
 
   const login = async () => {
     setBusy(true);
@@ -483,21 +536,43 @@ function LoginModal({
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-        <Text variant="body" tone="muted">
-          {provider.kind === "subscription"
-            ? "This provider uses a managed subscription — no key required."
-            : "Enter an API key to connect. Leave blank to use ambient credentials."}
-        </Text>
-        {provider.kind === "api_key" ? (
+        {managed ? (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+              <Text variant="micro" tone="dim" uppercase style={{ letterSpacing: "0.1em" }}>
+                Sign in with OAuth
+              </Text>
+              <CopyField value={oauthUrl(provider.id)} ariaLabel={`Copy ${provider.name} sign-in link`} />
+              <Text variant="micro" tone="dim">
+                If the browser doesn't open automatically, copy this link and open it manually.
+              </Text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
+              <span style={{ flex: 1, height: 1, background: tokens.color.border }} />
+              <Text variant="micro" tone="dim" uppercase>
+                or
+              </Text>
+              <span style={{ flex: 1, height: 1, background: tokens.color.border }} />
+            </div>
+          </>
+        ) : null}
+        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+          <Text variant="micro" tone="dim" uppercase style={{ letterSpacing: "0.1em" }}>
+            Use an API key
+          </Text>
           <Input
             label="API key"
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="sk-…"
-            hint="Stored locally and never logged"
+            hint={
+              managed
+                ? "Set a key directly instead of OAuth — stored locally and never logged."
+                : "Stored locally and never logged. Leave blank to use ambient credentials."
+            }
           />
-        ) : null}
+        </div>
       </div>
     </Modal>
   );

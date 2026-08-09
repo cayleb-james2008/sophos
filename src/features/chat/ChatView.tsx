@@ -13,6 +13,7 @@ import { useChat } from "./useChat";
 import { MessageList } from "./MessageList";
 import { Composer } from "./Composer";
 import { ContextBar } from "./ContextBar";
+import { FirstRunBanner } from "../settings/FirstRunBanner";
 
 function statusDotState(status: { kind: string }): "connecting" | "connected" | "disconnected" | "reconnecting" {
   switch (status.kind) {
@@ -61,7 +62,13 @@ function CopyIcon({ size = 13, color }: { size?: number; color: string }) {
   );
 }
 
-export function ChatView({ onNewSession }: { onNewSession?: () => void }) {
+export function ChatView({
+  onNewSession,
+  onSetupProviders,
+}: {
+  onNewSession?: () => void;
+  onSetupProviders?: () => void;
+}) {
   const chat = useChat();
   const ipc = useIpc();
   const state = useConnectionState();
@@ -272,6 +279,9 @@ export function ChatView({ onNewSession }: { onNewSession?: () => void }) {
           </Text>
         </div>
       ) : null}
+
+      {/* First-run onboarding — skippable, provider-first (research D12 / F1). */}
+      <FirstRunBanner onSetupProviders={onSetupProviders} />
 
       {/* Demo-mode banner: visible only in the browser preview (no Tauri). */}
       {!isTauri ? (

@@ -60,10 +60,25 @@ function formatTokens(n: number): string {
   return `${n}`;
 }
 
+/** Truncate a path in the middle so the tail (the meaningful part) stays visible. */
+function truncatePath(p: string, max = 30): string {
+  if (p.length <= max) return p;
+  const head = p.slice(0, Math.max(1, Math.floor(max * 0.4)));
+  const tail = p.slice(-Math.max(1, Math.floor(max * 0.6)));
+  return `${head}…${tail}`;
+}
+
+function formatCost(n?: number): string {
+  if (typeof n !== "number" || !Number.isFinite(n)) return "—";
+  return `$${n.toFixed(2)}`;
+}
+
 export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean; onToggleEngine: () => void }) {
   const state = useConnectionState();
   const ipc = useIpc();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [cwd, setCwd] = useState<string | undefined>(undefined);
+  const activeSessionId = state.activeSessionId;
 
   // Live agent count — refresh on mount and on agent_list / agent_status events.
   useEffect(() => {
@@ -84,6 +99,26 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
     };
   }, [ipc]);
 
+  // Current working directory — resolved from the active session (research F3).
+  // The contract carries cwd on SessionInfo (listSessions), not on the state
+  // snapshot, so we match the active session id against the session list.
+  useEffect(() => {
+    let mounted = true;
+    ipc
+      .listSessions()
+      .then((sessions) => {
+        if (!mounted) return;
+        const active = sessions.find((s) => s.id === activeSessionId);
+        setCwd(active?.cwd);
+      })
+      .catch(() => {
+        if (mounted) setCwd(undefined);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [ipc, activeSessionId]);
+
   const kind = statusKind(state.status);
   const color = statusColor(kind);
   const label = statusLabel(kind);
@@ -93,6 +128,16 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
   const tokensUsed = state.context?.tokens ?? 0;
   const window = state.context?.contextWindow ?? 0;
   const pct = window > 0 ? Math.min(100, Math.round((tokensUsed / window) * 100)) : 0;
+  const cost = state.costStats;
+  const costTitle = [
+    cost?.sessionCost != null ? `Session ${formatCost(cost.sessionCost)}` : null,
+    cost?.totalCost != null ? `Total ${formatCost(cost.totalCost)}` : null,
+    cost?.inputTokens != null || cost?.outputTokens != null
+      ? `${formatTokens(cost.inputTokens ?? 0)} in / ${formatTokens(cost.outputTokens ?? 0)} out`
+      : null,
+  ]
+    .filter((x): x is string => Boolean(x))
+    .join(" · ");
 
   return (
     <header
@@ -239,6 +284,33 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
           </Text>
         </div>
 
+        {/* Current working directory (research F3) — truncated, full path on hover */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: tokens.space.sm,
+            padding: "6px 12px",
+            borderRight: `1px solid ${tokens.color.border}`,
+            whiteSpace: "nowrap",
+            minWidth: 0,
+          }}
+        >
+          <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.08em" }}>
+            CWD
+          </Text>
+          <span title={cwd ?? "No working directory"} style={{ display: "inline-flex", minWidth: 0 }}>
+            <Text
+              variant="micro"
+              tone="muted"
+              mono
+              style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}
+            >
+              {cwd ? truncatePath(cwd) : "—"}
+            </Text>
+          </span>
+        </div>
+
         {/* Context usage */}
         <div
           style={{
@@ -280,6 +352,26 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
           <Text variant="micro" tone="dim" mono>
             {pct}%
           </Text>
+        </div>
+
+        {/* Session cost (research F4) — session cost, full accounting on hover */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: tokens.space.sm,
+            padding: "6px 12px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.08em" }}>
+            Cost
+          </Text>
+          <span title={costTitle || "No cost data"}>
+            <Text variant="micro" tone="muted" mono>
+              {formatCost(cost?.sessionCost)}
+            </Text>
+          </span>
         </div>
       </div>
 
