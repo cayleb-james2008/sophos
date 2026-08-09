@@ -469,7 +469,7 @@
 }
 .detail__sectionicon {
   display: inline-flex;
-  color: #85ed75;
+  color: rgba(244, 244, 244, 0.45);
 }
 .detail__sectionlabel {
   font: 600 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
@@ -484,9 +484,9 @@
   place-items: center;
   padding: 0 5px;
   border-radius: 0;
-  background: rgba(133, 237, 117, 0.12);
+  background: #2a2a2a;
   font: 600 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: #85ed75;
+  color: rgba(244, 244, 244, 0.6);
 }
 
 .detail__skeleton {
@@ -574,17 +574,19 @@
 .goals {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
 }
 .goal {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  background: rgba(21, 21, 21, 0.6);
-  border: 1px solid #2a2a2a;
+  padding: 9px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #2a2a2a;
   border-radius: 0;
 }
+.goal:last-child { border-bottom: 0; }
 .goal__status { flex: none; }
 .goal__dot {
   display: inline-block;
@@ -615,17 +617,19 @@
 .rlm-children {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
 }
 .rlm-child {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
-  background: rgba(21, 21, 21, 0.6);
-  border: 1px solid #2a2a2a;
+  padding: 9px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #2a2a2a;
   border-radius: 0;
 }
+.rlm-child:last-child { border-bottom: 0; }
 .rlm-child__avatar {
   width: 28px;
   height: 28px;
@@ -670,7 +674,7 @@
 .transcript {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   max-height: 360px;
   overflow-y: auto;
   padding-right: 4px;
@@ -678,11 +682,13 @@
 .transcript__row {
   display: flex;
   gap: 10px;
-  padding: 8px 10px;
-  background: rgba(21, 21, 21, 0.5);
-  border: 1px solid #2a2a2a;
+  padding: 9px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #2a2a2a;
   border-radius: 0;
 }
+.transcript__row:last-child { border-bottom: 0; }
 .transcript__role--user,
 .transcript__role--assistant,
 .transcript__role--system {
@@ -1138,9 +1144,10 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 10px 12px;
-  background: rgba(21, 21, 21, 0.6);
-  border: 1px solid #2a2a2a;
+  padding: 9px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #2a2a2a;
   border-radius: 0;
 }
 .context-block__meta {
@@ -1216,9 +1223,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  background: rgba(21, 21, 21, 0.6);
-  border: 1px solid #2a2a2a;
+  padding: 9px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #2a2a2a;
   border-radius: 0;
 }
 .compact-status__dot {
