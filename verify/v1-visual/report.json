@@ -29,9 +29,9 @@
       "banned_color": [],
       "banned_font": [],
       "glow": [],
-      "accentCount": 53,
+      "accentCount": 24,
       "borderColors": {
-        "rgb(42, 42, 42)": 39,
+        "rgb(42, 42, 42)": 28,
         "rgba(0, 0, 0, 0)": 4,
         "rgb(255, 255, 255)": 2,
         "rgb(44, 44, 44)": 23,
@@ -41,8 +41,8 @@
       },
       "fonts": {
         "Times New Roman": 23,
-        "Geist": 378,
-        "Geist Mono": 86,
+        "Geist": 373,
+        "Geist Mono": 83,
         "Arial": 49
       },
       "bodyBg": "rgb(14, 14, 14)",
