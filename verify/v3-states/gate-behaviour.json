@@ -1,0 +1,55 @@
+{
+  "results": [
+    {
+      "check": "auto-apply is OFF by default",
+      "ok": true,
+      "detail": "localStorage=None"
+    },
+    {
+      "check": "no refinement pending at rest",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "refine() dispatched",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "arriving refinement is HELD PENDING (alert lit)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "proposal is shown for review BEFORE applying",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "it was NOT silently applied",
+      "ok": true,
+      "detail": "held, awaiting explicit action"
+    },
+    {
+      "check": "pending proposal survives navigation (not bypassable)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Discard clears the pending proposal",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Apply resolves the proposal (explicit user action)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "no console errors during behaviour run",
+      "ok": true,
+      "detail": "0 errors"
+    }
+  ],
+  "consoleErrors": []
+}
