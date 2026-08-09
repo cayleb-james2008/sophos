@@ -16,7 +16,8 @@
 // Nothing was removed from the product; secondary telemetry moved one click
 // away so the resting state is calm.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { tokens } from "../design/tokens";
 import { Text, Tooltip, IconButton } from "../design";
 import { useConnectionState, useIpc } from "../ipc/client";
@@ -180,8 +181,10 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
   const model = state.model?.model ?? "no model";
   const provider = state.model?.provider ?? "—";
   const tokensUsed = state.context?.tokens ?? 0;
-  const window = state.context?.contextWindow ?? 0;
-  const pct = window > 0 ? Math.min(100, Math.round((tokensUsed / window) * 100)) : 0;
+  // NB: named contextWindow, not `window` — shadowing the global broke the
+  // portal/anchor code that needs real `window.innerWidth`.
+  const contextWindow = state.context?.contextWindow ?? 0;
+  const pct = contextWindow > 0 ? Math.min(100, Math.round((tokensUsed / contextWindow) * 100)) : 0;
   // Cost accounting is rendered as discrete rows in the Details panel, so no
   // hover-title summary string is needed here any more.
   const cost = state.costStats;
@@ -204,10 +207,33 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
   // on Escape so it never traps focus.
   const [detailsOpen, setDetailsOpen] = useState(false);
   const detailsRef = useRef<HTMLDivElement | null>(null);
+  const detailsBtnRef = useRef<HTMLButtonElement | null>(null);
+  // The panel is portalled to <body> so it escapes the header's stacking
+  // context and genuinely sits above the view (vision-critic defect D7: it
+  // previously rendered *under* the chat header's controls, leaving "New
+  // session" / the model selector / "Set up providers" looking clickable but
+  // covered). Anchor it to the toggle's measured position.
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!detailsOpen) return;
+    const measure = () => {
+      const r = detailsBtnRef.current?.getBoundingClientRect();
+      if (r) setAnchor({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [detailsOpen]);
   useEffect(() => {
     if (!detailsOpen) return;
     const onDown = (e: MouseEvent) => {
-      if (detailsRef.current && !detailsRef.current.contains(e.target as Node)) setDetailsOpen(false);
+      const t = e.target as Node;
+      // The panel is portalled to <body>, so it is NOT inside detailsRef.
+      // Treat a click within either the toggle or the portalled dialog as
+      // "inside"; the scrim handles dismissal for everything else.
+      const inToggle = detailsRef.current?.contains(t) ?? false;
+      const inPanel = !!(t instanceof Element && t.closest('[role="dialog"][aria-label="Session details"]'));
+      if (!inToggle && !inPanel) setDetailsOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -235,7 +261,11 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
         borderBottom: `1px solid ${tokens.color.border}`,
         flexShrink: 0,
         position: "relative",
-        zIndex: 10,
+        // The Details panel renders inside this header and drops below it. The
+        // header must therefore out-stack the content beneath (chat header,
+        // composer) so the panel is never trapped under a sibling. Raised when
+        // the panel is open so its own z-index is meaningful page-wide.
+        zIndex: detailsOpen ? 60 : 10,
         gap: tokens.space.lg,
       }}
     >
@@ -347,7 +377,7 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
         </div>
 
         {/* Context usage — the percentage only; the token counts live in Details */}
-        <Tooltip content={`Context ${formatTokens(tokensUsed)} / ${formatTokens(window)}`} side="bottom">
+        <Tooltip content={`Context ${formatTokens(tokensUsed)} / ${formatTokens(contextWindow)}`} side="bottom">
           <div
             style={{
               display: "flex",
@@ -443,6 +473,7 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
         <div ref={detailsRef} style={{ position: "relative" }}>
           <Tooltip content={detailsOpen ? "Hide details" : "Session details — agents, directory, cost"} side="bottom">
             <button
+              ref={detailsBtnRef}
               type="button"
               aria-expanded={detailsOpen}
               aria-label="Session details"
@@ -476,38 +507,52 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
             </button>
           </Tooltip>
 
-          {detailsOpen && (
-            <div
-              role="dialog"
-              aria-label="Session details"
-              style={{
-                position: "absolute",
-                top: "calc(100% + 8px)",
-                right: 0,
-                minWidth: 300,
-                background: tokens.color.bgOverlay,
-                border: `1px solid ${tokens.color.border}`,
-                borderRadius: tokens.radius.sm,
-                zIndex: 40,
-                display: "flex",
-                flexDirection: "column",
-              }}
-            >
-              <DetailRow label="Agents" value={`${runningAgents} live`} accent={runningAgents > 0} />
-              <DetailRow label="Directory" value={cwd ? truncatePath(cwd, 34) : "—"} title={cwd ?? "No working directory"} />
-              <DetailRow label="Context" value={`${formatTokens(tokensUsed)} / ${formatTokens(window)} · ${pct}%`} />
-              <DetailRow label="Session cost" value={formatCost(cost?.sessionCost)} />
-              {cost?.totalCost != null && <DetailRow label="Total cost" value={formatCost(cost.totalCost)} />}
-              {(cost?.inputTokens != null || cost?.outputTokens != null) && (
-                <DetailRow
-                  label="Tokens"
-                  value={`${formatTokens(cost?.inputTokens ?? 0)} in / ${formatTokens(cost?.outputTokens ?? 0)} out`}
+          {detailsOpen &&
+            anchor &&
+            createPortal(
+              <>
+                {/* Scrim — the panel covers part of the view, so make that
+                    explicit rather than leaving controls beneath that look
+                    clickable but are not. Click anywhere to dismiss. */}
+                <div
+                  aria-hidden="true"
+                  onClick={() => setDetailsOpen(false)}
+                  style={{ position: "fixed", inset: 0, background: "rgba(14,14,14,0.55)", zIndex: 190 }}
                 />
-              )}
-              <DetailRow label="Autonomous" value={autoActive ? autoBudget || "active" : "off"} accent={autoActive} />
-              <DetailRow label="Refinement" value={refinePending ? "awaiting review" : "none pending"} accent={refinePending} last />
-            </div>
-          )}
+                <div
+                  role="dialog"
+                  aria-label="Session details"
+                  style={{
+                    position: "fixed",
+                    top: anchor.top,
+                    right: anchor.right,
+                    minWidth: 300,
+                    background: tokens.color.bgOverlay,
+                    border: `1px solid ${tokens.color.border}`,
+                    borderRadius: tokens.radius.sm,
+                    zIndex: 191,
+                    display: "flex",
+                    flexDirection: "column",
+                    animation: "pa-fade-in 120ms ease",
+                  }}
+                >
+                  <DetailRow label="Agents" value={`${runningAgents} live`} accent={runningAgents > 0} />
+                  <DetailRow label="Directory" value={cwd ? truncatePath(cwd, 34) : "—"} title={cwd ?? "No working directory"} />
+                  <DetailRow label="Context" value={`${formatTokens(tokensUsed)} / ${formatTokens(contextWindow)} · ${pct}%`} />
+                  <DetailRow label="Session cost" value={formatCost(cost?.sessionCost)} />
+                  {cost?.totalCost != null && <DetailRow label="Total cost" value={formatCost(cost.totalCost)} />}
+                  {(cost?.inputTokens != null || cost?.outputTokens != null) && (
+                    <DetailRow
+                      label="Tokens"
+                      value={`${formatTokens(cost?.inputTokens ?? 0)} in / ${formatTokens(cost?.outputTokens ?? 0)} out`}
+                    />
+                  )}
+                  <DetailRow label="Autonomous" value={autoActive ? autoBudget || "active" : "off"} accent={autoActive} />
+                  <DetailRow label="Refinement" value={refinePending ? "awaiting review" : "none pending"} accent={refinePending} last />
+                </div>
+              </>,
+              document.body,
+            )}
         </div>
 
         <Tooltip content={engineOpen ? "Hide engine terminal" : "Show engine terminal"} side="bottom">
