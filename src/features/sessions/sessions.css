@@ -284,7 +284,18 @@
 }
 .detail__avatar .status { position: absolute; right: -2px; bottom: -2px; border: 2px solid #0e0e0e; box-sizing: content-box; }
 .detail__head > div:nth-child(2) { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.detail__head b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Session title: allow up to two lines instead of ellipsising a single word.
+   `white-space: nowrap` truncated "Refactor auth module" to "Ref…", which told
+   the user nothing about which session was selected (vision-critic D1). */
+.detail__head b {
+  font-size: 15px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
 .detail__head span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; text-transform: uppercase; color: rgba(244, 244, 244, 0.45); letter-spacing: 0.06em; }
 .detail__head span i { margin-right: 4px; }
 .detail__id { margin-left: auto; font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.3); letter-spacing: 0.12em; white-space: nowrap; }

@@ -425,12 +425,16 @@
   background: rgba(14, 14, 14, 0.35);
   backdrop-filter: blur(2px);
 }
+/* No box-in-box: the surrounding content frame already provides the border,
+   so a second bordered card around the empty-state copy read as an unfinished
+   fragment floating in a hollow rectangle (vision-critic D4). The DNA divides
+   with hairlines and whitespace, not nested containers. */
 .inbox__graphblank__card {
   text-align: center;
   max-width: 340px;
   padding: 22px 26px;
-  background: #151515;
-  border: 1px solid #2a2a2a;
+  background: transparent;
+  border: none;
   border-radius: 0;
   color: rgba(244, 244, 244, 0.6);
   font-size: 12.5px;

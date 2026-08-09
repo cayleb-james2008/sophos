@@ -240,6 +240,10 @@ export function SessionsGraph({
       onNodesChange={onNodesChange}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      /* The session tree is laid out to fit the canvas, so a mini-map added no
+         navigational value and read as a stray UI element mid-canvas
+         (vision-critic D2). Matches the Agents fleet graph. */
+      showMiniMap={false}
       onNodeClick={(id) => {
         const kind = layout.positioned.find((n) => n.id === id)?.data?.kind;
         if (kind === "session") onSelect(id);
