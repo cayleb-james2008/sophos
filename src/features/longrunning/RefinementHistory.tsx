@@ -1,8 +1,16 @@
-// RefinementHistory — surfaces past refinement passes with timestamps and
-// descriptions, lets the operator trigger a "refine now" pass (with optional
-// instructions — bare runs through ipc.refine(), instructed through
-// ipc.prompt("/refine ...")), and roll back to a prior refinement. Falls back
-// gracefully to local state in browser/demo mode.
+// RefinementHistory — the review-and-approve gate for refinement (A1).
+//
+// Research D37 / D38 / F17: a self-editing loop with no human gate is how a
+// system drifts silently. When a `refinement_result` event arrives, the
+// proposed change is held as a *pending proposal* and the user must explicitly
+// Apply (or Discard) before it is accepted into the session's refinement
+// record. Auto-apply is an explicit opt-in, OFF by default.
+//
+// The panel reads the shared gate store (useRefinementGate) so it stays in sync
+// with the always-visible SystemBar indicator. "Refine now" triggers a pass via
+// ipc.refine() (bare) or ipc.prompt("/refine ...") (instructed); the result
+// arrives as a refinement_result event and is gated here. Rollback routes
+// through /refine rollback <id> (the same slash-command pipeline the TUI uses).
 
 import { useState } from "react";
 import { tokens } from "../../design/tokens";
@@ -10,12 +18,13 @@ import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
 import { useIpc } from "../../ipc/client";
 import { SparkIcon, RefreshIcon, XIcon, CheckIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
+import { useRefinementGate } from "./useRefinementGate";
 
 export interface RefinementEntry {
   id: string;
   timestamp?: string;
   description?: string;
-  status?: "applied" | "rolled-back";
+  status?: "applied" | "discarded" | "rolled-back";
 }
 
 export interface RefinementHistoryProps {
@@ -25,7 +34,7 @@ export interface RefinementHistoryProps {
 
 export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
   const ipc = useIpc();
-  const [refinements, setRefinements] = useState<RefinementEntry[]>(initial);
+  const gate = useRefinementGate();
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
   const { error, run } = useActionError();
@@ -41,15 +50,6 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
         // Bare refine is a first-class RPC.
         await ipc.refine();
       }
-      setRefinements((prev) => [
-        {
-          id: `refine-${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          description: text ? `Refined: ${text}` : "Refined on request",
-          status: "applied",
-        },
-        ...prev,
-      ]);
       setInstructions("");
     }, "Could not run refinement (daemon unreachable?)");
     setBusy(false);
@@ -59,10 +59,15 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
     setBusy(true);
     await run(async () => {
       await ipc.prompt("/refine rollback " + id);
-      setRefinements((prev) => prev.map((r) => (r.id === id ? { ...r, status: "rolled-back" } : r)));
+      // The gate store marks the entry rolled back.
+      const { markRolledBack } = await import("./useRefinementGate");
+      markRolledBack(id);
     }, "Could not rollback refinement (daemon unreachable?)");
     setBusy(false);
   };
+
+  const pending = gate.pending;
+  const refinements = gate.history.length > 0 ? gate.history : initial;
 
   return (
     <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
@@ -76,9 +81,9 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
               alignItems: "center",
               justifyContent: "center",
               borderRadius: tokens.radius.md,
-              background: tokens.color.bgOverlay,
-              border: `1px solid ${tokens.color.border}`,
-              color: tokens.color.textDim,
+              background: pending ? tokens.color.accentSoft : tokens.color.bgOverlay,
+              border: `1px solid ${pending ? tokens.color.accentBorder : tokens.color.border}`,
+              color: pending ? tokens.color.accentHover : tokens.color.textDim,
             }}
           >
             <SparkIcon size={16} />
@@ -93,11 +98,84 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
       </div>
 
       <Text variant="body" tone="muted">
-        Refinement iterates on the current output to tighten it against the goal. Trigger a pass now,
-        optionally with instructions, and roll back a prior refinement if a pass regressed.
+        Refinement iterates on the agent's own instructions to tighten them against the goal. A proposed
+        change is held for your review — apply it only if you approve. Roll back a prior pass if it regressed.
       </Text>
 
+      {/* Trust note — D37/D38: the human holds the pen. */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: tokens.space.sm,
+          padding: `${tokens.space.sm} ${tokens.space.md}`,
+          borderRadius: tokens.radius.md,
+          background: tokens.color.warning + "14",
+          border: `1px solid ${tokens.color.warning}40`,
+        }}
+      >
+        <span style={{ color: tokens.color.warning, fontSize: 12, lineHeight: 1, flexShrink: 0, marginTop: 2 }}>!</span>
+        <Text variant="micro" tone="muted">
+          Refinement edits the agent's own instructions and runs with your OS permissions — it is not a
+          sandbox. Review every proposed change before applying.
+        </Text>
+      </div>
+
       {error ? <ActionErrorBanner message={error} /> : null}
+
+      {/* Auto-apply opt-in (OFF by default) */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: tokens.space.md,
+          padding: `${tokens.space.sm} ${tokens.space.md}`,
+          borderRadius: tokens.radius.md,
+          background: tokens.color.bgElevated,
+          border: `1px solid ${tokens.color.border}`,
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <Text variant="label" weight="medium">
+            Auto-apply refinements
+          </Text>
+          <Text variant="micro" tone="dim">
+            When off (default), every proposed change waits for your explicit Apply.
+          </Text>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={gate.autoApply}
+          onClick={() => gate.setAutoApply(!gate.autoApply)}
+          style={{
+            width: 40,
+            height: 22,
+            borderRadius: 0,
+            border: `1px solid ${tokens.color.border}`,
+            background: gate.autoApply ? tokens.color.accent : tokens.color.bgRaised,
+            position: "relative",
+            cursor: "pointer",
+            padding: 0,
+            flexShrink: 0,
+            transition: "background 120ms ease",
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: 2,
+              left: gate.autoApply ? 20 : 2,
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              background: tokens.color.text,
+              transition: "left 120ms ease",
+            }}
+          />
+        </button>
+      </div>
 
       {/* Refine now */}
       <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
@@ -114,6 +192,97 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
           </Button>
         </div>
       </div>
+
+      {/* Pending proposal — the human gate */}
+      {pending ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: tokens.space.md,
+            padding: tokens.space.lg,
+            borderRadius: tokens.radius.md,
+            background: tokens.color.accentSoft,
+            border: `1px solid ${tokens.color.accentBorder}`,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: tokens.color.accentHover,
+                flexShrink: 0,
+              }}
+            />
+            <Text variant="label" weight="semibold" tone="accent">
+              Proposed refinement — awaiting your review
+            </Text>
+          </div>
+
+          {pending.result.summary ? (
+            <Text variant="body">{pending.result.summary}</Text>
+          ) : null}
+          {pending.result.rationale ? (
+            <Text variant="micro" tone="muted">
+              Rationale: {pending.result.rationale}
+            </Text>
+          ) : null}
+          {pending.result.expectedOutcome ? (
+            <Text variant="micro" tone="muted">
+              Expected outcome: {pending.result.expectedOutcome}
+            </Text>
+          ) : null}
+
+          {(pending.result.appliedEdits ?? []).length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+              <Text variant="micro" tone="dim" uppercase>
+                Proposed edits
+              </Text>
+              {(pending.result.appliedEdits ?? []).map((e, i) => (
+                <div
+                  key={e.id ?? i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: tokens.space.sm,
+                    padding: tokens.space.sm,
+                    borderRadius: tokens.radius.md,
+                    background: tokens.color.bgElevated,
+                    border: `1px solid ${tokens.color.border}`,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      background: e.applied ? tokens.color.success : tokens.color.warning,
+                    }}
+                  />
+                  <Text variant="micro" mono style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {e.title ?? e.action ?? e.kind ?? "edit"}
+                  </Text>
+                  <Badge tone={e.applied ? "success" : "warning"} dot>
+                    {e.applied ? "Applied" : "Proposed"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", gap: tokens.space.sm }}>
+            <Button variant="primary" size="md" icon={<CheckIcon size={13} />} onClick={() => gate.apply()}>
+              Apply
+            </Button>
+            <Button variant="outline" size="md" icon={<XIcon size={13} />} onClick={() => gate.discard()}>
+              Discard
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {/* List */}
       {refinements.length === 0 ? (
@@ -132,13 +301,16 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
             No refinements yet
           </Text>
           <Text variant="micro" tone="dim">
-            Run a "refine now" pass above; past passes with timestamps and rollback controls appear here.
+            Run a "refine now" pass above. When the daemon reports a proposed change it appears here for your
+            review — apply it to accept, discard to reject. Past passes with timestamps and rollback controls
+            are listed below.
           </Text>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
           {refinements.map((r) => {
             const rolledBack = r.status === "rolled-back";
+            const discarded = r.status === "discarded";
             return (
               <div
                 key={r.id}
@@ -158,7 +330,11 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
                     height: 8,
                     borderRadius: "50%",
                     flexShrink: 0,
-                    background: rolledBack ? tokens.color.warning : tokens.color.accentHover,
+                    background: rolledBack
+                      ? tokens.color.warning
+                      : discarded
+                        ? tokens.color.textDim
+                        : tokens.color.accentHover,
                   }}
                 />
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
@@ -171,10 +347,13 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
                     </Text>
                   ) : null}
                 </div>
-                <Badge tone={rolledBack ? "warning" : "success"} dot>
-                  {rolledBack ? "Rolled back" : "Applied"}
+                <Badge
+                  tone={rolledBack ? "warning" : discarded ? "neutral" : "success"}
+                  dot
+                >
+                  {rolledBack ? "Rolled back" : discarded ? "Discarded" : "Applied"}
                 </Badge>
-                {!rolledBack ? (
+                {!rolledBack && !discarded ? (
                   <IconButton
                     title="Rollback this refinement"
                     onClick={() => void rollback(r.id)}
