@@ -309,17 +309,23 @@
   flex-direction: column;
   gap: 14px;
 }
+/* Definition-list rows: label above value, hairline-divided, full rail width.
+   No nested card-in-card boxes — a quiet editorial stack. Values wrap at word
+   boundaries (overflow-wrap: anywhere only splits an opaque id that alone
+   overflows; it never shreds words like `subagent`). */
 .detail__row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  background: rgba(21, 21, 21, 0.6);
-  border: 1px solid #2a2a2a;
+  gap: 2px;
+  padding: 9px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #2a2a2a;
   border-radius: 0;
 }
+.detail__row:last-child { border-bottom: 0; }
 .detail__row label { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; letter-spacing: 0.12em; color: rgba(244, 244, 244, 0.45); text-transform: uppercase; }
-.detail__row span { font: 12px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: #f4f4f4; word-break: break-all; }
+.detail__row span { font: 12px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: #f4f4f4; overflow-wrap: anywhere; }
 
 .detail__actions {
   flex: none;
@@ -522,7 +528,7 @@
 .detail__metadata {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 /* ---- Context meter ---- */
