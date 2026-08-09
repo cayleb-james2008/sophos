@@ -64,7 +64,7 @@ export function ContextBar({ stats }: { stats: ContextStats | null }) {
             style={{
               width: 96,
               height: 4,
-              borderRadius: tokens.radius.full,
+              borderRadius: tokens.radius.sm,
               background: tokens.color.bgOverlay,
               overflow: "hidden",
             }}
@@ -73,7 +73,7 @@ export function ContextBar({ stats }: { stats: ContextStats | null }) {
               style={{
                 height: "100%",
                 width: `${percent}%`,
-                borderRadius: tokens.radius.full,
+                borderRadius: tokens.radius.sm,
                 background: percent > 80 ? tokens.color.warning : percent > 50 ? tokens.color.accent : tokens.color.success,
               }}
             />

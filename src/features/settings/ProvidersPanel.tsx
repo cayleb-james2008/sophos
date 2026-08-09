@@ -402,7 +402,7 @@ function TokenField({
       <div
         style={{
           height: 3,
-          borderRadius: tokens.radius.full,
+          borderRadius: tokens.radius.sm,
           background: tokens.color.bgElevated,
           overflow: "hidden",
           marginTop: 1,

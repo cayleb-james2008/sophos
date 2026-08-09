@@ -518,7 +518,7 @@ export function Composer({
                   padding: "2px 8px",
                   background: tokens.color.accentSoft,
                   border: `1px solid ${tokens.color.accentBorder}`,
-                  borderRadius: tokens.radius.full,
+                  borderRadius: tokens.radius.sm,
                   color: tokens.color.accentHover,
                   fontSize: tokens.font.size.xs,
                   fontFamily: tokens.font.mono,

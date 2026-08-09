@@ -62,10 +62,27 @@ def sweep(page):
           const tag = el.tagName + (el.className && typeof el.className === 'string'
             ? '.' + el.className.split(' ').slice(0,2).join('.') : '');
 
-          // radius: only 0, 50%, 9999px (circular dots) are legal
+          // Radius: 0 is the DNA. A fully-round radius (50% / 9999px) is legal
+          // ONLY for a genuinely circular element (a status dot). The vision
+          // critic caught pills and progress bars hiding behind the blanket
+          // 9999px allowance, so measure the box: if it is not square-ish and
+          // small, a round radius is capsule geometry and therefore drift.
           const r = s.borderRadius;
-          if (r && !['0px','50%','9999px','0px 0px 0px 0px',''].includes(r)) {
-            out.radius.push({ el: tag, r });
+          if (r && !['0px','0px 0px 0px 0px',''].includes(r)) {
+            const round = ['50%','9999px'].includes(r);
+            if (!round) {
+              out.radius.push({ el: tag, r, why: 'non-zero radius' });
+            } else {
+              const b = el.getBoundingClientRect();
+              const square = Math.abs(b.width - b.height) <= 2;
+              const dotSized = b.width <= 64 && b.height <= 64;
+              if (b.width > 0 && b.height > 0 && !(square && dotSized)) {
+                out.radius.push({
+                  el: tag, r,
+                  why: `capsule geometry ${Math.round(b.width)}x${Math.round(b.height)} (round radius on a non-circular box)`
+                });
+              }
+            }
           }
           // banned colours anywhere
           for (const p of ['color','backgroundColor','borderColor']) {
@@ -150,7 +167,7 @@ def main() -> int:
         if s.get("bodyFg") != DNA["fg"]:
             report["blockers"].append(f"{view}: body fg {s.get('bodyFg')} != {DNA['fg']}")
         for r in s.get("radius", []):
-            report["blockers"].append(f"{view}: radius {r['r']} on {r['el']}")
+            report["blockers"].append(f"{view}: radius {r['r']} on {r['el']} - {r.get('why','')}")
         for c in s.get("banned_color", []):
             report["blockers"].append(f"{view}: copper {c['v']} on {c['el']}")
         for f in s.get("banned_font", []):

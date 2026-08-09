@@ -186,17 +186,17 @@ export function SkillsPanel() {
             </div>
 
             <Text variant="micro" tone="dim">
-              Discovery locations (precedence: CLI \u2192 settings \u2192 packages \u2192 project \u2192 global \u2192 built-in):
+              Discovery locations (precedence: CLI → settings → packages → project → global → built-in):
               <br />
-              \u2022 CLI: <Text mono>{`--skill <path>`}</Text>
+              • CLI: <Text mono>{`--skill <path>`}</Text>
               <br />
-              \u2022 Settings: <Text mono>skills: ["path", "!excluded"]</Text>
+              • Settings: <Text mono>skills: ["path", "!excluded"]</Text>
               <br />
-              \u2022 Global: <Text mono>~/.prime/agent/skills/</Text>, <Text mono>~/.agents/skills/</Text>
+              • Global: <Text mono>~/.prime/agent/skills/</Text>, <Text mono>~/.agents/skills/</Text>
               <br />
-              \u2022 Project: <Text mono>.prime/agent/skills/</Text>, <Text mono>.agents/skills/</Text>
+              • Project: <Text mono>.prime/agent/skills/</Text>, <Text mono>.agents/skills/</Text>
               <br />
-              \u2022 Packages: <Text mono>skills/</Text> in npm/git packages
+              • Packages: <Text mono>skills/</Text> in npm/git packages
             </Text>
           </Card>
         </>

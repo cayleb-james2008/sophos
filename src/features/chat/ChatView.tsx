@@ -173,7 +173,7 @@ export function ChatView({
               alignItems: "center",
               gap: tokens.space.sm,
               padding: "4px 10px",
-              borderRadius: tokens.radius.full,
+              borderRadius: tokens.radius.sm,
               background: tokens.color.bgRaised,
               border: `1px solid ${tokens.color.border}`,
             }}

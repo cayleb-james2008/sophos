@@ -136,7 +136,7 @@ export function MessageRow({ message }: { message: TranscriptMessage }) {
             alignItems: "center",
             gap: tokens.space.sm,
             padding: "4px 12px",
-            borderRadius: tokens.radius.full,
+            borderRadius: tokens.radius.sm,
             background: tokens.color.bgElevated,
             border: `1px solid ${tokens.color.border}`,
           }}

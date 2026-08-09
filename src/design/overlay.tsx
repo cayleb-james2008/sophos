@@ -153,7 +153,7 @@ export function Tabs({ items, activeId, onChange, variant = "underline", style }
               fontSize: tokens.font.size.sm,
               fontWeight: tokens.font.weight.medium,
               padding: variant === "pill" ? "6px 14px" : "8px 2px",
-              borderRadius: variant === "pill" ? tokens.radius.full : tokens.radius.sm,
+              borderRadius: tokens.radius.sm,
               transition: `color ${tokens.motion.fast} ${tokens.motion.ease}, background ${tokens.motion.fast} ${tokens.motion.ease}`,
             }}
           >

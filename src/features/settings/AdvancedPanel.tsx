@@ -147,9 +147,12 @@ function TrustModelCard() {
             alignItems: "center",
             justifyContent: "center",
             borderRadius: tokens.radius.md,
-            background: tokens.color.accentSoft,
-            border: `1px solid ${tokens.color.accentBorder}`,
-            color: tokens.color.accentHover,
+            // Caution, not success: terminal green is the "all good / live"
+            // signal, so a trust warning must not borrow it. Amber is the
+            // design system's semantic caution tone (--chart-2).
+            background: "rgba(243,188,86,0.12)",
+            border: `1px solid rgba(243,188,86,0.4)`,
+            color: tokens.color.warning,
           }}
         >
           <ShieldIcon size={16} />
@@ -157,7 +160,7 @@ function TrustModelCard() {
         <Text variant="label" weight="semibold">
           Trust model
         </Text>
-        <Badge tone="accent">Not a sandbox</Badge>
+        <Badge tone="warning">Not a sandbox</Badge>
       </div>
       <Text variant="body" tone="muted">
         Sophos executes model-generated code with your user permissions. It is not a security sandbox —
@@ -336,7 +339,7 @@ function ContextCard({ context, onCompact }: { context: ContextStats; onCompact:
         <div
           style={{
             height: 8,
-            borderRadius: tokens.radius.full,
+            borderRadius: tokens.radius.sm,
             background: tokens.color.bgOverlay,
             overflow: "hidden",
           }}
@@ -345,8 +348,8 @@ function ContextCard({ context, onCompact }: { context: ContextStats; onCompact:
             style={{
               height: "100%",
               width: `${pct}%`,
-              borderRadius: tokens.radius.full,
-              background: `linear-gradient(90deg, ${tokens.color.accent}, ${tokens.color.accentHover})`,
+              borderRadius: tokens.radius.sm,
+              background: tokens.color.accent,
               transition: `width ${tokens.motion.slow} ${tokens.motion.easeOut}`,
             }}
           />
