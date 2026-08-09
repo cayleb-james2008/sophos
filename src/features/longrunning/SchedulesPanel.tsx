@@ -3,12 +3,17 @@
 // remove one through the first-class RPC commands (ipc.addSchedule /
 // ipc.removeSchedule) that call the daemon's addCronJob / cancelCronJob methods.
 // Falls back gracefully to local state in browser/demo mode.
+//
+// B2/B3: flat, ruled layout matching the other long-running panels — the state
+// (any schedules armed?) and the "Add schedule" action lead, list rows are
+// plain hairline-ruled lines instead of nested bordered boxes. The dashed empty
+// state is kept.
 
 import { useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
 import { useIpc } from "../../ipc/client";
-import { CalendarIcon, PlusIcon, XIcon } from "../sessions/icons";
+import { PlusIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
 import { estimateNextDue } from "./nextDue";
 
@@ -23,6 +28,14 @@ export interface SchedulesPanelProps {
   /** Seed schedules from daemon state when available. */
   initial?: ScheduleEntry[];
 }
+
+const section: React.CSSProperties = {
+  borderTop: `1px solid ${tokens.color.line}`,
+  paddingTop: tokens.space.lg,
+  display: "flex",
+  flexDirection: "column",
+  gap: tokens.space.md,
+};
 
 export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
   const ipc = useIpc();
@@ -55,135 +68,124 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
     setBusy(false);
   };
 
+  const activeCount = schedules.filter((s) => s.active !== false).length;
+
   return (
     <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+      {/* State answer: is anything scheduled? */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-          <span
+        <Text variant="label" weight="semibold">
+          Schedules
+        </Text>
+        <Badge tone={activeCount > 0 ? "success" : "neutral"} dot>
+          {activeCount > 0 ? `${activeCount} scheduled` : "none scheduled"}
+        </Badge>
+      </div>
+
+      {/* State + action: add a schedule up front. */}
+      <div style={section}>
+        <Text variant="body" tone="muted">
+          Schedule a one-time or recurring prompt for the agent. Use a standard cron expression (e.g. "0 9 * * 1-5")
+          plus the prompt to deliver when the schedule fires.
+        </Text>
+
+        {error ? <ActionErrorBanner message={error} /> : null}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+          <div style={{ display: "flex", gap: tokens.space.sm, alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <Input
+                label="Cron expression"
+                placeholder='e.g. "0 9 * * 1-5"'
+                value={cron}
+                onChange={(e) => setCron(e.target.value)}
+                disabled={busy}
+              />
+            </div>
+            <Button
+              size="md"
+              icon={<PlusIcon size={13} />}
+              onClick={() => void add()}
+              loading={busy}
+              disabled={!cron.trim() || !prompt.trim()}
+            >
+              Add schedule
+            </Button>
+          </div>
+          <Input
+            label="Prompt"
+            placeholder="e.g. Review open work and report status"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            disabled={busy}
+          />
+        </div>
+      </div>
+
+      {/* List — plain ruled rows. */}
+      <div style={section}>
+        <Text variant="micro" tone="dim" uppercase>
+          Scheduled jobs
+        </Text>
+        {schedules.length === 0 ? (
+          <div
             style={{
-              width: 34,
-              height: 34,
               display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              flexDirection: "column",
+              gap: tokens.space.sm,
+              padding: tokens.space.lg,
               borderRadius: tokens.radius.md,
-              background: tokens.color.bgOverlay,
-              border: `1px solid ${tokens.color.border}`,
-              color: tokens.color.textDim,
+              background: tokens.color.bgElevated,
+              border: `1px dashed ${tokens.color.borderStrong}`,
             }}
           >
-            <CalendarIcon size={16} />
-          </span>
-          <Text variant="label" weight="semibold">
-            Schedules
-          </Text>
-          <Badge tone={schedules.length > 0 ? "success" : "neutral"} dot>
-            {schedules.length}
-          </Badge>
-        </div>
-      </div>
-
-      <Text variant="body" tone="muted">
-        Schedule a one-time or recurring prompt for the agent. Use a standard cron expression (e.g. "0 9 * * 1-5")
-        plus the prompt to deliver when the schedule fires.
-      </Text>
-
-      {error ? <ActionErrorBanner message={error} /> : null}
-
-      {/* Add schedule */}
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-        <div style={{ display: "flex", gap: tokens.space.sm, alignItems: "flex-end" }}>
-          <div style={{ flex: 1 }}>
-            <Input
-              label="Cron expression"
-              placeholder='e.g. "0 9 * * 1-5"'
-              value={cron}
-              onChange={(e) => setCron(e.target.value)}
-              disabled={busy}
-            />
+            <Text variant="label" tone="muted">
+              No schedules
+            </Text>
+            <Text variant="micro" tone="dim">
+              A schedule delivers a prompt to the agent on a cron cadence (e.g. "0 9 * * 1-5"). Add one above to
+              run recurring or one-time prompts. Scheduled jobs persist and continue while the UI is detached.
+            </Text>
           </div>
-          <Button
-            size="md"
-            icon={<PlusIcon size={13} />}
-            onClick={() => void add()}
-            loading={busy}
-            disabled={!cron.trim() || !prompt.trim()}
-          >
-            Add schedule
-          </Button>
-        </div>
-        <Input
-          label="Prompt"
-          placeholder="e.g. Review open work and report status"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          disabled={busy}
-        />
-      </div>
-
-      {/* List */}
-      {schedules.length === 0 ? (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: tokens.space.sm,
-            padding: tokens.space.lg,
-            borderRadius: tokens.radius.md,
-            background: tokens.color.bgElevated,
-            border: `1px dashed ${tokens.color.borderStrong}`,
-          }}
-        >
-          <Text variant="label" tone="muted">
-            No schedules
-          </Text>
-          <Text variant="micro" tone="dim">
-            A schedule delivers a prompt to the agent on a cron cadence (e.g. "0 9 * * 1-5"). Add one above to
-            run recurring or one-time prompts. Scheduled jobs persist and continue while the UI is detached.
-          </Text>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-          {schedules.map((s) => (
-            <div
-              key={s.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: tokens.space.md,
-                padding: tokens.space.md,
-                borderRadius: tokens.radius.md,
-                background: tokens.color.bgElevated,
-                border: `1px solid ${tokens.color.border}`,
-              }}
-            >
-              <span
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.md }}>
+            {schedules.map((s) => (
+              <div
+                key={s.id}
                 style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  flexShrink: 0,
-                  background: s.active === false ? tokens.color.textDim : tokens.color.success,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: tokens.space.md,
                 }}
-              />
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-                <Text variant="label" weight="medium" mono>
-                  {s.cron}
-                </Text>
-                <Text variant="micro" tone="dim" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {s.prompt}
-                </Text>
-                <Text variant="micro" tone="dim" mono>
-                  next run (est.): {estimateNextDue(s.cron) ?? "—"} · last fired: not reported by daemon
-                </Text>
+              >
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: s.active === false ? tokens.color.textDim : tokens.color.success,
+                  }}
+                />
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                  <Text variant="label" weight="medium" mono>
+                    {s.cron}
+                  </Text>
+                  <Text variant="micro" tone="dim" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.prompt}
+                  </Text>
+                  <Text variant="micro" tone="dim" mono>
+                    next run (est.): {estimateNextDue(s.cron) ?? "—"} · last fired: not reported by daemon
+                  </Text>
+                </div>
+                <IconButton title="Remove schedule" onClick={() => void remove(s.id)} tone="danger" size="sm" disabled={busy}>
+                  <XIcon size={13} />
+                </IconButton>
               </div>
-              <IconButton title="Remove schedule" onClick={() => void remove(s.id)} tone="danger" size="sm" disabled={busy}>
-                <XIcon size={13} />
-              </IconButton>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
