@@ -249,31 +249,15 @@ export class RpcServer {
       }
 
       case "forkSession": {
-        // Contract param is a session identifier (path or id), but
-        // AgentConnection.fork requires an entry id. Resolve the session
-        // tree and pick the leaf entry as the fork point. If the caller
-        // already passed an entry id (8-byte hex like 063dbbea6117), we
-        // forward it as-is for ergonomics.
+        // Contract param is a session identifier (path, id, or transcript
+        // message id). The daemon only forks from USER-message entries, so we
+        // resolve the request to a valid user-message fork point via
+        // getUserMessagesForForking() (see ConnectionHolder.resolveForkEntryId).
         const p = requireParams<{ pathOrId: string }>(params, ["pathOrId"]);
         const conn = this.requireConn();
-        // Entry ids are short non-UUID strings — treat anything that looks
-        // like one as a direct entry id; otherwise resolve via the tree.
-        const looksLikeEntryId = /^[a-z0-9]{4,32}$/i.test(p.pathOrId) && !p.pathOrId.includes("/") && !p.pathOrId.includes("\\");
-        if (looksLikeEntryId) {
-          try {
-            return await conn.fork(p.pathOrId);
-          } catch (err) {
-            // Fall through to tree resolution if the daemon rejects it as
-            // an entry id.
-            if (typeof process !== "undefined" && process.stderr) {
-              const msg = err instanceof Error ? err.message : String(err);
-              process.stderr.write(`[bridge:rpc] fork direct entryId failed, trying tree resolve: ${msg}\n`);
-            }
-          }
-        }
-        const entryId = await this.holder.resolveSessionToEntryId(conn, p.pathOrId);
+        const entryId = await this.holder.resolveForkEntryId(conn, p.pathOrId);
         if (!entryId) {
-          throw rpcError(JSON_RPC_ERROR.invalidParams, `cannot resolve fork entry for session: ${p.pathOrId}`);
+          throw rpcError(JSON_RPC_ERROR.invalidParams, `cannot resolve a forkable entry for: ${p.pathOrId}`);
         }
         return conn.fork(entryId);
       }
@@ -509,14 +493,14 @@ export class RpcServer {
 
       case "cloneSession": {
         // No first-class clone on the daemon's AgentConnection. A fork of the
-        // current leaf is the closest primitive. After a successful fork the
-        // daemon switches to the new session, so read back its id via getState.
+        // most recent user message is the closest primitive. After a
+        // successful fork the daemon switches to the new session, so read
+        // back its id via getState.
         const conn = this.requireConn();
-        const treeResp = await conn.getSessionTree();
-        const leafId = treeResp?.leafId;
-        if (typeof leafId === "string" && leafId) {
+        const entryId = await this.holder.resolveForkEntryId(conn, "");
+        if (typeof entryId === "string" && entryId) {
           try {
-            const res = await conn.fork(leafId);
+            const res = await conn.fork(entryId);
             if (!res?.cancelled) {
               const st = await conn.getState();
               const activeSessionId = st.activeSessionId ?? st.sessionId;

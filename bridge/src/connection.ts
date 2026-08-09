@@ -1164,6 +1164,67 @@ export class ConnectionHolder {
   }
 
   /**
+   * Resolve a fork request to a VALID user-message entry id that the daemon's
+   * `fork` command accepts.
+   *
+   * The daemon only forks from user-message transcript entries (assistant
+   * replies and system entries are rejected with "Invalid entry ID for
+   * forking"). The frontend passes a transcript message id (`msg-N`, a
+   * synthetic index the bridge assigns when the daemon message carries no
+   * id), so we map it to the Nth user message's fork point via
+   * `getUserMessagesForForking()`. A direct entry id is verified against the
+   * forkable set; a session id/path resolves to the most recent user message.
+   *
+   * Returns undefined when no forkable point can be resolved.
+   */
+  async resolveForkEntryId(conn: AgentConnection, pathOrId: string): Promise<string | undefined> {
+    let forkable: Array<{ entryId?: string; text?: string }> = [];
+    try {
+      const msgs = (await conn.getUserMessagesForForking()) as unknown as Array<{ entryId?: string; text?: string }>;
+      if (Array.isArray(msgs)) forkable = msgs;
+    } catch {
+      // daemon lacks the read — fall through to tree-based resolution below
+    }
+    const valid = forkable.filter((f) => typeof f.entryId === "string" && f.entryId.length > 0);
+
+    // 1) Transcript message id like "msg-3" → the Nth user message's fork point.
+    const msgMatch = /^msg-(\d+)$/.exec(pathOrId);
+    if (msgMatch) {
+      const idx = Number(msgMatch[1]);
+      if (valid.length > 0) {
+        let userCount = 0;
+        try {
+          const all = await conn.getMessages();
+          for (let i = 0; i <= idx && i < all.length; i++) {
+            const role = (all[i] as unknown as { role?: string })?.role;
+            if (role === "user") userCount++;
+          }
+        } catch {
+          // fall back to treating the id as a 1-based user index
+          userCount = idx + 1;
+        }
+        const target = valid[userCount - 1];
+        if (target && typeof target.entryId === "string") return target.entryId;
+      }
+      return undefined;
+    }
+
+    // 2) Direct entry id — only accept it if it is actually forkable.
+    if (valid.some((f) => f.entryId === pathOrId)) return pathOrId;
+
+    // 3) Session id / path / anything else → most recent user message fork point.
+    if (valid.length > 0) {
+      const last = valid[valid.length - 1];
+      if (last && typeof last.entryId === "string") return last.entryId;
+    }
+
+    // 4) Fallback: tree-based leaf resolution (best-effort; the daemon may
+    //    still reject a non-user leaf, in which case the caller surfaces the
+    //    daemon's clear error).
+    return this.resolveSessionToEntryId(conn, pathOrId);
+  }
+
+  /**
    * Issue a daemon `create` command with the supplied runtime config
    * (cwd + initialGoal), then re-attach the bridge to the new session.
    * Used by the rpc.ts newSession dispatcher when cwd/goal are present,
@@ -1193,6 +1254,12 @@ export class ConnectionHolder {
     // Tear down the current attach BEFORE issuing the re-attach: the daemon
     // may refuse two attaches from the same client at the same time.
     await this.disposeConnectionOnly();
+    // The AgentConnection was created with closeClientOnDispose: true, so
+    // disposing it closed the DaemonClient. Reconnect it before re-attaching,
+    // otherwise the attach below fails with "daemon is not connected".
+    if (this.client && !this.client.isConnected) {
+      await this.client.connect();
+    }
     try {
       this.conn = await DaemonAgentConnection.attach(this.client, newId, {
         closeClientOnDispose: true,
