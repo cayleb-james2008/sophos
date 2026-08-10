@@ -142,6 +142,29 @@
   font-size: 13px;
 }
 
+/* Search sub-modes (Find session / Search transcript) */
+.palette__search {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.palette__searchlabel {
+  font: 600 9px/1.2 'Geist Mono', ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(244, 244, 244, 0.45);
+}
+.palette__searchlist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 0 -8px;
+  padding: 0 8px;
+}
+
 /* Footer */
 .palette__foot {
   display: flex;

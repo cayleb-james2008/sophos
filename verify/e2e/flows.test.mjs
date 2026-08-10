@@ -7,6 +7,28 @@ import { patchProviderLoginFlow, restoreMock } from "./mock-patch.mjs";
 export const flows = [
   {
     section: "Flows",
+    name: "File-edit tool call renders a unified diff (not raw JSON)",
+    fn: async ({ page, shot, expect }) => {
+      await navTo(page, "Chat");
+      await sendMessage(page, "show me a diff");
+      // The simulated turn includes a file-edit tool call → a diff renders.
+      await page.waitForSelector('[data-diff="true"]', { timeout: 15000 });
+      // The diff header shows the edited file path.
+      await expect(await page.locator("text=src/features/chat/demo.ts").count() > 0, "diff file path not shown");
+      // Added lines are present and green-tinted (non-transparent background).
+      const addCount = await page.locator('[data-diff-add="true"]').count();
+      await expect(addCount > 0, "no added lines in diff");
+      const addBg = await page.locator('[data-diff-add="true"]').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      await expect(addBg !== "rgba(0, 0, 0, 0)" && addBg !== "transparent", `added line not tinted (bg=${addBg})`);
+      // The raw input JSON is collapsed behind the "input" button by default.
+      await expect(await page.locator("text=old_string").count() === 0, "raw input JSON visible by default (should be collapsed)");
+      await shot("flow-diff");
+      await waitIdle(page, 20000);
+      return true;
+    },
+  },
+  {
+    section: "Flows",
     name: "Send a message → user msg + streaming assistant + completes",
     fn: async ({ page, shot, expect }) => {
       await navTo(page, "Chat");

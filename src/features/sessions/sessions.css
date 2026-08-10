@@ -48,7 +48,7 @@
 .sessions__telemetry i { width: 1px; height: 14px; background: #2a2a2a; }
 .sessions__sync { color: rgba(244, 244, 244, 0.6); }
 
-/* Toolbar: view switch + actions on one restrained row (not two bands). */
+/* Toolbar: view switch + filter + actions on one restrained row. */
 .sessions__toolbar {
   display: flex;
   align-items: center;
@@ -58,6 +58,81 @@
 .sessions__actions {
   display: flex;
   gap: 8px;
+}
+
+/* ---- P5: session filter (name search + status select) ---- */
+.sessions__filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sessions__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  background: rgba(21, 21, 21, 0.75);
+  border: 1px solid #2a2a2a;
+  border-radius: 0;
+  min-width: 220px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.sessions__search:focus-within {
+  border-color: rgba(133, 237, 117, 0.4);
+  box-shadow: 0 0 0 3px rgba(133, 237, 117, 0.12);
+}
+.sessions__search-icon {
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(244, 244, 244, 0.45);
+  flex: none;
+}
+.sessions__search-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f4f4f4;
+  font: 12px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  padding: 7px 0;
+}
+.sessions__search-input::placeholder {
+  color: rgba(244, 244, 244, 0.35);
+}
+.sessions__search-clear {
+  background: transparent;
+  border: none;
+  color: rgba(244, 244, 244, 0.45);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 0;
+  flex: none;
+  transition: color 0.12s ease;
+}
+.sessions__search-clear:hover {
+  color: #f4f4f4;
+}
+.sessions__status-select {
+  background: rgba(21, 21, 21, 0.75);
+  border: 1px solid #2a2a2a;
+  border-radius: 0;
+  color: rgba(244, 244, 244, 0.6);
+  font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  padding: 7px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.sessions__status-select:focus {
+  border-color: rgba(133, 237, 117, 0.4);
+  box-shadow: 0 0 0 3px rgba(133, 237, 117, 0.12);
+}
+.sessions__status-select option {
+  background: #151515;
+  color: #f4f4f4;
 }
 
 .sessions__console {

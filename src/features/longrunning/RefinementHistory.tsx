@@ -20,15 +20,18 @@ import { useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
 import { useIpc } from "../../ipc/client";
-import { RefreshIcon, XIcon, CheckIcon } from "../sessions/icons";
+import type { RefinementResult } from "../../ipc/contract";
+import { RefreshIcon, XIcon, CheckIcon, ChevronRightIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
-import { useRefinementGate } from "./useRefinementGate";
+import { useRefinementGate, buildRefinementDiff } from "./useRefinementGate";
+import { DiffView } from "./DiffView";
 
 export interface RefinementEntry {
   id: string;
   timestamp?: string;
   description?: string;
   status?: "applied" | "discarded" | "rolled-back";
+  result?: RefinementResult;
 }
 
 export interface RefinementHistoryProps {
@@ -49,7 +52,17 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
   const gate = useRefinementGate();
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
+  const [openDiffs, setOpenDiffs] = useState<Set<string>>(new Set());
   const { error, run } = useActionError();
+
+  const toggleDiff = (id: string) => {
+    setOpenDiffs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const refineNow = async () => {
     setBusy(true);
@@ -319,59 +332,94 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
             {refinements.map((r) => {
               const rolledBack = r.status === "rolled-back";
               const discarded = r.status === "discarded";
+              const hasEdits = (r.result?.appliedEdits ?? []).length > 0;
+              const diffOpen = openDiffs.has(r.id);
               return (
-                <div
-                  key={r.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: tokens.space.md,
-                  }}
-                >
-                  <span
+                <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+                  <div
                     style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      background: rolledBack
-                        ? tokens.color.warning
-                        : discarded
-                          ? tokens.color.textDim
-                          : tokens.color.accentHover,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: tokens.space.md,
                     }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-                    <Text variant="label" weight="medium" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {r.description ?? "Refinement"}
-                    </Text>
-                    {r.timestamp ? (
-                      <Text variant="micro" tone="dim" mono>
-                        {new Date(r.timestamp).toLocaleString()}
-                      </Text>
-                    ) : null}
-                  </div>
-                  <Badge
-                    tone={rolledBack ? "warning" : discarded ? "neutral" : "success"}
-                    dot
                   >
-                    {rolledBack ? "Rolled back" : discarded ? "Discarded" : "Applied"}
-                  </Badge>
-                  {!rolledBack && !discarded ? (
-                    <IconButton
-                      title="Rollback this refinement"
-                      onClick={() => void rollback(r.id)}
-                      tone="danger"
-                      size="sm"
-                      disabled={busy}
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        background: rolledBack
+                          ? tokens.color.warning
+                          : discarded
+                            ? tokens.color.textDim
+                            : tokens.color.accentHover,
+                      }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                      <Text variant="label" weight="medium" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.description ?? "Refinement"}
+                      </Text>
+                      {r.timestamp ? (
+                        <Text variant="micro" tone="dim" mono>
+                          {new Date(r.timestamp).toLocaleString()}
+                        </Text>
+                      ) : null}
+                    </div>
+                    {hasEdits ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleDiff(r.id)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          background: "transparent",
+                          border: "none",
+                          color: tokens.color.textDim,
+                          fontFamily: tokens.font.sans,
+                          fontSize: tokens.font.size.xs,
+                          cursor: "pointer",
+                          padding: "2px 4px",
+                        }}
+                      >
+                        <ChevronRightIcon
+                          size={11}
+                          style={{
+                            transform: diffOpen ? "rotate(90deg)" : "none",
+                            transition: `transform ${tokens.motion.fast} ${tokens.motion.ease}`,
+                          }}
+                        />
+                        {diffOpen ? "Hide diff" : "Show diff"}
+                      </button>
+                    ) : null}
+                    <Badge
+                      tone={rolledBack ? "warning" : discarded ? "neutral" : "success"}
+                      dot
                     >
-                      <XIcon size={13} />
-                    </IconButton>
-                  ) : (
-                    <span style={{ color: tokens.color.textDim, display: "inline-flex" }}>
-                      <CheckIcon size={13} />
-                    </span>
-                  )}
+                      {rolledBack ? "Rolled back" : discarded ? "Discarded" : "Applied"}
+                    </Badge>
+                    {!rolledBack && !discarded ? (
+                      <IconButton
+                        title="Rollback this refinement"
+                        onClick={() => void rollback(r.id)}
+                        tone="danger"
+                        size="sm"
+                        disabled={busy}
+                      >
+                        <XIcon size={13} />
+                      </IconButton>
+                    ) : (
+                      <span style={{ color: tokens.color.textDim, display: "inline-flex" }}>
+                        <CheckIcon size={13} />
+                      </span>
+                    )}
+                  </div>
+                  {hasEdits && diffOpen && r.result ? (
+                    <div style={{ paddingLeft: tokens.space.lg }}>
+                      <DiffView lines={buildRefinementDiff(r.result)} />
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

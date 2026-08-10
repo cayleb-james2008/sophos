@@ -5,13 +5,13 @@
 //   * tool      — nested tool card
 // Streaming assistant messages get a blinking caret.
 
-import { useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Text } from "../../design";
 import type { TranscriptMessage } from "../../ipc/contract";
 import { Markdown } from "./markdown";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolCallCard } from "./ToolCallCard";
+import { MessageActions } from "./MessageActions";
 
 // SophosMark — the geometric "Σ" (sigma, sum of knowledge) wordmark in Geist
 // Mono, replacing the old Prime bolt glyph.
@@ -56,80 +56,25 @@ function StreamingCaret() {
   );
 }
 
-// CopyButton — a small icon button that appears on hover and copies text to
-// the clipboard, showing a brief checkmark on success.
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  const [visible, setVisible] = useState(false);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Fallback for restricted contexts.
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand("copy");
-      } catch {
-        /* ignore */
-      }
-      document.body.removeChild(ta);
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1400);
-  };
-
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={copied ? "Copied" : "Copy"}
-      onClick={copy}
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
-      className="pa-focus-ring"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 24,
-        height: 24,
-        borderRadius: tokens.radius.sm,
-        background: copied ? tokens.color.accentSoft : tokens.color.bgOverlay,
-        border: `1px solid ${copied ? tokens.color.accentBorder : tokens.color.border}`,
-        color: copied ? tokens.color.accentHover : tokens.color.textDim,
-        cursor: "pointer",
-        opacity: visible || copied ? 1 : 0,
-        transform: visible || copied ? "translateY(0)" : "translateY(-2px)",
-        transition: `opacity ${tokens.motion.fast} ${tokens.motion.ease}, transform ${tokens.motion.fast} ${tokens.motion.ease}, background ${tokens.motion.fast} ${tokens.motion.ease}`,
-      }}
-    >
-      {copied ? (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-      ) : (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="9" y="9" width="13" height="13" rx="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
-      )}
-    </button>
-  );
-}
-
-export function MessageRow({ message }: { message: TranscriptMessage }) {
+export function MessageRow({
+  message,
+  canRetry,
+  canEdit,
+  onRetry,
+  onEdit,
+}: {
+  message: TranscriptMessage;
+  canRetry: boolean;
+  canEdit: boolean;
+  onRetry: (message: TranscriptMessage) => void;
+  onEdit: (message: TranscriptMessage) => void;
+}) {
   const time = formatTime(message.timestamp);
 
   // ---- System ----
   if (message.role === "system") {
     return (
-      <div style={{ display: "flex", justifyContent: "center", padding: `${tokens.space.sm} 0` }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: tokens.space.xs, padding: `${tokens.space.sm} 0` }}>
         <div
           style={{
             display: "inline-flex",
@@ -146,6 +91,7 @@ export function MessageRow({ message }: { message: TranscriptMessage }) {
             {message.content}
           </Text>
         </div>
+        <MessageActions role="system" content={message.content} />
       </div>
     );
   }
@@ -153,7 +99,7 @@ export function MessageRow({ message }: { message: TranscriptMessage }) {
   // ---- Tool (standalone) ----
   if (message.role === "tool") {
     return (
-      <div style={{ padding: `${tokens.space.xs} 0 ${tokens.space.xs} ${tokens.space["2xl"]}` }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: tokens.space.xs, padding: `${tokens.space.xs} 0 ${tokens.space.xs} ${tokens.space["2xl"]}` }}>
         <ToolCallCard
           call={{
             id: message.id,
@@ -163,6 +109,7 @@ export function MessageRow({ message }: { message: TranscriptMessage }) {
             status: message.status === "error" ? "error" : "complete",
           }}
         />
+        <MessageActions role="tool" content={message.content} />
       </div>
     );
   }
@@ -198,6 +145,7 @@ export function MessageRow({ message }: { message: TranscriptMessage }) {
         >
           {message.content}
         </div>
+        <MessageActions role="user" content={message.content} onEdit={() => onEdit(message)} canEdit={canEdit} />
       </div>
     );
   }
@@ -295,10 +243,15 @@ export function MessageRow({ message }: { message: TranscriptMessage }) {
           </div>
         ) : null}
 
-        {/* Copy-on-hover for assistant content */}
+        {/* Copy + retry on hover for assistant content */}
         {message.content && !isStreaming ? (
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -2 }}>
-            <CopyButton text={message.content} label="Copy assistant message" />
+            <MessageActions
+              role="assistant"
+              content={message.content}
+              onRetry={() => onRetry(message)}
+              canRetry={canRetry}
+            />
           </div>
         ) : null}
       </div>

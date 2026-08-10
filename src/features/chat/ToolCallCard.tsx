@@ -6,6 +6,8 @@ import { tokens } from "../../design/tokens";
 import { Text, Badge, type BadgeTone } from "../../design";
 import type { ToolCall } from "../../ipc/contract";
 import { HighlightedCode, detectLang } from "./highlight";
+import { DiffView } from "./DiffView";
+import { diffLines, formatUnified, isEditToolName, parseFileEdit } from "./diff";
 
 function ToolIcon({ size = 13, color }: { size?: number; color: string }) {
   return (
@@ -33,6 +35,13 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
   const meta = statusMeta(call.status);
   const hasInput = !!call.input;
   const hasOutput = !!call.output;
+
+  // File-edit detection: by tool name OR by input shape. When recognized, the
+  // unified diff becomes the default view and the raw JSON is collapsed behind
+  // the input/output buttons. Unrecognized input falls back to raw rendering.
+  const edit = parseFileEdit(call.input, call.name);
+  const isEdit = isEditToolName(call.name) || edit !== null;
+  const showDiff = isEdit && edit !== null;
 
   return (
     <div
@@ -105,7 +114,43 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
             {showInput ? "hide input" : "input"}
           </button>
         ) : null}
+        {isEdit && hasOutput ? (
+          <button
+            type="button"
+            onClick={() => setShowOutput((s) => !s)}
+            className="pa-focus-ring"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: tokens.color.textDim,
+              cursor: "pointer",
+              fontFamily: tokens.font.sans,
+              fontSize: tokens.font.size.xs,
+              padding: "2px 6px",
+              borderRadius: tokens.radius.sm,
+            }}
+          >
+            {showOutput ? "hide output" : "output"}
+          </button>
+        ) : null}
       </div>
+
+      {/* Diff — the default view for file-edit calls */}
+      {showDiff ? (
+        <div
+          style={{
+            padding: `${tokens.space.sm} ${tokens.space.md}`,
+            borderBottom: `1px solid ${tokens.color.border}`,
+            background: tokens.color.bg,
+          }}
+        >
+          <DiffView
+            filePath={edit!.filePath || call.name}
+            lines={diffLines(edit!.before, edit!.after)}
+            unified={formatUnified(edit!.before, edit!.after, edit!.filePath || call.name)}
+          />
+        </div>
+      ) : null}
 
       {/* Input */}
       {hasInput && showInput ? (
@@ -135,8 +180,30 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
         </div>
       ) : null}
 
-      {/* Output */}
-      {hasOutput ? (
+      {/* Output — for edit calls the raw output is collapsed behind the
+          "output" button (the diff is the default view); for all other tools
+          the existing highlighted output with collapse/expand is kept. */}
+      {isEdit && hasOutput && showOutput ? (
+        <div style={{ padding: `${tokens.space.sm} ${tokens.space.md}`, background: tokens.color.bg }}>
+          <Text variant="micro" tone="dim" mono uppercase style={{ marginBottom: tokens.space.xs }}>
+            Output
+          </Text>
+          <pre
+            style={{
+              margin: 0,
+              fontFamily: tokens.font.mono,
+              fontSize: tokens.font.size.xs,
+              lineHeight: 1.6,
+              color: tokens.color.textMuted,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {call.output}
+          </pre>
+        </div>
+      ) : null}
+      {!isEdit && hasOutput ? (
         <div style={{ padding: `${tokens.space.sm} ${tokens.space.md}`, background: tokens.color.bg }}>
           <div
             style={{

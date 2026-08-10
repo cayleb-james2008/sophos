@@ -89,6 +89,15 @@ function QuestionIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+function SearchIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
 export interface PaletteCommand {
   id: string;
   group: string;
@@ -97,6 +106,8 @@ export interface PaletteCommand {
   keywords?: string;
   icon?: ReactNode;
   hint?: string;
+  /** Keep the palette open after running (for sub-mode commands like /name, Find session…). */
+  keepOpen?: boolean;
   run: () => void;
 }
 
@@ -111,12 +122,34 @@ export function buildPaletteCommands(
   onNavigate: (view: View) => void,
   onNewSession: () => void,
   onNameRequest: () => void,
+  onFindSessionRequest: () => void,
+  onSearchTranscriptRequest: () => void,
 ): PaletteGroup[] {
   return [
     {
       id: "session",
       label: "Session",
       commands: [
+        {
+          id: "find-session",
+          group: "Session",
+          label: "Find session…",
+          description: "Search sessions by name and open the manager filtered",
+          keywords: "find search session title name locate",
+          icon: <SearchIcon />,
+          keepOpen: true,
+          run: onFindSessionRequest,
+        },
+        {
+          id: "search-transcript",
+          group: "Session",
+          label: "Search transcript…",
+          description: "Search the current session's messages and jump to a match",
+          keywords: "search transcript messages find content text",
+          icon: <SearchIcon />,
+          keepOpen: true,
+          run: onSearchTranscriptRequest,
+        },
         {
           id: "new-session",
           group: "Session",
@@ -142,6 +175,7 @@ export function buildPaletteCommands(
           description: "Set the session display name (e.g. /name My task)",
           keywords: "name rename title session",
           icon: <TextIcon />,
+          keepOpen: true,
           run: onNameRequest,
         },
         {

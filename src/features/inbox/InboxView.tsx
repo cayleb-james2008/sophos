@@ -29,6 +29,7 @@ export function InboxView() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [lastSync, setLastSync] = useState<Date | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -36,6 +37,7 @@ export function InboxView() {
       setAgents(nextAgents); setMessages(inbox);
       setSelected((old) => old ?? nextAgents[0]?.id ?? (inbox[0] ? peerId(inbox[0]) : undefined));
       setError(undefined);
+      setLastSync(new Date());
     } catch (e) { setError(e instanceof Error ? e.message : "Inbox unavailable"); }
     finally { setLoading(false); }
   }, [ipc]);
@@ -200,6 +202,21 @@ export function InboxView() {
           </div>
         )}
       </section>
+
+      {/* Thin status footer — a second visual anchor under the (often empty)
+          canvas so the view reads as an instrument, not negative space. */}
+      <footer className="inbox__foot">
+        <span className="inbox__foot__item">
+          <span className="inbox__foot__dot" />
+          relay {agents.length} agent{agents.length === 1 ? "" : "s"} · {messages.length} message{messages.length === 1 ? "" : "s"}
+        </span>
+        <span className="inbox__foot__item">
+          last sync {lastSync ? lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"}
+        </span>
+        <span className="inbox__foot__item">
+          {selectedAgent ? `peer ${selectedAgent.name ?? selectedAgent.id}` : "no peer selected"}
+        </span>
+      </footer>
     </main>
   );
 }

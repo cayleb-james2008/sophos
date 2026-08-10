@@ -10,8 +10,8 @@
     "executable": "C:/Program Files/Google/Chrome/Application/chrome.exe",
     "headless": true
   },
-  "startedAt": "2026-08-10T14:14:51.511Z",
-  "finishedAt": "2026-08-10T14:16:27.003Z",
+  "startedAt": "2026-08-10T18:41:21.934Z",
+  "finishedAt": "2026-08-10T18:43:00.959Z",
   "results": [
     {
       "section": "Views",
@@ -93,6 +93,13 @@
     {
       "section": "Views",
       "name": "Engine terminal opens via SystemBar toggle",
+      "ok": true,
+      "detail": "ok",
+      "error": null
+    },
+    {
+      "section": "Flows",
+      "name": "File-edit tool call renders a unified diff (not raw JSON)",
       "ok": true,
       "detail": "ok",
       "error": null
@@ -261,9 +268,9 @@
     {
       "section": "Edge",
       "name": "No console/page errors across all views",
-      "ok": true,
-      "detail": "ok",
-      "error": null
+      "ok": false,
+      "detail": "page.waitForTimeout: Target page, context or browser has been closed",
+      "error": "page.waitForTimeout: Target page, context or browser has been closed"
     }
   ],
   "consoleErrors": [],
@@ -280,6 +287,7 @@
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Views-settings-advanced-runtime-telemetry-renders-settings-advanced.png",
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Views-settings-long-running-panels-render-goals-autonomous-heartbeats-schedules-refinement--settings-longrunning.png",
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Views-engine-terminal-opens-via-systembar-toggle-engine.png",
+    "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Flows-file-edit-tool-call-renders-a-unified-diff-not-raw-json--flow-diff.png",
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Flows-send-a-message-user-msg-streaming-assistant-completes-flow-send-busy.png",
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Flows-send-a-message-user-msg-streaming-assistant-completes-flow-send-done.png",
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Flows-steering-enter-while-busy-shows-steered-indicator-flow-steer.png",
@@ -307,13 +315,12 @@
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-inbox-view-empty-state-no-relay-traffic--edge-inbox-empty.png",
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-state.png",
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-recovered.png",
-    "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-empty-transcript-state-in-session-detail-edge-empty-transcript.png",
-    "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-no-console-page-errors-across-all-views-edge-error-sweep.png"
+    "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-empty-transcript-state-in-session-detail-edge-empty-transcript.png"
   ],
   "summary": {
-    "total": 36,
+    "total": 37,
     "passed": 36,
-    "failed": 0,
-    "overall": "PASS"
+    "failed": 1,
+    "overall": "FAIL"
   }
 }

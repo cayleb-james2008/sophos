@@ -24,6 +24,7 @@
 import { useSyncExternalStore } from "react";
 import { useIpcEvent } from "../../ipc/client";
 import type { RefinementResult } from "../../ipc/contract";
+import { diffLines, type DiffLine } from "./diff";
 
 export interface RefinementEntry {
   id: string;
@@ -36,6 +37,51 @@ export interface RefinementEntry {
 export interface PendingRefinement {
   result: RefinementResult;
   receivedAt: string;
+  /** Rendered diff lines for the banner — computed from the event, never fabricated. */
+  diff?: DiffLine[];
+}
+
+/**
+ * Widened edit shape. The frozen IPC contract carries no old/new file content,
+ * but a richer event (e.g. the demo trigger) may include it. We read it
+ * defensively and only ever render what the event actually reported.
+ */
+type AppliedEdit = NonNullable<RefinementResult["appliedEdits"]>[number];
+interface RichEdit extends AppliedEdit {
+  path?: string;
+  oldContent?: string;
+  newContent?: string;
+}
+
+/**
+ * Build the diff shown in the banner from a refinement result.
+ *
+ * Honesty: the frozen contract does not carry old/new file content, so a true
+ * unified diff is only rendered when the event actually includes it
+ * (oldContent/newContent on an edit). Otherwise we fall back to a structured
+ * per-edit change list (file + action + kind) — we never invent content the
+ * daemon did not report.
+ */
+export function buildRefinementDiff(result: RefinementResult): DiffLine[] {
+  const edits = (result.appliedEdits ?? []) as RichEdit[];
+  const rich = edits.filter((e) => e.oldContent != null || e.newContent != null);
+  if (rich.length > 0) {
+    const lines: DiffLine[] = [];
+    for (const e of rich) {
+      const path = e.path ?? e.title ?? e.action ?? "edit";
+      lines.push({ type: "ctx", text: `@@ ${path} @@` });
+      lines.push(...diffLines(e.oldContent ?? "", e.newContent ?? ""));
+    }
+    return lines;
+  }
+  const lines: DiffLine[] = [];
+  for (const e of edits) {
+    const title = e.title ?? e.action ?? e.kind ?? "edit";
+    lines.push({ type: "ctx", text: `@@ ${title} @@` });
+    if (e.action) lines.push({ type: "del", text: e.action });
+    if (e.kind) lines.push({ type: "add", text: e.kind });
+  }
+  return lines;
 }
 
 interface GateState {
@@ -115,7 +161,7 @@ export function handleRefinementResult(result: RefinementResult) {
       result,
     });
   } else {
-    setState({ pending: { result, receivedAt: nowIso() } });
+    setState({ pending: { result, receivedAt: nowIso(), diff: buildRefinementDiff(result) } });
   }
 }
 

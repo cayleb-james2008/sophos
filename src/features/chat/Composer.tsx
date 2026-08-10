@@ -159,6 +159,7 @@ function SideQuestionPanel({
 
 export function Composer({
   busy,
+  editDraft,
   onSend,
   onAbort,
   onSteer,
@@ -175,6 +176,7 @@ export function Composer({
   onSetName,
 }: {
   busy: boolean;
+  editDraft: { index: number; text: string } | null;
   onSend: (text: string) => void;
   onAbort: () => void;
   onSteer: (text: string) => void;
@@ -213,6 +215,16 @@ export function Composer({
     setValue("");
     focusInput();
   };
+
+  // Edit-and-resend: when a user message is marked for editing, load its text
+  // into the editor and focus. The draft is consumed by `send` (which branches
+  // from the edited message), so this effect only re-fires on a new draft.
+  useEffect(() => {
+    if (editDraft) {
+      setValue(editDraft.text);
+      focusInput();
+    }
+  }, [editDraft]);
 
   // Route a submitted line to the correct handler based on prefix + busy.
   const submit = () => {

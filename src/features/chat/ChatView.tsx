@@ -92,6 +92,10 @@ export function ChatView({
     runShell,
     contextStats,
     setSessionName,
+    loadDemoMessages,
+    editDraft,
+    requestEdit,
+    retry,
   } = chat;
 
   // ---- Toast for header actions ----
@@ -313,12 +317,47 @@ export function ChatView({
           <Text variant="label" tone="muted">
             Demo mode — engine not connected. Responses here are simulated and do not reflect real tools or data.
           </Text>
+          {/* Dev-only trigger: seeds a 500+ message transcript so the windowed
+              MessageList perf is demonstrable in the browser preview. */}
+          <button
+            type="button"
+            onClick={() => loadDemoMessages(500)}
+            title="Seed a 500-message transcript to test windowed rendering"
+            style={{
+              marginLeft: "auto",
+              flexShrink: 0,
+              background: "transparent",
+              border: `1px solid ${tokens.color.borderStrong}`,
+              borderRadius: tokens.radius.sm,
+              color: tokens.color.textMuted,
+              fontFamily: tokens.font.mono,
+              fontSize: tokens.font.size.xs,
+              padding: "3px 10px",
+              cursor: "pointer",
+              transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = tokens.color.accentBorder;
+              e.currentTarget.style.color = tokens.color.text;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = tokens.color.borderStrong;
+              e.currentTarget.style.color = tokens.color.textMuted;
+            }}
+          >
+            Load 500 messages
+          </button>
         </div>
       ) : null}
 
       {/* Message list */}
       {loaded ? (
-        <MessageList messages={messages} />
+        <MessageList
+          messages={messages}
+          busy={busy}
+          onRetry={retry}
+          onEdit={(index, m) => requestEdit(index, m.content)}
+        />
       ) : (
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Text variant="label" tone="dim">
@@ -333,6 +372,7 @@ export function ChatView({
       {/* Composer */}
       <Composer
         busy={busy}
+        editDraft={editDraft}
         onSend={send}
         onAbort={abort}
         onSteer={steer}

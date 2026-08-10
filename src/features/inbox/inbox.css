@@ -469,3 +469,26 @@
   font-size: 12px;
 }
 .inbox__graphblank__retry:hover { color: #f4f4f4; border-color: #85ed75; }
+
+/* Thin status footer — a quiet second anchor under the canvas so the empty
+   state reads as an instrument, not negative space. Hairline top rule,
+   opacity-based text, no new colours. */
+.inbox__foot {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 16px;
+  border-top: 1px solid #2a2a2a;
+  background: #0e0e0e;
+  font: 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(244, 244, 244, 0.45);
+}
+.inbox__foot__item { display: inline-flex; align-items: center; gap: 6px; }
+.inbox__foot__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #85ed75;
+}

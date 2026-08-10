@@ -187,20 +187,34 @@ export function SkillsPanel() {
                 reads state → controls → reference → commit, and the primary
                 action is the last thing in the card — the same rule card 1
                 follows with Reload (vision-critic D7: one action was inside its
-                card, the other stranded mid-card above the help text). */}
-            <Text variant="micro" tone="dim">
-              Discovery locations (precedence: CLI → settings → packages → project → global → built-in):
-              <br />
-              • CLI: <Text mono>{`--skill <path>`}</Text>
-              <br />
-              • Settings: <Text mono>skills: ["path", "!excluded"]</Text>
-              <br />
-              • Global: <Text mono>~/.prime/agent/skills/</Text>, <Text mono>~/.agents/skills/</Text>
-              <br />
-              • Project: <Text mono>.prime/agent/skills/</Text>, <Text mono>.agents/skills/</Text>
-              <br />
-              • Packages: <Text mono>skills/</Text> in npm/git packages
-            </Text>
+                card, the other stranded mid-card above the help text).
+                Wrapped in a hairline #2a2a2a card outline so the discovery
+                locations read as a config block, not a paragraph. */}
+            <div
+              style={{
+                border: `1px solid ${tokens.color.border}`,
+                borderRadius: tokens.radius.md,
+                background: tokens.color.bgElevated,
+                padding: `${tokens.space.md} ${tokens.space.lg}`,
+              }}
+            >
+              <Text variant="micro" tone="dim" mono style={{ letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: tokens.space.sm, display: "block" }}>
+                Discovery locations
+              </Text>
+              <Text variant="micro" tone="dim">
+                Precedence: CLI → settings → packages → project → global → built-in
+                <br />
+                • CLI: <Text mono>{`--skill <path>`}</Text>
+                <br />
+                • Settings: <Text mono>skills: ["path", "!excluded"]</Text>
+                <br />
+                • Global: <Text mono>~/.prime/agent/skills/</Text>, <Text mono>~/.agents/skills/</Text>
+                <br />
+                • Project: <Text mono>.prime/agent/skills/</Text>, <Text mono>.agents/skills/</Text>
+                <br />
+                • Packages: <Text mono>skills/</Text> in npm/git packages
+              </Text>
+            </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: tokens.space.sm, borderTop: `1px solid ${tokens.color.border}`, paddingTop: tokens.space.lg }}>
               <Button variant="ghost" onClick={refresh} disabled={saving}>

@@ -41,6 +41,7 @@ export const tokens = {
     warning: "#f3bc56",
     danger: "#ef4444",
     err: "#ef4444",
+    dangerSoft: "rgba(239,68,68,0.10)",
     info: "#8b7cf6",
 
     // Role colors

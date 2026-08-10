@@ -19,6 +19,7 @@ import type {
   ModelRuntimeConfig,
   NavigateTreeResult,
   ProviderInfo,
+  RefinementResult,
   ScheduleInfo,
   SessionInfo,
   SessionTree,
@@ -603,18 +604,41 @@ export class MockIpcClient implements IpcClient {
     // Browser preview: emit a demo refinement_result so the review-and-approve
     // gate (A1) is demonstrable without a live daemon. The proposed change is
     // held pending until the user explicitly applies or discards it.
-    this.emit({
-      type: "refinement_result",
-      result: {
-        id: `refine-${Date.now()}`,
-        summary: "Tighten the session instructions against the stated goal.",
-        rationale: "The current instructions drift from the objective; this pass realigns them.",
-        expectedOutcome: "More focused continuations on the active goal.",
-        appliedEdits: [
-          { id: "edit-1", action: "update", kind: "instruction", title: "Session instructions", applied: false },
-        ],
-      },
-    });
+    //
+    // P3: the demo edit carries old/new content so the banner renders a REAL
+    // unified diff (added/removed lines), not just a text summary. The frozen
+    // contract type has no old/new fields, so they ride along at runtime and
+    // buildRefinementDiff reads them defensively — production only renders a
+    // true diff when the event actually reports the content.
+    const oldContent = [
+      "You are Sophos, a focused agent.",
+      "Complete the user's tasks.",
+      "Be concise.",
+    ].join("\n");
+    const newContent = [
+      "You are Sophos, a focused agent.",
+      "Complete the user's tasks and verify every published artifact.",
+      "Be concise and cite your sources.",
+    ].join("\n");
+    const result = {
+      id: `refine-${Date.now()}`,
+      summary: "Tighten the session instructions against the stated goal.",
+      rationale: "The current instructions drift from the objective; this pass realigns them.",
+      expectedOutcome: "More focused continuations on the active goal.",
+      appliedEdits: [
+        {
+          id: "edit-1",
+          action: "update",
+          kind: "instruction",
+          title: "Session instructions",
+          path: "session-instructions.md",
+          oldContent,
+          newContent,
+          applied: false,
+        },
+      ],
+    } as unknown as RefinementResult;
+    this.emit({ type: "refinement_result", result });
   }
   async exportSession(format?: string): Promise<{ exportedPath?: string }> {
     // Browser preview: report the requested format without a real export.
@@ -713,6 +737,15 @@ export function getIpcClient(): IpcClient {
   // In Tauri, the global __TAURI_INTERNALS__ is present.
   const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
   client = inTauri ? new TauriIpcClient() : new MockIpcClient();
+  // Expose on window in browser/demo mode so the e2e test harness can patch
+  // the singleton directly (Vite HMR creates separate module instances per
+  // `?t=` timestamp, so `import()` in page.evaluate resolves to a different
+  // module than the app loaded — patching that prototype has no effect on the
+  // already-instantiated singleton). In Tauri this is a no-op (the mock isn't
+  // used). Harmless in production.
+  if (typeof window !== "undefined" && !inTauri) {
+    (window as any).__sophosIpc = client;
+  }
   return client;
 }
 

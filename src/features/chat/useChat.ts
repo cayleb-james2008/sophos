@@ -17,7 +17,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useIpc, useIpcEvent, useConnectionState, isTauri } from "../../ipc/client";
 import type { ContextStats, SessionEvent, ToolCall, TranscriptMessage } from "../../ipc/contract";
-import { demoSeed, simulateResponse } from "./demo";
+import { demoSeed, demoSeedLarge, simulateResponse } from "./demo";
+import { setTranscriptMessages } from "./chatBridge";
 
 /**
  * Parse the daemon's message content — a string OR an array of content blocks
@@ -84,6 +85,12 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
   const simCleanup = useRef<(() => void) | null>(null);
   const streamingId = useRef<string | null>(null);
+
+  // ---- Edit-and-resend draft ------------------------------------------
+  // Holds the user message being edited (index + original text). The composer
+  // loads `text` into the editor; on send, `send` branches from `index`.
+  const [editDraft, setEditDraft] = useState<{ index: number; text: string } | null>(null);
+  const editDraftRef = useRef<{ index: number; text: string } | null>(null);
 
   // ---- Steering / follow-up queue -------------------------------------
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
@@ -156,6 +163,12 @@ export function useChat() {
       setMessages(demoSeed());
     }
   }, [isTauri, loaded, messages.length]);
+
+  // ---- Publish the transcript to the shared bridge so the ⌘K palette can
+  // search it without duplicating the chat state engine. ----
+  useEffect(() => {
+    setTranscriptMessages(messages);
+  }, [messages]);
 
   // ---- Cleanup simulation on unmount ----
   useEffect(() => {
@@ -353,11 +366,96 @@ export function useChat() {
     }
   }, []);
 
+  // ---- Edit-and-resend / retry (universal message actions) ------------
+  const requestEdit = useCallback((index: number, text: string) => {
+    const draft = { index, text };
+    editDraftRef.current = draft;
+    setEditDraft(draft);
+  }, []);
+
+  const editAndResend = useCallback(
+    (index: number, newText: string) => {
+      const trimmed = newText.trim();
+      if (!trimmed) return;
+      // Branch: keep history up to and including the edited message, replace it
+      // with the edited version, and drop everything after. History before the
+      // edited message is never mutated.
+      busyRef.current = true;
+      setMessages((msgs) => [
+        ...msgs.slice(0, index),
+        { id: `u-${Date.now()}`, role: "user", content: trimmed, timestamp: nowIso(), status: "complete" },
+      ]);
+      setBusy(true);
+      setError(null);
+      if (isTauri) {
+        void client.prompt(trimmed).catch((err) => {
+          setError(err instanceof Error ? err.message : String(err));
+          setBusy(false);
+        });
+        return;
+      }
+      // Browser demo mode — re-stream a simulated response to the edited text.
+      simCleanup.current?.();
+      simCleanup.current = simulateResponse(trimmed, {
+        onUpdate: (updater) => setMessages(updater),
+        onDone: () => {
+          setBusy(false);
+          streamingId.current = null;
+        },
+      });
+    },
+    [client],
+  );
+
+  const retry = useCallback(
+    (message: TranscriptMessage) => {
+      const idx = messages.findIndex((m) => m.id === message.id);
+      if (idx < 0) return;
+      // Re-issue the preceding user prompt.
+      let userText: string | null = null;
+      for (let i = idx - 1; i >= 0; i--) {
+        if (messages[i].role === "user") {
+          userText = messages[i].content;
+          break;
+        }
+      }
+      if (!userText) return;
+      if (isTauri) {
+        void client.retry().catch((err) => {
+          setError(err instanceof Error ? err.message : String(err));
+        });
+        return;
+      }
+      // Browser demo mode — re-stream a simulated response to that prompt.
+      setError(null);
+      setBusy(true);
+      simCleanup.current?.();
+      simCleanup.current = simulateResponse(userText, {
+        onUpdate: (updater) => setMessages(updater),
+        onDone: () => {
+          setBusy(false);
+          streamingId.current = null;
+        },
+      });
+    },
+    [messages, client],
+  );
+
   // ---- Send ----
   const send = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || busy) return;
+
+      // Edit-and-resend: if a user message is pending edit, branch from that
+      // point instead of appending a fresh message. History before the edited
+      // message is never mutated.
+      const pending = editDraftRef.current;
+      if (pending) {
+        editDraftRef.current = null;
+        setEditDraft(null);
+        return editAndResend(pending.index, trimmed);
+      }
 
       // Set busyRef synchronously BEFORE any work starts so the follow-up
       // flush loop cannot re-enter in the same microtask. In browser demo
@@ -398,7 +496,7 @@ export function useChat() {
         },
       });
     },
-    [busy, client],
+    [busy, client, editAndResend],
   );
 
   // ---- Steer (Enter while busy — delivered after current tool calls) ----
@@ -574,6 +672,11 @@ export function useChat() {
     streamingId.current = null;
   }, [client]);
 
+  // ---- Demo: load a large transcript to exercise windowed rendering ----
+  const loadDemoMessages = useCallback((count = 500) => {
+    setMessages(demoSeedLarge(count));
+  }, []);
+
   return {
     messages,
     busy,
@@ -594,5 +697,9 @@ export function useChat() {
     runShell,
     contextStats,
     setSessionName,
+    loadDemoMessages,
+    editDraft,
+    requestEdit,
+    retry,
   };
 }

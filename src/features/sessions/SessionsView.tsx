@@ -25,16 +25,30 @@ type SessionEnrichment = {
   rlmChildren?: RlmChild[];
 };
 
-export function SessionsView({ onNewSession }: { onNewSession?: () => void }) {
+export function SessionsView({
+  onNewSession,
+  initialFilter,
+  initialSelectedId,
+}: {
+  onNewSession?: () => void;
+  /** Optional pre-filter (e.g. from the ⌘K "Find session" command) — seeds the name filter. */
+  initialFilter?: string;
+  /** Optional session id to select on mount (e.g. the session the user picked in the palette). */
+  initialSelectedId?: string;
+}) {
   const ipc = useIpc();
   const conn = useConnectionState();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [enrichment, setEnrichment] = useState<Record<string, SessionEnrichment>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
   const [actionError, setActionError] = useState<string | undefined>();
   const [viewMode, setViewMode] = useState<"graph" | "tree">("graph");
+  // P5: session list filter — narrows the graph by name (case-insensitive
+  // substring) and/or status, in real time. Empty filter shows all sessions.
+  const [filter, setFilter] = useState(initialFilter ?? "");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "saved" | "idle">("all");
   const handleNew = onNewSession ?? (() => {});
 
   const daemonDown = conn.status.kind === "disconnected";
@@ -94,7 +108,20 @@ export function SessionsView({ onNewSession }: { onNewSession?: () => void }) {
     }));
   }, [conn.activeSessionId, conn.goals, conn.rlmChildren]);
 
-  const selected = sessions.find((s) => s.id === selectedId) ?? null;
+  // P5: apply the name + status filter to the session list. When both are
+  // empty/unset the list is unchanged (all sessions shown).
+  const filteredSessions = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q && statusFilter === "all") return sessions;
+    return sessions.filter((s) => {
+      const title = (s.title ?? s.id).toLowerCase();
+      const matchesName = !q || title.includes(q);
+      const matchesStatus = statusFilter === "all" || (s.status ?? "idle") === statusFilter;
+      return matchesName && matchesStatus;
+    });
+  }, [sessions, filter, statusFilter]);
+
+  const selected = filteredSessions.find((s) => s.id === selectedId) ?? filteredSessions[0] ?? null;
 
   const activeCount = sessions.filter((s) => s.status === "active").length;
   const savedCount = sessions.filter((s) => s.status === "saved").length;
@@ -115,6 +142,8 @@ export function SessionsView({ onNewSession }: { onNewSession?: () => void }) {
   };
 
   const empty = !loading && !error && sessions.length === 0;
+  // Filter active but nothing matched — distinct from a truly empty fleet.
+  const filteredEmpty = !loading && !error && sessions.length > 0 && filteredSessions.length === 0;
 
   return (
     <main className="sessions">
@@ -176,7 +205,7 @@ export function SessionsView({ onNewSession }: { onNewSession?: () => void }) {
         </div>
       )}
 
-      {/* Toolbar: view switch + actions on one restrained row (not two bands) */}
+        {/* Toolbar: view switch + filter + actions on one restrained row */}
       <div className="sessions__toolbar">
         {/* View switch: graph vs context tree */}
         <div className="sessions__modeswitch" role="tablist" aria-label="Session view">
@@ -198,6 +227,45 @@ export function SessionsView({ onNewSession }: { onNewSession?: () => void }) {
           </button>
         </div>
 
+        {/* P5: session filter — name search + status select, real-time. */}
+        <div className="sessions__filter">
+          <div className="sessions__search">
+            <span className="sessions__search-icon" aria-hidden>
+              ⌕
+            </span>
+            <input
+              type="text"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter sessions…"
+              aria-label="Filter sessions by name"
+              className="sessions__search-input"
+            />
+            {filter ? (
+              <button
+                type="button"
+                className="sessions__search-clear"
+                onClick={() => setFilter("")}
+                aria-label="Clear session filter"
+                title="Clear filter"
+              >
+                ✕
+              </button>
+            ) : null}
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "saved" | "idle")}
+            aria-label="Filter sessions by status"
+            className="sessions__status-select"
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="saved">Saved</option>
+            <option value="idle">Idle</option>
+          </select>
+        </div>
+
         {/* Actions */}
         <div className="sessions__actions">
           <Button variant="ghost" icon={<RefreshIcon size={14} />} onClick={() => void refresh()} loading={loading}>
@@ -215,7 +283,7 @@ export function SessionsView({ onNewSession }: { onNewSession?: () => void }) {
           {viewMode === "graph" ? (
             <>
               <SessionsGraph
-                sessions={sessions}
+                sessions={filteredSessions}
                 enrichment={enrichment}
                 activeSessionId={conn.activeSessionId}
                 daemonDown={daemonDown}
@@ -240,6 +308,16 @@ export function SessionsView({ onNewSession }: { onNewSession?: () => void }) {
                     <span>{error}</span>
                     <button className="sessions__graphblank__link" onClick={() => void refresh()}>
                       Try again
+                    </button>
+                  </div>
+                </div>
+              ) : filteredEmpty ? (
+                <div className="sessions__graphblank">
+                  <div className="sessions__graphblank__card">
+                    <b>No sessions match your filter</b>
+                    <span>Try a different name or status.</span>
+                    <button className="sessions__graphblank__link" onClick={() => { setFilter(""); setStatusFilter("all"); }}>
+                      Clear filter
                     </button>
                   </div>
                 </div>

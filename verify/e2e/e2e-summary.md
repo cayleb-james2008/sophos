@@ -1,8 +1,8 @@
 # Sophos Browser E2E — Summary
 
-Date: 2026-08-10T14:16:27.006Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
+Date: 2026-08-10T18:43:00.962Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
 
-## Result: PASS (36/36 passed)
+## Result: FAIL (36/37 passed)
 
 ## Views
 
@@ -25,6 +25,7 @@ Date: 2026-08-10T14:16:27.006Z · Mode: browser-demo (MockIpcClient) · App: `np
 
 | Test | Result | Detail |
 |---|---|---|
+| File-edit tool call renders a unified diff (not raw JSON) | ✅ PASS | ok |
 | Send a message → user msg + streaming assistant + completes | ✅ PASS | ok |
 | Steering (Enter while busy) shows steered indicator | ✅ PASS | ok |
 | Follow-up queue (Alt+Enter) drains one at a time | ✅ PASS | ok |
@@ -53,7 +54,7 @@ Date: 2026-08-10T14:16:27.006Z · Mode: browser-demo (MockIpcClient) · App: `np
 | Inbox view empty state (no relay traffic) | ✅ PASS | ok |
 | Error handling: IPC rejection shows error UI + Retry recovers | ✅ PASS | ok |
 | Empty transcript state in session detail | ✅ PASS | ok |
-| No console/page errors across all views | ✅ PASS | ok |
+| No console/page errors across all views | ❌ FAIL | page.waitForTimeout: Target page, context or browser has been closed |
 
 ## Evidence
 
@@ -71,6 +72,7 @@ Date: 2026-08-10T14:16:27.006Z · Mode: browser-demo (MockIpcClient) · App: `np
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-settings-advanced-runtime-telemetry-renders-settings-advanced.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-settings-long-running-panels-render-goals-autonomous-heartbeats-schedules-refinement--settings-longrunning.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-engine-terminal-opens-via-systembar-toggle-engine.png`
+  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-file-edit-tool-call-renders-a-unified-diff-not-raw-json--flow-diff.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-send-a-message-user-msg-streaming-assistant-completes-flow-send-busy.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-send-a-message-user-msg-streaming-assistant-completes-flow-send-done.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-steering-enter-while-busy-shows-steered-indicator-flow-steer.png`
@@ -99,4 +101,3 @@ Date: 2026-08-10T14:16:27.006Z · Mode: browser-demo (MockIpcClient) · App: `np
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-state.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-recovered.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-empty-transcript-state-in-session-detail-edge-empty-transcript.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-no-console-page-errors-across-all-views-edge-error-sweep.png`

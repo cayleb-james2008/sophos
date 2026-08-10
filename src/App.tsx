@@ -35,6 +35,10 @@ export default function App() {
   // onboarding (U1) deep-links straight to Providers; sidebar navigation
   // resets to General.
   const [settingsTab, setSettingsTab] = useState("general");
+  // P4: pre-filter + selection for the Sessions view, set by the ⌘K
+  // "Find session…" command so it can land filtered.
+  const [sessionsFilter, setSessionsFilter] = useState<string | undefined>();
+  const [sessionsSelectedId, setSessionsSelectedId] = useState<string | undefined>();
   const ActiveView = VIEWS[view as Exclude<View, "settings">];
 
   const handleNavigate = (v: View) => {
@@ -45,6 +49,11 @@ export default function App() {
     setSettingsTab("providers");
     setView("settings");
   };
+  const handleFindSession = (filter: string, sessionId: string) => {
+    setSessionsFilter(filter);
+    setSessionsSelectedId(sessionId);
+    setView("sessions");
+  };
 
   return (
     <UnreadProvider>
@@ -52,12 +61,22 @@ export default function App() {
         <ViewTransition transitionKey={view}>
           {view === "settings" ? (
             <SettingsView initialTab={settingsTab} />
+          ) : view === "sessions" ? (
+            <SessionsView
+              onNewSession={() => setNewOpen(true)}
+              initialFilter={sessionsFilter}
+              initialSelectedId={sessionsSelectedId}
+            />
           ) : (
             <ActiveView onNewSession={() => setNewOpen(true)} onSetupProviders={handleSetupProviders} />
           )}
         </ViewTransition>
       </Shell>
-      <CommandPalette onNavigate={setView} onNewSession={() => setNewOpen(true)} />
+      <CommandPalette
+        onNavigate={setView}
+        onNewSession={() => setNewOpen(true)}
+        onFindSession={handleFindSession}
+      />
       <NewSessionModal
         open={newOpen}
         onClose={() => setNewOpen(false)}
