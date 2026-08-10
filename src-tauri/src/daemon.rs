@@ -90,6 +90,22 @@ impl DaemonManager {
         if daemon_tcp {
             cmd.env("PRIME_DAEMON_TCP", "1");
         }
+        // Windows kernel-bootstrap workaround (upstream PrimeIntellect-ai/prime-agent#660).
+        //
+        // The daemon builds its kernel interpreter path as `<venv>/bin/python`,
+        // a POSIX layout. On Windows uv creates `<venv>/Scripts/python.exe`, so
+        // the path never resolves, the IPython kernel never boots, and every
+        // retry wipes the venv. Since IPython is the agent's only execution
+        // tool, the agent comes up unable to run code at all.
+        //
+        // The daemon supports `PRIME_AGENT_KERNEL_PYTHON` as a first-class
+        // override, so point it at the real Windows interpreter when one exists.
+        // We do not overwrite an operator-set value.
+        if std::env::var("PRIME_AGENT_KERNEL_PYTHON").is_err() {
+            if let Some(python) = windows_kernel_python() {
+                cmd.env("PRIME_AGENT_KERNEL_PYTHON", python);
+            }
+        }
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
         match cmd.spawn() {
@@ -158,4 +174,32 @@ impl DaemonManager {
             eprintln!("[daemon] shut down");
         }
     }
+}
+
+/// Locate the kernel venv's real Windows interpreter, if it exists.
+///
+/// Upstream builds this path as `<venv>/bin/python` (POSIX). On Windows uv
+/// creates `<venv>/Scripts/python.exe`, so we resolve the actual file and hand
+/// it to the daemon via `PRIME_AGENT_KERNEL_PYTHON`. Returns `None` when the
+/// venv has not been bootstrapped yet, so the daemon keeps its own behaviour
+/// rather than being pointed at a path that does not exist.
+#[cfg(windows)]
+fn windows_kernel_python() -> Option<String> {
+    let home = std::env::var("USERPROFILE").ok()?;
+    let candidate = std::path::Path::new(&home)
+        .join(".prime")
+        .join("agent")
+        .join("kernel-venv")
+        .join("Scripts")
+        .join("python.exe");
+    if candidate.is_file() {
+        candidate.to_str().map(|s| s.to_string())
+    } else {
+        None
+    }
+}
+
+#[cfg(not(windows))]
+fn windows_kernel_python() -> Option<String> {
+    None
 }
