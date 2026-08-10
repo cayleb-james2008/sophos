@@ -432,11 +432,19 @@ export function Badge({
   children,
   tone = "neutral",
   dot = false,
+  dotTone,
   style,
 }: {
   children: React.ReactNode;
   tone?: BadgeTone;
   dot?: boolean;
+  /**
+   * Colour the dot from a different tone than the badge itself, so a badge can
+   * stay visually neutral while its dot still carries the state signal. Used
+   * where an adjacent element already encodes the same state and a fully-toned
+   * badge would say it twice.
+   */
+  dotTone?: BadgeTone;
   style?: CSS;
 }) {
   const tones: Record<BadgeTone, CSS> = {
@@ -477,7 +485,7 @@ export function Badge({
             width: 5,
             height: 5,
             borderRadius: "50%",
-            background: dotColors[tone],
+            background: dotColors[dotTone ?? tone],
           }}
         />
       ) : null}

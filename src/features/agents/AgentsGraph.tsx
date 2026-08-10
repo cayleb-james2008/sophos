@@ -75,7 +75,12 @@ function AgentNode({ data }: NodeProps<AgentGraphNode>) {
             <DetachIcon size={11} /> Detach
           </button>
         ) : (
-          <button className="pg-btn pg-btn--accent" onClick={(e) => { e.stopPropagation(); data.onAttach?.(); }} title="Attach to relay">
+          // Neutral, not accent: every unattached node rendered a green Attach
+          // button, so the accent appeared on all of them at once and competed
+          // with the left-border selection marker that actually encodes state
+          // (vision-critic D4). Green stays on the *attached* indicator and the
+          // node's own status, where it means something.
+          <button className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onAttach?.(); }} title="Attach to relay">
             <AttachIcon size={11} /> Attach
           </button>
         )}

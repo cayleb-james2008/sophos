@@ -218,7 +218,26 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
     if (!detailsOpen) return;
     const measure = () => {
       const r = detailsBtnRef.current?.getBoundingClientRect();
-      if (r) setAnchor({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+      if (!r) return;
+      // Open BELOW whatever interactive chrome sits under the SystemBar, so the
+      // panel never lands on the view's own header controls ("+ New session",
+      // the model selector, the first-run strip's "ESC to skip"). Measured
+      // rather than hard-coded, so it stays correct as those surfaces change
+      // (vision-critic D6). The scrim already made the overlay unambiguous;
+      // this avoids the collision outright.
+      let clearBelow = r.bottom + 8;
+      for (const sel of ['[data-view-header]', ".pa-firstrun", "main header"]) {
+        for (const el of Array.from(document.querySelectorAll(sel))) {
+          const b = el.getBoundingClientRect();
+          if (b.height > 0 && b.top < window.innerHeight * 0.5) {
+            clearBelow = Math.max(clearBelow, b.bottom + 8);
+          }
+        }
+      }
+      setAnchor({
+        top: Math.min(clearBelow, window.innerHeight * 0.4),
+        right: Math.max(8, window.innerWidth - r.right),
+      });
     };
     measure();
     window.addEventListener("resize", measure);

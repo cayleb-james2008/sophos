@@ -158,7 +158,11 @@ export function ChatView({
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <Text variant="micro" tone="accent" mono uppercase style={{ letterSpacing: "0.12em" }}>
+          {/* Neutral eyebrow, matching `.ag-eyebrow` / `.sessions__eyebrow`.
+              A green kicker here was redundant with the "Conversation" heading
+              below it and the active nav state, and it was one of ~7 greens
+              clustered in the top strip (vision-critic D5). */}
+          <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.12em" }}>
             Chat
           </Text>
           <Text variant="subtitle" weight="semibold" style={{ letterSpacing: "-0.01em" }}>

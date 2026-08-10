@@ -53,7 +53,10 @@
 }
 .inbox__telemetry b { color: #f4f4f4; }
 .inbox__telemetry i { width: 1px; height: 15px; background: #2a2a2a; }
-.inbox__sync { color: #85ed75; }
+/* "synchronized" is the resting default, not an attention state, so it does not
+   earn the accent (vision-critic D7). Green here competed with the genuine
+   signals (live agents, unread messages) in the same strip. */
+.inbox__sync { color: rgba(244, 244, 244, 0.6); }
 .inbox__error {
   padding: 9px 13px;
   border: 1px solid rgba(239,68,68,0.4);

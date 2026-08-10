@@ -134,9 +134,15 @@ function ProviderCard({
             on a separate row below with a StatusDot that repeated the same
             connection state a second time, so different cards appeared to use
             different visual languages for "state". */}
+        {/* The green icon tile already carries "connected"; a green pill beside
+            it stated the same fact twice, and across four connected cards that
+            stacked into the densest green view in the app (vision-critic
+            D1/D2). The pill keeps its dot — which is the state marker — but
+            drops to neutral so the signal is said once per card. "Managed" is a
+            kind, not a state, so it is neutral too. */}
         <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, flexShrink: 0 }}>
-          <Badge tone={managed ? "accent" : "neutral"}>{managed ? "Managed" : "API key"}</Badge>
-          <Badge tone={provider.connected ? "success" : "neutral"} dot>
+          <Badge tone="neutral">{managed ? "Managed" : "API key"}</Badge>
+          <Badge tone="neutral" dot dotTone={provider.connected ? "success" : "neutral"}>
             {provider.connected ? "Connected" : "Offline"}
           </Badge>
         </div>
