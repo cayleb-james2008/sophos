@@ -59,6 +59,41 @@ pub fn resolve_runtime_paths(resource_dir: Option<&std::path::Path>) -> (String,
     ("node".to_string(), daemon, bridge)
 }
 
+/// Resolve the preload module (`--require` target) that defaults
+/// `child_process` `windowsHide: true` on Windows so the daemon's own child
+/// processes (kernels, shells, tools) do not flash console windows.
+///
+/// Follows the same pattern as `resolve_runtime_paths`: packaged installs look
+/// under the Tauri resource dir; dev falls back to a walk-up from the exe to
+/// the project root's `scripts/` directory. Returns `None` when the preload
+/// cannot be found, in which case the daemon spawns without `--require` (the
+/// pre-change behavior is preserved).
+pub fn resolve_preload_path(resource_dir: Option<&std::path::Path>) -> Option<String> {
+    // Packaged: the preload is bundled under the resource dir.
+    if let Some(rd) = resource_dir {
+        let p = rd.join("scripts").join("no-window-preload.cjs");
+        if p.is_file() {
+            return Some(normalize_win_path(&p));
+        }
+    }
+    // Dev fallback: walk up from the exe to find the project root's scripts dir.
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let mut probe = Some(dir.to_path_buf());
+            for _ in 0..6 {
+                if let Some(p) = probe.take() {
+                    let candidate = p.join("scripts").join("no-window-preload.cjs");
+                    if candidate.is_file() {
+                        return Some(candidate.to_string_lossy().to_string());
+                    }
+                    probe = p.parent().map(|pp| pp.to_path_buf());
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Default daemon CLI entrypoint (the Prime Agent coding-agent CLI), resolved
 /// relative to the running app's executable directory.
 fn default_daemon_cli() -> String {

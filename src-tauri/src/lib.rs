@@ -185,6 +185,9 @@ pub fn run() {
             let resource_dir = app.path().resource_dir().ok();
             let (node_path, daemon_path, bridge_path) =
                 settings::resolve_runtime_paths(resource_dir.as_deref());
+            // Resolve the child_process windowsHide preload (may be None if not
+            // found; daemon then spawns without --require).
+            let preload_path = settings::resolve_preload_path(resource_dir.as_deref()).unwrap_or_default();
             // `daemonTcp` selects the TCP-loopback fallback transport. The daemon
             // and the bridge are launched with the SAME flag so both resolve
             // `defaultDaemonSocketPath()` to the same endpoint.
@@ -196,7 +199,7 @@ pub fn run() {
 
             // Create daemon manager, wire up paths + log sink.
             let daemon = DaemonManager::new(job.clone());
-            daemon.set_paths(node_path.clone(), daemon_path.clone());
+            daemon.set_paths(node_path.clone(), daemon_path.clone(), preload_path.clone());
             daemon.set_log_sink(log_sink.clone());
 
             let sidecar = SidecarManager::new(
