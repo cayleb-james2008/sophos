@@ -234,6 +234,13 @@ export type { IpcCommand, IpcEvent, PromptOptions } from "../../src/ipc/contract
 
 export type InternalStatus = "connecting" | "connected" | "disconnected" | "reconnecting";
 
+export function isRecoverableDaemonClose(reason: string): boolean {
+  // Session lifecycle closures (completed, killed, replaced, shutdown, update)
+  // are terminal. Only transport-loss errors should create a new attachment.
+  return reason.startsWith("Lost connection to the Prime Agent daemon.")
+    || reason.startsWith("Daemon reconnection failed:");
+}
+
 export function toConnectionStatus(
   status: InternalStatus,
   reason?: string,
@@ -1197,6 +1204,8 @@ export class ConnectionHolder {
   private readonly preferredSessionId: string | undefined;
   /** One live watcher per child session; entries own their unsubscribe/close lifecycle. */
   private readonly childWatches = new Map<string, ChildWatch>();
+  private reconnectPromise: Promise<void> | undefined;
+  private stopping = false;
 
   constructor(events: ConnectionHolderEvents, opts: ConnectionHolderOptions = {}) {
     this.events = events;
@@ -1231,6 +1240,7 @@ export class ConnectionHolder {
 
   /** Connect to the daemon and attach. Retries until the daemon is ready. */
   async connect(): Promise<void> {
+    this.stopping = false;
     this.setStatus("connecting");
     const maxAttempts = 30;
     const baseDelayMs = 500;
@@ -1255,32 +1265,23 @@ export class ConnectionHolder {
     }
   }
 
-  private async tryConnectOnce(): Promise<void> {
+  private async tryConnectOnce(allowPreferredSession = true, emitFailure = true): Promise<void> {
     this.client = new DaemonClient(this.socketPath);
-    await this.client.connect();
     try {
+      await this.client.connect();
       // attach() requires an activeSessionId. Discover an existing session
       // via `list`, or create one if there are none.
-      const activeSessionId = await this.discoverOrCreateSession();
+      const activeSessionId = await this.discoverOrCreateSession(undefined, allowPreferredSession);
       this.conn = await DaemonAgentConnection.attach(this.client, activeSessionId, {
         closeClientOnDispose: true,
+        reconnectTimeoutMs: 8_000,
         supportsExtensionUi: true,
         // recoverDaemon enables the DaemonAgentConnection's internal reconnect
         // path: when the socket closes (not via shutdown), the connection
         // re-invokes this callback to re-spawn/re-ping the daemon and then
         // re-attaches. Without it, a transient socket loss emits a terminal
         // "closed" event and the sidecar gives up.
-        recoverDaemon: async () => {
-          // The DaemonClient is dead; we cannot reach the daemon through it.
-          // best-effort no-op: the Rust shell or operator must restart the
-          // daemon. We log so the failure is observable; the connection will
-          // then emit "closed" and the bridge surfaces "disconnected".
-          if (typeof process !== "undefined" && process.stderr) {
-            process.stderr.write(
-              "[bridge:connection] recoverDaemon called but no auto-respawn wired; daemon must be restarted externally\n",
-            );
-          }
-        },
+        recoverDaemon: () => this.waitForDaemonReady(),
       });
       if (!this.conn) {
         throw new Error("attach returned no connection");
@@ -1319,12 +1320,34 @@ export class ConnectionHolder {
       });
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      this.setStatus("disconnected", reason);
-      this.events.onEvent({
-        type: "connection_status",
-        status: { kind: "disconnected", reason },
-      });
+      this.unsubscribe?.();
+      this.unsubscribe = undefined;
+      this.conn = undefined;
+      this.client?.close();
+      this.client = undefined;
+      if (emitFailure) {
+        this.setStatus("disconnected", reason);
+        this.events.onEvent({
+          type: "connection_status",
+          status: { kind: "disconnected", reason },
+        });
+      }
       throw err;
+    }
+  }
+
+  /**
+   * Wait for the daemon to be accepting connections before the upstream
+   * connection recovery loop creates its replacement transport. The probe is
+   * disposable; the recovery loop still owns the actual client connection.
+   */
+  private async waitForDaemonReady(): Promise<void> {
+    const probe = new DaemonClient(this.socketPath);
+    try {
+      await probe.connect(1_000);
+      await probe.waitForHello(3_000);
+    } finally {
+      probe.close();
     }
   }
 
@@ -1368,9 +1391,12 @@ export class ConnectionHolder {
    * them through AgentSessionRuntimeConfig (config.cwd + config.initialGoal).
    * Otherwise a plain create with daemon defaults is issued.
    */
-  private async discoverOrCreateSession(opts?: { cwd?: string; goal?: string }): Promise<string> {
+  private async discoverOrCreateSession(
+    opts?: { cwd?: string; goal?: string },
+    allowPreferredSession = true,
+  ): Promise<string> {
     if (!this.client) throw new Error("client not initialized");
-    if (this.preferredSessionId) return this.preferredSessionId;
+    if (allowPreferredSession && this.preferredSessionId) return this.preferredSessionId;
     // Try to attach to an existing session first.
     try {
       const listResp = await this.client.request({ type: "list" }, 10_000);
@@ -1654,14 +1680,9 @@ export class ConnectionHolder {
     try {
       this.conn = await DaemonAgentConnection.attach(this.client, newId, {
         closeClientOnDispose: true,
+        reconnectTimeoutMs: 8_000,
         supportsExtensionUi: true,
-        recoverDaemon: async () => {
-          if (typeof process !== "undefined" && process.stderr) {
-            process.stderr.write(
-              "[bridge:connection] recoverDaemon called but no auto-respawn wired; daemon must be restarted externally\n",
-            );
-          }
-        },
+        recoverDaemon: () => this.waitForDaemonReady(),
       });
     } catch (err) {
       // Re-attach failed — the bridge is now disconnected. Surface it so the
@@ -1709,8 +1730,46 @@ export class ConnectionHolder {
     }
   }
 
+  /** Rebuild the client/session after the upstream reconnect exhausted its stale attach. */
+  private async reconnectFromClosed(reason: string): Promise<void> {
+    if (this.stopping || this.reconnectPromise) return;
+    const recovery = (async () => {
+      this.setStatus("reconnecting", reason);
+      this.events.onEvent({ type: "connection_status", status: { kind: "reconnecting" } });
+      await this.disposeConnectionOnly();
+
+      const deadline = Date.now() + 30_000;
+      let attempt = 0;
+      let lastError = reason;
+      while (!this.stopping && Date.now() < deadline) {
+        try {
+          await this.tryConnectOnce(false, false);
+          return;
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : String(error);
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) break;
+          await new Promise((resolve) => setTimeout(resolve, Math.min(remaining, 500 * 2 ** Math.min(attempt++, 3))));
+        }
+      }
+      if (!this.stopping) {
+        this.setStatus("disconnected", lastError);
+        this.events.onEvent({ type: "connection_status", status: { kind: "disconnected", reason: lastError } });
+      }
+    })();
+    this.reconnectPromise = recovery;
+    try {
+      await recovery;
+    } finally {
+      if (this.reconnectPromise === recovery) this.reconnectPromise = undefined;
+    }
+  }
+
   /** Disconnect from the daemon and release resources. */
   async disconnect(): Promise<void> {
+    this.stopping = true;
+    this.client?.close();
+    await this.reconnectPromise?.catch(() => {});
     await this.closeAllChildWatches("connection closed");
     this.unsubscribe?.();
     this.unsubscribe = undefined;
@@ -1853,14 +1912,17 @@ export class ConnectionHolder {
           event: { kind: "side_question_event", id: evt.event.id, status: evt.event.status },
         });
         return;
-      case "closed":
-        void this.closeAllChildWatches("parent connection closed");
-        this.setStatus("disconnected", evt.error);
-        this.events.onEvent({
-          type: "connection_status",
-          status: { kind: "disconnected", reason: evt.error },
-        });
+      case "closed": {
+        const reason = evt.error ?? "daemon connection closed";
+        if (isRecoverableDaemonClose(reason)) {
+          void this.reconnectFromClosed(reason);
+        } else {
+          void this.closeAllChildWatches("parent connection closed");
+          this.setStatus("disconnected", reason);
+          this.events.onEvent({ type: "connection_status", status: { kind: "disconnected", reason } });
+        }
         return;
+      }
     }
   }
 

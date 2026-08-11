@@ -90,8 +90,12 @@ fn get_engine_logs(state: tauri::State<AppState>) -> Vec<EngineLogEntry> {
 /// Restart both the daemon and the sidecar.
 #[tauri::command]
 fn restart_engine(state: tauri::State<AppState>) -> Result<(), String> {
-    state.sidecar.restart();
+    // Stop the bridge before replacing the daemon so it cannot attach to the
+    // old daemon between the two explicit restarts. Sidecar EOF recovery is
+    // generation-guarded, so the stopped bridge cannot resurrect itself here.
+    state.sidecar.shutdown();
     state.daemon.restart();
+    state.sidecar.start();
     Ok(())
 }
 
