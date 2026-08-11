@@ -52,6 +52,12 @@ const FALLBACK_MAX: Record<string, { contextWindow: number; maxOutputTokens: num
   "minimax:MiniMax-M3": { contextWindow: 524288, maxOutputTokens: 128000 },
 };
 
+function asThinkingLevel(value: unknown): ThinkingLevel | undefined {
+  return typeof value === "string" && THINKING_LEVELS.some((level) => level.value === value)
+    ? value as ThinkingLevel
+    : undefined;
+}
+
 const DEFAULT_MAX_CONTEXT = 128000;
 const DEFAULT_MAX_OUTPUT = 16384;
 
@@ -125,6 +131,8 @@ export function useModels() {
         client.getSettings().catch(() => undefined),
       ]);
       const overrides = settings?.modelConfig ?? {};
+      const savedThinking = asThinkingLevel(settings?.defaultThinking);
+      if (savedThinking) setThinking(savedThinking);
       setProviders(provs);
       const localConnected = !isTauri && !!(settings?.localProviders?.length);
       setModels(modelsForCatalog(mods, overrides, localConnected));
@@ -143,6 +151,8 @@ export function useModels() {
       .then(([provs, mods, settings]) => {
         if (!mounted) return;
         const overrides = settings?.modelConfig ?? {};
+        const savedThinking = asThinkingLevel(settings?.defaultThinking);
+        if (savedThinking) setThinking(savedThinking);
         setProviders(provs);
         const localConnected = !isTauri && !!(settings?.localProviders?.length);
         setModels(modelsForCatalog(mods, overrides, localConnected));

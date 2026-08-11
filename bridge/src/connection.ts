@@ -29,74 +29,145 @@ import { join, resolve } from "node:path";
 // ---------------------------------------------------------------------------
 // Persistent settings file.
 //
-// `daemonTcp` is the one setting that must survive restarts and be readable by
-// the Rust shell, which loads `daemonTcp` from ~/.prime/agent/settings.json at
-// launch. The Rust `settings::Settings::load()` owns the canonical parse; we
-// mirror just that key here (read once at startup, written on change) so a
-// toggle in the UI is honored on the next app launch.
+// Settings are shared with the Rust shell through ~/.prime/agent/settings.json.
+// The bridge owns the user-facing JSON values and keeps the file backward
+// compatible by preserving fields it does not interpret.
 // ---------------------------------------------------------------------------
 
 const PRIME_AGENT_DIR = join(homedir(), ".prime", "agent");
 const SETTINGS_PATH = join(PRIME_AGENT_DIR, "settings.json");
 const MODELS_JSON_PATH = join(PRIME_AGENT_DIR, "models.json");
 
-function readDaemonTcp(): boolean {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readSettingsFile(): Record<string, unknown> {
   try {
-    if (!existsSync(SETTINGS_PATH)) return false;
-    const raw = readFileSync(SETTINGS_PATH, "utf8");
-    const value = JSON.parse(raw) as Record<string, unknown>;
-    const v = value.daemonTcp;
-    if (typeof v === "boolean") return v;
-    if (typeof v === "string") return ["true", "1", "yes", "on"].includes(v.trim().toLowerCase());
-    return false;
+    if (!existsSync(SETTINGS_PATH)) return {};
+    const value: unknown = JSON.parse(readFileSync(SETTINGS_PATH, "utf8"));
+    return isRecord(value) ? value : {};
   } catch {
-    return false;
+    return {};
   }
 }
 
-function readModelConfig(): Settings["modelConfig"] {
-  try {
-    if (!existsSync(SETTINGS_PATH)) return undefined;
-    const raw = readFileSync(SETTINGS_PATH, "utf8");
-    const value = JSON.parse(raw) as Record<string, unknown>;
-    const v = value.modelConfig;
-    if (v && typeof v === "object" && !Array.isArray(v)) {
-      return v as Settings["modelConfig"];
+function parseBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return undefined;
+}
+
+function normalizeModelConfig(value: unknown): Settings["modelConfig"] {
+  if (!isRecord(value)) return undefined;
+  const result: NonNullable<Settings["modelConfig"]> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (!isRecord(raw)) continue;
+    const config: NonNullable<Settings["modelConfig"]>[string] = {};
+    if (Number.isSafeInteger(raw.contextWindow) && (raw.contextWindow as number) >= 1024) {
+      config.contextWindow = raw.contextWindow as number;
     }
-    return undefined;
-  } catch {
-    return undefined;
+    if (Number.isSafeInteger(raw.maxOutputTokens) && (raw.maxOutputTokens as number) >= 1024) {
+      config.maxOutputTokens = raw.maxOutputTokens as number;
+    }
+    if (Object.keys(config).length > 0) result[key] = config;
   }
+  return result;
 }
 
-/** Write a settings file patch atomically (merge-on-top of any existing file). */
-export function writeSettingsPatch(patch: Record<string, unknown>): void {
-  try {
-    if (!existsSync(PRIME_AGENT_DIR)) mkdirSync(PRIME_AGENT_DIR, { recursive: true });
-    let existing: Record<string, unknown> = {};
-    if (existsSync(SETTINGS_PATH)) {
-      try {
-        existing = JSON.parse(readFileSync(SETTINGS_PATH, "utf8")) as Record<string, unknown>;
-      } catch {
-        existing = {};
-      }
-    }
-    Object.assign(existing, patch);
-    writeFileSync(SETTINGS_PATH, JSON.stringify(existing, null, 2) + "\n", "utf8");
-  } catch (err) {
-    if (typeof process !== "undefined" && process.stderr) {
-      const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`[bridge:settings] failed to persist settings patch: ${msg}\n`);
+function normalizeString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+const STRING_SETTING_KEYS = ["shellPath", "sessionDir", "defaultCwd", "defaultProvider", "defaultModel", "defaultThinking", "daemonCliPath"] as const;
+
+function normalizeThinking(value: unknown): string | undefined {
+  const thinking = normalizeString(value);
+  return thinking && THINKING_LEVELS.has(thinking) ? thinking : undefined;
+}
+
+function normalizeStringSetting(key: string, value: unknown): string | undefined {
+  return key === "defaultThinking" ? normalizeThinking(value) : normalizeString(value);
+}
+
+function normalizeTheme(value: unknown): Settings["theme"] {
+  return value === "dark" || value === "light" || value === "system" ? value : undefined;
+}
+
+function normalizeSettings(raw: Record<string, unknown>): Settings {
+  const out: Record<string, unknown> = { ...raw, theme: normalizeTheme(raw.theme) ?? "dark", daemonTcp: false };
+
+  for (const key of STRING_SETTING_KEYS) {
+    const value = normalizeStringSetting(key, raw[key]);
+    if (value) out[key] = value;
+    else delete out[key];
+  }
+
+  const daemonTcp = parseBoolean(raw.daemonTcp);
+  out.daemonTcp = daemonTcp ?? false;
+
+  const modelConfig = normalizeModelConfig(raw.modelConfig);
+  if (modelConfig) out.modelConfig = modelConfig;
+  else delete out.modelConfig;
+
+  if (isRecord(raw.auth)) {
+    out.auth = Object.fromEntries(
+      Object.entries(raw.auth).filter(([, value]) => typeof value === "string" && value.length > 0),
+    );
+  } else {
+    delete out.auth;
+  }
+
+  if (Array.isArray(raw.localProviders)) {
+    out.localProviders = raw.localProviders.filter((value): value is Record<string, unknown> => {
+      if (!isRecord(value)) return false;
+      return normalizeString(value.id) !== undefined
+        && normalizeString(value.name) !== undefined
+        && normalizeString(value.baseUrl) !== undefined
+        && (value.kind === "ollama" || value.kind === "openai-compatible");
+    });
+  } else {
+    delete out.localProviders;
+  }
+
+  return out as Settings;
+}
+
+function normalizePatch(patch: Partial<Settings>): Record<string, unknown> {
+  const raw: Record<string, unknown> = isRecord(patch) ? { ...(patch as Record<string, unknown>) } : {};
+  const normalized = normalizeSettings(raw);
+  const result: Record<string, unknown> = { ...raw };
+
+  for (const key of STRING_SETTING_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(raw, key)) {
+      const value = normalizeStringSetting(key, raw[key]);
+      if (value) result[key] = value;
+      else delete result[key];
     }
   }
+  if (Object.prototype.hasOwnProperty.call(raw, "theme")) {
+    const theme = normalizeTheme(raw.theme);
+    if (theme) result.theme = theme;
+    else delete result.theme;
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, "daemonTcp")) {
+    const value = parseBoolean(raw.daemonTcp);
+    if (value === undefined) delete result.daemonTcp;
+    else result.daemonTcp = value;
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, "modelConfig")) result.modelConfig = normalized.modelConfig ?? {};
+  if (Object.prototype.hasOwnProperty.call(raw, "auth")) result.auth = normalized.auth ?? {};
+  if (Object.prototype.hasOwnProperty.call(raw, "localProviders")) result.localProviders = normalized.localProviders ?? [];
+  return result;
 }
 
-function writeDaemonTcp(value: boolean): void {
-  writeSettingsPatch({ daemonTcp: value });
-}
-
-function writeModelConfig(value: Settings["modelConfig"]): void {
-  writeSettingsPatch({ modelConfig: value ?? {} });
+function writeSettingsSnapshot(settings: Record<string, unknown>): void {
+  if (!existsSync(PRIME_AGENT_DIR)) mkdirSync(PRIME_AGENT_DIR, { recursive: true });
+  writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n", "utf8");
 }
 
 const AUTH_PATH = join(PRIME_AGENT_DIR, "auth.json");
@@ -986,13 +1057,28 @@ export function mapContextTree(tree: unknown): ContextTreeNode {
 
 // ---------------------------------------------------------------------------
 // Settings — AgentConnection doesn't model persistent UI settings, so the
-// sidecar holds them in-memory. They survive reconnects within the same
-// sidecar process.
+// bridge owns their in-memory view and persists them to the shared settings file.
 // ---------------------------------------------------------------------------
 
 const DEFAULT_SETTINGS: Settings = {
   theme: "dark",
+  daemonTcp: false,
 };
+
+export const DEFAULT_MODEL_SELECTION = {
+  provider: "ollama-cloud",
+  model: "deepseek-v4-flash:0731-cloud",
+} as const;
+
+export function resolvePreferredModel(
+  settings: Settings,
+  current?: { provider?: string; model?: string; id?: string },
+): { provider: string; model: string } {
+  return {
+    provider: normalizeString(settings.defaultProvider) ?? normalizeString(current?.provider) ?? DEFAULT_MODEL_SELECTION.provider,
+    model: normalizeString(settings.defaultModel) ?? normalizeString(current?.model ?? current?.id) ?? DEFAULT_MODEL_SELECTION.model,
+  };
+}
 
 /**
  * Write a per-model context-window / max-tokens override into
@@ -1050,25 +1136,32 @@ export function writeModelOverrideToModelsJson(
 }
 
 export class SettingsStore {
-  private current: Settings = {
+  private current: Settings = normalizeSettings({
     ...DEFAULT_SETTINGS,
-    daemonTcp: readDaemonTcp(),
-    modelConfig: readModelConfig(),
-  };
+    ...readSettingsFile(),
+  });
+
   get(): Settings {
-    return { ...this.current, modelConfig: { ...(this.current.modelConfig ?? {}) } };
+    return {
+      ...this.current,
+      modelConfig: this.current.modelConfig ? { ...this.current.modelConfig } : undefined,
+      auth: this.current.auth ? { ...this.current.auth } : undefined,
+      localProviders: this.current.localProviders?.map((provider) => ({ ...provider })),
+    };
   }
+
   update(patch: Partial<Settings>): Settings {
-    this.current = { ...this.current, ...patch };
-    if (patch.daemonTcp !== undefined) {
-      // Persist the transport flag so the Rust shell picks it up next launch.
-      writeDaemonTcp(Boolean(patch.daemonTcp));
+    const normalizedPatch = normalizePatch(patch);
+    this.current = normalizeSettings({ ...this.current, ...normalizedPatch });
+    try {
+      writeSettingsSnapshot(this.current as unknown as Record<string, unknown>);
+    } catch (err) {
+      if (typeof process !== "undefined" && process.stderr) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`[bridge:settings] failed to persist settings: ${msg}\n`);
+      }
     }
-    if (patch.modelConfig !== undefined) {
-      // Persist model overrides so they survive a sidecar/app restart.
-      writeModelConfig(patch.modelConfig);
-    }
-    return this.current;
+    return this.get();
   }
 }
 
@@ -1308,14 +1401,13 @@ export class ConnectionHolder {
       if (snapshotOk && this.latestState) {
         await this.emitEnrichedSnapshot("snapshot");
       }
-      // Apply the app's default model (ollama-cloud / deepseek-v4-flash) so
-      // the session starts on the requested provider+model rather than the
-      // daemon's built-in default. Best-effort: if the model is unknown to
-      // this daemon, fall back silently and keep the current selection.
-      await this.applyDefaultModel().catch((err) => {
+      // Restore the persisted selection and runtime limits. With no saved
+      // selection, the current session model wins; the built-in default is the
+      // final fallback only when neither exists.
+      await this.applyPreferredModel().catch((err) => {
         if (typeof process !== "undefined" && process.stderr) {
           const msg = err instanceof Error ? err.message : String(err);
-          process.stderr.write(`[bridge:connection] applyDefaultModel skipped: ${msg}\n`);
+          process.stderr.write(`[bridge:connection] applyPreferredModel skipped: ${msg}\n`);
         }
       });
     } catch (err) {
@@ -1351,34 +1443,35 @@ export class ConnectionHolder {
     }
   }
 
-  /**
-   * Best-effort default model selection. If the currently active model is not
-   * already the app default (ollama-cloud / deepseek-v4-flash:0731-cloud),
-   * issue a setModel to switch to it. Failures are non-fatal.
-   */
-  private async applyDefaultModel(): Promise<void> {
-    const DEFAULT_PROVIDER = "ollama-cloud";
-    const DEFAULT_MODEL = "deepseek-v4-flash:0731-cloud";
+  /** Restore the saved model, runtime limits, and thinking level when attached. */
+  async applyPreferredModel(): Promise<void> {
     if (!this.conn) return;
-    const state = this.latestState;
-    const current = state?.model;
-    if (
-      current &&
-      typeof current === "object" &&
-      (current as { provider?: string; id?: string }).provider === DEFAULT_PROVIDER &&
-      (current as { id?: string }).id === DEFAULT_MODEL
-    ) {
-      return; // already on the requested model
+    const settings = this.settings.get();
+    const current = this.latestState?.model;
+    const preferred = resolvePreferredModel(settings, current);
+    const key = `${preferred.provider}:${preferred.model}`;
+    const runtime = settings.modelConfig?.[key];
+    if (runtime && (runtime.contextWindow !== undefined || runtime.maxOutputTokens !== undefined)) {
+      writeModelOverrideToModelsJson(preferred.provider, preferred.model, {
+        contextWindow: runtime.contextWindow,
+        maxTokens: runtime.maxOutputTokens,
+      });
     }
-    const updated = await this.conn.setModel(DEFAULT_PROVIDER, DEFAULT_MODEL);
-    if (updated && typeof updated === "object") {
-      this.latestState = {
-        ...(this.latestState as object),
-        model: updated,
-      } as AgentConnectionState;
+
+    const currentProvider = current && typeof current === "object" ? current.provider : undefined;
+    const currentModel = current && typeof current === "object" ? current.id : undefined;
+    const selectionMatches = currentProvider === preferred.provider && currentModel === preferred.model;
+    if (!selectionMatches || runtime) {
+      const updated = await this.conn.setModel(preferred.provider, preferred.model);
+      if (updated && typeof updated === "object") {
+        this.latestState = {
+          ...(this.latestState as object),
+          model: updated,
+        } as AgentConnectionState;
+      }
     }
-    if (typeof process !== "undefined" && process.stderr) {
-      process.stderr.write(`[bridge:connection] applied default model: ${DEFAULT_PROVIDER}/${DEFAULT_MODEL}\n`);
+    if (settings.defaultThinking) {
+      await this.conn.setThinkingLevel(settings.defaultThinking as never);
     }
   }
 
@@ -1712,6 +1805,7 @@ export class ConnectionHolder {
     if (snapshotOk && this.latestState) {
       await this.emitEnrichedSnapshot("snapshot");
     }
+    await this.applyPreferredModel().catch(() => undefined);
     return newId;
   }
 

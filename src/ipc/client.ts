@@ -364,6 +364,28 @@ export class TauriIpcClient implements IpcClient {
 
 const LOCAL_MODEL_CONFIG_KEY = "prime-agent.modelConfig.v1";
 const LOCAL_PROVIDER_KEY = "prime-agent.localProviders.v1";
+const LOCAL_SETTINGS_KEY = "prime-agent.settings.v1";
+
+function readLocalSettings(): Settings {
+  try {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(LOCAL_SETTINGS_KEY) : null;
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Settings : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalSettings(value: Settings): void {
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(value));
+  } catch {
+    // Browser preview persistence is best-effort.
+  }
+}
+
+const INITIAL_LOCAL_SETTINGS = readLocalSettings();
 
 /** Read the mock's persisted model overrides from localStorage (survives reload). */
 function readLocalModelConfig(): Record<string, ModelRuntimeConfig> {
@@ -427,13 +449,18 @@ const LOCAL_DEFAULT_CONFIG: LocalProviderConfig = {
 export class MockIpcClient implements IpcClient {
   private listeners: Array<(e: IpcEvent) => void> = [];
   private mockSettings: Settings = {
-    theme: "dark",
-    modelConfig: readLocalModelConfig(),
+    ...INITIAL_LOCAL_SETTINGS,
+    theme: INITIAL_LOCAL_SETTINGS.theme ?? "dark",
+    modelConfig: { ...(INITIAL_LOCAL_SETTINGS.modelConfig ?? {}), ...readLocalModelConfig() },
     localProviders: readLocalProviders() ?? [LOCAL_DEFAULT_CONFIG],
   };
   private state: ConnectionState = {
     status: { kind: "connecting" },
-    model: { provider: "ollama-cloud", model: "deepseek-v4-flash:0731-cloud" },
+    model: {
+      provider: this.mockSettings.defaultProvider ?? "ollama-cloud",
+      model: this.mockSettings.defaultModel ?? "deepseek-v4-flash:0731-cloud",
+      thinking: this.mockSettings.defaultThinking,
+    },
     activeSessionId: "session-0",
     goals: [{ id: "goal-demo", objective: "Ship the release and verify every published artifact", status: "active", progress: "3 of 5 artifacts verified" }],
     context: { tokens: 18432, contextWindow: 1000000, messages: 42 },
@@ -487,6 +514,13 @@ export class MockIpcClient implements IpcClient {
     if (runtime) {
       this.applyModelRuntime(provider, model, runtime);
     }
+    this.mockSettings = {
+      ...this.mockSettings,
+      defaultProvider: provider,
+      defaultModel: model,
+      ...(_thinking ? { defaultThinking: _thinking } : {}),
+    };
+    writeLocalSettings(this.mockSettings);
     this.state = { ...this.state, model: { provider, model, thinking: _thinking } };
     this.emit({ type: "snapshot", state: this.state });
   }
@@ -677,6 +711,7 @@ export class MockIpcClient implements IpcClient {
       next.localProviders = settings.localProviders;
     }
     this.mockSettings = next;
+    writeLocalSettings(this.mockSettings);
     writeLocalModelConfig(next.modelConfig ?? {});
     writeLocalProviders(next.localProviders ?? []);
   }

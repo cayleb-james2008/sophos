@@ -14,6 +14,7 @@
     "build:watch": "tsc -p tsconfig.json --watch",
     "clean": "shx rm -rf dist",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify:settings": "npm run build && node verify-settings.mjs",
     "verify:lifecycle": "npm run build && node verify-lifecycle.mjs"
   },
   "dependencies": {

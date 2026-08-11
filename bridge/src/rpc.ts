@@ -42,7 +42,6 @@ import {
   mapSessionTree,
   writeAuthKey,
   writeModelOverrideToModelsJson,
-  writeSettingsPatch,
   type AgentConnectionRlmChild,
 } from "./connection.js";
 
@@ -191,24 +190,36 @@ export class RpcServer {
         // model catalog, then issue setModel so the daemon reloads the catalog and
         // the request uses the new definition. Also persist to the app settings
         // store so the UI / reconnect path retains it.
-        const runtime = { contextWindow: p.contextWindow, maxOutputTokens: p.maxOutputTokens };
+        const store = this.holder.getSettingsStore();
+        const key = `${p.provider}:${p.model}`;
+        const current = store.get();
+        const savedRuntime = current.modelConfig?.[key];
+        const effectiveRuntime = {
+          ...(savedRuntime ?? {}),
+          ...(p.contextWindow != null ? { contextWindow: p.contextWindow } : {}),
+          ...(p.maxOutputTokens != null ? { maxOutputTokens: p.maxOutputTokens } : {}),
+        };
         if (p.contextWindow != null || p.maxOutputTokens != null) {
-          const key = `${p.provider}:${p.model}`;
-          const store = this.holder.getSettingsStore();
-          const current = store.get();
-          const modelConfig = { ...(current.modelConfig ?? {}) };
-          const prev = { ...(modelConfig[key] ?? {}) };
-          if (p.contextWindow != null) prev.contextWindow = p.contextWindow;
-          if (p.maxOutputTokens != null) prev.maxOutputTokens = p.maxOutputTokens;
-          modelConfig[key] = prev;
+          const modelConfig = { ...(current.modelConfig ?? {}), [key]: effectiveRuntime };
           store.update({ modelConfig } as Settings);
-          // Write the engine override BEFORE setModel so the daemon picks it up.
+        }
+        // Reapply a saved override even when the selector only supplies a
+        // provider/model pair; this covers a fresh bridge after models.json was
+        // regenerated or removed.
+        if (Object.keys(effectiveRuntime).length > 0) {
           writeModelOverrideToModelsJson(p.provider, p.model, {
-            contextWindow: p.contextWindow,
-            maxTokens: p.maxOutputTokens,
+            contextWindow: effectiveRuntime.contextWindow,
+            maxTokens: effectiveRuntime.maxOutputTokens,
           });
         }
         const updated = await conn.setModel(p.provider, p.model);
+        // Persist the successful user selection before optional tuning calls;
+        // a thinking/service-tier error must not lose the model choice.
+        store.update({
+          defaultProvider: p.provider,
+          defaultModel: p.model,
+          ...(p.thinking ? { defaultThinking: p.thinking } : {}),
+        });
         if (p.thinking) {
           // setThinkingLevel accepts the thinking enum; cast through unknown
           // since the exact union varies by provider.
@@ -236,7 +247,9 @@ export class RpcServer {
         if (typeof p.goal === "string") opts.goal = p.goal;
         if (Object.keys(opts).length === 0) {
           const conn = this.requireConn();
-          return conn.newSession();
+          const result = await conn.newSession();
+          await this.holder.applyPreferredModel().catch(() => undefined);
+          return result;
         }
         // cwd/goal present — re-attach via the daemon's create command. We
         // delegate to the holder's helper, which returns the new
@@ -384,9 +397,6 @@ export class RpcServer {
       case "setSettings": {
         const p = requireParams<{ settings: Record<string, unknown> }>(params, ["settings"]);
         const updated = this.holder.getSettingsStore().update(p.settings as Partial<Settings>);
-        if (Object.prototype.hasOwnProperty.call(p.settings, "skills")) {
-          writeSettingsPatch({ skills: p.settings.skills });
-        }
         return updated;
       }
 
@@ -697,7 +707,6 @@ export class RpcServer {
         const settings = this.holder.getSettingsStore().get() as Settings & { skills?: string[] };
         const skills = [...new Set([...(settings.skills ?? []), root])];
         this.holder.getSettingsStore().update({ skills } as Partial<Settings>);
-        writeSettingsPatch({ skills });
         await conn.reload();
         return { name, description: p.description.trim(), filePath: resolve(root, "SKILL.md"), source: "project" };
       }
@@ -709,7 +718,6 @@ export class RpcServer {
         const settings = this.holder.getSettingsStore().get() as Settings & { skills?: string[] };
         const skills = [...new Set([...(settings.skills ?? []), path])];
         this.holder.getSettingsStore().update({ skills } as Partial<Settings>);
-        writeSettingsPatch({ skills });
         await conn.reload();
         const resources = await conn.getResourceSnapshot();
         return resources.skills.map((skill) => ({
