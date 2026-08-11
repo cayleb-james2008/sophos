@@ -45,6 +45,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
 
   return (
     <div
+      className="tool-call-card"
       style={{
         border: `1px solid ${tokens.color.border}`,
         borderLeft: `3px solid ${tokens.color.tool}`,
@@ -81,19 +82,8 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
         <Badge tone={meta.tone} dot>
           {meta.label}
         </Badge>
-        {call.status === "running" ? (
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              border: `2px solid ${tokens.color.borderStrong}`,
-              borderTopColor: tokens.color.info,
-              animation: "pa-spin 0.8s linear infinite",
-              marginLeft: 2,
-            }}
-          />
-        ) : null}
+        {call.status === "running" ? <span className="tool-call-card__spinner" aria-label="Tool running" /> : null}
+        <span key={call.status} className={`tool-call-card__state-flash tool-call-card__state-flash--${call.status}`} aria-hidden="true" />
         {hasInput ? (
           <button
             type="button"

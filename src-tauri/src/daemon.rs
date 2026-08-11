@@ -41,6 +41,7 @@ pub struct DaemonManager {
     job: Arc<Job>,
     node_path: Mutex<String>,
     cli_path: Mutex<String>,
+    preload_path: Mutex<String>,
     daemon_tcp: Mutex<bool>,
     log_sink: Mutex<Option<Arc<EngineLogSink>>>,
 }
@@ -53,6 +54,7 @@ impl DaemonManager {
             job,
             node_path: Mutex::new(String::new()),
             cli_path: Mutex::new(String::new()),
+            preload_path: Mutex::new(String::new()),
             daemon_tcp: Mutex::new(false),
             log_sink: Mutex::new(None),
         })
@@ -64,9 +66,11 @@ impl DaemonManager {
     }
 
     /// Set the runtime paths (so restart can re-spawn without re-passing them).
-    pub fn set_paths(&self, node_path: String, cli_path: String) {
+    /// `preload_path` is the `--require` preload module (empty = don't inject).
+    pub fn set_paths(&self, node_path: String, cli_path: String, preload_path: String) {
         *self.node_path.lock().unwrap() = node_path;
         *self.cli_path.lock().unwrap() = cli_path;
+        *self.preload_path.lock().unwrap() = preload_path;
     }
 
     /// Spawn the daemon. Idempotent — if one is already running, this is a no-op.
@@ -81,6 +85,15 @@ impl DaemonManager {
         *self.daemon_tcp.lock().unwrap() = daemon_tcp;
         self.running.store(true, Ordering::SeqCst);
         let mut cmd = Command::new(node_path);
+        // Inject the child_process windowsHide preload BEFORE the CLI path so it
+        // loads before the daemon CLI. The daemon's own children (kernels,
+        // shells, tools) then default to windowsHide:true and stop flashing
+        // console windows. When no preload was resolved, skip --require so the
+        // spawn stays identical to before.
+        let preload = self.preload_path.lock().unwrap().clone();
+        if !preload.is_empty() {
+            cmd.arg("--require").arg(&preload);
+        }
         cmd.arg(cli_path)
             .arg("--mode")
             .arg("daemon")
@@ -112,7 +125,8 @@ impl DaemonManager {
 
                 *self.child.lock().unwrap() = Some(child);
                 let transport = if daemon_tcp { "tcp-loopback" } else { "named-pipe" };
-                eprintln!("[daemon] spawned ({transport}): {node_path} {cli_path} --mode daemon");
+                let preload_desc = if preload.is_empty() { String::new() } else { format!(" --require {preload}") };
+                eprintln!("[daemon] spawned ({transport}):{preload_desc} {node_path} {cli_path} --mode daemon");
             }
             Err(e) => {
                 eprintln!("[daemon] failed to spawn: {e}");

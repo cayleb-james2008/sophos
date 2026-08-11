@@ -1,0 +1,234 @@
+/* Sophos shell — shared Operate/Monitor chrome. The shell is a translucent
+   editorial frame: the surface behind it stays visible, while hairlines and
+   short labels keep the state legible. */
+
+.sophos-shell {
+  --glass: rgba(14, 14, 14, 0.78);
+  --glass-raised: rgba(21, 21, 21, 0.72);
+  --glass-soft: rgba(255, 255, 255, 0.045);
+  --hairline: rgba(244, 244, 244, 0.12);
+  --hairline-strong: rgba(244, 244, 244, 0.2);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 76% 6%, rgba(133, 237, 117, 0.07), transparent 24rem),
+    linear-gradient(135deg, #0e0e0e 0%, #121212 52%, #0e0e0e 100%);
+  color: #f4f4f4;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+}
+
+.sophos-shell::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  opacity: 0.45;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 0.6px, transparent 0.6px);
+  background-size: 5px 5px;
+  mask-image: linear-gradient(120deg, transparent, black 26%, black 72%, transparent);
+}
+
+.shell__body { display: flex; flex: 1; min-height: 0; }
+.shell__main {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(14, 14, 14, 0.7), rgba(14, 14, 14, 0.96));
+}
+.shell__view-wrap { display: flex; flex: 1; min-height: 0; flex-direction: column; overflow: hidden; }
+.shell__engine {
+  height: 0;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: height 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.shell__engine--open { height: 320px; }
+
+/* Sidebar = Configure-adjacent navigation: quiet, translucent, no cockpit rail. */
+.sidebar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-shrink: 0;
+  width: 232px;
+  height: 100%;
+  flex-direction: column;
+  border-right: 1px solid var(--hairline);
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.sidebar__eyebrow { padding: 22px 18px 10px; }
+.sidebar__nav { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
+.sidebar__item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(244, 244, 244, 0.6);
+  cursor: pointer;
+  font: 400 12.5px/1.3 "Geist", sans-serif;
+  letter-spacing: 0.01em;
+  text-align: left;
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+}
+.sidebar__item:hover { background: var(--glass-soft); color: #f4f4f4; }
+.sidebar__item--active {
+  border-color: rgba(133, 237, 117, 0.18);
+  background: linear-gradient(90deg, rgba(133, 237, 117, 0.12), rgba(133, 237, 117, 0.025));
+  color: #f4f4f4;
+  font-weight: 600;
+}
+.sidebar__badge { margin-left: auto; display: inline-flex; min-width: 18px; height: 18px; }
+.sidebar__active-mark { width: 2px; height: 18px; margin-left: -12px; background: #85ed75; }
+.sidebar__separator { height: 1px; margin: 14px 18px; background: var(--hairline); }
+.sidebar__footer { display: flex; margin-top: auto; padding: 18px; flex-direction: column; gap: 18px; }
+.sidebar__command {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.025);
+}
+.sidebar__brand { display: flex; align-items: center; gap: 8px; }
+.sidebar__brand-mark, .system-bar__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid var(--hairline-strong);
+  background: linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025));
+}
+.sidebar__brand-mark { width: 22px; height: 22px; }
+.sidebar__brand-copy { display: flex; flex-direction: column; line-height: 1.2; }
+.sidebar__wordmark { color: #f4f4f4; font: 600 12px/1 "Geist", sans-serif; letter-spacing: 0.06em; }
+.sidebar__version { color: rgba(244,244,244,0.45); font: 9px/1.4 "Geist Mono", monospace; }
+
+/* SystemBar = Monitor archetype. Resting state contains only status/model/context. */
+.system-bar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  height: 52px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--hairline);
+  background: rgba(14, 14, 14, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.system-bar__brand { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.system-bar__mark { width: 22px; height: 22px; }
+.system-bar__wordmark { color: #f4f4f4; font: 600 14px/1 "Geist", sans-serif; letter-spacing: 0.06em; }
+.system-bar__divider { width: 1px; height: 16px; background: var(--hairline-strong); }
+.system-bar__platform { color: rgba(244,244,244,0.45); font: 10px/1 "Geist Mono", monospace; letter-spacing: 0.1em; text-transform: uppercase; }
+.system-bar__readout {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  border: 1px solid var(--hairline);
+  background: rgba(0,0,0,0.16);
+}
+.system-bar__readout--updated {
+  background-image: linear-gradient(100deg, transparent 0%, rgba(133,237,117,0.12) 48%, transparent 66%);
+  background-size: 220% 100%;
+  animation: pa-reward-row-update 280ms cubic-bezier(0.16,1,0.3,1) both;
+}
+.system-bar__cell { display: flex; min-width: 0; align-items: center; gap: 8px; padding: 7px 12px; white-space: nowrap; }
+.system-bar__cell + .system-bar__cell { border-left: 1px solid var(--hairline); }
+.system-bar__label { color: rgba(244,244,244,0.42); font: 9px/1 "Geist Mono", monospace; letter-spacing: 0.11em; text-transform: uppercase; }
+.system-bar__value { max-width: 170px; overflow: hidden; color: rgba(244,244,244,0.82); text-overflow: ellipsis; font: 10px/1 "Geist Mono", monospace; }
+.system-bar__dot { position: relative; width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: rgba(244,244,244,0.3); }
+.system-bar__dot::after { position: absolute; inset: -3px; border: 1px solid currentColor; border-radius: 50%; content: ""; opacity: 0.18; }
+.system-bar__dot--connected { color: #85ed75; background: #85ed75; animation: pa-beat 1.8s ease-in-out infinite; }
+.system-bar__dot--connecting, .system-bar__dot--reconnecting { color: #f3bc56; background: #f3bc56; animation: pa-pulse 1.2s ease-in-out infinite; }
+.system-bar__dot--disconnected { color: #ef4444; background: #ef4444; }
+.system-bar__context-track { width: 48px; height: 3px; overflow: hidden; background: rgba(255,255,255,0.12); }
+.system-bar__context-fill { height: 100%; background: #85ed75; transition: width 180ms ease; }
+.system-bar__context-fill--warn { background: #f3bc56; }
+.system-bar__context-fill--0 { width: 0%; }
+.system-bar__context-fill--5 { width: 5%; }
+.system-bar__context-fill--10 { width: 10%; }
+.system-bar__context-fill--15 { width: 15%; }
+.system-bar__context-fill--20 { width: 20%; }
+.system-bar__context-fill--25 { width: 25%; }
+.system-bar__context-fill--30 { width: 30%; }
+.system-bar__context-fill--35 { width: 35%; }
+.system-bar__context-fill--40 { width: 40%; }
+.system-bar__context-fill--45 { width: 45%; }
+.system-bar__context-fill--50 { width: 50%; }
+.system-bar__context-fill--55 { width: 55%; }
+.system-bar__context-fill--60 { width: 60%; }
+.system-bar__context-fill--65 { width: 65%; }
+.system-bar__context-fill--70 { width: 70%; }
+.system-bar__context-fill--75 { width: 75%; }
+.system-bar__context-fill--80 { width: 80%; }
+.system-bar__context-fill--85 { width: 85%; }
+.system-bar__context-fill--90 { width: 90%; }
+.system-bar__context-fill--95 { width: 95%; }
+.system-bar__context-fill--100 { width: 100%; }
+.system-bar__alerts { display: flex; align-items: center; gap: 6px; }
+.system-bar__alert { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid rgba(133,237,117,0.3); background: rgba(133,237,117,0.08); color: #85ed75; font: 9px/1 "Geist Mono", monospace; letter-spacing: 0.1em; }
+.system-bar__alert-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.system-bar__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.system-bar__details-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: rgba(244,244,244,0.48);
+  cursor: pointer;
+  font: 9px/1 "Geist Mono", monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.system-bar__details-button:hover, .system-bar__details-button[aria-expanded="true"] { border-color: var(--hairline-strong); background: var(--glass-soft); color: #f4f4f4; }
+.system-bar__chevron { transition: transform 100ms ease; }
+.system-bar__chevron--open { transform: rotate(180deg); }
+.system-bar__details-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 52px;
+  z-index: 30;
+  min-width: 288px;
+  border: 1px solid var(--hairline-strong);
+  background: rgba(17, 17, 17, 0.92);
+  box-shadow: 0 18px 50px rgba(0,0,0,0.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: pa-slide-down 120ms ease both;
+}
+.system-bar__detail-row { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding: 9px 12px; }
+.system-bar__detail-row + .system-bar__detail-row { border-top: 1px solid var(--hairline); }
+.system-bar__detail-row:last-child { padding-bottom: 11px; }
+.system-bar__scrim { position: fixed; inset: 52px 0 0; z-index: 20; background: rgba(14,14,14,0.34); }
+
+@media (max-width: 900px) {
+  .sidebar { width: 70px; }
+  .sidebar__eyebrow, .sidebar__item > span:not(.sidebar__active-mark), .sidebar__footer > div:not(.sidebar__brand), .sidebar__wordmark, .sidebar__version { display: none; }
+  .sidebar__item { justify-content: center; }
+  .sidebar__active-mark { margin-left: -12px; }
+  .sidebar__footer { padding: 12px; }
+  .system-bar__brand .system-bar__platform, .system-bar__alerts, .system-bar__label { display: none; }
+  .system-bar__cell { padding: 7px 8px; }
+  .system-bar__value { max-width: 100px; }
+}

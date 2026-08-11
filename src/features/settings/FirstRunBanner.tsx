@@ -1,44 +1,27 @@
-// FirstRunBanner — guided first-run onboarding for a non-technical user.
-//
-// The live Tauri path checks the managed Node processes, daemon, bridge,
-// persistent kernel, and the default free DeepSeek model before enabling the
-// first prompt. Browser preview remains explicitly marked as preview so it
-// never masquerades as a live health check.
+// FirstRunExperience — a full-stage welcome sequence for a non-technical user.
+// The engine/provider health logic remains shared with the composer; this file
+// only changes the first-run presentation and the path into provider setup.
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { tokens } from "../../design/tokens";
-import { Text, Button, Badge } from "../../design";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useIpc, isTauri } from "../../ipc/client";
 import type { ModelInfo, ProviderInfo, RuntimeInfo } from "../../ipc/contract";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../providers/useModels";
-import { KeyIcon } from "../sessions/icons";
+import "./onboarding.css";
 
 const DISMISS_KEY = "sophos.onboardingDismissed.v1";
 const FIRST_MESSAGE_KEY = "sophos.hasFirstMessage.v1";
 
 function readFlag(key: string): boolean {
-  try {
-    return window.localStorage.getItem(key) === "1";
-  } catch {
-    return false;
-  }
+  try { return window.localStorage.getItem(key) === "1"; }
+  catch { return false; }
 }
 function writeFlag(key: string): void {
-  try {
-    window.localStorage.setItem(key, "1");
-  } catch {
-    // best-effort persistence
-  }
+  try { window.localStorage.setItem(key, "1"); }
+  catch { /* best-effort persistence */ }
 }
 
 export type SetupCheckState = "checking" | "ready" | "waiting" | "preview";
-
-export interface SetupCheck {
-  label: string;
-  state: SetupCheckState;
-  detail: string;
-}
-
+export interface SetupCheck { label: string; state: SetupCheckState; detail: string; }
 export interface OnboardingStatus {
   checks: SetupCheck[];
   ready: boolean;
@@ -47,20 +30,14 @@ export interface OnboardingStatus {
   refresh: () => void;
 }
 
-interface EngineStatus {
-  daemon_alive: boolean;
-  sidecar_alive: boolean;
-}
+interface EngineStatus { daemon_alive: boolean; sidecar_alive: boolean; }
 
-/** The Rust shell owns this command; browser preview intentionally returns null. */
 async function getEngineStatus(): Promise<EngineStatus | null> {
   if (!isTauri) return null;
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     return await invoke<EngineStatus>("get_engine_status");
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 function liveCheck(label: string, ok: boolean, readyDetail: string, waitingDetail: string): SetupCheck {
@@ -74,12 +51,9 @@ const FRIENDLY_CHECK_LABELS: Record<string, string> = {
   Kernel: "Python workspace",
   "Free model": "Free model",
 };
+function friendlyCheckLabel(label: string): string { return FRIENDLY_CHECK_LABELS[label] ?? label; }
 
-function friendlyCheckLabel(label: string): string {
-  return FRIENDLY_CHECK_LABELS[label] ?? label;
-}
-
-/** Shared health state used by both the banner and the composer gate. */
+/** Shared health state used by the experience and the composer gate. */
 export function useOnboardingStatus(): OnboardingStatus {
   const ipc = useIpc();
   const [checks, setChecks] = useState<SetupCheck[]>(() =>
@@ -129,8 +103,6 @@ export function useOnboardingStatus(): OnboardingStatus {
     const timer = window.setInterval(refresh, 2500);
     return () => {
       window.clearInterval(timer);
-      // Invalidate an in-flight refresh so it cannot publish state after this
-      // hook unmounts or after a newer refresh has started.
       refreshGeneration.current += 1;
     };
   }, [refresh]);
@@ -143,55 +115,52 @@ export interface FirstRunBannerProps {
   onSetupProviders?: () => void;
   onStartChat?: () => void;
   hasFirstMessage?: boolean;
-  /** Shared health snapshot; ChatView also uses it to gate the composer. */
   setup: OnboardingStatus;
 }
 
-function CheckList({ checks }: { checks: SetupCheck[] }) {
+
+function Archetype({ mark, title, detail }: { mark: string; title: string; detail: string }) {
   return (
-    <div
-      data-testid="onboarding-prerequisites"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
-        gap: tokens.space.xs,
-        width: "100%",
-        marginTop: tokens.space.sm,
-      }}
-    >
+    <div className="pa-onboarding__archetype">
+      <span className="pa-onboarding__archetype-mark" aria-hidden="true">{mark}</span>
+      <div className="pa-onboarding__archetype-copy">
+        <span className="pa-onboarding__archetype-title">{title}</span>
+        <span className="pa-onboarding__archetype-detail">{detail}</span>
+      </div>
+    </div>
+  );
+}
+
+function CheckRail({ checks }: { checks: SetupCheck[] }) {
+  return (
+    <div className="pa-onboarding__checks" data-testid="onboarding-prerequisites">
       {checks.map((check) => {
-        const live = check.state === "ready";
-        const preview = check.state === "preview";
+        const stateClass = check.state === "ready" ? "--ready" : check.state === "preview" ? "--preview" : "";
         return (
-          <div
-            key={check.label}
-            title={`${friendlyCheckLabel(check.label)}: ${check.detail}`}
-            aria-label={`${friendlyCheckLabel(check.label)}: ${check.detail}`}
-            style={{ display: "flex", alignItems: "center", gap: tokens.space.xs, minWidth: 0 }}
-          >
-            <span style={{ width: 6, height: 6, flexShrink: 0, borderRadius: "50%", background: live ? tokens.color.success : preview ? tokens.color.textDim : tokens.color.warning }} />
-            <Text variant="micro" tone={live ? "success" : preview ? "dim" : "warning"} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {friendlyCheckLabel(check.label)}
-            </Text>
-          </div>
+          <span key={check.label} className="pa-onboarding__check" title={`${friendlyCheckLabel(check.label)}: ${check.detail}`}>
+            <span className={`pa-onboarding__check-dot${stateClass}`} aria-hidden="true" />
+            {friendlyCheckLabel(check.label)}
+          </span>
         );
       })}
     </div>
   );
 }
 
-export function FirstRunBanner({ onSetupProviders, onStartChat, hasFirstMessage = false, setup }: FirstRunBannerProps): JSX.Element | null {
-  const [dismissed, setDismissed] = useState<boolean>(() => readFlag(DISMISS_KEY));
+export function FirstRunExperience({ onSetupProviders, onStartChat, hasFirstMessage = false, setup }: FirstRunBannerProps): JSX.Element | null {
+  const [dismissed, setDismissed] = useState(() => readFlag(DISMISS_KEY));
   const completed = hasFirstMessage || readFlag(FIRST_MESSAGE_KEY);
-  // Keep the banner and composer on the same health snapshot. ChatView owns
-  // the polling hook so this component does not start a second timer/request
-  // stream for the same daemon state.
   const health = setup;
 
   const dismiss = () => {
     writeFlag(DISMISS_KEY);
     setDismissed(true);
   };
+  const beginChat = () => {
+    dismiss();
+    onStartChat?.();
+  };
+  const openProviderSetup = () => onSetupProviders?.();
 
   useEffect(() => {
     if (dismissed || completed) return;
@@ -208,75 +177,79 @@ export function FirstRunBanner({ onSetupProviders, onStartChat, hasFirstMessage 
 
   if (completed || dismissed) return null;
 
-  const stripStyle: CSSProperties = {
-    flexShrink: 0,
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.space.lg,
-    padding: `${tokens.space.md} ${tokens.space.xl}`,
-    borderBottom: `1px solid ${tokens.color.border}`,
-    background: `linear-gradient(180deg, ${tokens.color.bgElevated}cc, transparent)`,
-  };
-  const icon = (
-    <span style={{ width: 30, height: 30, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: tokens.radius.md, background: tokens.color.accentSoft, border: `1px solid ${tokens.color.accentBorder}`, color: tokens.color.accentHover }}>
-      <KeyIcon size={15} />
-    </span>
-  );
-  const copy = (title: string, body: string) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
-      <Text variant="label" weight="semibold">{title}</Text>
-      <Text variant="body" tone="muted">{body}</Text>
-      <CheckList checks={health.checks} />
-    </div>
-  );
-  const actions = (children: ReactNode) => <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>{children}</div>;
   const providerReady = health.hasFreeProvider;
-
-  if (!isTauri) {
-    return (
-      <div className="pa-firstrun" role="region" aria-label="First-run setup" style={stripStyle}>
-        {icon}
-        {copy("Preview mode", "This browser preview uses simulated responses. It does not connect to DeepSeek V4 Flash 0731 or your files; use a starter prompt to try the flow.")}
-        {actions(
-          <>
-            <Badge tone="warning" dot>Preview only</Badge>
-            <Button variant="primary" size="sm" onClick={onStartChat}>Start typing</Button>
-            <Button variant="ghost" size="sm" onClick={dismiss}>Dismiss</Button>
-          </>,
-        )}
-      </div>
-    );
-  }
-
-  if (!providerReady) {
-    return (
-      <div className="pa-firstrun" role="region" aria-label="First-run setup" style={stripStyle}>
-        {icon}
-        {copy("Welcome to Sophos", "Connect the free Ollama Cloud model once — no config files to edit. Sophos will use DeepSeek V4 Flash 0731 for your first chat.")}
-        {actions(
-          <>
-            <Button variant="primary" size="sm" onClick={onSetupProviders}>Connect free DeepSeek</Button>
-            <Button variant="ghost" size="sm" onClick={health.refresh}>Check again</Button>
-            <Button variant="ghost" size="sm" onClick={dismiss}>Skip</Button>
-          </>,
-        )}
-      </div>
-    );
-  }
-
   const liveReady = health.ready;
+  const preview = !isTauri;
+  const title = preview
+    ? <>A quieter way to <em>think</em>.</>
+    : !providerReady
+      ? <>Meet your new <em>thinking space</em>.</>
+      : liveReady
+        ? <>Your workspace is <em>ready</em>.</>
+        : <>The engine is finding its <em>rhythm</em>.</>;
+  const lede = preview
+    ? "Sophos brings an open, local-first coding agent into a focused Windows workspace. Try the flow, then connect your own engine when you’re ready."
+    : !providerReady
+      ? "Start with one free model. Connect DeepSeek V4 Flash 0731 once, and Sophos will take care of the rest."
+      : liveReady
+        ? "The engine and model are ready. Your first conversation is one click away."
+        : "Your provider is connected. Keep this window open while the local engine finishes starting.";
+  const statusTitle = preview ? "Preview workspace" : liveReady ? "All systems ready" : providerReady ? "Starting local workspace" : "One small setup step";
+  const statusDetail = preview ? "Simulated responses · no files or network calls" : liveReady ? "DeepSeek V4 Flash 0731 · ready to chat" : providerReady ? "Daemon · bridge · kernel · model" : "Connect the free starter model to continue";
+
   return (
-    <div className="pa-firstrun" role="region" aria-label="First-run setup" style={stripStyle}>
-      {icon}
-      {copy(liveReady ? "You're ready" : "Finish setup before your first chat", liveReady ? "DeepSeek V4 Flash 0731 is connected. Start your first conversation." : "Keep this window open until the app engine, connection, Python workspace, and model are ready.")}
-      {actions(
-        <>
-          <Badge tone={liveReady ? "success" : "warning"} dot>{liveReady ? "Ready" : "Starting"}</Badge>
-          {!liveReady && <Button variant="outline" size="sm" onClick={onSetupProviders}>Open setup</Button>}
-          {liveReady && <Button variant="primary" size="sm" onClick={onStartChat}>Start chatting</Button>}
-          <Button variant="ghost" size="sm" onClick={dismiss}>{liveReady ? "Dismiss" : "Skip"}</Button>
-        </>,
-      )}
-    </div>
+    <section className="pa-onboarding" role="dialog" aria-modal="true" aria-labelledby="sophos-onboarding-title">
+      <div className="pa-onboarding__frame">
+        <span className="pa-onboarding__edge" aria-hidden="true" />
+        <div className="pa-onboarding__topline">
+          <div className="pa-onboarding__brand"><span className="pa-onboarding__brand-mark">Σ</span> SOPHOS</div>
+          <span className="pa-onboarding__eyebrow">First run / Windows</span>
+        </div>
+
+        <div className="pa-onboarding__body">
+          <div className="pa-onboarding__hero">
+            <div className="pa-onboarding__kicker">Open intelligence workspace</div>
+            <h1 className="pa-onboarding__title" id="sophos-onboarding-title">{title}</h1>
+            <p className="pa-onboarding__lede">{lede}</p>
+            <div className="pa-onboarding__actions">
+              {preview ? (
+                <button type="button" className="pa-onboarding__action-primary" onClick={beginChat}>Start a preview</button>
+              ) : !providerReady ? (
+                <button type="button" className="pa-onboarding__action-primary" onClick={openProviderSetup}>Set up free model</button>
+              ) : liveReady ? (
+                <button type="button" className="pa-onboarding__action-primary" onClick={beginChat}>Start your first chat</button>
+              ) : (
+                <button type="button" className="pa-onboarding__action-primary" onClick={health.refresh}>Check workspace</button>
+              )}
+              <button type="button" className="pa-onboarding__action-secondary" onClick={dismiss}>Skip for now</button>
+            </div>
+          </div>
+
+          <aside className="pa-onboarding__aside" aria-label="Sophos surface archetypes">
+            <div className="pa-onboarding__aside-label">Three surfaces / one flow</div>
+            <div className="pa-onboarding__archetypes">
+              <Archetype mark="01" title="Chat / Operate" detail="A focused transcript where ideas become working code." />
+              <Archetype mark="02" title="SystemBar / Monitor" detail="A calm glance at engine, model, and context." />
+              <Archetype mark="03" title="Settings / Configure" detail="A precise place to connect providers and tune the workspace." />
+            </div>
+          </aside>
+        </div>
+
+        <footer className="pa-onboarding__footer">
+          <div className="pa-onboarding__status">
+            <span className={`pa-onboarding__status-dot${liveReady ? " pa-onboarding__status-dot--ready" : ""}`} aria-hidden="true" />
+            <div className="pa-onboarding__status-copy">
+              <span className="pa-onboarding__status-title">{statusTitle}</span>
+              <span className="pa-onboarding__status-detail">{statusDetail}</span>
+            </div>
+          </div>
+          <CheckRail checks={health.checks} />
+          <button type="button" className="pa-onboarding__skip" onClick={dismiss}>Esc to dismiss</button>
+        </footer>
+      </div>
+    </section>
   );
 }
+
+// Keep the old export stable for any feature or test importing the original name.
+export const FirstRunBanner = FirstRunExperience;

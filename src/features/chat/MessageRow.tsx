@@ -39,21 +39,7 @@ function formatTime(ts?: string): string {
 }
 
 function StreamingCaret() {
-  return (
-    <span
-      aria-hidden
-      style={{
-        display: "inline-block",
-        width: 7,
-        height: 15,
-        marginLeft: 2,
-        verticalAlign: "text-bottom",
-        background: tokens.color.accentHover,
-        borderRadius: 0,
-        animation: "pa-blink 0.9s step-end infinite",
-      }}
-    />
-  );
+  return <span aria-hidden className="message-row__streaming-caret" />;
 }
 
 export function MessageRow({
@@ -211,6 +197,7 @@ export function MessageRow({
 
         {message.content ? (
           <div
+            className={`message-row__content${isStreaming ? " message-row__content--streaming" : ""}`}
             style={{
               color: isError ? tokens.color.danger : tokens.color.assistant,
               fontSize: tokens.font.size.md,
@@ -225,16 +212,7 @@ export function MessageRow({
           <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, padding: `${tokens.space.xs} 0` }}>
             <span style={{ display: "inline-flex", gap: 4 }}>
               {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  style={{
-                    width: 5,
-                    height: 5,
-                    borderRadius: "50%",
-                    background: tokens.color.accentHover,
-                    animation: `pa-blink 1.1s ease-in-out ${i * 0.18}s infinite`,
-                  }}
-                />
+                <span key={i} className="message-row__working-dot" />
               ))}
             </span>
             <Text variant="label" tone="muted">
