@@ -32,7 +32,7 @@ function isolatedSocketPath() {
   return join(tmpdir(), `prime-agent-bridge-verify-${runId}.sock`);
 }
 
-const SOCKET_PATH = isolatedSocketPath();
+const SOCKET_PATH = process.env.BRIDGE_VERIFY_SOCKET || isolatedSocketPath();
 function terminateProcessTree(proc) {
   if (!proc?.pid || proc.exitCode !== null) return;
   if (process.platform === "win32") {
@@ -49,6 +49,17 @@ function terminateProcessTree(proc) {
 function record(label, ok, detail) {
   results.push({ label, ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"}  ${label}${detail ? " — " + detail : ""}`);
+}
+
+async function waitForExit(proc, timeoutMs = 5000) {
+  if (!proc || proc.exitCode !== null) return true;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    proc.once("exit", () => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
 }
 
 function parseLines(buffer, onLine) {
@@ -68,8 +79,8 @@ async function startDaemon() {
   });
   proc.stdout.on("data", (chunk) => diagnostics.push(`[daemon] ${chunk.toString()}`));
   proc.stderr.on("data", (chunk) => diagnostics.push(`[daemon-err] ${chunk.toString()}`));
-  // Give the daemon a moment to listen on the pipe.
-  await sleep(2000);
+  // Give the supervisor and its session worker time to bind and handshake.
+  await sleep(8000);
   return { proc, diagnostics };
 }
 
@@ -77,7 +88,9 @@ async function run() {
   console.log(`BRIDGE_VERIFY_SOCKET=${SOCKET_PATH}`);
   console.log("=== Bridge verification harness ===\n");
 
-  const { proc: daemon, diagnostics: daemonDiagnostics } = await startDaemon();
+  const firstDaemon = await startDaemon();
+  let daemon = firstDaemon.proc;
+  const daemonDiagnostics = [...firstDaemon.diagnostics];
   let bridge;
   const cleanup = () => {
     try { bridge?.stdin.end(); } catch {}
@@ -182,7 +195,30 @@ async function run() {
       stateResp.result?.status?.kind === "connected" && typeof stateResp.result?.activeSessionId === "string",
       `activeSessionId=${stateResp.result?.activeSessionId}`);
 
-    // 5. getModels
+    if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {
+      // Replace the daemon while keeping the bridge alive. This exercises the
+      // recoverDaemon readiness gate and the upstream reconnect/reattach path.
+      const oldDaemon = daemon;
+      terminateProcessTree(oldDaemon);
+      const exited = await waitForExit(oldDaemon);
+      daemon = undefined;
+      record("old daemon exits before replacement", exited);
+      await sleep(300);
+      const reconnectingStart = events.length;
+      const replacement = await startDaemon();
+      daemon = replacement.proc;
+      daemonDiagnostics.push(...replacement.diagnostics);
+      const reconnectDeadline = Date.now() + 45_000;
+      while (!events.slice(reconnectingStart).some((e) => e.type === "connection_status" && e.status.kind === "connected") && Date.now() < reconnectDeadline) {
+        await sleep(50);
+      }
+      const recovered = events.slice(reconnectingStart).some((e) => e.type === "connection_status" && e.status.kind === "connected");
+      record("bridge reconnects after daemon replacement", recovered);
+      const recoveredState = await send({ id: "c4r", method: "getState", params: {} });
+      record("reconnected bridge serves state", recoveredState.result?.status?.kind === "connected", `status=${recoveredState.result?.status?.kind}`);
+    }
+
+    // 6. getModels
     const modelsResp = await send({ id: "c5", method: "getModels", params: {} });
     record("getModels returns catalog",
       Array.isArray(modelsResp.result) && modelsResp.result.length > 0,

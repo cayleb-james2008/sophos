@@ -17,7 +17,7 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[cfg(windows)]
@@ -35,12 +35,20 @@ use crate::job::Job;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
+fn can_recover_after_eof(running: bool, current_generation: u64, eof_generation: u64) -> bool {
+    running && current_generation == eof_generation
+}
+
 /// Owns the sidecar child process, its stdin/stdout, and restart-on-crash.
 pub struct SidecarManager {
     app: AppHandle,
     child: Mutex<Option<Child>>,
     stdin: Mutex<Option<ChildStdin>>,
     running: Arc<AtomicBool>,
+    /// Invalidates EOF recovery callbacks when an explicit restart or shutdown wins the race.
+    generation: AtomicU64,
+    /// Serializes spawn/stop/restart so only one child can be owned at a time.
+    lifecycle: Mutex<()>,
     job: Arc<Job>,
     node_path: String,
     bridge_path: String,
@@ -64,6 +72,8 @@ impl SidecarManager {
             child: Mutex::new(None),
             stdin: Mutex::new(None),
             running: Arc::new(AtomicBool::new(false)),
+            generation: AtomicU64::new(0),
+            lifecycle: Mutex::new(()),
             job,
             node_path,
             bridge_path,
@@ -80,15 +90,17 @@ impl SidecarManager {
 
     /// Start the sidecar. Idempotent — if one is already running, no-op.
     pub fn start(self: &Arc<Self>) {
+        let _lifecycle = self.lifecycle.lock().unwrap();
         if self.is_alive() {
             return;
         }
         self.running.store(true, Ordering::SeqCst);
-        self.spawn();
+        self.spawn_locked();
     }
 
     /// Spawn a fresh sidecar child and its stdout reader thread.
-    fn spawn(self: &Arc<Self>) {
+    /// Caller must hold `lifecycle`.
+    fn spawn_locked(self: &Arc<Self>) {
         let node_path = self.node_path.clone();
         let sidecar_path = self.bridge_path.clone();
         let mut cmd = Command::new(&node_path);
@@ -101,6 +113,7 @@ impl SidecarManager {
         }
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
+        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         match cmd.spawn() {
             Ok(mut child) => {
                 self.job.assign(&child);
@@ -113,7 +126,7 @@ impl SidecarManager {
                 // stdout → JSON-RPC events (existing behavior, unchanged)
                 if let Some(stdout) = stdout {
                     let this = Arc::clone(self);
-                    std::thread::spawn(move || this.read_loop(stdout));
+                    std::thread::spawn(move || this.read_loop(stdout, generation));
                 }
 
                 // stderr → engine-log (buffered + forwarded via the shared sink)
@@ -127,6 +140,9 @@ impl SidecarManager {
             }
             Err(e) => {
                 eprintln!("[sidecar] failed to spawn: {e}");
+                if self.generation.load(Ordering::SeqCst) == generation {
+                    self.running.store(false, Ordering::SeqCst);
+                }
                 // Surface the failure in the engine panel
                 if let Some(sink) = self.log_sink.lock().unwrap().as_ref() {
                     sink.push(Proc::Sidecar, Stream::Stderr, format!("[sidecar] failed to spawn: {e}"));
@@ -136,8 +152,9 @@ impl SidecarManager {
     }
 
     /// Read the sidecar's stdout line-by-line, forwarding each JSON event to
-    /// the frontend. On EOF (crash/exit), restart the sidecar.
-    fn read_loop(self: Arc<Self>, stdout: ChildStdout) {
+    /// the frontend. On EOF (crash/exit), restart the same generation only if
+    /// no explicit restart or shutdown has superseded it.
+    fn read_loop(self: Arc<Self>, stdout: ChildStdout, generation: u64) {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
             let line = match line {
@@ -169,12 +186,34 @@ impl SidecarManager {
             // Back off briefly before restarting so a crash-looping sidecar
             // (e.g. missing build output) does not spin a hot loop.
             std::thread::sleep(std::time::Duration::from_millis(1000));
-            self.restart();
+            self.recover_after_eof(generation);
         }
+    }
+
+    /// Recover an EOF only while the child that produced it is still current.
+    fn recover_after_eof(self: &Arc<Self>, generation: u64) {
+        let _lifecycle = self.lifecycle.lock().unwrap();
+        if !can_recover_after_eof(
+            self.running.load(Ordering::SeqCst),
+            self.generation.load(Ordering::SeqCst),
+            generation,
+        ) {
+            return;
+        }
+        self.restart_locked();
     }
 
     /// Kill the current sidecar (if any) and spawn a fresh one.
     pub fn restart(self: &Arc<Self>) {
+        let _lifecycle = self.lifecycle.lock().unwrap();
+        self.running.store(true, Ordering::SeqCst);
+        self.restart_locked();
+    }
+
+    /// Caller must hold `lifecycle`.
+    fn restart_locked(self: &Arc<Self>) {
+        // Invalidate any reader thread that is about to observe the old child's EOF.
+        self.generation.fetch_add(1, Ordering::SeqCst);
         let old = self.child.lock().unwrap().take();
         *self.stdin.lock().unwrap() = None;
         if let Some(mut child) = old {
@@ -185,7 +224,7 @@ impl SidecarManager {
         if let Some(sink) = self.log_sink.lock().unwrap().as_ref() {
             sink.push(Proc::Sidecar, Stream::Stderr, "[sidecar] restarting...".to_string());
         }
-        self.spawn();
+        self.spawn_locked();
     }
 
     /// Forward a command to the sidecar as a single JSON line on stdin.
@@ -213,7 +252,9 @@ impl SidecarManager {
 
     /// Kill the sidecar and reap it. Safe to call multiple times.
     pub fn shutdown(&self) {
+        let _lifecycle = self.lifecycle.lock().unwrap();
         self.running.store(false, Ordering::SeqCst);
+        self.generation.fetch_add(1, Ordering::SeqCst);
         let child = self.child.lock().unwrap().take();
         *self.stdin.lock().unwrap() = None;
         if let Some(mut child) = child {
@@ -221,5 +262,21 @@ impl SidecarManager {
             let _ = child.wait();
             eprintln!("[sidecar] shut down");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::can_recover_after_eof;
+
+    #[test]
+    fn explicit_restart_invalidates_stale_eof_recovery() {
+        assert!(can_recover_after_eof(true, 4, 4));
+        assert!(!can_recover_after_eof(true, 5, 4));
+    }
+
+    #[test]
+    fn shutdown_invalidates_eof_recovery() {
+        assert!(!can_recover_after_eof(false, 4, 4));
     }
 }
