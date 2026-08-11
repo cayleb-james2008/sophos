@@ -34,7 +34,8 @@
       "../resources/daemon/package.json": "daemon/package.json",
       "../resources/bridge/dist": "bridge/dist",
       "../resources/node_modules": "node_modules",
-      "../resources/node/node-v24.18.0-win-x64": "node"
+      "../resources/node/node-v24.18.0-win-x64": "node",
+      "../scripts/no-window-preload.cjs": "scripts/no-window-preload.cjs"
     },
     "icon": [
       "icons/32x32.png",
