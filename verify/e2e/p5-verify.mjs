@@ -1,32 +1,37 @@
 // verify/e2e/p5-verify.mjs — P5 worker verification: session filter + windowed
-// transcript. Drives the live app (vite :1420) with Playwright-core.
-import { chromium } from "playwright-core";
+// transcript. Drives the browser-demo app through an owned Vite server.
 import { writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gotoApp, launch, startOwnedDevServer, stopOwnedDevServer } from "./helpers.mjs";
 
-const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
-const APP_URL = "http://localhost:1420/";
 const REPO = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const OUT = join(REPO, "verify", "e2e", "p5-report.json");
 
 const results = [];
 const consoleErrors = [];
+const devServer = await startOwnedDevServer();
 const record = (name, ok, detail) => results.push({ name, ok, detail });
 
-const browser = await chromium.launch({
-  channel: "chrome",
-  headless: true,
-  args: ["--disable-gpu", "--disable-software-rasterizer", "--disable-dev-shm-usage", "--no-sandbox", "--disable-background-timer-throttling", "--disable-renderer-backgrounding"],
-});
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+let browser;
+let page;
+try {
+  ({ browser, page } = await launch());
+} catch (error) {
+  await stopOwnedDevServer(devServer);
+  throw error;
+}
 page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
 page.on("pageerror", (e) => consoleErrors.push(`pageerror: ${e.message}`));
 
 try {
-  await page.goto(APP_URL, { waitUntil: "networkidle", timeout: 30000 });
-  await page.waitForSelector("text=Conversation", { timeout: 30000 });
-  await page.waitForSelector("text=Engine Live", { timeout: 30000 });
+  await gotoApp(page, devServer.url);
+
+  // The first-run dialog is an intentional mock-preview entry point. Dismiss it
+  // through the real action before exercising the developer-only fixture.
+  const startPreview = page.locator('button:has-text("Start a preview")');
+  if (await startPreview.count() > 0) await startPreview.click();
+  await page.waitForTimeout(250);
 
   // ---- 1. Session filter ----
   await page.click('nav button:has-text("Sessions")', { timeout: 10000 });
@@ -86,8 +91,9 @@ try {
   await page.waitForSelector('[data-index]', { timeout: 10000 });
   const renderMs = Date.now() - t0;
   record("perf-load-500-render", renderMs < 3000, `render 500 msgs in ${renderMs}ms`);
-  const onboardingStillVisible = await page.locator('text=Preview mode').count();
-  record("perf-fixture-does-not-complete-onboarding", onboardingStillVisible > 0, `preview onboarding remains visible after fixture load: ${onboardingStillVisible}`);
+  const onboardingStillVisible = await page.locator(".pa-onboarding").count();
+  const demoBoundary = await page.locator("text=Demo mode — engine not connected").count();
+  record("perf-fixture-keeps-browser-demo-boundary", onboardingStillVisible === 0 && demoBoundary > 0, `onboarding=${onboardingStillVisible}, demo boundary=${demoBoundary}`);
 
   // Only a window of rows should be mounted (not all 500).
   const mountedRows = await page.evaluate(() => {
@@ -146,8 +152,10 @@ try {
       body = body.replace("setMessages(demoSeed());", "setMessages([]);");
       await route.fulfill({ response: resp, body });
     });
-    await emptyPage.goto(APP_URL, { waitUntil: "networkidle", timeout: 30000 });
+    await emptyPage.goto(devServer.url, { waitUntil: "networkidle", timeout: 30000 });
     await emptyPage.waitForSelector("text=Conversation", { timeout: 30000 });
+    const emptyStartPreview = emptyPage.locator('button:has-text("Start a preview")');
+    if (await emptyStartPreview.count() > 0) await emptyStartPreview.click();
     await emptyPage.waitForTimeout(1000);
     const emptyHint = await emptyPage.locator("text=Start a conversation").count();
     const prompt = await emptyPage.locator("text=$ sophos").count();
@@ -233,6 +241,7 @@ try {
   record("fatal", false, e.message);
 } finally {
   await browser.close();
+  await stopOwnedDevServer(devServer);
 }
 
 const passed = results.filter((r) => r.ok).length;

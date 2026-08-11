@@ -19,10 +19,7 @@
  *   node verify/e2e-isolate.mjs --repeat 5 "Busy state" "Steering" "Follow-up"
  *   node verify/e2e-isolate.mjs --repeat 3 --all-agents
  */
-import { execFileSync, spawn } from "node:child_process";
-import { join } from "node:path";
-import { setTimeout as sleep } from "node:timers/promises";
-import { createHarness, launch, gotoApp, APP_URL, REPO } from "./e2e/helpers.mjs";
+import { createHarness, launch, gotoApp, startOwnedDevServer, stopOwnedDevServer } from "./e2e/helpers.mjs";
 import { views } from "./e2e/views.test.mjs";
 import { flows } from "./e2e/flows.test.mjs";
 import { edge } from "./e2e/edge.test.mjs";
@@ -46,28 +43,6 @@ if (!selected.length) {
   process.exit(2);
 }
 
-async function ensureDevServer() {
-  try { const r = await fetch(APP_URL); if (r.ok) return null; } catch {}
-  const viteBin = join(REPO, "node_modules", "vite", "bin", "vite.js");
-  const proc = spawn(process.execPath, [viteBin], { stdio: "ignore", detached: true });
-  for (let i = 0; i < 30; i++) {
-    await sleep(1000);
-    try { const r = await fetch(APP_URL); if (r.ok) return proc; } catch {}
-  }
-  throw new Error("dev server did not start on " + APP_URL);
-}
-
-function killStrayChrome() {
-  try {
-    const out = execFileSync("powershell", [
-      "-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process -Filter 'Name=\"chrome.exe\"' | Where-Object { $_.CommandLine -match \"--headless\" -and $_.CommandLine -match \"playwright\" } | ForEach-Object { $_.ProcessId }",
-    ], { encoding: "utf8", timeout: 8000 }).toString();
-    for (const pid of out.split("\n").map((s) => parseInt(s.trim(), 10)).filter(Number.isFinite)) {
-      try { execFileSync("taskkill", ["/F", "/T", "/PID", String(pid)], { stdio: "ignore", timeout: 5000 }); } catch {}
-    }
-  } catch {}
-}
 
 const CRASH_SIGNS = [
   "Target page, context or browser has been closed",
@@ -78,8 +53,7 @@ const CRASH_SIGNS = [
 ];
 
 async function main() {
-  killStrayChrome();
-  const devProc = await ensureDevServer();
+  const devServer = await startOwnedDevServer();
   console.log(`Isolating ${selected.length} test(s), ${repeat}x each, fresh browser per run.\n`);
 
   const tally = new Map();
@@ -96,7 +70,7 @@ async function main() {
         page.on("pageerror", (e) => harness.recordError("pageerror: " + e.message));
         let ok = false, err = "";
         try {
-          await gotoApp(page);
+          await gotoApp(page, devServer.url);
           ok = await harness.test(t.section, t.name, t.fn)(page);
           if (!ok) err = harness.results[harness.results.length - 1]?.error ?? "unknown";
         } catch (e) {
@@ -111,8 +85,7 @@ async function main() {
       }
     }
   } finally {
-    if (devProc) { try { execFileSync("taskkill", ["/F", "/T", "/PID", String(devProc.pid)], { stdio: "ignore", timeout: 8000 }); } catch {} }
-    killStrayChrome();
+    await stopOwnedDevServer(devServer);
   }
 
   console.log("\n=== VERDICT ===");

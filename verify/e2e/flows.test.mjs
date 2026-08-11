@@ -146,7 +146,9 @@ export const flows = [
       await page.click('button[aria-haspopup="listbox"]');
       await page.waitForSelector('div[role="listbox"]', { timeout: 5000 });
       await expect(await page.locator("text=MiniMax M3").count() > 0, "MiniMax model option missing");
-      await page.click('button[role="option"]:has-text("MiniMax M3")');
+      // Keyboard activation avoids the transcript overlay intercepting a
+      // visually overlapping but accessible menu option.
+      await page.locator('button[role="option"]:has-text("MiniMax M3")').press("Enter");
       await page.waitForTimeout(600);
       // System bar model readout should now show MiniMax M3.
       await expect(await page.locator("text=MiniMax M3").count() > 0, "model did not switch in system bar");

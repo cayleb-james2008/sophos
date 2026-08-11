@@ -1,13 +1,15 @@
 // verify/e2e/helpers.mjs — shared harness for the browser-driven e2e suite.
-// Drives the LIVE app (npm run dev, Vite on :1420) with Playwright-core against
-// the system Chrome. No agent-browser daemon — Playwright directly.
+// Drives an owned ephemeral Vite server with Playwright-core against the system
+// Chrome. No agent-browser daemon — Playwright directly.
+import { spawn, execFileSync } from "node:child_process";
+import { createServer } from "node:net";
 import { chromium } from "playwright-core";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { setTimeout as sleep } from "node:timers/promises";
 
 export const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
-export const APP_URL = "http://localhost:1420/";
 export const REPO = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 export const SHOT_DIR = join(REPO, "verify", "e2e", "screenshots");
 export const REPORT_PATH = join(REPO, "verify", "e2e", "e2e-report.json");
@@ -17,6 +19,62 @@ mkdirSync(SHOT_DIR, { recursive: true });
 
 /** Hard timeout helper — never hangs forever. */
 export const HARD = 30000;
+
+/** Reserve an ephemeral loopback port without touching a caller-owned server. */
+export async function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        server.close(() => reject(new Error("could not determine an ephemeral port")));
+        return;
+      }
+      server.close((error) => error ? reject(error) : resolve(address.port));
+    });
+  });
+}
+
+/**
+ * Start and own a Vite server for the mock browser suite.
+ *
+ * This intentionally never probes or reuses port 1420: a responding process
+ * there may belong to another worktree. The returned process is the only
+ * process this harness is allowed to stop.
+ */
+export async function startOwnedDevServer() {
+  const port = await freePort();
+  const viteBin = join(REPO, "node_modules", "vite", "bin", "vite.js");
+  const proc = spawn(process.execPath, [viteBin, "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
+    cwd: REPO,
+    stdio: "ignore",
+    windowsHide: true,
+  });
+  const url = `http://127.0.0.1:${port}/`;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    if (proc.exitCode !== null) throw new Error(`owned Vite server exited before becoming ready (code ${proc.exitCode})`);
+    try {
+      const response = await fetch(url);
+      if (response.ok) return { proc, url, port };
+    } catch {
+      // The owned process may still be binding its ephemeral port.
+    }
+    await sleep(250);
+  }
+  await stopOwnedDevServer({ proc, url, port });
+  throw new Error(`owned Vite server did not start on ${url}`);
+}
+
+/** Stop only the Vite process previously returned by startOwnedDevServer. */
+export async function stopOwnedDevServer(server) {
+  if (!server?.proc || server.proc.exitCode !== null) return;
+  if (process.platform === "win32" && server.proc.pid) {
+    try { execFileSync("taskkill", ["/F", "/T", "/PID", String(server.proc.pid)], { stdio: "ignore", timeout: 8000 }); } catch {}
+  } else {
+    try { server.proc.kill("SIGTERM"); } catch {}
+  }
+}
 
 /** A tiny test harness: collects pass/fail results + screenshots. */
 export function createHarness() {
@@ -62,27 +120,38 @@ export function createHarness() {
 
 /** Launch the browser (system Chrome, headless). Returns { browser, page }. */
 export async function launch() {
-  const browser = await chromium.launch({
-    channel: "chrome",
-    headless: true,
-    args: [
-      "--disable-gpu",
-      "--disable-software-rasterizer",
-      "--disable-dev-shm-usage",
-      "--no-sandbox",
-      "--disable-background-timer-throttling",
-      "--disable-renderer-backgrounding",
-    ],
-  });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  return { browser, page };
+  let browser;
+  try {
+    browser = await chromium.launch({
+      channel: "chrome",
+      headless: true,
+      args: [
+        "--disable-gpu",
+        "--disable-software-rasterizer",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-background-timer-throttling",
+        "--disable-renderer-backgrounding",
+      ],
+    });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    return { browser, page };
+  } catch (error) {
+    try { await browser?.close(); } catch {}
+    throw error;
+  }
 }
 
 /** Navigate to the app and wait for the shell to render. */
-export async function gotoApp(page) {
-  await page.goto(APP_URL, { waitUntil: "networkidle", timeout: HARD });
+export async function gotoApp(page, appUrl) {
+  if (!appUrl) throw new Error("gotoApp requires the URL returned by startOwnedDevServer");
+  await page.goto(appUrl, { waitUntil: "networkidle", timeout: HARD });
   await page.waitForSelector("text=Conversation", { timeout: HARD });
-  // Wait for the mock connection to flip to connected.
+  // This suite is deliberately browser-demo only. A real Tauri page must use
+  // the live-daemon harnesses instead of silently passing mock assertions.
+  const tauriRuntime = await page.evaluate(() => "__TAURI_INTERNALS__" in window);
+  if (tauriRuntime) throw new Error("browser suite attached to a Tauri runtime; expected MockIpcClient preview");
+  await page.waitForSelector("text=Demo mode — engine not connected", { timeout: HARD });
   await page.waitForSelector("text=Engine Live", { timeout: HARD });
 }
 
@@ -113,15 +182,6 @@ export async function waitIdle(page, ms = HARD) {
   await page.waitForSelector('button[aria-label="Send message"]', { timeout: ms });
 }
 
-/** Collect any console/page errors currently present. */
-export async function collectErrors(page, harness) {
-  const errs = await page.evaluate(() => {
-    // No direct access to past console; we rely on the event listener.
-    return [];
-  });
-  return errs;
-}
-
 /** Write the machine-readable JSON report. */
 export function writeReport(harness, meta) {
   const passed = harness.results.filter((r) => r.ok).length;
@@ -129,7 +189,7 @@ export function writeReport(harness, meta) {
   const report = {
     suite: "sophos-browser-e2e",
     mode: "browser-demo (MockIpcClient)",
-    app: { url: APP_URL, devServer: "vite :1420" },
+    app: { url: meta.appUrl, devServer: "owned ephemeral Vite server", mode: "browser-demo (MockIpcClient)" },
     browser: { engine: "chromium", executable: CHROME, headless: true },
     startedAt: meta.startedAt,
     finishedAt: new Date().toISOString(),
@@ -154,7 +214,7 @@ export function writeSummary(harness, meta) {
   const lines = [];
   lines.push(`# Sophos Browser E2E — Summary`);
   lines.push(``);
-  lines.push(`Date: ${new Date().toISOString()} · Mode: browser-demo (MockIpcClient) · App: \`npm run dev\` on :1420`);
+  lines.push(`Date: ${new Date().toISOString()} · Mode: browser-demo (MockIpcClient) · App: owned ephemeral Vite server`);
   lines.push(``);
   lines.push(`## Result: ${failed === 0 ? "PASS" : "FAIL"} (${passed}/${harness.results.length} passed)`);
   lines.push(``);
