@@ -1,0 +1,128 @@
+/* Chat — Operate archetype. The transcript remains the primary object;
+   chrome is a translucent edge, not a second dashboard. */
+
+.chat-view {
+  position: relative;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(133,237,117,0.035), transparent 32rem),
+    linear-gradient(180deg, rgba(21,21,21,0.22), transparent 18rem);
+}
+.chat-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 24px;
+  border-bottom: 1px solid rgba(244,244,244,0.1);
+  background: linear-gradient(180deg, rgba(21,21,21,0.75), rgba(14,14,14,0.35));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.chat-heading { display: flex; flex-direction: column; gap: 3px; }
+.chat-actions { display: flex; align-items: center; gap: 8px; }
+.chat-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border: 1px solid rgba(244,244,244,0.12);
+  background: rgba(255,255,255,0.035);
+}
+.chat-action-button, .chat-new-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(244,244,244,0.12);
+  background: rgba(255,255,255,0.035);
+  color: rgba(244,244,244,0.6);
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+}
+.chat-action-button { width: 30px; height: 30px; }
+.chat-new-button { gap: 7px; padding: 7px 10px; font: 500 11px/1 "Geist", sans-serif; }
+.chat-action-button:hover, .chat-new-button:hover { border-color: rgba(133,237,117,0.4); background: rgba(133,237,117,0.08); color: #f4f4f4; }
+.chat-error, .chat-demo {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 24px;
+  border-bottom: 1px solid;
+}
+.chat-error { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); }
+.chat-demo { background: rgba(243,188,86,0.07); border-color: rgba(243,188,86,0.2); }
+.chat-demo-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: #f3bc56; }
+.chat-developer-preview { margin-left: auto; color: rgba(244,244,244,0.6); }
+.chat-developer-summary { cursor: pointer; font: 10px/1 "Geist Mono", monospace; }
+.chat-demo-button { margin-top: 6px; padding: 4px 10px; border: 1px solid rgba(244,244,244,0.18); background: transparent; color: rgba(244,244,244,0.6); cursor: pointer; font: 10px/1 "Geist Mono", monospace; }
+.chat-demo-button:hover { border-color: rgba(133,237,117,0.4); color: #f4f4f4; }
+.chat-loading { display: flex; flex: 1; align-items: center; justify-content: center; }
+.chat-toast { position: absolute; right: 24px; bottom: 96px; padding: 8px 14px; border: 1px solid rgba(244,244,244,0.2); background: rgba(17,17,17,0.9); box-shadow: 0 16px 40px rgba(0,0,0,0.28); animation: pa-slide-up 140ms ease both; }
+.chat-icon { display: block; }
+
+/* Live transcript motion: the wash marks the moment an assistant stream
+   becomes active; the caret and working dots only exist while work is live. */
+.message-row__content--streaming {
+  background-image: linear-gradient(100deg, transparent 0%, rgba(133,237,117,0.07) 46%, transparent 64%);
+  background-size: 220% 100%;
+  animation: pa-title-wash 900ms cubic-bezier(0.16,1,0.3,1) both;
+}
+.message-row__streaming-caret {
+  display: inline-block;
+  width: 7px;
+  height: 15px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: #9fff8a;
+  animation: pa-blink 0.9s step-end infinite;
+}
+.message-row__working-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #9fff8a;
+  animation: pa-blink 1.1s ease-in-out infinite;
+}
+.message-row__working-dot:nth-child(2) { animation-delay: 180ms; }
+.message-row__working-dot:nth-child(3) { animation-delay: 360ms; }
+
+/* Tool state motion: a single pulse on status change, plus a spinner only
+   while the tool is genuinely running. */
+.tool-call-card { position: relative; }
+.tool-call-card__spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 2px;
+  border: 2px solid rgba(244,244,244,0.18);
+  border-top-color: #8b7cf6;
+  border-radius: 50%;
+  animation: pa-spin 0.8s linear infinite;
+}
+.tool-call-card__state-flash {
+  position: absolute;
+  top: 11px;
+  left: 13px;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  border-radius: 50%;
+  animation: pa-state-flash 260ms ease-out both;
+}
+.tool-call-card__state-flash--running { background: #8b7cf6; }
+.tool-call-card__state-flash--complete { background: #85ed75; }
+.tool-call-card__state-flash--error { background: #ef4444; }
+
+
+@media (max-width: 900px) {
+  .chat-header { padding-inline: 16px; }
+  .chat-status, .chat-action-button { display: none; }
+  .chat-demo, .chat-error { padding-inline: 16px; }
+  .chat-new-button { padding-inline: 8px; }
+}

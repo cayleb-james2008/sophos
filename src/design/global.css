@@ -2,6 +2,16 @@
 
 :root {
   color-scheme: dark;
+  --pa-ink: #0e0e0e;
+  --pa-paper: #f4f4f4;
+  --pa-card: #151515;
+  --pa-secondary: #202020;
+  --pa-line: rgba(244, 244, 244, 0.12);
+  --pa-glass: rgba(14, 14, 14, 0.78);
+  --pa-green: #85ed75;
+  --pa-amber: #f3bc56;
+  --pa-radius: 0px;
+  --pa-blur: 12px;
 }
 
 * {
@@ -17,7 +27,9 @@ body,
 }
 
 body {
-  background: #0e0e0e;
+  background:
+    radial-gradient(circle at 80% -10%, rgba(133, 237, 117, 0.05), transparent 28rem),
+    #0e0e0e;
   color: #f4f4f4;
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -170,6 +182,43 @@ body {
   }
   50% {
     opacity: 0.3;
+  }
+}
+
+/* PI-inspired live-data motion. These are short, one-shot cues for changes;
+   active-state loops stay reserved for streaming/running indicators. */
+@keyframes pa-title-wash {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -30% 0;
+  }
+}
+
+@keyframes pa-reward-row-update {
+  from {
+    background-position: 160% 0;
+    box-shadow: inset 0 0 0 1px rgba(133, 237, 117, 0.34);
+  }
+  to {
+    background-position: -30% 0;
+    box-shadow: inset 0 0 0 1px rgba(133, 237, 117, 0);
+  }
+}
+
+@keyframes pa-state-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  45% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
   }
 }
 

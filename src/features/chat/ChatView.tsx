@@ -1,11 +1,8 @@
-// ChatView — the chat experience: message list, streaming assistant messages,
-// thinking display, tool/IPython call rendering, prompt input, steer/follow-up
-// queue, inline side questions, a context/usage bar, and the model/provider
-// selector. Header actions (Export / Share / Copy) mirror the TUI. Wired to
-// the IPC client.
+// ChatView — the Operate surface: transcript, streaming state, onboarding,
+// session actions, and composer. Presentation lives in chat.css so the view can
+// share the same design-system layer as the shell.
 
 import { useEffect, useRef, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, StatusDot } from "../../design";
 import { useConnectionState, useIpc, isTauri } from "../../ipc/client";
 import { ModelSelector } from "../providers/ModelSelector";
@@ -14,276 +11,96 @@ import { MessageList } from "./MessageList";
 import { Composer } from "./Composer";
 import { ContextBar } from "./ContextBar";
 import { FirstRunBanner, useOnboardingStatus } from "../settings/FirstRunBanner";
+import "./chat.css";
 
 function statusDotState(status: { kind: string }): "connecting" | "connected" | "disconnected" | "reconnecting" {
   switch (status.kind) {
-    case "connecting":
-      return "connecting";
-    case "connected":
-      return "connected";
-    case "disconnected":
-      return "disconnected";
-    case "reconnecting":
-      return "reconnecting";
-    default:
-      return "disconnected";
+    case "connecting": return "connecting";
+    case "connected": return "connected";
+    case "reconnecting": return "reconnecting";
+    default: return "disconnected";
   }
 }
 
-// Small line icons for the header actions, matching the Sophos token palette.
 function ExportIcon({ size = 13, color }: { size?: number; color: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
+  return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>;
 }
 
 function ShareIcon({ size = 13, color }: { size?: number; color: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="18" cy="5" r="3" />
-      <circle cx="6" cy="12" r="3" />
-      <circle cx="18" cy="19" r="3" />
-      <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
-      <line x1="15.4" y1="6.5" x2="8.6" y2="10.5" />
-    </svg>
-  );
+  return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.6" y1="13.5" x2="15.4" y2="17.5" /><line x1="15.4" y1="6.5" x2="8.6" y2="10.5" /></svg>;
 }
 
 function CopyIcon({ size = 13, color }: { size?: number; color: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  );
+  return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>;
 }
 
-export function ChatView({
-  onNewSession,
-  onSetupProviders,
-}: {
-  onNewSession?: () => void;
-  onSetupProviders?: () => void;
-}) {
+export function ChatView({ onNewSession, onSetupProviders }: { onNewSession?: () => void; onSetupProviders?: () => void }) {
   const chat = useChat();
   const ipc = useIpc();
   const state = useConnectionState();
   const onboarding = useOnboardingStatus();
   const { hasProvider } = onboarding;
   const {
-    messages,
-    busy,
-    loaded,
-    error,
-    hasFirstMessage,
-    send,
-    steer,
-    abort,
-    queueFollowUp,
-    clearFollowUps,
-    popFollowUp,
-    followUps,
-    steered,
-    shellNotice,
-    askSideQuestion,
-    dismissSideQuestion,
-    sideQuestions,
-    runShell,
-    contextStats,
-    setSessionName,
-    loadDemoMessages,
-    editDraft,
-    requestEdit,
-    retry,
+    messages, busy, loaded, error, hasFirstMessage, send, steer, abort,
+    queueFollowUp, clearFollowUps, popFollowUp, followUps, steered,
+    shellNotice, askSideQuestion, dismissSideQuestion, sideQuestions,
+    runShell, contextStats, setSessionName, loadDemoMessages, editDraft,
+    requestEdit, retry,
   } = chat;
 
-  // ---- Toast for header actions ----
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
-  const showToast = (msg: string) => {
-    setToast(msg);
+  const [developerPreviewOpen, setDeveloperPreviewOpen] = useState(false);
+  const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant")?.content ?? "";
+  const starterSeq = useRef(0);
+  const [starterDraft, setStarterDraft] = useState<{ seq: number; text: string } | null>(null);
+
+  const showToast = (message: string) => {
+    setToast(message);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 2600);
   };
-
-  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
-
-  // ---- Empty-state starter prompts → composer ----------------
-  // Picking a starter prompt fills the composer (editable, never auto-sent).
-  // A monotonically increasing seq lets the user pick the same prompt twice.
-  const starterSeq = useRef(0);
-  const [starterDraft, setStarterDraft] = useState<{ seq: number; text: string } | null>(null);
-  const [developerPreviewOpen, setDeveloperPreviewOpen] = useState(false);
-  const fillPrompt = (text: string) => {
-    setStarterDraft({ seq: ++starterSeq.current, text });
-  };
-
-  // FirstRunBanner's "Start typing" action — App keeps us on Chat; the local
-  // fallback focuses the composer so the user can type immediately.
-  const onStartChat = () => {
-    document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message input"]')?.focus();
-  };
-
-  const onExport = () => {
-    void ipc.exportToHtml().catch(() => {});
-    showToast("Exporting session to HTML…");
-  };
-  const onShare = () => {
-    // The daemon does not support share (bridge returns -32601). Keep the call
-    // best-effort but surface a graceful notice instead of a dead end.
-    void ipc.runCommand("share").catch(() => {});
-    showToast("Share not available yet");
-  };
+  const fillPrompt = (text: string) => setStarterDraft({ seq: ++starterSeq.current, text });
+  const onStartChat = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message input"]')?.focus();
+  const onExport = () => { void ipc.exportToHtml().catch(() => {}); showToast("Exporting session to HTML…"); };
+  const onShare = () => { void ipc.runCommand("share").catch(() => {}); showToast("Share not available yet"); };
   const onCopy = async () => {
-    if (!lastAssistant) {
-      showToast("No assistant message to copy");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(lastAssistant);
-      showToast("Copied last assistant message");
-    } catch {
-      showToast("Copy failed");
-    }
+    if (!lastAssistant) { showToast("No assistant message to copy"); return; }
+    try { await navigator.clipboard.writeText(lastAssistant); showToast("Copied last assistant message"); }
+    catch { showToast("Copy failed"); }
   };
 
-  // Cleanup toast timer on unmount.
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    };
+  useEffect(() => () => {
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
   }, []);
 
+  const headerButtons = [
+    { title: "Export session to HTML", onClick: onExport, icon: (color: string) => <ExportIcon color={color} /> },
+    { title: "Share as GitHub gist", onClick: onShare, icon: (color: string) => <ShareIcon color={color} /> },
+    { title: "Copy last assistant message", onClick: () => void onCopy(), icon: (color: string) => <CopyIcon color={color} /> },
+  ];
+
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        position: "relative",
-      }}
-    >
-      {/* Header */}
-      <header
-        style={{
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: tokens.space.lg,
-          padding: `${tokens.space.md} ${tokens.space.xl}`,
-          borderBottom: `1px solid ${tokens.color.border}`,
-          background: `linear-gradient(180deg, ${tokens.color.bgElevated}cc, transparent)`,
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {/* Neutral eyebrow, matching `.ag-eyebrow` / `.sessions__eyebrow`.
-              A green kicker here was redundant with the "Conversation" heading
-              below it and the active nav state, and it was one of ~7 greens
-              clustered in the top strip (vision-critic D5). */}
-          <Text variant="micro" tone="dim" mono uppercase style={{ letterSpacing: "0.12em" }}>
-            Chat
-          </Text>
-          <Text variant="subtitle" weight="semibold" style={{ letterSpacing: "-0.01em" }}>
-            Conversation
-          </Text>
+    <div className="chat-view">
+      <header className="chat-header" data-view-header>
+        <div className="chat-heading">
+          <Text variant="micro" tone="dim" mono uppercase>Chat</Text>
+          <Text variant="subtitle" weight="semibold">Conversation</Text>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: tokens.space.sm,
-              padding: "4px 10px",
-              borderRadius: tokens.radius.sm,
-              background: tokens.color.bgRaised,
-              border: `1px solid ${tokens.color.border}`,
-            }}
-          >
+        <div className="chat-actions">
+          <div className="chat-status">
             <StatusDot state={statusDotState(state.status)} />
-            <Text variant="micro" tone="muted" mono uppercase>
-              {state.status.kind}
-            </Text>
+            <Text variant="micro" tone="muted" mono uppercase>{state.status.kind}</Text>
           </div>
-
-          {/* Export / Share / Copy */}
-          {[
-            { title: "Export session to HTML", onClick: onExport, icon: (c: string) => <ExportIcon color={c} /> },
-            { title: "Share as GitHub gist", onClick: onShare, icon: (c: string) => <ShareIcon color={c} /> },
-            { title: "Copy last assistant message", onClick: () => void onCopy(), icon: (c: string) => <CopyIcon color={c} /> },
-          ].map((b) => (
-            <button
-              key={b.title}
-              type="button"
-              onClick={b.onClick}
-              title={b.title}
-              aria-label={b.title}
-              className="pa-focus-ring"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 30,
-                height: 30,
-                borderRadius: tokens.radius.md,
-                background: tokens.color.bgRaised,
-                border: `1px solid ${tokens.color.border}`,
-                color: tokens.color.textMuted,
-                cursor: "pointer",
-                transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = tokens.color.accentBorder;
-                e.currentTarget.style.color = tokens.color.text;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = tokens.color.border;
-                e.currentTarget.style.color = tokens.color.textMuted;
-              }}
-            >
-              {b.icon("currentColor")}
+          {headerButtons.map((button) => (
+            <button key={button.title} type="button" onClick={button.onClick} title={button.title} aria-label={button.title} className="pa-focus-ring chat-action-button">
+              {button.icon("currentColor")}
             </button>
           ))}
-
           {onNewSession ? (
-            <button
-              type="button"
-              onClick={onNewSession}
-              title="New session"
-              className="pa-focus-ring"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: tokens.space.sm,
-                padding: "5px 10px",
-                borderRadius: tokens.radius.md,
-                background: tokens.color.bgRaised,
-                border: `1px solid ${tokens.color.border}`,
-                color: tokens.color.textMuted,
-                cursor: "pointer",
-                fontFamily: tokens.font.sans,
-                fontSize: tokens.font.size.xs,
-                fontWeight: tokens.font.weight.medium,
-                transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = tokens.color.accentBorder;
-                e.currentTarget.style.color = tokens.color.text;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = tokens.color.border;
-                e.currentTarget.style.color = tokens.color.textMuted;
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
+            <button type="button" onClick={onNewSession} title="New session" className="pa-focus-ring chat-new-button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
               New session
             </button>
           ) : null}
@@ -291,127 +108,30 @@ export function ChatView({
         </div>
       </header>
 
-      {/* Error banner */}
-      {error ? (
-        <div
-          style={{
-            flexShrink: 0,
-            padding: `${tokens.space.sm} ${tokens.space.xl}`,
-            background: tokens.color.danger + "1a",
-            borderBottom: `1px solid ${tokens.color.danger}44`,
-          }}
-        >
-          <Text variant="label" tone="danger">
-            {error}
-          </Text>
-        </div>
-      ) : null}
+      {error ? <div className="chat-error"><Text variant="label" tone="danger">{error}</Text></div> : null}
 
-      {/* First-run onboarding — skippable, provider-first (research D12 / F1).
-          P2 interface: completion is driven by `hasProvider` + `hasFirstMessage`. */}
-      <FirstRunBanner
-        onSetupProviders={onSetupProviders}
-        onStartChat={onStartChat}
-        hasFirstMessage={hasFirstMessage}
-        setup={onboarding}
-      />
+      <FirstRunBanner onSetupProviders={onSetupProviders} onStartChat={onStartChat} hasFirstMessage={hasFirstMessage} setup={onboarding} />
 
-      {/* Demo-mode banner: visible only in the browser preview (no Tauri). */}
       {!isTauri ? (
-        <div
-          style={{
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            gap: tokens.space.sm,
-            padding: `${tokens.space.sm} ${tokens.space.xl}`,
-            background: tokens.color.warning + "14",
-            borderBottom: `1px solid ${tokens.color.warning}40`,
-          }}
-        >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              background: tokens.color.warning,
-              flexShrink: 0,
-            }}
-            aria-hidden
-          />
-          <Text variant="label" tone="muted">
-            Demo mode — engine not connected. Responses here are simulated and do not reflect real tools or data.
-          </Text>
-          {/* Keep the performance fixture available without presenting it as a
-              normal first-run action. */}
-          <details
-            open={developerPreviewOpen}
-            style={{ marginLeft: "auto", flexShrink: 0, color: tokens.color.textMuted }}
-          >
-            <summary
-              onClick={(event) => {
-                event.preventDefault();
-                setDeveloperPreviewOpen((open) => !open);
-              }}
-              style={{ cursor: "pointer", fontFamily: tokens.font.mono, fontSize: tokens.font.size.xs }}
-            >
-              Developer preview
-            </summary>
+        <div className="chat-demo">
+          <span className="chat-demo-dot" aria-hidden="true" />
+          <Text variant="label" tone="muted">Demo mode — engine not connected. Responses here are simulated and do not reflect real tools or data.</Text>
+          <details open={developerPreviewOpen} className="chat-developer-preview">
+            <summary onClick={(event) => { event.preventDefault(); setDeveloperPreviewOpen((open) => !open); }} className="chat-developer-summary">Developer preview</summary>
             <div hidden={!developerPreviewOpen}>
-            <button
-              type="button"
-              onClick={() => loadDemoMessages(500)}
-              title="Seed a 500-message transcript to test windowed rendering"
-              style={{
-                marginTop: tokens.space.xs,
-                background: "transparent",
-                border: `1px solid ${tokens.color.borderStrong}`,
-                borderRadius: tokens.radius.sm,
-                color: tokens.color.textMuted,
-                fontFamily: tokens.font.mono,
-                fontSize: tokens.font.size.xs,
-                padding: "3px 10px",
-                cursor: "pointer",
-                transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = tokens.color.accentBorder;
-                e.currentTarget.style.color = tokens.color.text;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = tokens.color.borderStrong;
-                e.currentTarget.style.color = tokens.color.textMuted;
-              }}
-            >
-              Load 500 messages
-            </button>
+              <button type="button" onClick={() => loadDemoMessages(500)} title="Seed a 500-message transcript to test windowed rendering" className="chat-demo-button">Load 500 messages</button>
             </div>
           </details>
         </div>
       ) : null}
 
-      {/* Message list */}
       {loaded ? (
-        <MessageList
-          messages={messages}
-          busy={busy}
-          onRetry={retry}
-          onEdit={(index, m) => requestEdit(index, m.content)}
-          hasProvider={hasProvider}
-          onFillPrompt={fillPrompt}
-        />
+        <MessageList messages={messages} busy={busy} onRetry={retry} onEdit={(index, message) => requestEdit(index, message.content)} hasProvider={hasProvider} onFillPrompt={fillPrompt} />
       ) : (
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Text variant="label" tone="dim">
-            Loading transcript…
-          </Text>
-        </div>
+        <div className="chat-loading"><Text variant="label" tone="dim">Loading transcript…</Text></div>
       )}
 
-      {/* Context / usage bar */}
       <ContextBar stats={contextStats} />
-
-      {/* Composer */}
       <Composer
         busy={busy}
         setupReady={!isTauri || onboarding.ready}
@@ -433,26 +153,7 @@ export function ChatView({
         onSetName={setSessionName}
       />
 
-      {/* Toast */}
-      {toast ? (
-        <div
-          role="status"
-          style={{
-            position: "absolute",
-            right: tokens.space.xl,
-            bottom: 96,
-            padding: "7px 14px",
-            background: tokens.color.bgOverlay,
-            border: `1px solid ${tokens.color.borderStrong}`,
-            borderRadius: tokens.radius.md,
-            boxShadow: tokens.shadow.lg,
-          }}
-        >
-          <Text variant="label" tone="accent">
-            {toast}
-          </Text>
-        </div>
-      ) : null}
+      {toast ? <div role="status" className="chat-toast"><Text variant="label" tone="accent">{toast}</Text></div> : null}
     </div>
   );
 }
