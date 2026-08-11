@@ -12,7 +12,8 @@
     "bridge:build": "cd bridge && npm run build",
     "bridge:verify": "node bridge/verify.mjs",
     "bridge:verify:concurrent": "node bridge/verify-concurrency.mjs",
-    "bridge:dev": "cd bridge && npm run dev"
+    "bridge:dev": "cd bridge && npm run dev",
+    "verify:safety": "node verify/e2e-safety.mjs"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",

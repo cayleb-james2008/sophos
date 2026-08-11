@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * verify/e2e-browser.mjs — browser-driven end-to-end + edge-case suite for the
- * Sophos app, running on the LIVE dev server (npm run dev, Vite :1420) in the
- * browser-demo mode (MockIpcClient). Uses Playwright-core directly against the
+ * Sophos app, running on an owned ephemeral Vite dev server in the browser-
+ * demo mode (MockIpcClient). Uses Playwright-core directly against the
  * system Chrome — no agent-browser daemon.
  *
  * Coverage:
@@ -20,12 +20,7 @@
  *
  * Exit 0 iff every test passes. Browser tree is always killed on exit.
  */
-import { spawn } from "node:child_process";
-import { createServer } from "node:net";
-import { execFileSync } from "node:child_process";
-import { join } from "node:path";
-import { setTimeout as sleep } from "node:timers/promises";
-import { createHarness, launch, gotoApp, writeReport, writeSummary, APP_URL, REPO } from "./e2e/helpers.mjs";
+import { createHarness, launch, gotoApp, startOwnedDevServer, stopOwnedDevServer, writeReport, writeSummary } from "./e2e/helpers.mjs";
 import { views } from "./e2e/views.test.mjs";
 import { flows } from "./e2e/flows.test.mjs";
 import { edge } from "./e2e/edge.test.mjs";
@@ -33,56 +28,25 @@ import { edge } from "./e2e/edge.test.mjs";
 const startedAt = new Date().toISOString();
 const harness = createHarness();
 
-// ---- Ensure the dev server is up (spawn if not) -------------------------
-async function ensureDevServer() {
-  try {
-    const res = await fetch(APP_URL);
-    if (res.ok) return null;
-  } catch {}
-  // Not running — start it. Spawn the vite server via node directly (a .cmd
-  // batch cannot be spawned detached on Windows — EINVAL).
-  const viteBin = join(REPO, "node_modules", "vite", "bin", "vite.js");
-  const proc = spawn(process.execPath, [viteBin], { stdio: "ignore", detached: true });
-  for (let i = 0; i < 30; i++) {
-    await sleep(1000);
-    try { const r = await fetch(APP_URL); if (r.ok) return proc; } catch {}
-  }
-  throw new Error("dev server did not start on " + APP_URL);
-}
-
-// ---- Reap any stray headless Chrome from prior runs ---------------------
-function killStrayChrome() {
-  try {
-    const out = execFileSync("powershell", [
-      "-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process -Filter 'Name=\"chrome.exe\"' | Where-Object { $_.CommandLine -match \"--headless\" -and $_.CommandLine -match \"playwright\" } | ForEach-Object { $_.ProcessId }",
-    ], { encoding: "utf8", timeout: 8000 }).toString();
-    for (const pid of out.split("\n").map((s) => parseInt(s.trim(), 10)).filter(Number.isFinite)) {
-      try { execFileSync("taskkill", ["/F", "/T", "/PID", String(pid)], { stdio: "ignore", timeout: 5000 }); } catch {}
-    }
-  } catch {}
-}
-
 async function main() {
-  killStrayChrome();
-  const devProc = await ensureDevServer();
-
-  const { browser, page } = await launch();
-  // Wire error capture for the whole run.
-  page.on("console", (m) => { if (m.type() === "error") harness.recordError("console: " + m.text()); });
-  page.on("pageerror", (e) => harness.recordError("pageerror: " + e.message));
-
-  let current = { browser, page };
-  const relaunch = async () => {
-    try { await current.browser.close(); } catch {}
-    current = await launch();
-    current.page.on("console", (m) => { if (m.type() === "error") harness.recordError("console: " + m.text()); });
-    current.page.on("pageerror", (e) => harness.recordError("pageerror: " + e.message));
-    await gotoApp(current.page);
-  };
+  const devServer = await startOwnedDevServer();
+  let current;
 
   try {
-    await gotoApp(page);
+    current = await launch();
+    const { page } = current;
+    page.on("console", (m) => { if (m.type() === "error") harness.recordError("console: " + m.text()); });
+    page.on("pageerror", (e) => harness.recordError("pageerror: " + e.message));
+
+    const relaunch = async () => {
+      try { await current.browser.close(); } catch {}
+      current = await launch();
+      current.page.on("console", (m) => { if (m.type() === "error") harness.recordError("console: " + m.text()); });
+      current.page.on("pageerror", (e) => harness.recordError("pageerror: " + e.message));
+      await gotoApp(current.page, devServer.url);
+    };
+
+    await gotoApp(page, devServer.url);
 
     const all = [...views, ...flows, ...edge];
     for (const t of all) {
@@ -101,16 +65,12 @@ async function main() {
       else console.log(`PASS  [${t.section}] ${t.name}`);
     }
   } finally {
-    // Browser hygiene: always close the browser (kills the whole tree).
-    try { await current.browser.close(); } catch {}
-    // Kill the dev server we started (if any) — taskkill /T reaps the whole tree.
-    if (devProc) {
-      try { execFileSync("taskkill", ["/F", "/T", "/PID", String(devProc.pid)], { stdio: "ignore", timeout: 8000 }); } catch {}
-    }
-    killStrayChrome();
+    // Browser hygiene: close only the browser instance(s) this run created.
+    try { await current?.browser.close(); } catch {}
+    await stopOwnedDevServer(devServer);
   }
 
-  const report = writeReport(harness, { startedAt });
+  const report = writeReport(harness, { startedAt, appUrl: devServer.url });
   writeSummary(harness, { startedAt });
   console.log("\n=== SUMMARY ===");
   console.log(`passed ${report.summary.passed}/${report.summary.total}, failed ${report.summary.failed}`);

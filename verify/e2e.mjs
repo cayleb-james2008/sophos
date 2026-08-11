@@ -23,11 +23,11 @@
  * Exit 0 iff layout is correct AND the TCP round-trip succeeds. The named-pipe
  * wedge, when present, is an ENV BLOCKER — it does NOT fail the harness.
  */
-import { spawn, execSync, execFileSync } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { createConnection, createServer } from "node:net";
 import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
-import { writeFileSync, statSync, readFileSync, readdirSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { writeFileSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -40,7 +40,9 @@ const BRIDGE_CLI = join(RESOURCES, "bridge", "dist", "bridge", "src", "index.js"
 const NODE_MODULES_DIR = join(RESOURCES, "node_modules");
 const REPORT_PATH = join(REPO, "verify", "e2e-report.json");
 const EVIDENCE_PATH = join(REPO, "verify", "e2e-evidence.txt");
-const WORKERS_DIR = join(homedir(), ".prime", "agent", "daemon-workers");
+let testHome;
+const ownedProcesses = new Set();
+const testSessionDirs = new Set();
 
 const PROTO = "prime-agent.daemon";
 const PROTO_VERSION = 7;
@@ -50,7 +52,6 @@ const CLI_ARGS = process.argv.slice(2);
 const OPTS = {
   noTcp: CLI_ARGS.includes("--no-tcp"),
   port: parseInt(CLI_ARGS.find((a) => a.startsWith("--port="))?.slice(7) || "0", 10) || 0,
-  stripTypedefs: CLI_ARGS.includes("--strip-typedefs"),
 };
 
 const report = { startedAt: new Date().toISOString(), steps: [], envBlockers: [], summary: {} };
@@ -66,34 +67,13 @@ function freePort() {
   });
 }
 
-// Reap orphaned daemon processes. On this host `node` is Windows `node.exe`
-// (process.platform === "win32"); Linux `ps`/`/proc` cannot see it, so we use
-// PowerShell + `taskkill /F /T` (the /T flag reaps the daemon's worker tree).
-// We filter on `--mode daemon` (unique to the prime-agent daemon) to avoid
-// killing unrelated npm/vite dev servers. The daemon also spawns worker
-// children that hold the supervisor lock and would make the next launch fail
-// with `daemon_supervisor_already_running`.
-function killStrays() {
-  try {
-    const out = execFileSync("powershell", [
-      "-NoProfile", "-Command",
-      "Get-CimInstance Win32_Process -Filter 'Name=\"node.exe\"' | Where-Object { $_.CommandLine -match '--mode daemon' } | ForEach-Object { $_.ProcessId }",
-    ], { encoding: "utf8", timeout: 8000 }).toString();
-    for (const pid of out.split("\n").map((s) => parseInt(s.trim(), 10)).filter(Number.isFinite)) {
-      if (pid !== process.pid) { try { execFileSync("taskkill", ["/F", "/T", "/PID", String(pid)], { stdio: "ignore", timeout: 5000 }); } catch {} }
-    }
-  } catch {}
-}
+// This harness never scans or kills arbitrary daemon processes. Every process
+// it starts is tracked locally and runs under a temporary HOME/USERPROFILE.
 
-// Clear the supervisor ownership registry + session leases. SIGKILL (used by
-// killTree) leaves stale registry/lease files that make the next daemon think
-// a supervisor is already running, masking the genuine named-pipe wedge.
-async function clearWorkers() {
-  const agentDir = join(homedir(), ".prime", "agent");
-  for (const sub of ["daemon-workers", "session-leases"]) {
-    try { await rm(join(agentDir, sub), { recursive: true, force: true }); } catch {}
-  }
-  try { await mkdir(join(agentDir, "daemon-workers"), { recursive: true }); } catch {}
+function trackProcess(proc) {
+  ownedProcesses.add(proc);
+  proc.once("exit", () => ownedProcesses.delete(proc));
+  return proc;
 }
 
 function spawnDaemon(socketArg) {
@@ -103,10 +83,10 @@ function spawnDaemon(socketArg) {
 // reflects the host's real (broken) `\\.\pipe\` behavior — then `taskkill /T`
 // in killTree reaps the worker tree. `detached:true` spawned a *connectable*
 // pipe here (an artifact of the detached session), which masked the wedge.
-const proc = spawn(NODE_EXE || "node", [DAEMON_CLI, ...args], {
+  const proc = trackProcess(spawn(NODE_EXE || "node", [DAEMON_CLI, ...args], {
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, PI_OFFLINE: "1" },
-  });
+    env: { ...process.env, USERPROFILE: testHome, HOME: testHome, PI_OFFLINE: "1" },
+  }));
   let out = "", err = "";
   proc.stdout.on("data", (d) => { out += d.toString(); });
   proc.stderr.on("data", (d) => { err += d.toString(); });
@@ -120,16 +100,44 @@ const proc = spawn(NODE_EXE || "node", [DAEMON_CLI, ...args], {
   };
 }
 
-function killTree(proc) {
-  // Kill the whole process tree (daemon + worker children). On Windows,
-  // process.kill(-pid) is unsupported, so prefer `taskkill /F /T /PID` — with a
-  // hard timeout so a stuck child cannot block the harness.
-  try { proc.kill("SIGTERM"); } catch {}
-  const t = setTimeout(() => {
+async function killTree(proc) {
+  if (!proc?.pid) return;
+  if (proc.exitCode !== null) {
+    ownedProcesses.delete(proc);
+    return;
+  }
+  // On Windows, process.kill only reaches the parent. Kill the exact process
+  // tree synchronously so daemon workers cannot survive the verifier.
+  if (process.platform === "win32") {
     try { execFileSync("taskkill", ["/F", "/T", "/PID", String(proc.pid)], { stdio: "ignore", timeout: 5000 }); } catch {}
-    try { process.kill(proc.pid, "SIGKILL"); } catch {}
-  }, 2000);
-  proc.on("exit", () => clearTimeout(t));
+    await Promise.race([
+      new Promise((resolve) => proc.once("exit", resolve)),
+      sleep(2000),
+    ]);
+    if (proc.exitCode === null) {
+      try { execFileSync("taskkill", ["/F", "/T", "/PID", String(proc.pid)], { stdio: "ignore", timeout: 5000 }); } catch {}
+    }
+  } else {
+    try { proc.kill("SIGTERM"); } catch {}
+    await Promise.race([
+      new Promise((resolve) => proc.once("exit", resolve)),
+      sleep(2000),
+    ]);
+    if (proc.exitCode === null) {
+      try { proc.kill("SIGKILL"); } catch {}
+    }
+  }
+  ownedProcesses.delete(proc);
+}
+
+async function cleanupOwnedProcesses() {
+  await Promise.all([...ownedProcesses].map((proc) => killTree(proc)));
+}
+
+async function cleanupOwnedDirs() {
+  const dirs = new Set([...testSessionDirs, testHome]);
+  await Promise.all([...dirs].filter(Boolean).map((dir) => rm(dir, { recursive: true, force: true }).catch(() => {})));
+  testSessionDirs.clear();
 }
 
 // Probe the named-pipe transport with a REAL JSONL handshake: connect to the
@@ -157,7 +165,7 @@ function probePipe(pipePath) {
         id: "e2e_np_" + Date.now(),
         protocol: { name: PROTO, version: PROTO_VERSION },
         clientId: "prime-agent-e2e-np",
-        command: { type: "create", config: { cwd: homedir() }, id: "e2e_np_" + Date.now() },
+        command: { type: "create", config: { cwd: testHome }, id: "e2e_np_" + Date.now() },
       }) + "\n");
     });
     sock.on("data", (d) => { buf += d.toString("utf8"); parse(); });
@@ -211,8 +219,7 @@ function newClient(port) {
 
 async function main() {
   await mkdir(join(REPO, "verify"), { recursive: true });
-  killStrays(); // reap orphaned daemons from prior runs before we begin
-  await clearWorkers();
+  testHome = await mkdtemp(join(tmpdir(), "sophos-e2e-home-"));
   let sessDir = "";
 
   // ---- 0. layout check (settings.rs resolve_runtime_paths) ----
@@ -229,29 +236,24 @@ async function main() {
   rec("layout: node_modules/ (shared) exists", layout.node_modules_dir, NODE_MODULES_DIR);
   report.layout = layout;
   if (!Object.values(layout).every(Boolean)) {
-    finish({ ok: false, reason: "layout incomplete — run `node scripts/bundle.mjs` first", sessDir });
+    await finish({ ok: false, reason: "layout incomplete — run `node scripts/bundle.mjs` first" });
     return;
   }
 
-  // ---- 1. named-pipe attempt (default transport) ----
-  // Try the production default socket `\\.\pipe\prime-agent-daemon` first, per
-  // the transport contract. On this host `\\.\pipe\` binds are intermittent:
-  // the daemon logs "listening" but client connections fail with ENOENT /
-  // ERROR_INVALID_NAME / EACCES (reproduced deterministically — see the 3x JSONL
-  // probe in verify/e2e-evidence.txt). Intermittent failures are broken for
-  // production, so we retry up to 2x and flag an ENV BLOCKER if any handshake
-  // fails; a lucky passing handshake is recorded as supplementary evidence.
-  push("\n=== Step 1: daemon on default named-pipe transport ===\n");
-  const NP_PATH = "\\\\.\\pipe\\prime-agent-daemon";
+  // ---- 1. named-pipe attempt (isolated transport) ----
+  // Exercise the named-pipe protocol with a unique per-run endpoint. This
+  // preserves transport coverage without connecting to or disrupting a
+  // production daemon that may already own the default pipe. On this host
+  // named-pipe binds are intermittent, so we retry up to 2x.
+  push("\n=== Step 1: daemon on isolated named-pipe transport ===\n");
+  const NP_PATH = `\\\\.\\pipe\\sophos-e2e-${process.pid}-${Date.now()}`;
   let npBlocked = false;
   let npEvidence = "";
   for (let attempt = 1; attempt <= 2 && !npBlocked; attempt++) {
-    killStrays();
-    await clearWorkers();
     const np = spawnDaemon(NP_PATH);
     await np.wait(20000); // named-pipe daemons can be slow to bind on this host
     const npText = np.text();
-    const npListening = npText.includes("listening on") && npText.includes("\\pipe\\prime-agent-daemon");
+    const npListening = npText.includes("listening on") && npText.includes(NP_PATH);
     if (npListening) {
       const probe = await probePipe(NP_PATH);
       push(`  attempt ${attempt}: named-pipe probe -> ${probe.ok ? "handshake ok" : "FAIL (" + probe.err + ")"}`);
@@ -264,7 +266,7 @@ async function main() {
       npEvidence = (np.err() || np.out()).split("\n").filter(Boolean).slice(-4).join("\n    ");
       push(`  attempt ${attempt}: daemon did not emit 'listening' within 10s (wedge)`);
     }
-    killTree(np.proc);
+    await killTree(np.proc);
   }
   if (npBlocked) {
     rec("named-pipe: client handshake", false, "intermittent/non-functional on this host (ENOENT/ERROR_INVALID_NAME/EACCES) - env blocker");
@@ -272,24 +274,17 @@ async function main() {
     push("  environment-blocker evidence (named-pipe):");
     push("    " + npEvidence);
   } else {
-    // NOTE: an isolated handshake succeeding THIS run does NOT mean the pipe is
-    // reliable for production — see Step 4 (bridge ENOENT) + the 3x baseline
-    // probe documented in README.md. We deliberately do NOT assert "available"
-    // here; the production bridge's deterministic ENOENT (Step 4) is the
-    // authoritative breaker, and the named-pipe is treated as an ENV BLOCKER.
-    rec("named-pipe: client handshake", true, "isolated handshake ok THIS run (intermittent — bridge ENOENT in Step 4; see README)");
+    // NOTE: an isolated handshake succeeding THIS run does not certify the
+    // production default pipe; it only proves this run's endpoint worked.
+    rec("named-pipe: client handshake", true, "isolated handshake ok THIS run");
   }
-  killStrays();
-  await clearWorkers(); // clear before the TCP launch
 
   // ---- 2. TCP fallback + 3. minimal-client round-trip ----
-  if (OPTS.noTcp) { push("\n(skip TCP round-trip: --no-tcp)\n"); finish({ ok: false, reason: "skipped (--no-tcp)", sessDir }); return; }
+  if (OPTS.noTcp) { push("\n(skip TCP round-trip: --no-tcp)\n"); await finish({ ok: false, reason: "skipped (--no-tcp)" }); return; }
   push("\n=== Step 2/3: TCP fallback + protocol round-trip ===\n");
   const port = OPTS.port || await freePort();
   let roundTripOk = false, tcp = null;
   for (let attempt = 1; attempt <= 2 && !roundTripOk; attempt++) {
-    killStrays(); // ensure no orphaned daemon holds the port/registry
-    await clearWorkers();
     if (attempt > 1) push(`  (retrying TCP launch, attempt ${attempt})`);
     tcp = spawnDaemon(`tcp://127.0.0.1:${port}`);
     await tcp.wait(DEFAULT_WAIT_MS + 5000); // give the daemon time to bind + warm up
@@ -298,7 +293,7 @@ async function main() {
     if (!tcpListening || tcp.exitCode() !== null) {
       rec("tcp: daemon listening", attempt === 1, `exit=${tcp.exitCode()} ` + tcpText.slice(-200));
       report.envBlockers.push({ transport: "tcp", status: "listen-failed", attempt, evidence: tcpText.slice(-600) });
-      killTree(tcp.proc);
+      await killTree(tcp.proc);
       tcp = null;
       continue;
     }
@@ -313,6 +308,7 @@ async function main() {
       catch (e) { push("  (no daemon_hello observed within 6s: " + e.message + ")"); }
 
       sessDir = await mkdtemp(join(tmpdir(), "prime-sess-"));
+      testSessionDirs.add(sessDir);
       await writeFile(join(sessDir, "README.md"), "# e2e session\n");
       const cid = cli.send({ type: "create", config: { cwd: sessDir } });
       push("  sent create ->", cid);
@@ -343,17 +339,17 @@ async function main() {
     } finally {
       cli?.close();
     }
-    if (!roundTripOk) { killTree(tcp.proc); tcp = null; }
+    if (!roundTripOk) { await killTree(tcp.proc); tcp = null; }
   }
-  if (!tcp) { finish({ ok: false, reason: "tcp daemon did not produce a round-trip", sessDir }); return; }
+  if (!tcp) { await finish({ ok: false, reason: "tcp daemon did not produce a round-trip" }); return; }
 
   // ---- 4. bridge sidecar smoke (non-fatal; daemon still alive) ----
   push("\n=== Step 4: bridge sidecar smoke (non-fatal) ===\n");
   if (await exists(BRIDGE_CLI)) {
     let bproc;
     try {
-      const benv = { ...process.env, PI_OFFLINE: "1", PRIME_DAEMON_TCP: "1", PRIME_DAEMON_TCP_PORT: String(port) };
-      bproc = spawn(NODE_EXE || "node", [BRIDGE_CLI], { stdio: ["ignore", "pipe", "pipe"], env: benv, cwd: RESOURCES });
+      const benv = { ...process.env, USERPROFILE: testHome, HOME: testHome, PI_OFFLINE: "1", PRIME_DAEMON_TCP: "1", PRIME_DAEMON_TCP_PORT: String(port) };
+      bproc = trackProcess(spawn(NODE_EXE || "node", [BRIDGE_CLI], { stdio: ["ignore", "pipe", "pipe"], env: benv, cwd: RESOURCES }));
       let berr = ""; bproc.stderr.on("data", (d) => { berr += d.toString(); });
       await sleep(2500);
       if (bproc.exitCode === null) {
@@ -366,15 +362,14 @@ async function main() {
         rec("bridge: sidecar booted", false, "exited " + bproc.exitCode + " stderr=" + berr.slice(-200));
       }
     } catch (e) { rec("bridge: sidecar booted", false, String(e)); }
-    try { bproc?.kill("SIGKILL"); } catch {}
+    await killTree(bproc);
   } else { rec("bridge: sidecar booted", false, "bridge dist missing"); }
 
-  killTree(tcp.proc);
-  killStrays();
-  finish({ ok: roundTripOk, reason: roundTripOk ? "ok" : "round-trip failed", sessDir });
+  await killTree(tcp.proc);
+  await finish({ ok: roundTripOk, reason: roundTripOk ? "ok" : "round-trip failed" });
 }
 
-function finish({ ok, reason, sessDir }) {
+async function finish({ ok, reason }) {
   report.finishedAt = new Date().toISOString();
   report.reason = reason;
   report.summary = {
@@ -382,10 +377,8 @@ function finish({ ok, reason, sessDir }) {
     tcpRoundTrip: ok,
     overall: ok ? "PASS" : "FAIL",
   };
-  (async () => {
-    for (const d of [sessDir]) { try { await rm(d, { recursive: true, force: true }); } catch {} }
-    try { await rm(WORKERS_DIR, { recursive: true, force: true }); } catch {}
-  })();
+  await cleanupOwnedProcesses();
+  await cleanupOwnedDirs();
   try { writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2)); push("  wrote " + REPORT_PATH); } catch (e) { push("could not write report: " + e.message); }
   try { writeFileSync(EVIDENCE_PATH, evidence.join("\n") + "\n"); push("  wrote " + EVIDENCE_PATH); } catch (e) { push("could not write evidence: " + e.message); }
   push("\n=== SUMMARY ===");
@@ -397,4 +390,9 @@ function finish({ ok, reason, sessDir }) {
   process.exit(ok ? 0 : 1);
 }
 
-main().catch((e) => { console.error("e2e harness crashed:", e); process.exit(2); });
+main().catch(async (e) => {
+  console.error("e2e harness crashed:", e);
+  await cleanupOwnedProcesses();
+  await cleanupOwnedDirs();
+  process.exit(2);
+});
