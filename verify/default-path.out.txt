@@ -1,4 +1,0 @@
-default (no env)  : \\.\pipe\prime-agent-daemon
-env=1             : tcp://127.0.0.1:48100
-env=1 port=48222  : tcp://127.0.0.1:48222
-ASSERT default-unchanged: true | tcp gate: true | port override: true
