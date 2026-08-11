@@ -15,6 +15,8 @@
 //   * Writes to stdout are serialized to keep lines atomic.
 
 import { createInterface } from "node:readline";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { Readable, Writable } from "node:stream";
 
 import type {
@@ -27,16 +29,20 @@ import type {
 import {
   ConnectionHolder,
   enrichConnectionState,
+  getHarnessState as connGetHarnessState,
+  getKernelState as connGetKernelState,
   getModels as connGetModels,
   getProviders as connGetProviders,
   getTranscript as connGetTranscript,
   listSessions as connListSessions,
   mapConnectionState,
   mapContextTree,
+  mapAgentMessage,
   mapCronJobToSchedule,
   mapSessionTree,
   writeAuthKey,
   writeModelOverrideToModelsJson,
+  writeSettingsPatch,
   type AgentConnectionRlmChild,
 } from "./connection.js";
 
@@ -151,11 +157,14 @@ export class RpcServer {
     // params and returns either void or a typed shape.
     switch (method) {
       case "prompt": {
-        const p = requireParams<{ text: string; options?: { thinking?: string; serviceTier?: string; transport?: string; goal?: string } }>(params, ["text"]);
+        const p = requireParams<{ text: string; options?: { thinking?: string; streamingBehavior?: "steer" | "followUp"; queueIfBusy?: boolean; serviceTier?: string; transport?: string; goal?: string } }>(params, ["text"]);
         const conn = this.requireConn();
-        const opts = p.options ? {
-          ...(p.options.thinking ? { streamingBehavior: "followUp" as const } : {}),
-        } : undefined;
+        const opts = p.options
+          ? {
+              ...(p.options.streamingBehavior ? { streamingBehavior: p.options.streamingBehavior } : {}),
+              ...(p.options.queueIfBusy !== undefined ? { queueIfBusy: p.options.queueIfBusy } : {}),
+            }
+          : undefined;
         await conn.prompt(p.text, opts);
         return undefined;
       }
@@ -284,19 +293,16 @@ export class RpcServer {
 
       case "attachAgent": {
         const p = requireParams<{ id: string }>(params, ["id"]);
-        const conn = this.requireConn();
-        const snapshot = this.holder.getSnapshot();
-        const child = snapshot?.children?.find((c: AgentConnectionRlmChild) => c.id === p.id);
+        const child = this.holder.getSnapshot()?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
         if (!child?.activeSessionId) {
           throw rpcError(JSON_RPC_ERROR.invalidParams, `agent not found or not attachable: ${p.id}`);
         }
-        // watchSession returns a watcher; we don't expose it through the IPC
-        // contract yet, but invoking it exercises the attach path.
-        const watcher = await conn.watchSession(child.activeSessionId);
-        if (!watcher) {
-          throw rpcError(JSON_RPC_ERROR.internalError, `failed to attach to agent ${p.id}`);
-        }
-        await watcher.close();
+        return this.holder.attachChildAgent(child);
+      }
+
+      case "detachAgent": {
+        const p = requireParams<{ id: string }>(params, ["id"]);
+        await this.holder.detachChildAgent(p.id);
         return undefined;
       }
 
@@ -377,7 +383,11 @@ export class RpcServer {
 
       case "setSettings": {
         const p = requireParams<{ settings: Record<string, unknown> }>(params, ["settings"]);
-        return this.holder.getSettingsStore().update(p.settings as Partial<Settings>);
+        const updated = this.holder.getSettingsStore().update(p.settings as Partial<Settings>);
+        if (Object.prototype.hasOwnProperty.call(p.settings, "skills")) {
+          writeSettingsPatch({ skills: p.settings.skills });
+        }
+        return updated;
       }
 
       case "runCommand": {
@@ -413,6 +423,7 @@ export class RpcServer {
         const children = snapshot?.children ?? [];
         return children.map((c: AgentConnectionRlmChild) => ({
           id: c.id,
+          sessionId: c.activeSessionId,
           name: c.sessionName ?? c.label,
           status: (c.status === "queued" || c.status === "running")
             ? "running"
@@ -429,12 +440,13 @@ export class RpcServer {
       case "sendAgentMessage": {
         const p = requireParams<{ agentId: string; message: string }>(params, ["agentId", "message"]);
         const conn = this.requireConn();
-        const snapshot = this.holder.getSnapshot();
-        const child = snapshot?.children?.find((c: AgentConnectionRlmChild) => c.id === p.agentId);
+        const child = this.holder.getSnapshot()?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.agentId);
         const target = child?.activeSessionId;
         if (!target) {
           throw rpcError(JSON_RPC_ERROR.invalidParams, `agent ${p.agentId} not found`);
         }
+        // Preserve the daemon's receipt verbatim: deliveryStatus is the
+        // authoritative queued-vs-delivered result, not an optimistic UI guess.
         return conn.sendAgentMessage(target, p.message);
       }
 
@@ -604,6 +616,108 @@ export class RpcServer {
         const conn = this.requireConn();
         const tree = await conn.getContextTree();
         return mapContextTree(tree as never);
+      }
+
+      case "getRuntimeInfo": {
+        const conn = this.requireConn();
+        const state = await conn.getState();
+        const resources = await conn.getResourceSnapshot();
+        const activeTools = Array.isArray(state.activeToolNames) ? state.activeToolNames : [];
+        return {
+          cwd: state.cwd,
+          kernel: {
+            // The daemon exposes the persistent IPython tool as a capability,
+            // not a separate liveness endpoint. "configured" is deliberately
+            // narrower than "running"; cell events remain the liveness proof.
+            status: activeTools.includes("ipython") ? "configured" : "unavailable",
+            persistent: activeTools.includes("ipython"),
+            toolAvailable: activeTools.includes("ipython"),
+            sessionId: state.sessionId,
+          },
+          skills: resources.skills.map((skill) => ({
+            name: skill.name,
+            description: skill.description,
+            filePath: skill.filePath,
+            source: skill.sourceInfo?.scope,
+          })),
+          skillDiagnostics: resources.diagnostics.skills.map((diagnostic) => ({
+            type: diagnostic.type,
+            message: diagnostic.message,
+            path: diagnostic.path,
+          })),
+          extensions: resources.extensions.map((extension) => extension.path),
+        };
+      }
+
+      case "getKernelState": {
+        return connGetKernelState(this.requireConn());
+      }
+
+      case "getHarnessState": {
+        return connGetHarnessState(this.requireConn());
+      }
+
+      case "getAgentState": {
+        const p = requireParams<{ id: string }>(params, ["id"]);
+        const child = this.holder.getSnapshot()?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
+        if (!child) throw rpcError(JSON_RPC_ERROR.invalidParams, `agent not found: ${p.id}`);
+        return this.holder.getAttachedChildState(p.id) ?? {
+          id: child.id,
+          status: child.status,
+          sessionId: child.activeSessionId,
+          model: child.model,
+          summary: child.recap ?? child.answerPreview,
+          activity: child.activity && typeof child.activity === "object" ? (child.activity as { kind?: string }).kind : undefined,
+          tokenCount: child.tokenCount,
+          toolUseCount: child.toolUseCount,
+          transcript: [],
+        };
+      }
+
+      case "createSkill": {
+        const p = requireParams<{ name: string; description: string; content: string; pythonImport?: string }>(params, ["name", "description", "content"]);
+        const conn = this.requireConn();
+        const name = p.name.trim();
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) {
+          throw rpcError(JSON_RPC_ERROR.invalidParams, "skill name must use letters, numbers, '_' or '-'");
+        }
+        const state = await conn.getState();
+        const root = resolve(state.cwd, ".prime", "agent", "skills", name);
+        mkdirSync(root, { recursive: true });
+        const frontmatter = `---\nname: ${name}\ndescription: ${p.description.trim()}\n---\n\n`;
+        writeFileSync(resolve(root, "SKILL.md"), `${frontmatter}${p.content.trim()}\n`, "utf8");
+        if (p.pythonImport?.trim()) {
+          const importName = p.pythonImport.trim();
+          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(importName)) {
+            throw rpcError(JSON_RPC_ERROR.invalidParams, "python import must be a valid module name");
+          }
+          mkdirSync(resolve(root, "src", importName), { recursive: true });
+          writeFileSync(resolve(root, "src", importName, "__init__.py"), "\\nasync def run(*args, **kwargs):\\n    \\\"\\\"\\\"Implement this skill's callable here.\\\"\\\"\\\"\\n    raise NotImplementedError(\\\"Skill callable is not implemented yet\\\")\\n", "utf8");
+        }
+        const settings = this.holder.getSettingsStore().get() as Settings & { skills?: string[] };
+        const skills = [...new Set([...(settings.skills ?? []), root])];
+        this.holder.getSettingsStore().update({ skills } as Partial<Settings>);
+        writeSettingsPatch({ skills });
+        await conn.reload();
+        return { name, description: p.description.trim(), filePath: resolve(root, "SKILL.md"), source: "project" };
+      }
+
+      case "installSkill": {
+        const p = requireParams<{ path: string }>(params, ["path"]);
+        const conn = this.requireConn();
+        const path = resolve(p.path);
+        const settings = this.holder.getSettingsStore().get() as Settings & { skills?: string[] };
+        const skills = [...new Set([...(settings.skills ?? []), path])];
+        this.holder.getSettingsStore().update({ skills } as Partial<Settings>);
+        writeSettingsPatch({ skills });
+        await conn.reload();
+        const resources = await conn.getResourceSnapshot();
+        return resources.skills.map((skill) => ({
+          name: skill.name,
+          description: skill.description,
+          filePath: skill.filePath,
+          source: skill.sourceInfo?.scope,
+        }));
       }
 
       default:

@@ -41,6 +41,7 @@ type AgentNodeData = {
   attached?: boolean;
   unread?: number;
   onAttach?: () => void;
+  onDetach?: () => void;
   onMessage?: () => void;
 };
 
@@ -71,7 +72,7 @@ function AgentNode({ data }: NodeProps<AgentGraphNode>) {
     data.kind === "agent" || data.kind === "rlm" ? (
       <>
         {data.attached ? (
-          <button className="pg-btn pg-btn--danger" onClick={(e) => { e.stopPropagation(); data.onAttach?.(); }} title="Stop monitoring">
+          <button className="pg-btn pg-btn--danger" onClick={(e) => { e.stopPropagation(); data.onDetach?.(); }} title="Stop monitoring">
             <DetachIcon size={11} /> Detach
           </button>
         ) : (
@@ -128,20 +129,22 @@ function toConnStatus(status: ConnectionStatus): string {
 export interface AgentsGraphProps {
   rows: AgentRow[];
   connectionStatus: ConnectionStatus;
-  attachedId?: string;
+  attachedIds?: readonly string[];
   unreadByAgent: (id: string) => number;
   onSelect: (id: string) => void;
   onAttach: (id: string) => void;
+  onDetach: (id: string) => void;
   onMessage: (id: string) => void;
 }
 
 export function AgentsGraph({
   rows,
   connectionStatus,
-  attachedId,
+  attachedIds = [],
   unreadByAgent,
   onSelect,
   onAttach,
+  onDetach,
   onMessage,
 }: AgentsGraphProps) {
   const conn = toConnStatus(connectionStatus);
@@ -190,9 +193,10 @@ export function AgentsGraph({
         status: a.status,
         subtitle: a.summary ?? (a.sessionId ? `session ${a.sessionId.slice(0, 8)}` : `${a.id.slice(0, 8).toUpperCase()}`),
         mono: `${a.id.slice(0, 10).toUpperCase()} · ${a.status}`,
-        attached: attachedId === a.id,
+        attached: attachedIds.includes(a.id),
         unread: unreadByAgent(a.id),
         onAttach: () => onAttach(a.id),
+        onDetach: () => onDetach(a.id),
         onMessage: () => onMessage(a.id),
       },
       position: { x: 0, y: 0 },
@@ -210,9 +214,10 @@ export function AgentsGraph({
         status: c.status,
         subtitle: c.summary ?? "RLM subagent",
         mono: `${c.id.slice(0, 10).toUpperCase()} · ${c.status}`,
-        attached: attachedId === c.id,
+        attached: attachedIds.includes(c.id),
         unread: unreadByAgent(c.id),
         onAttach: () => onAttach(c.id),
+        onDetach: () => onDetach(c.id),
         onMessage: () => onMessage(c.id),
       },
       position: { x: 0, y: 0 },
@@ -266,7 +271,7 @@ export function AgentsGraph({
     });
     return { positioned, edges };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, attachedId, conn, connectionStatus.kind]);
+  }, [rows, attachedIds, conn, connectionStatus.kind]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentGraphNode>([]);
 

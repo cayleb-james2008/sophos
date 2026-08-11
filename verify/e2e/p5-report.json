@@ -30,7 +30,12 @@
     {
       "name": "perf-load-500-render",
       "ok": true,
-      "detail": "render 500 msgs in 117ms"
+      "detail": "render 500 msgs in 132ms"
+    },
+    {
+      "name": "perf-fixture-does-not-complete-onboarding",
+      "ok": true,
+      "detail": "preview onboarding remains visible after fixture load: 1"
     },
     {
       "name": "perf-windowed-mount-count",
@@ -90,8 +95,8 @@
   ],
   "consoleErrors": [],
   "summary": {
-    "total": 17,
-    "passed": 17,
+    "total": 18,
+    "passed": 18,
     "failed": 0,
     "overall": "PASS"
   }

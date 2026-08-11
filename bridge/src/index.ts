@@ -21,14 +21,31 @@ function log(line: string): void {
   process.stderr.write(`[bridge] ${line}\n`);
 }
 
+function socketPathFromArgs(args: readonly string[] = process.argv.slice(2)): string | undefined {
+  const flag = "--daemon-socket";
+  const index = args.indexOf(flag);
+  if (index >= 0) {
+    const value = args[index + 1]?.trim();
+    if (value) return value;
+  }
+  const inline = args.find((arg) => arg.startsWith(`${flag}=`));
+  const value = inline?.slice(flag.length + 1).trim();
+  return value || undefined;
+}
+
 async function main(): Promise<void> {
   // Declare server first so the holder's onEvent callback can close over it
   // without a temporal-dead-zone trap if either order is ever swapped.
   let server: RpcServer | undefined;
 
-  const holder = new ConnectionHolder({
-    onEvent: (event) => server?.emitEvent(event),
-  });
+  // The bridge normally follows the daemon's default socket. Verification
+  // harnesses may pass the same explicit socket flag as the daemon CLI.
+  const socketPath = socketPathFromArgs();
+  if (socketPath) log(`using daemon socket override ${socketPath}`);
+  const holder = new ConnectionHolder(
+    { onEvent: (event) => server?.emitEvent(event) },
+    socketPath ? { socketPath } : {},
+  );
 
   server = new RpcServer(holder, {
     stdin: process.stdin,

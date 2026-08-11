@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useIpc, useIpcEvent, useConnectionState } from "../../ipc/client";
-import type { AgentInfo, AgentMessage, RlmChild } from "../../ipc/contract";
+import type { AgentInfo, AgentMessage, AgentMessageReceipt, AgentSessionState, AgentWatchEvent, RlmChild } from "../../ipc/contract";
 import { useUnreadRefresh } from "../../ipc/unread";
 
 /** Where an agent process originates. */
@@ -44,7 +44,7 @@ function toAgentRow(a: AgentInfo): AgentRow {
 }
 
 function childToAgentRow(c: RlmChild): AgentRow {
-  return { id: c.id, name: c.name, kind: "rlm", status: c.status, summary: c.summary, parentId: c.parentId };
+  return { id: c.id, name: c.name, kind: "rlm", status: c.status, summary: c.summary, parentId: c.parentId, sessionId: c.sessionId };
 }
 
 export function useAgents() {
@@ -54,10 +54,12 @@ export function useAgents() {
   const [rlmChildren, setRlmChildren] = useState<RlmChild[]>([]);
   const [inbox, setInbox] = useState<AgentMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
-  const [attachedId, setAttachedId] = useState<string>();
+  const [selectedAgentState, setSelectedAgentState] = useState<AgentSessionState>();
+  const [attachedIds, setAttachedIds] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [deliveryReceipt, setDeliveryReceipt] = useState<AgentMessageReceipt>();
   const [error, setError] = useState<string>();
 
   const runtimeModel = conn.model?.model;
@@ -109,6 +111,43 @@ export function useAgents() {
     });
   }, [rows]);
 
+  useEffect(() => {
+    setDeliveryReceipt(undefined);
+  }, [selectedId]);
+
+  useEffect(() => {
+    let mounted = true;
+    // Clear the previous child immediately. Otherwise a slow watcher request
+    // can leave the old agent's transcript visible while the new node is
+    // already selected.
+    setSelectedAgentState(undefined);
+    if (!selectedId) {
+      return () => { mounted = false; };
+    }
+    ipc.getAgentState(selectedId).then((next) => {
+      if (mounted) setSelectedAgentState(next);
+    }).catch(() => {
+      if (mounted) setSelectedAgentState(undefined);
+    });
+    return () => { mounted = false; };
+  }, [ipc, selectedId]);
+
+  const applyWatchEvent = useCallback((event: AgentWatchEvent) => {
+    if (event.kind === "attached") {
+      setAttachedIds((current) => current.includes(event.childId) ? current : [...current, event.childId]);
+      setSelectedAgentState((current) => current === undefined || current.id === event.childId ? event.state : current);
+      return;
+    }
+    if (event.kind === "detached") {
+      setAttachedIds((current) => current.filter((id) => id !== event.childId));
+      return;
+    }
+    setSelectedAgentState((current) => current?.id === event.childId ? event.state : current);
+    if (event.kind === "status") {
+      setRlmChildren((old) => old.map((child) => child.id === event.childId ? { ...child, status: event.status } : child));
+    }
+  }, []);
+
   // ---- Live event stream ----
   useIpcEvent((event) => {
     if (event.type === "agent_list") {
@@ -121,6 +160,8 @@ export function useAgents() {
       );
     } else if (event.type === "agent_message") {
       setInbox((old) => (old.some((m) => m.id === event.message.id) ? old : [...old, event.message]));
+    } else if (event.type === "agent_watch") {
+      applyWatchEvent(event.event);
     }
   });
 
@@ -131,7 +172,6 @@ export function useAgents() {
       setError(undefined);
       try {
         await ipc.attachAgent(id);
-        setAttachedId(id);
         setSelectedId(id);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Attach failed");
@@ -140,10 +180,14 @@ export function useAgents() {
     [ipc, rows],
   );
 
-  // No detach IPC exists; detach is a client-side stop-monitoring.
-  const detach = useCallback((id: string) => {
-    if (attachedId === id) setAttachedId(undefined);
-  }, [attachedId]);
+  const detach = useCallback(async (id: string) => {
+    setError(undefined);
+    try {
+      await ipc.detachAgent(id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Detach failed");
+    }
+  }, [ipc]);
 
   // ---- Messaging ----
   const send = useCallback(async () => {
@@ -152,13 +196,23 @@ export function useAgents() {
     setSending(true);
     setError(undefined);
     try {
-      await ipc.sendAgentMessage(selectedId, text);
+      const receipt = await ipc.sendAgentMessage(selectedId, text);
+      setDeliveryReceipt(receipt);
+      // Refresh the live session projection after delivery so the inspector
+      // does not remain on the pre-message transcript. The inbox echo below
+      // keeps the coordination thread responsive while the child processes it.
+      try {
+        setSelectedAgentState(await ipc.getAgentState(selectedId));
+      } catch {
+        // A queued message may temporarily outlive the child watcher; retain
+        // the last readable state and let the next selection refresh retry.
+      }
       // Optimistic echo so the relay feels responsive.
       const peer = rows.find((r) => r.id === selectedId);
       setInbox((old) => [
         ...old,
         {
-          id: `local-${Date.now()}`,
+          id: `local-${receipt.id}`,
           fromAgentId: SELF,
           fromAgentName: "You",
           toAgentId: selectedId,
@@ -216,12 +270,14 @@ export function useAgents() {
     rows,
     selected,
     selectedId,
+    selectedAgentState,
     setSelectedId,
     thread,
     inbox,
-    attachedId,
+    attachedIds,
     attach,
     detach,
+    deliveryReceipt,
     draft,
     setDraft,
     send,

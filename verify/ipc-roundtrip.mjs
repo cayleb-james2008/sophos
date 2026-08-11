@@ -13,15 +13,17 @@
 // Env:   REF (coding-agent package root), DAEMON_PORT (default 48100),
 //        BRIDGE (path to bridge dist index.js)
 
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
-const REF =
-  process.env.REF ||
-  "C:/Users/Cayleb/Desktop/workspace/prime-agent-ref/packages/coding-agent";
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REF = resolve(
+  process.env.REF ?? resolve(REPO_ROOT, "..", "prime-agent-ref", "packages", "coding-agent"),
+);
 // Unique port per run so the daemon supervisor registry never collides with a
 // previous run's leftover supervisor (which would claim the port is owned).
 const DAEMON_PORT = Number(process.env.DAEMON_PORT || (48000 + Math.floor(Math.random() * 1000)));
@@ -29,7 +31,7 @@ const SPEC = `tcp://127.0.0.1:${DAEMON_PORT}`;
 const CLI = join(REF, "dist", "bundle", "cli.js");
 const BRIDGE =
   process.env.BRIDGE ||
-  "C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-agentic/bridge/dist/bridge/src/index.js";
+  join(REPO_ROOT, "bridge", "dist", "bridge", "src", "index.js");
 
 const results = [];
 let passCount = 0;
@@ -41,6 +43,17 @@ let failCount = 0;
 const GRACEFUL = /-32601|-32602|-32603|no active/;
 const METHOD_NOT_FOUND = /-32601/;
 const INVALID_PARAMS = /-32602/;
+
+function terminateProcessTree(proc) {
+  if (!proc?.pid || proc.exitCode !== null) return;
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+    } catch {}
+    return;
+  }
+  try { proc.kill("SIGTERM"); } catch {}
+}
 
 function record(name, ok, detail) {
   results.push({ name, ok, detail });
@@ -129,9 +142,8 @@ async function main() {
     record("daemon: supervisor listening on TCP", true, SPEC);
 
     // 2) Spawn the bridge sidecar (the exact process the Rust shell spawns).
-    bridge = spawn(process.execPath, [BRIDGE], {
+    bridge = spawn(process.execPath, [BRIDGE, "--daemon-socket", SPEC], {
       cwd,
-      env: { ...process.env, PRIME_DAEMON_TCP: "1", PRIME_DAEMON_TCP_PORT: String(DAEMON_PORT) },
       stdio: ["pipe", "pipe", "pipe"],
     });
     const bErr = [];
@@ -513,8 +525,9 @@ async function main() {
 
     client.close();
   } finally {
-    try { bridge?.kill(); } catch {}
-    try { daemon.kill(); } catch {}
+    try { bridge?.stdin.end(); } catch {}
+    terminateProcessTree(bridge);
+    terminateProcessTree(daemon);
     writeFileSync(daemonLog, dOut.join(""), "utf8");
     writeFileSync(bridgeLog, "", "utf8");
   }

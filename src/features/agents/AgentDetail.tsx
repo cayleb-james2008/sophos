@@ -9,7 +9,7 @@ import { Button } from "../../design";
 import type { ReactNode } from "react";
 import { AttachIcon, DetachIcon, LayersIcon, PlugIcon, ClockIcon } from "./icons";
 import { initials } from "../../features/sessions/format";
-import type { AgentMessage } from "../../ipc/contract";
+import type { AgentMessage, AgentMessageReceipt, AgentSessionState } from "../../ipc/contract";
 import type { AgentRow } from "./useAgents";
 import { InboxThread } from "./InboxThread";
 import { AgentComposer } from "./AgentComposer";
@@ -19,6 +19,7 @@ interface AgentDetailProps {
   agent: AgentRow | null;
   runtimeModel?: string;
   attached: boolean;
+  sessionState?: AgentSessionState;
   onAttach: () => void;
   onDetach: () => void;
   thread: AgentMessage[];
@@ -26,6 +27,7 @@ interface AgentDetailProps {
   draft: string;
   setDraft: (v: string) => void;
   sending: boolean;
+  deliveryReceipt?: AgentMessageReceipt;
   onSend: () => void;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
@@ -35,6 +37,7 @@ export function AgentDetail({
   agent,
   runtimeModel,
   attached,
+  sessionState,
   onAttach,
   onDetach,
   thread,
@@ -42,6 +45,7 @@ export function AgentDetail({
   draft,
   setDraft,
   sending,
+  deliveryReceipt,
   onSend,
   onMarkRead,
   onMarkAllRead,
@@ -84,7 +88,12 @@ export function AgentDetail({
             {agent.parentId ? <Row icon={<LayersIcon size={14} />} label="Parent" value={agent.parentId} /> : null}
             <Row icon={<ClockIcon size={14} />} label="Agent id" value={agent.id} mono />
             {agent.summary ? <Row icon={<LayersIcon size={14} />} label="Summary" value={agent.summary} /> : null}
+            {sessionState ? <Row icon={<LayersIcon size={14} />} label="Child state" value={`${sessionState.status}${sessionState.activity ? ` · ${sessionState.activity}` : ""}${sessionState.tokenCount ? ` · ${sessionState.tokenCount} tokens` : ""}`} /> : null}
           </div>
+          {sessionState ? <div className="ag-detail__state">
+            <small>LIVE SESSION STATE · {sessionState.transcript.length} messages</small>
+            {sessionState.transcript.slice(-3).map((message) => <div key={message.id}><b>{message.role}</b><span>{message.content || "(tool activity)"}</span></div>)}
+          </div> : null}
 
           {/* Actions */}
           <div className="ag-detail__actions">
@@ -102,6 +111,12 @@ export function AgentDetail({
       )}
 
       {/* Coordination thread + composer (always present so the relay is usable) */}
+      {deliveryReceipt ? (
+        <div className="ag-detail__receipt" role="status">
+          Message {deliveryReceipt.deliveryStatus === "queued" ? "queued for delivery" : "delivered to the child"}
+        </div>
+      ) : null}
+
       <div className="ag-detail__thread">
         <InboxThread
           agent={agent}

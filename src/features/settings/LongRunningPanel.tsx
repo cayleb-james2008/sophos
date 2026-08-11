@@ -16,6 +16,7 @@ import { HeartbeatsPanel } from "../longrunning/HeartbeatsPanel";
 import { SchedulesPanel } from "../longrunning/SchedulesPanel";
 import { RefinementHistory } from "../longrunning/RefinementHistory";
 import { GoalsPanel } from "../goals/GoalsPanel";
+import { HarnessStatePanel } from "../longrunning/HarnessStatePanel";
 
 export function LongRunningPanel() {
   const [tab, setTab] = useState("autonomous");
@@ -29,6 +30,7 @@ export function LongRunningPanel() {
           { id: "heartbeats", label: "Heartbeats" },
           { id: "schedules", label: "Schedules" },
           { id: "refinement", label: "Refinement" },
+          { id: "harness", label: "Harness state" },
         ]}
         activeId={tab}
         onChange={setTab}
@@ -38,6 +40,7 @@ export function LongRunningPanel() {
       {tab === "heartbeats" ? <HeartbeatsPanel /> : null}
       {tab === "schedules" ? <SchedulesPanel /> : null}
       {tab === "refinement" ? <RefinementHistory /> : null}
+      {tab === "harness" ? <HarnessStatePanel /> : null}
     </div>
   );
 }

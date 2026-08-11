@@ -12,14 +12,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   AgentInfo,
   AgentMessage,
+  AgentMessageReceipt,
   ConnectionState,
+  AgentSessionState,
+  HarnessState,
+  KernelState,
   ContextTreeNode,
   IpcEvent,
+  LocalProviderConfig,
   ModelInfo,
   ModelRuntimeConfig,
   NavigateTreeResult,
   ProviderInfo,
   RefinementResult,
+  RuntimeInfo,
+  RuntimeSkill,
   ScheduleInfo,
   SessionInfo,
   SessionTree,
@@ -33,7 +40,7 @@ export const isTauri =
 
 export interface IpcClient {
   // Commands
-  prompt(text: string, options?: { thinking?: string }): Promise<void>;
+  prompt(text: string, options?: { thinking?: string; streamingBehavior?: "steer" | "followUp"; queueIfBusy?: boolean }): Promise<void>;
   abort(): Promise<void>;
   steer(text: string): Promise<void>;
   setModel(provider: string, model: string, thinking?: string, runtime?: ModelRuntimeConfig): Promise<void>;
@@ -43,7 +50,8 @@ export interface IpcClient {
   forkSession(pathOrId: string): Promise<void>;
   listSessions(): Promise<SessionInfo[]>;
   listAgents(): Promise<AgentInfo[]>;
-  attachAgent(id: string): Promise<void>;
+  attachAgent(id: string): Promise<{ childId: string; sessionId: string; attached: true }>;
+  detachAgent(id: string): Promise<void>;
   getState(): Promise<ConnectionState>;
   getTranscript(): Promise<TranscriptMessage[]>;
   getModels(): Promise<ModelInfo[]>;
@@ -55,7 +63,7 @@ export interface IpcClient {
   runCommand(command: string, args?: string[]): Promise<void>;
   getContextStats(): Promise<ConnectionState["context"]>;
   getRlmChildren(): Promise<ConnectionState["rlmChildren"]>;
-  sendAgentMessage(agentId: string, message: string): Promise<void>;
+  sendAgentMessage(agentId: string, message: string): Promise<AgentMessageReceipt>;
   listInbox(): Promise<AgentMessage[]>;
   markMessageRead(messageId: string): Promise<void>;
   compact(prompt?: string): Promise<void>;
@@ -77,6 +85,12 @@ export interface IpcClient {
   exportToJsonl(outputPath?: string): Promise<{ outputPath: string }>;
   setSessionName(name: string): Promise<void>;
   getContextTree(): Promise<ContextTreeNode>;
+  getRuntimeInfo(): Promise<RuntimeInfo>;
+  getKernelState(): Promise<KernelState>;
+  getHarnessState(): Promise<HarnessState>;
+  getAgentState(id: string): Promise<AgentSessionState>;
+  createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill>;
+  installSkill(path: string): Promise<RuntimeSkill[]>;
 
   // Events
   onEvent(cb: (event: IpcEvent) => void): () => void;
@@ -217,8 +231,11 @@ export class TauriIpcClient implements IpcClient {
   listAgents(): Promise<AgentInfo[]> {
     return this.send("listAgents", {}) as Promise<AgentInfo[]>;
   }
-  attachAgent(id: string): Promise<void> {
-    return this.send("attachAgent", { id }) as Promise<void>;
+  attachAgent(id: string): Promise<{ childId: string; sessionId: string; attached: true }> {
+    return this.send("attachAgent", { id }) as Promise<{ childId: string; sessionId: string; attached: true }>;
+  }
+  detachAgent(id: string): Promise<void> {
+    return this.send("detachAgent", { id }) as Promise<void>;
   }
   getState(): Promise<ConnectionState> {
     return this.send("getState", {}) as Promise<ConnectionState>;
@@ -253,8 +270,8 @@ export class TauriIpcClient implements IpcClient {
   getRlmChildren(): Promise<ConnectionState["rlmChildren"]> {
     return this.send("getRlmChildren", {}) as Promise<ConnectionState["rlmChildren"]>;
   }
-  sendAgentMessage(agentId: string, message: string): Promise<void> {
-    return this.send("sendAgentMessage", { agentId, message }) as Promise<void>;
+  sendAgentMessage(agentId: string, message: string): Promise<AgentMessageReceipt> {
+    return this.send("sendAgentMessage", { agentId, message }) as Promise<AgentMessageReceipt>;
   }
   listInbox(): Promise<AgentMessage[]> {
     return this.send("listInbox", {}) as Promise<AgentMessage[]>;
@@ -319,6 +336,24 @@ export class TauriIpcClient implements IpcClient {
   getContextTree(): Promise<ContextTreeNode> {
     return this.send("getContextTree", {}) as Promise<ContextTreeNode>;
   }
+  getRuntimeInfo(): Promise<RuntimeInfo> {
+    return this.send("getRuntimeInfo", {}) as Promise<RuntimeInfo>;
+  }
+  getKernelState(): Promise<KernelState> {
+    return this.send("getKernelState", {}) as Promise<KernelState>;
+  }
+  getHarnessState(): Promise<HarnessState> {
+    return this.send("getHarnessState", {}) as Promise<HarnessState>;
+  }
+  getAgentState(id: string): Promise<AgentSessionState> {
+    return this.send("getAgentState", { id }) as Promise<AgentSessionState>;
+  }
+  createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill> {
+    return this.send("createSkill", input) as Promise<RuntimeSkill>;
+  }
+  installSkill(path: string): Promise<RuntimeSkill[]> {
+    return this.send("installSkill", { path }) as Promise<RuntimeSkill[]>;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -328,6 +363,7 @@ export class TauriIpcClient implements IpcClient {
 // ---------------------------------------------------------------------------
 
 const LOCAL_MODEL_CONFIG_KEY = "prime-agent.modelConfig.v1";
+const LOCAL_PROVIDER_KEY = "prime-agent.localProviders.v1";
 
 /** Read the mock's persisted model overrides from localStorage (survives reload). */
 function readLocalModelConfig(): Record<string, ModelRuntimeConfig> {
@@ -350,11 +386,50 @@ function writeLocalModelConfig(value: Record<string, ModelRuntimeConfig>): void 
   }
 }
 
+/** Read the mock's persisted local provider configs from localStorage. Returns
+ * `null` when the key was never written, so the mock can default to a connected
+ * local endpoint (matching the cloud-provider convention) instead of an empty
+ * "logged out" state on a first-ever load. */
+function readLocalProviders(): LocalProviderConfig[] | null {
+  try {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(LOCAL_PROVIDER_KEY) : null;
+    if (raw === null) return null; // never persisted → treat as not-yet-configured
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as LocalProviderConfig[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the mock's local provider configs to localStorage (best-effort). */
+function writeLocalProviders(value: LocalProviderConfig[]): void {
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(LOCAL_PROVIDER_KEY, JSON.stringify(value));
+  } catch {
+    // ignore quota/security errors — persistence is best-effort in the mock
+  }
+}
+
+/**
+ * Default local endpoint config. The mock ships it connected by default,
+ * mirroring the cloud-provider convention (everything connected so the demo
+ * looks alive). The local card renders separately from getProviders() — it is
+ * a user-specified endpoint, not a daemon-discovered provider — so adding it
+ * here never shifts the provider-array indices the e2e tests rely on.
+ */
+const LOCAL_DEFAULT_CONFIG: LocalProviderConfig = {
+  id: "local",
+  name: "My Local Model",
+  baseUrl: "http://localhost:11434",
+  kind: "ollama",
+};
+
 export class MockIpcClient implements IpcClient {
   private listeners: Array<(e: IpcEvent) => void> = [];
   private mockSettings: Settings = {
     theme: "dark",
     modelConfig: readLocalModelConfig(),
+    localProviders: readLocalProviders() ?? [LOCAL_DEFAULT_CONFIG],
   };
   private state: ConnectionState = {
     status: { kind: "connecting" },
@@ -470,7 +545,14 @@ export class MockIpcClient implements IpcClient {
   async listAgents(): Promise<AgentInfo[]> {
     return [];
   }
-  async attachAgent(): Promise<void> {}
+  async attachAgent(id: string): Promise<{ childId: string; sessionId: string; attached: true }> {
+    const state = await this.getAgentState(id);
+    this.emit({ type: "agent_watch", event: { kind: "attached", childId: id, sessionId: id, state } });
+    return { childId: id, sessionId: id, attached: true };
+  }
+  async detachAgent(id: string): Promise<void> {
+    this.emit({ type: "agent_watch", event: { kind: "detached", childId: id, sessionId: id, reason: "detached" } });
+  }
   async getState(): Promise<ConnectionState> {
     return {
       ...this.state,
@@ -559,12 +641,27 @@ export class MockIpcClient implements IpcClient {
     // Make the demo honest: signing in actually flips the provider to
     // connected, so the Connect → modal → connected round-trip is real rather
     // than a no-op that leaves the UI lying about its state.
+    if (provider === "local") {
+      // A local endpoint has no ambient/daemon auth — connecting stores its
+      // config in settings. ProvidersPanel persists the user-entered config
+      // via setSettings first; this default guards direct login() calls.
+      if (!(this.mockSettings.localProviders ?? []).length) {
+        this.mockSettings = { ...this.mockSettings, localProviders: [LOCAL_DEFAULT_CONFIG] };
+        writeLocalProviders([LOCAL_DEFAULT_CONFIG]);
+      }
+    }
     this.mockLoggedIn.add(provider);
     this.mockLoggedOut.delete(provider);
   }
   async logout(provider: string): Promise<void> {
     this.mockLoggedOut.add(provider);
     this.mockLoggedIn.delete(provider);
+    if (provider === "local") {
+      // Disconnecting a local endpoint removes its config (login stores it,
+      // logout removes it).
+      this.mockSettings = { ...this.mockSettings, localProviders: [] };
+      writeLocalProviders([]);
+    }
   }
   async getSettings(): Promise<Settings> {
     return { ...this.mockSettings, modelConfig: { ...(this.mockSettings.modelConfig ?? {}) } };
@@ -576,8 +673,12 @@ export class MockIpcClient implements IpcClient {
       // so a reset that removes a key actually drops it from the persisted config.
       next.modelConfig = settings.modelConfig;
     }
+    if (settings.localProviders !== undefined) {
+      next.localProviders = settings.localProviders;
+    }
     this.mockSettings = next;
     writeLocalModelConfig(next.modelConfig ?? {});
+    writeLocalProviders(next.localProviders ?? []);
   }
   async runCommand(): Promise<void> {}
   async getContextStats(): Promise<ConnectionState["context"]> {
@@ -593,7 +694,15 @@ export class MockIpcClient implements IpcClient {
       { id: "rlm-2", name: "test-runner", status: "idle" as const, parentId: this.activeSessionId, summary: "Awaiting next batch" },
     ];
   }
-  async sendAgentMessage(): Promise<void> {}
+  async sendAgentMessage(agentId: string, message: string): Promise<AgentMessageReceipt> {
+    return {
+      id: `mock-receipt-${Date.now()}`,
+      target: { activeSessionId: agentId, sessionId: agentId },
+      message,
+      deliveryStatus: "delivered",
+      deliveredAt: new Date().toISOString(),
+    };
+  }
   async listInbox(): Promise<AgentMessage[]> {
     return [];
   }
@@ -723,6 +832,42 @@ export class MockIpcClient implements IpcClient {
       status: "active",
       children: [{ id: "sub-1", label: "api-reviewer", status: "running", children: [] }],
     };
+  }
+  async getRuntimeInfo(): Promise<RuntimeInfo> {
+    return {
+      kernel: { status: "browser-preview", persistent: false, toolAvailable: false },
+      skills: [],
+      skillDiagnostics: [],
+      extensions: [],
+    };
+  }
+  async getKernelState(): Promise<KernelState> {
+    return {
+      status: "browser-preview",
+      persistent: false,
+      toolAvailable: false,
+      cells: [],
+      variables: [],
+      imports: [],
+      diagnostic: {
+        reason: "browser_preview",
+        message: "The browser preview has no live Python workspace.",
+        nextStep: "Open the Tauri app to inspect the live kernel.",
+        action: "open_tauri",
+      },
+    };
+  }
+  async getHarnessState(): Promise<HarnessState> {
+    return { entries: [], refinements: [], source: "browser-preview" };
+  }
+  async getAgentState(id: string): Promise<AgentSessionState> {
+    return { id, status: "browser-preview", transcript: [] };
+  }
+  async createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill> {
+    return { name: input.name, description: input.description, source: "browser-preview" };
+  }
+  async installSkill(_path: string): Promise<RuntimeSkill[]> {
+    return [];
   }
 }
 

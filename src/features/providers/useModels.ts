@@ -9,7 +9,7 @@
 // values below the ceiling. setModelConfig() persists + pushes an override to the engine.
 
 import { useCallback, useEffect, useState } from "react";
-import { useIpc } from "../../ipc/client";
+import { useIpc, isTauri } from "../../ipc/client";
 import type { ModelInfo, ModelRuntimeConfig, ProviderInfo, Settings } from "../../ipc/contract";
 
 export const DEFAULT_PROVIDER = "ollama-cloud";
@@ -54,6 +54,30 @@ const FALLBACK_MAX: Record<string, { contextWindow: number; maxOutputTokens: num
 
 const DEFAULT_MAX_CONTEXT = 128000;
 const DEFAULT_MAX_OUTPUT = 16384;
+
+/**
+ * Mock local endpoint model. When a local (Ollama / OpenAI-compatible)
+ * provider is connected, this single entry is appended to the catalog so the
+ * local card shows a model with reasonable defaults (128k context, 8k output).
+ * Only used in browser-demo mode (not Tauri), where the real daemon would
+ * report the actual local models.
+ */
+const LOCAL_MODEL: ModelInfo = {
+  id: "local-model",
+  name: "Local Model",
+  provider: "local",
+  contextWindow: 131072,
+  maxOutputTokens: 8192,
+  maxContextWindow: 131072,
+  maxOutputTokensCeiling: 8192,
+};
+
+/** Apply overrides + append the mock local model when a local provider is connected. */
+function modelsForCatalog(mods: ModelInfo[], overrides: Record<string, ModelRuntimeConfig>, localConnected: boolean): ModelInfo[] {
+  const base = mods.map((m) => withEffectiveConfig(m, overrides[modelKey(m.provider, m.id)]));
+  if (!localConnected) return base;
+  return [...base, withEffectiveConfig(LOCAL_MODEL, overrides[modelKey(LOCAL_MODEL.provider, LOCAL_MODEL.id)])];
+}
 
 /** Clamp a token value into [min, max], returning a safe integer. */
 function clampToken(v: number, min: number, max: number): number {
@@ -102,7 +126,8 @@ export function useModels() {
       ]);
       const overrides = settings?.modelConfig ?? {};
       setProviders(provs);
-      setModels(mods.map((m) => withEffectiveConfig(m, overrides[modelKey(m.provider, m.id)])));
+      const localConnected = !isTauri && !!(settings?.localProviders?.length);
+      setModels(modelsForCatalog(mods, overrides, localConnected));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -119,7 +144,8 @@ export function useModels() {
         if (!mounted) return;
         const overrides = settings?.modelConfig ?? {};
         setProviders(provs);
-        setModels(mods.map((m) => withEffectiveConfig(m, overrides[modelKey(m.provider, m.id)])));
+        const localConnected = !isTauri && !!(settings?.localProviders?.length);
+        setModels(modelsForCatalog(mods, overrides, localConnected));
         setError(null);
       })
       .catch((err) => {

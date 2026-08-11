@@ -6,13 +6,15 @@ import { useCallback, useEffect, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Text, Card, Badge, Button, Spinner, type BadgeTone } from "../../design";
 import { useIpc } from "../../ipc/client";
-import type { AgentInfo, ContextStats, RlmChild, Settings } from "../../ipc/contract";
+import type { AgentInfo, ContextStats, RlmChild, RuntimeInfo, Settings } from "../../ipc/contract";
 import { GaugeIcon, LayersIcon, RefreshIcon, ZapIcon, PlugIcon, CpuIcon, LinkIcon, ShieldIcon } from "../sessions/icons";
 import { formatTokens } from "../sessions/format";
+import { KernelPanel } from "./KernelPanel";
 
 export function AdvancedPanel() {
   const ipc = useIpc();
   const [context, setContext] = useState<ContextStats>({});
+  const [runtime, setRuntime] = useState<RuntimeInfo>();
   const [children, setChildren] = useState<RlmChild[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [daemonStatus, setDaemonStatus] = useState<{ connected: boolean; tcpEnabled?: boolean; socketPath?: string }>({ connected: false });
@@ -24,13 +26,15 @@ export function AdvancedPanel() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, r, a, s] = await Promise.all([
+      const [c, runtimeInfo, r, a, s] = await Promise.all([
         ipc.getContextStats(),
+        ipc.getRuntimeInfo(),
         ipc.getRlmChildren(),
         ipc.listAgents(),
         ipc.getSettings(),
       ]);
       setContext(c ?? {});
+      setRuntime(runtimeInfo);
       setChildren(r ?? []);
       setAgents(a ?? []);
       setSettings(s ?? {});
@@ -76,6 +80,8 @@ export function AdvancedPanel() {
       ) : (
         <>
           <TrustModelCard />
+          <KernelCard runtime={runtime} />
+          <KernelPanel />
           <DaemonTransportCard />
           <ContextCard context={context} onCompact={() => void ipc.compact().then(() => refresh())} />
           <RlmChildrenCard children={children} onRefresh={() => void refresh()} />
@@ -136,6 +142,34 @@ function TrustModelCard() {
         This matches the project's documented stance: the kernel is not a security boundary, and
         model-generated code runs with your permissions.
       </Text>
+    </Card>
+  );
+}
+
+function KernelCard({ runtime }: { runtime?: RuntimeInfo }) {
+  const kernel = runtime?.kernel;
+  const configured = kernel?.status === "configured";
+  const browserPreview = kernel?.status === "browser-preview";
+  return (
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.md }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+          <CpuIcon size={16} />
+          <Text variant="label" weight="semibold">Persistent IPython kernel</Text>
+        </div>
+        <Badge tone={configured ? "success" : browserPreview ? "neutral" : "warning"} dot>
+          {configured ? "Configured" : browserPreview ? "Browser preview" : "Unavailable"}
+        </Badge>
+      </div>
+      <Text variant="body" tone="muted">
+        {configured
+          ? "The live daemon exposes IPython as the persistent execution tool. Variables and imports survive across cells and compaction; a running-cell event is the proof of liveness."
+          : browserPreview
+            ? "The browser preview has no daemon or kernel. Open the Tauri app to inspect the live session capability."
+            : "The live daemon did not expose the IPython tool for this session."}
+      </Text>
+      {kernel?.sessionId ? <Text variant="micro" tone="dim" mono>session {kernel.sessionId}</Text> : null}
+      {runtime?.cwd ? <Text variant="micro" tone="dim" mono style={{ wordBreak: "break-all" }}>cwd {runtime.cwd}</Text> : null}
     </Card>
   );
 }

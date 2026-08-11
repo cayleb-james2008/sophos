@@ -18,6 +18,7 @@ export type IpcCommand =
   | { method: "listSessions"; params: {} }
   | { method: "listAgents"; params: {} }
   | { method: "attachAgent"; params: { id: string } }
+  | { method: "detachAgent"; params: { id: string } }
   | { method: "getState"; params: {} }
   | { method: "getTranscript"; params: {} }
   | { method: "getModels"; params: {} }
@@ -50,10 +51,19 @@ export type IpcCommand =
   | { method: "exportToHtml"; params: { outputPath?: string } }
   | { method: "exportToJsonl"; params: { outputPath?: string } }
   | { method: "setSessionName"; params: { name: string } }
-  | { method: "getContextTree"; params: {} };
+  | { method: "getContextTree"; params: {} }
+  | { method: "getRuntimeInfo"; params: {} }
+  | { method: "getKernelState"; params: {} }
+  | { method: "getHarnessState"; params: {} }
+  | { method: "getAgentState"; params: { id: string } }
+  | { method: "createSkill"; params: { name: string; description: string; content: string; pythonImport?: string } }
+  | { method: "installSkill"; params: { path: string } };
 
 export interface PromptOptions {
   thinking?: string;
+  /** Queue or steer a prompt while another turn is running, matching the daemon/TUI contract. */
+  streamingBehavior?: "steer" | "followUp";
+  queueIfBusy?: boolean;
   serviceTier?: string;
   transport?: string;
   goal?: string;
@@ -72,7 +82,37 @@ export type IpcEvent =
   | { type: "agent_message"; message: AgentMessage }
   | { type: "agent_list"; agents: AgentInfo[] }
   | { type: "agent_status"; agent: AgentInfo }
+  | { type: "agent_watch"; event: AgentWatchEvent }
   | { type: "refinement_result"; result: RefinementResult };
+
+export type AgentWatchEvent =
+  | { kind: "attached"; childId: string; sessionId: string; state: AgentSessionState }
+  | { kind: "detached"; childId: string; sessionId: string; reason?: string }
+  | { kind: "status"; childId: string; status: RlmChild["status"]; state: AgentSessionState }
+  | { kind: "transcript"; childId: string; state: AgentSessionState; message?: TranscriptMessage }
+  | { kind: "message"; childId: string; state: AgentSessionState; message: TranscriptMessage };
+
+export interface AgentMessageReceipt {
+  id: string;
+  source?: string;
+  target: {
+    activeSessionId: string;
+    sessionId: string;
+    sessionName?: string;
+    runtimeKind?: string;
+  };
+  from?: {
+    activeSessionId?: string;
+    sessionId?: string;
+    sessionName?: string;
+    clientId?: string;
+  };
+  message: string;
+  deliveryStatus: "delivered" | "queued";
+  deliveredAt?: string;
+  queuedAt?: string;
+  deliveryMode?: "steer";
+}
 
 export type ConnectionStatus =
   | { kind: "connecting" }
@@ -167,6 +207,104 @@ export interface ContextTreeNode {
   children: ContextTreeNode[];
 }
 
+/** A skill discovered by the live daemon resource loader. */
+export interface RuntimeSkill {
+  name: string;
+  description?: string;
+  filePath?: string;
+  source?: string;
+}
+
+export interface KernelCell {
+  id: string;
+  code: string;
+  status: "ok" | "error" | "running" | "unknown";
+  executionCount?: number;
+  output?: string;
+  error?: string;
+  timestamp?: string;
+  variables?: string[];
+  imports?: string[];
+}
+
+export type KernelHealthReason =
+  | "healthy"
+  | "starting"
+  | "not_started"
+  | "bootstrap_failed"
+  | "dead"
+  | "namespace_unavailable"
+  | "browser_preview"
+  | "unavailable";
+
+export type KernelHealthAction = "none" | "wait" | "run_cell" | "retry" | "restart" | "refresh" | "open_tauri";
+
+export interface KernelHealthDiagnostic {
+  reason: KernelHealthReason;
+  message: string;
+  nextStep: string;
+  action: KernelHealthAction;
+}
+
+/** Real kernel evidence from the daemon's persistent IPython state and transcript details. */
+export interface KernelState {
+  status: "configured" | "running" | "unavailable" | "browser-preview";
+  persistent: boolean;
+  toolAvailable: boolean;
+  sessionId?: string;
+  executionCount?: number;
+  cells: KernelCell[];
+  variables: string[];
+  imports: string[];
+  diagnostic: KernelHealthDiagnostic;
+  lastOutput?: string;
+  lastError?: string;
+}
+
+export interface HarnessEntry {
+  id: string;
+  kind: "prompt" | "memory" | "skill" | "subagent";
+  title: string;
+  content: string;
+  path?: string;
+  scope?: "local" | "global";
+  reference?: Record<string, unknown>;
+  arguments?: Record<string, unknown>;
+  version?: number;
+  updatedAt?: string;
+}
+
+export interface HarnessRefinement {
+  id: string;
+  summary?: string;
+  trigger?: string;
+  changes?: string[];
+  outcome?: string;
+  timestamp?: string;
+  rollbackOf?: string;
+}
+
+export interface HarnessState {
+  entries: HarnessEntry[];
+  refinements: HarnessRefinement[];
+  source?: string;
+}
+
+/** Live daemon-owned runtime capabilities used by the harness panels. */
+export interface RuntimeInfo {
+  cwd?: string;
+  kernel: {
+    /** "configured" means the persistent IPython tool is available; it does not claim a cell is running. */
+    status: "configured" | "unavailable" | "browser-preview";
+    persistent: boolean;
+    toolAvailable: boolean;
+    sessionId?: string;
+  };
+  skills: RuntimeSkill[];
+  skillDiagnostics: Array<{ type: string; message: string; path?: string }>;
+  extensions: string[];
+}
+
 /** Refinement (continual-harness) result pushed as an event. */
 export interface RefinementResult {
   id?: string;
@@ -207,6 +345,8 @@ export interface ContextStats {
 
 export interface RlmChild {
   id: string;
+  /** Child's daemon active-session id, required for attach and direct messaging. */
+  sessionId?: string;
   name?: string;
   status: "running" | "idle" | "done" | "error";
   parentId?: string;
@@ -269,6 +409,21 @@ export interface ProviderInfo {
   models: ModelInfo[];
 }
 
+export type LocalProviderKind = "ollama" | "openai-compatible";
+
+/**
+ * A local (self-hosted) model endpoint — Ollama or an OpenAI-compatible
+ * server. Unlike daemon-discovered cloud providers, this is a user-specified
+ * base URL; it is always rendered as a first-class card and persisted to
+ * settings (login stores the config, logout removes it).
+ */
+export interface LocalProviderConfig {
+  id: string;
+  name: string;
+  baseUrl: string;
+  kind: LocalProviderKind;
+}
+
 export interface SessionInfo {
   id: string;
   title?: string;
@@ -283,6 +438,18 @@ export interface AgentInfo {
   name?: string;
   status: "running" | "idle" | "saved";
   sessionId?: string;
+}
+
+export interface AgentSessionState {
+  id: string;
+  status: string;
+  sessionId?: string;
+  model?: string;
+  summary?: string;
+  activity?: string;
+  tokenCount?: number;
+  toolUseCount?: number;
+  transcript: TranscriptMessage[];
 }
 
 export interface AgentMessage {
@@ -316,4 +483,11 @@ export interface Settings {
   modelConfig?: Record<string, ModelRuntimeConfig>;
   /** API keys per provider, stored/removed by login/logout (persisted to settings). */
   auth?: Record<string, string>;
+  /**
+   * Local (Ollama / OpenAI-compatible) endpoint configs, keyed by id. A non-empty
+   * array means a local provider is connected; login stores a config here and
+   * logout removes it. getSettings/setSettings already carry arbitrary fields,
+   * so no new IPC methods are needed.
+   */
+  localProviders?: LocalProviderConfig[];
 }

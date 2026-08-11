@@ -1,8 +1,8 @@
 # Sophos Browser E2E — Summary
 
-Date: 2026-08-10T18:43:00.962Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
+Date: 2026-08-11T05:02:26.395Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
 
-## Result: FAIL (36/37 passed)
+## Result: PASS (37/37 passed)
 
 ## Views
 
@@ -54,7 +54,7 @@ Date: 2026-08-10T18:43:00.962Z · Mode: browser-demo (MockIpcClient) · App: `np
 | Inbox view empty state (no relay traffic) | ✅ PASS | ok |
 | Error handling: IPC rejection shows error UI + Retry recovers | ✅ PASS | ok |
 | Empty transcript state in session detail | ✅ PASS | ok |
-| No console/page errors across all views | ❌ FAIL | page.waitForTimeout: Target page, context or browser has been closed |
+| No console/page errors across all views | ✅ PASS | ok |
 
 ## Evidence
 
@@ -101,3 +101,4 @@ Date: 2026-08-10T18:43:00.962Z · Mode: browser-demo (MockIpcClient) · App: `np
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-state.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-recovered.png`
   - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-empty-transcript-state-in-session-detail-edge-empty-transcript.png`
+  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-no-console-page-errors-across-all-views-edge-error-sweep.png`

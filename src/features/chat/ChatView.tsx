@@ -13,7 +13,7 @@ import { useChat } from "./useChat";
 import { MessageList } from "./MessageList";
 import { Composer } from "./Composer";
 import { ContextBar } from "./ContextBar";
-import { FirstRunBanner } from "../settings/FirstRunBanner";
+import { FirstRunBanner, useOnboardingStatus } from "../settings/FirstRunBanner";
 
 function statusDotState(status: { kind: string }): "connecting" | "connected" | "disconnected" | "reconnecting" {
   switch (status.kind) {
@@ -72,11 +72,14 @@ export function ChatView({
   const chat = useChat();
   const ipc = useIpc();
   const state = useConnectionState();
+  const onboarding = useOnboardingStatus();
+  const { hasProvider } = onboarding;
   const {
     messages,
     busy,
     loaded,
     error,
+    hasFirstMessage,
     send,
     steer,
     abort,
@@ -108,6 +111,22 @@ export function ChatView({
   };
 
   const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
+
+  // ---- Empty-state starter prompts → composer ----------------
+  // Picking a starter prompt fills the composer (editable, never auto-sent).
+  // A monotonically increasing seq lets the user pick the same prompt twice.
+  const starterSeq = useRef(0);
+  const [starterDraft, setStarterDraft] = useState<{ seq: number; text: string } | null>(null);
+  const [developerPreviewOpen, setDeveloperPreviewOpen] = useState(false);
+  const fillPrompt = (text: string) => {
+    setStarterDraft({ seq: ++starterSeq.current, text });
+  };
+
+  // FirstRunBanner's "Start typing" action — App keeps us on Chat; the local
+  // fallback focuses the composer so the user can type immediately.
+  const onStartChat = () => {
+    document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message input"]')?.focus();
+  };
 
   const onExport = () => {
     void ipc.exportToHtml().catch(() => {});
@@ -288,8 +307,14 @@ export function ChatView({
         </div>
       ) : null}
 
-      {/* First-run onboarding — skippable, provider-first (research D12 / F1). */}
-      <FirstRunBanner onSetupProviders={onSetupProviders} />
+      {/* First-run onboarding — skippable, provider-first (research D12 / F1).
+          P2 interface: completion is driven by `hasProvider` + `hasFirstMessage`. */}
+      <FirstRunBanner
+        onSetupProviders={onSetupProviders}
+        onStartChat={onStartChat}
+        hasFirstMessage={hasFirstMessage}
+        setup={onboarding}
+      />
 
       {/* Demo-mode banner: visible only in the browser preview (no Tauri). */}
       {!isTauri ? (
@@ -317,36 +342,51 @@ export function ChatView({
           <Text variant="label" tone="muted">
             Demo mode — engine not connected. Responses here are simulated and do not reflect real tools or data.
           </Text>
-          {/* Dev-only trigger: seeds a 500+ message transcript so the windowed
-              MessageList perf is demonstrable in the browser preview. */}
-          <button
-            type="button"
-            onClick={() => loadDemoMessages(500)}
-            title="Seed a 500-message transcript to test windowed rendering"
-            style={{
-              marginLeft: "auto",
-              flexShrink: 0,
-              background: "transparent",
-              border: `1px solid ${tokens.color.borderStrong}`,
-              borderRadius: tokens.radius.sm,
-              color: tokens.color.textMuted,
-              fontFamily: tokens.font.mono,
-              fontSize: tokens.font.size.xs,
-              padding: "3px 10px",
-              cursor: "pointer",
-              transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = tokens.color.accentBorder;
-              e.currentTarget.style.color = tokens.color.text;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = tokens.color.borderStrong;
-              e.currentTarget.style.color = tokens.color.textMuted;
-            }}
+          {/* Keep the performance fixture available without presenting it as a
+              normal first-run action. */}
+          <details
+            open={developerPreviewOpen}
+            style={{ marginLeft: "auto", flexShrink: 0, color: tokens.color.textMuted }}
           >
-            Load 500 messages
-          </button>
+            <summary
+              onClick={(event) => {
+                event.preventDefault();
+                setDeveloperPreviewOpen((open) => !open);
+              }}
+              style={{ cursor: "pointer", fontFamily: tokens.font.mono, fontSize: tokens.font.size.xs }}
+            >
+              Developer preview
+            </summary>
+            <div hidden={!developerPreviewOpen}>
+            <button
+              type="button"
+              onClick={() => loadDemoMessages(500)}
+              title="Seed a 500-message transcript to test windowed rendering"
+              style={{
+                marginTop: tokens.space.xs,
+                background: "transparent",
+                border: `1px solid ${tokens.color.borderStrong}`,
+                borderRadius: tokens.radius.sm,
+                color: tokens.color.textMuted,
+                fontFamily: tokens.font.mono,
+                fontSize: tokens.font.size.xs,
+                padding: "3px 10px",
+                cursor: "pointer",
+                transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = tokens.color.accentBorder;
+                e.currentTarget.style.color = tokens.color.text;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = tokens.color.borderStrong;
+                e.currentTarget.style.color = tokens.color.textMuted;
+              }}
+            >
+              Load 500 messages
+            </button>
+            </div>
+          </details>
         </div>
       ) : null}
 
@@ -357,6 +397,8 @@ export function ChatView({
           busy={busy}
           onRetry={retry}
           onEdit={(index, m) => requestEdit(index, m.content)}
+          hasProvider={hasProvider}
+          onFillPrompt={fillPrompt}
         />
       ) : (
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -372,7 +414,9 @@ export function ChatView({
       {/* Composer */}
       <Composer
         busy={busy}
+        setupReady={!isTauri || onboarding.ready}
         editDraft={editDraft}
+        starterDraft={starterDraft}
         onSend={send}
         onAbort={abort}
         onSteer={steer}

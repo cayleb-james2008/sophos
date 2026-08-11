@@ -9,11 +9,11 @@
 // value, ceiling shown as the provider max — persisted to settings and pushed
 // to the engine via useModels().setModelConfig (graceful offline).
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Text, Card, Badge, Button, Modal, Input, Spinner } from "../../design";
+import { Text, Card, Badge, Button, Modal, Input, Select, Spinner } from "../../design";
 import { useIpc } from "../../ipc/client";
-import type { ModelInfo, ProviderInfo } from "../../ipc/contract";
+import type { LocalProviderConfig, LocalProviderKind, ModelInfo, ProviderInfo, Settings } from "../../ipc/contract";
 import { useModels, modelKey } from "../providers/useModels";
 import { KeyIcon, LogoutIcon, PlugIcon, CpuIcon } from "../sessions/icons";
 
@@ -22,9 +22,48 @@ export function ProvidersPanel() {
   const { providers, models, loading, reload, setModelConfig, resetModelConfig } = useModels();
   const [loginTarget, setLoginTarget] = useState<ProviderInfo | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [localConfigs, setLocalConfigs] = useState<LocalProviderConfig[]>([]);
+  const [localVersion, setLocalVersion] = useState(0);
+  const [localOpen, setLocalOpen] = useState(false);
+
+  // Load the persisted local provider config. getSettings/setSettings already
+  // carry arbitrary fields, so no new IPC method is needed — we read
+  // settings.localProviders here and re-read after connect/disconnect.
+  useEffect(() => {
+    let mounted = true;
+    ipc
+      .getSettings()
+      .then((s) => {
+        if (mounted) setLocalConfigs(s.localProviders ?? []);
+      })
+      .catch(() => {
+        // settings unavailable — local card simply shows disconnected
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [ipc, localVersion]);
+
+  // A local provider is a single endpoint; treat the first config as the one.
+  const localConfig = localConfigs[0] ?? null;
 
   const providerModels = (p: ProviderInfo): ModelInfo[] =>
     p.models.length ? p.models : models.filter((m) => m.provider === p.id);
+
+  const connectLocal = async (config: LocalProviderConfig) => {
+    await ipc.setSettings({ localProviders: [config] } as Settings);
+    await ipc.login("local");
+    setLocalOpen(false);
+    setLocalVersion((v) => v + 1);
+    void reload();
+  };
+
+  const logoutLocal = async () => {
+    await ipc.setSettings({ localProviders: [] } as Settings);
+    await ipc.logout("local");
+    setLocalVersion((v) => v + 1);
+    void reload();
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
@@ -32,14 +71,20 @@ export function ProvidersPanel() {
         <div style={{ display: "flex", justifyContent: "center", padding: tokens.space["3xl"] }}>
           <Spinner size={22} />
         </div>
-      ) : providers.length === 0 ? (
-        <Card variant="raised" padding="lg">
-          <Text variant="body" tone="dim">
-            No providers configured yet.
-          </Text>
-        </Card>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: tokens.space.lg }}>
+        <div
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: tokens.space.lg }}
+        >
+          {/* The local (Ollama / OpenAI-compatible) endpoint is a FIRST-CLASS card,
+              rendered separately from the daemon-discovered providers so the
+              getProviders() array — and its index-0 `ollama-cloud` e2e assumption —
+              is never touched. */}
+          <LocalProviderCard
+            config={localConfig}
+            models={models.filter((m) => m.provider === "local")}
+            onConnect={() => setLocalOpen(true)}
+            onLogout={() => void logoutLocal()}
+          />
           {providers.map((p) => {
             const pModels = providerModels(p);
             return (
@@ -71,6 +116,8 @@ export function ProvidersPanel() {
           }}
         />
       ) : null}
+
+      {localOpen ? <LocalConnectModal onClose={() => setLocalOpen(false)} onConnect={connectLocal} /> : null}
     </div>
   );
 }
@@ -252,6 +299,14 @@ function ProviderCard({
           </Text>
         )}
       </div>
+
+      {provider.id === "ollama-cloud" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, padding: tokens.space.md, background: tokens.color.accentSoft, border: `1px solid ${tokens.color.accentBorder}`, borderRadius: tokens.radius.md }}>
+          <Text variant="micro" tone="accent" mono uppercase>Free starter model</Text>
+          <Text variant="label" weight="semibold">DeepSeek V4 Flash 0731</Text>
+          <Text variant="micro" tone="muted">Connect here once; Sophos selects this model automatically for new sessions. No settings file editing required.</Text>
+        </div>
+      ) : null}
 
       <div style={{ borderTop: `1px solid ${tokens.color.border}`, paddingTop: tokens.space.md }}>
         {provider.connected ? (
@@ -446,6 +501,197 @@ function Chevron({ open }: { open: boolean }) {
     >
       <polyline points="6 9 12 15 18 9" />
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Local provider card + connect modal (Ollama / OpenAI-compatible)
+// ---------------------------------------------------------------------------
+
+/**
+ * First-class card for a local (self-hosted) model endpoint. Unlike the cloud
+ * providers it is rendered separately from the `providers` array (it is a
+ * user-specified base URL, not a daemon-discovered provider), so it never
+ * shifts the getProviders() indices the e2e suite relies on. Uses ONLY the
+ * existing design tokens / components — no new colors, sharp corners via
+ * tokens.radius.md, Geist type.
+ */
+function LocalProviderCard({
+  config,
+  models,
+  onConnect,
+  onLogout,
+}: {
+  config: LocalProviderConfig | null;
+  models: ModelInfo[];
+  onConnect: () => void;
+  onLogout: () => void;
+}) {
+  const connected = !!config;
+  const name = config?.name ?? "Local";
+  const sub = config ? config.baseUrl : "Not connected";
+  return (
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: tokens.space.md }}>
+        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
+          <span
+            style={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: tokens.radius.md,
+              background: connected ? tokens.color.accentSoft : tokens.color.bgOverlay,
+              border: `1px solid ${connected ? tokens.color.accentBorder : tokens.color.border}`,
+              color: connected ? tokens.color.accentHover : tokens.color.textDim,
+            }}
+          >
+            <PlugIcon size={17} />
+          </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+            <Text variant="label" weight="semibold">
+              {name}
+            </Text>
+            <Text variant="micro" tone="dim" mono style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
+              {sub}
+            </Text>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, flexShrink: 0 }}>
+          <Badge tone="neutral">Local</Badge>
+          <Badge tone="neutral" dot dotTone={connected ? "success" : "neutral"}>
+            {connected ? "Connected" : "Offline"}
+          </Badge>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+          <CpuIcon size={12} color={tokens.color.textDim} />
+          <Text variant="micro" tone="dim" uppercase>
+            Models
+          </Text>
+        </div>
+        {connected && models.length ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs }}>
+            {models.map((m) => (
+              <div
+                key={m.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: tokens.space.sm,
+                  border: `1px solid ${tokens.color.border}`,
+                  borderRadius: tokens.radius.md,
+                  background: tokens.color.bgOverlay,
+                  padding: "7px 10px",
+                }}
+              >
+                <Text variant="micro" mono style={{ color: tokens.color.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {m.name ?? m.id}
+                </Text>
+                <Text variant="micro" tone="dim" mono style={{ flexShrink: 0 }}>
+                  {m.contextWindow ? `${m.contextWindow.toLocaleString()} ctx` : ""}
+                  {m.contextWindow && m.maxOutputTokens ? ` · ${m.maxOutputTokens.toLocaleString()} out` : ""}
+                </Text>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Text variant="micro" tone="dim">
+            {connected ? "No models reported by endpoint" : "Connect to add local models"}
+          </Text>
+        )}
+      </div>
+
+      <div style={{ borderTop: `1px solid ${tokens.color.border}`, paddingTop: tokens.space.md }}>
+        {connected ? (
+          <Button variant="outline" size="sm" icon={<LogoutIcon size={13} />} onClick={onLogout}>
+            Log out
+          </Button>
+        ) : (
+          <Button variant="accent-soft" size="sm" icon={<PlugIcon size={13} />} onClick={onConnect}>
+            Connect
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Connect modal for a local endpoint — takes a base URL + kind instead of an
+ * API key. Titled "Connect Local Model" (not "Connect … Cloud") so it never
+ * collides with the cloud provider login modal the e2e suite targets.
+ */
+function LocalConnectModal({
+  onClose,
+  onConnect,
+}: {
+  onClose: () => void;
+  onConnect: (config: LocalProviderConfig) => void;
+}) {
+  const [name, setName] = useState("My Local Model");
+  const [baseUrl, setBaseUrl] = useState("http://localhost:11434");
+  const [kind, setKind] = useState<LocalProviderKind>("ollama");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await onConnect({
+        id: "local",
+        name: name.trim() || "My Local Model",
+        baseUrl: baseUrl.trim() || "http://localhost:11434",
+        kind,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Connect Local Model"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={submit} loading={busy}>
+            Connect
+          </Button>
+        </>
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+        <Text variant="micro" tone="dim">
+          Point Sophos at a local (self-hosted) model endpoint. The config is stored in your settings.
+        </Text>
+        <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My Local Model" />
+        <Input
+          label="Base URL"
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.target.value)}
+          placeholder="http://localhost:11434"
+          hint="e.g. http://localhost:11434 (Ollama) or an OpenAI-compatible base URL."
+        />
+        <Select
+          label="Kind"
+          options={[
+            { value: "ollama", label: "Ollama" },
+            { value: "openai-compatible", label: "OpenAI-compatible" },
+          ]}
+          value={kind}
+          onChange={(e) => setKind(e.target.value as LocalProviderKind)}
+        />
+      </div>
+    </Modal>
   );
 }
 

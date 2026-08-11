@@ -368,6 +368,7 @@
 .ag-detail__rowvalue--mono { letter-spacing: 0.02em; }
 
 .ag-detail__actions { flex: none; display: flex; gap: 9px; padding: 12px 22px; border-top: 1px solid #2a2a2a; }
+.ag-detail__receipt { flex: none; padding: 7px 22px; border-top: 1px solid #2a2a2a; color: rgba(244, 244, 244, 0.68); font: 11px/1.4 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; }
 
 .ag-detail__thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 

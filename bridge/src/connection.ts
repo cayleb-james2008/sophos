@@ -24,7 +24,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Persistent settings file.
@@ -70,7 +70,7 @@ function readModelConfig(): Settings["modelConfig"] {
 }
 
 /** Write a settings file patch atomically (merge-on-top of any existing file). */
-function writeSettingsPatch(patch: Record<string, unknown>): void {
+export function writeSettingsPatch(patch: Record<string, unknown>): void {
   try {
     if (!existsSync(PRIME_AGENT_DIR)) mkdirSync(PRIME_AGENT_DIR, { recursive: true });
     let existing: Record<string, unknown> = {};
@@ -146,6 +146,7 @@ import type { AgentMessage as PiAgentMessage } from "@earendil-works/pi-agent-co
 import type {
   AgentInfo,
   AgentMessage,
+  AgentSessionState,
   AutonomousConfig,
   ConnectionState,
   ConnectionStatus,
@@ -154,6 +155,13 @@ import type {
   CostStats,
   Goal,
   HeartbeatInfo,
+  HarnessEntry,
+  HarnessRefinement,
+  HarnessState,
+  KernelCell,
+  KernelHealthDiagnostic,
+  KernelHealthReason,
+  KernelState,
   ModelInfo,
   ProviderInfo,
   QueueState,
@@ -377,6 +385,7 @@ function mapRlmChildren(snapshot: AgentConnectionSnapshot | undefined): RlmChild
   if (!children || children.length === 0) return undefined;
   return children.map((c) => ({
     id: c.id,
+    sessionId: c.activeSessionId,
     name: c.sessionName ?? c.label,
     status: (c.status === "queued" || c.status === "running")
       ? "running"
@@ -552,7 +561,7 @@ function refineEventError(inner: AgentConnectionSessionEvent): string {
 // Transcript mapper — PiAgentMessage[] → TranscriptMessage[]
 // ---------------------------------------------------------------------------
 
-function mapAgentMessage(msg: PiAgentMessage, idx: number): TranscriptMessage {
+export function mapAgentMessage(msg: PiAgentMessage, idx: number): TranscriptMessage {
   const m = msg as unknown as Record<string, unknown>;
   const role = (typeof m.role === "string" ? m.role : "system") as TranscriptMessage["role"];
   const id = typeof m.id === "string" ? m.id : `msg-${idx}`;
@@ -609,6 +618,198 @@ function mapAgentMessage(msg: PiAgentMessage, idx: number): TranscriptMessage {
 export async function getTranscript(conn: AgentConnection): Promise<TranscriptMessage[]> {
   const msgs = await conn.getMessages();
   return msgs.map((m, i) => mapAgentMessage(m, i));
+}
+
+function textFromContent(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value)) return "";
+  return value.map((part) => {
+    if (!part || typeof part !== "object") return "";
+    const p = part as Record<string, unknown>;
+    return typeof p.text === "string" ? p.text : "";
+  }).join("");
+}
+
+const KERNEL_HEALTH_COPY: Record<KernelHealthReason, Omit<KernelHealthDiagnostic, "reason">> = {
+  healthy: { message: "The Python workspace is healthy and responding.", nextStep: "No action is needed.", action: "none" },
+  starting: { message: "The Python workspace is starting.", nextStep: "Wait a few seconds, then refresh this panel.", action: "wait" },
+  not_started: { message: "The Python workspace has not started yet.", nextStep: "Run a code cell to start it.", action: "run_cell" },
+  bootstrap_failed: { message: "The Python workspace could not start.", nextStep: "Refresh once. If it stays unavailable, restart the engine and check that Python support is installed.", action: "retry" },
+  dead: { message: "The Python workspace stopped unexpectedly.", nextStep: "Restart the engine to create a fresh workspace. In-memory variables will be lost.", action: "restart" },
+  namespace_unavailable: { message: "The Python workspace is running, but its live state could not be read.", nextStep: "Wait for the current cell to finish, then refresh this panel.", action: "refresh" },
+  browser_preview: { message: "The browser preview has no live Python workspace.", nextStep: "Open the Tauri app to inspect the live kernel.", action: "open_tauri" },
+  unavailable: { message: "Kernel health is temporarily unavailable.", nextStep: "Check the engine connection, then refresh this panel.", action: "refresh" },
+};
+
+/** Map only allowlisted health fields; daemon errors never cross into the UI. */
+export function mapKernelDiagnostic(value: unknown): KernelHealthDiagnostic {
+  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const reason = typeof raw.reason === "string" && Object.prototype.hasOwnProperty.call(KERNEL_HEALTH_COPY, raw.reason)
+    ? raw.reason as KernelHealthReason
+    : "unavailable";
+  return { reason, ...KERNEL_HEALTH_COPY[reason] };
+}
+
+/** Build a visible notebook projection from daemon kernel metadata and real IPython tool details. */
+export async function getKernelState(conn: AgentConnection): Promise<KernelState> {
+  const [daemonState, kernelState, messages] = await Promise.all([
+    conn.getState(),
+    conn.getKernelState(),
+    conn.getMessages(),
+  ]);
+  const activeTools = Array.isArray(daemonState.activeToolNames) ? daemonState.activeToolNames : [];
+  const results = new Map<string, Record<string, unknown>>();
+  for (const raw of messages as unknown[]) {
+    const msg = (raw ?? {}) as Record<string, unknown>;
+    if (msg.role === "toolResult" && msg.toolName === "ipython" && typeof msg.toolCallId === "string") {
+      results.set(msg.toolCallId, msg);
+    }
+  }
+  const cells: KernelCell[] = [];
+  for (const raw of messages as unknown[]) {
+    const msg = (raw ?? {}) as Record<string, unknown>;
+    if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
+    for (const part of msg.content as unknown[]) {
+      if (!part || typeof part !== "object") continue;
+      const block = part as Record<string, unknown>;
+      if (block.type !== "toolCall" || block.name !== "ipython") continue;
+      const args = block.arguments && typeof block.arguments === "object"
+        ? block.arguments as Record<string, unknown>
+        : {};
+      const code = typeof args.code === "string" ? args.code : "";
+      const id = typeof block.id === "string" ? block.id : `cell-${cells.length + 1}`;
+      const result = results.get(id);
+      const details = result?.details && typeof result.details === "object"
+        ? result.details as Record<string, unknown>
+        : undefined;
+      const stdout = typeof details?.stdout === "string" ? details.stdout : "";
+      const resultText = typeof details?.result === "string" ? details.result : "";
+      const output = stdout || resultText || (result ? textFromContent(result.content) : undefined);
+      const errorDetails = details?.error && typeof details.error === "object"
+        ? details.error as Record<string, unknown>
+        : undefined;
+      const error = typeof errorDetails?.evalue === "string"
+        ? errorDetails.evalue
+        : result?.isError === true ? (typeof details?.stderr === "string" ? details.stderr : output) : undefined;
+      const executionCount = typeof details?.executionCount === "number" && Number.isInteger(details.executionCount)
+        ? details.executionCount
+        : undefined;
+      cells.push({
+        id,
+        code,
+        status: result ? (result.isError === true ? "error" : "ok") : "running",
+        executionCount,
+        output,
+        error,
+        timestamp: typeof msg.timestamp === "string" ? msg.timestamp : undefined,
+      });
+    }
+  }
+  const latest = cells[cells.length - 1];
+  const running = kernelState.running && kernelState.namespace !== null;
+  return {
+    status: !activeTools.includes("ipython") ? "unavailable" : latest?.status === "running" ? "running" : running ? "configured" : "unavailable",
+    persistent: activeTools.includes("ipython"),
+    toolAvailable: activeTools.includes("ipython"),
+    sessionId: daemonState.sessionId,
+    executionCount: kernelState.executionCount,
+    cells,
+    variables: kernelState.namespace?.names ?? [],
+    imports: kernelState.namespace?.imports ?? [],
+    diagnostic: mapKernelDiagnostic(kernelState.diagnostic),
+    lastOutput: latest?.output,
+    lastError: latest?.error,
+  };
+}
+
+function readJsonFile(path: string): Record<string, unknown> | undefined {
+  try {
+    if (!existsSync(path)) return undefined;
+    const value = JSON.parse(readFileSync(path, "utf8"));
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Read the daemon-owned continual harness files without claiming mock state. */
+export async function getHarnessState(conn: AgentConnection): Promise<HarnessState> {
+  const daemonState = await conn.getState();
+  const globalPath = join(PRIME_AGENT_DIR, "harness", "harness_state.json");
+  const candidatePaths = [globalPath];
+  if (typeof daemonState.sessionDir === "string") {
+    candidatePaths.push(join(daemonState.sessionDir, "harness", "harness_state.json"));
+  }
+  const entries: HarnessEntry[] = [];
+  const refinements: HarnessRefinement[] = [];
+  let source = globalPath;
+  for (const path of candidatePaths) {
+    const raw = readJsonFile(path);
+    if (!raw) continue;
+    source = path;
+    const records = raw.entries as Record<string, Record<string, unknown>> | undefined;
+    if (records) {
+      for (const [kind, byId] of Object.entries(records)) {
+        if (!byId || typeof byId !== "object") continue;
+        for (const [id, value] of Object.entries(byId)) {
+          if (!value || typeof value !== "object") continue;
+          const entry = value as Record<string, unknown>;
+          if (!["prompt", "memory", "skill", "subagent"].includes(kind)) continue;
+          entries.push({
+            id,
+            kind: kind as HarnessEntry["kind"],
+            title: typeof entry.title === "string" ? entry.title : id,
+            content: typeof entry.content === "string" ? entry.content : "",
+            path: typeof entry.path === "string" ? entry.path : undefined,
+            scope: entry.scope === "local" ? "local" : "global",
+            reference: entry.reference && typeof entry.reference === "object" ? entry.reference as Record<string, unknown> : undefined,
+            arguments: entry.arguments && typeof entry.arguments === "object" ? entry.arguments as Record<string, unknown> : undefined,
+            version: typeof entry.version === "number" ? entry.version : undefined,
+            updatedAt: typeof entry.updated_at === "string" ? entry.updated_at : undefined,
+          });
+        }
+      }
+    }
+    if (Array.isArray(raw.refinements)) {
+      for (const item of raw.refinements) {
+        if (!item || typeof item !== "object") continue;
+        const r = item as Record<string, unknown>;
+        refinements.push({
+          id: typeof r.id === "string" ? r.id : `refinement-${refinements.length + 1}`,
+          summary: typeof r.summary === "string" ? r.summary : undefined,
+          trigger: typeof r.trigger === "string" ? r.trigger : undefined,
+          changes: Array.isArray(r.changes) ? r.changes.filter((x): x is string => typeof x === "string") : undefined,
+          outcome: typeof r.outcome === "string" ? r.outcome : undefined,
+          timestamp: typeof r.created_at === "string" ? r.created_at : undefined,
+          rollbackOf: typeof r.rollbackOf === "string" ? r.rollbackOf : undefined,
+        });
+      }
+    }
+  }
+  const historyPath = join(PRIME_AGENT_DIR, "harness", "refinements.jsonl");
+  if (existsSync(historyPath)) {
+    for (const line of readFileSync(historyPath, "utf8").split(/\\r?\\n/).filter(Boolean)) {
+      const value = readJsonFileFromText(line);
+      if (!value || typeof value.id !== "string") continue;
+      refinements.push({
+        id: value.id,
+        summary: typeof value.summary === "string" ? value.summary : undefined,
+        changes: Array.isArray(value.appliedEdits) ? value.appliedEdits.map((e) => `${e.applied ? "applied" : "failed"} ${e.action ?? "edit"} ${e.kind ?? ""}`) : undefined,
+        timestamp: typeof value.id === "string" ? value.id : undefined,
+        rollbackOf: typeof value.rollbackOf === "string" ? value.rollbackOf : undefined,
+      });
+    }
+  }
+  return { entries, refinements, source };
+}
+
+function readJsonFileFromText(text: string): Record<string, unknown> | undefined {
+  try {
+    const value = JSON.parse(text);
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -903,6 +1104,68 @@ export class InboxStore {
 }
 
 // ---------------------------------------------------------------------------
+// Persistent child-session watches
+// ---------------------------------------------------------------------------
+
+interface AgentConnectionSessionWatcher {
+  getMessages(): Promise<PiAgentMessage[]>;
+  subscribe(listener: (event: AgentConnectionEvent) => void): () => void;
+  close(): Promise<void>;
+}
+
+interface ChildWatch {
+  childId: string;
+  sessionId: string;
+  watcher: AgentConnectionSessionWatcher;
+  unsubscribe: () => void;
+  state: AgentSessionState;
+  refreshTail: Promise<void>;
+}
+
+function toUiChildStatus(status: string): RlmChild["status"] {
+  switch (status) {
+    case "queued":
+    case "running":
+      return "running";
+    case "done":
+      return "done";
+    case "error":
+    case "cancelled":
+      return "error";
+    default:
+      return "idle";
+  }
+}
+
+function mapChildSessionState(child: AgentConnectionRlmChild, messages: PiAgentMessage[]): AgentSessionState {
+  return {
+    id: child.id,
+    status: child.status,
+    sessionId: child.activeSessionId,
+    model: child.model,
+    summary: child.recap ?? child.answerPreview,
+    activity: child.activity && typeof child.activity === "object"
+      ? (child.activity as { kind?: string }).kind
+      : undefined,
+    tokenCount: child.tokenCount,
+    toolUseCount: child.toolUseCount,
+    transcript: messages.map((message, index) => mapAgentMessage(message, index)),
+  };
+}
+
+function transcriptChanged(before: TranscriptMessage[], after: TranscriptMessage[]): boolean {
+  if (before.length !== after.length) return true;
+  return after.some((message, index) => {
+    const previous = before[index];
+    return previous?.id !== message.id ||
+      previous?.role !== message.role ||
+      previous?.content !== message.content ||
+      previous?.status !== message.status ||
+      JSON.stringify(previous?.toolCalls) !== JSON.stringify(message.toolCalls);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Connection holder
 // ---------------------------------------------------------------------------
 
@@ -923,11 +1186,17 @@ export class ConnectionHolder {
   private disconnectReason: string | undefined;
   private snapshot: AgentConnectionSnapshot | undefined;
   private latestState: AgentConnectionState | undefined;
+  // Async snapshot enrichment can overlap when several daemon events arrive
+  // close together. Only the newest refresh may publish, otherwise an older
+  // child roster can overwrite a newer one in the frontend.
+  private snapshotEventGeneration = 0;
   private readonly settings = new SettingsStore();
   readonly inbox = new InboxStore();
   private readonly events: ConnectionHolderEvents;
   private readonly socketPath: string;
   private readonly preferredSessionId: string | undefined;
+  /** One live watcher per child session; entries own their unsubscribe/close lifecycle. */
+  private readonly childWatches = new Map<string, ChildWatch>();
 
   constructor(events: ConnectionHolderEvents, opts: ConnectionHolderOptions = {}) {
     this.events = events;
@@ -1224,6 +1493,128 @@ export class ConnectionHolder {
     return this.resolveSessionToEntryId(conn, pathOrId);
   }
 
+  /** Attach one persistent watcher to a child session and publish its initial state. */
+  async attachChildAgent(child: AgentConnectionRlmChild): Promise<{ childId: string; sessionId: string; attached: true }> {
+    const sessionId = child.activeSessionId;
+    if (!sessionId) throw new Error(`agent not found or not attachable: ${child.id}`);
+
+    const existing = this.childWatches.get(sessionId);
+    if (existing) {
+      if (existing.childId === child.id) return { childId: child.id, sessionId, attached: true };
+      await this.closeChildWatch(sessionId, "replaced");
+    }
+
+    const conn = this.conn;
+    if (!conn) throw new Error("daemon connection unavailable");
+    const watcher = await conn.watchSession(sessionId);
+    if (!watcher) throw new Error(`failed to attach to agent ${child.id}`);
+
+    const watch: ChildWatch = {
+      childId: child.id,
+      sessionId,
+      watcher,
+      unsubscribe: () => {},
+      state: mapChildSessionState(child, []),
+      refreshTail: Promise.resolve(),
+    };
+    watch.unsubscribe = watcher.subscribe((event) => { void this.handleChildWatchEvent(watch, event); });
+    this.childWatches.set(sessionId, watch);
+
+    try {
+      watch.state = mapChildSessionState(child, await watcher.getMessages());
+      if (this.childWatches.get(sessionId) !== watch) throw new Error("child watcher was closed during attach");
+      this.events.onEvent({ type: "agent_watch", event: { kind: "attached", childId: child.id, sessionId, state: watch.state } });
+      return { childId: child.id, sessionId, attached: true };
+    } catch (error) {
+      await this.closeChildWatch(sessionId, "attach failed");
+      throw error;
+    }
+  }
+
+  /** Stop monitoring a child session and release its daemon watcher. */
+  async detachChildAgent(childId: string): Promise<void> {
+    const watch = [...this.childWatches.values()].find((candidate) => candidate.childId === childId);
+    if (watch) await this.closeChildWatch(watch.sessionId, "detached");
+  }
+
+  getAttachedChildState(childId: string): AgentSessionState | undefined {
+    return [...this.childWatches.values()].find((watch) => watch.childId === childId)?.state;
+  }
+
+  private publishChildState(watch: ChildWatch, next: AgentSessionState): void {
+    if (this.childWatches.get(watch.sessionId) !== watch) return;
+    const statusChanged = next.status !== watch.state.status ||
+      next.summary !== watch.state.summary ||
+      next.activity !== watch.state.activity ||
+      next.tokenCount !== watch.state.tokenCount ||
+      next.toolUseCount !== watch.state.toolUseCount;
+    const messagesChanged = transcriptChanged(watch.state.transcript, next.transcript);
+    if (!statusChanged && !messagesChanged) return;
+
+    watch.state = next;
+    if (statusChanged) {
+      this.events.onEvent({
+        type: "agent_watch",
+        event: {
+          kind: "status",
+          childId: watch.childId,
+          status: toUiChildStatus(next.status),
+          state: next,
+        },
+      });
+    }
+    if (messagesChanged) {
+      const message = next.transcript[next.transcript.length - 1];
+      if (message) {
+        this.events.onEvent({ type: "agent_watch", event: { kind: "message", childId: watch.childId, state: next, message } });
+      }
+      this.events.onEvent({ type: "agent_watch", event: { kind: "transcript", childId: watch.childId, state: next, message } });
+    }
+  }
+
+  private async handleChildWatchEvent(watch: ChildWatch, event: AgentConnectionEvent): Promise<void> {
+    if (this.childWatches.get(watch.sessionId) !== watch) return;
+    if (event.type === "closed") {
+      await this.closeChildWatch(watch.sessionId, event.error ?? "child session closed");
+      return;
+    }
+    watch.refreshTail = watch.refreshTail.then(async () => {
+      if (this.childWatches.get(watch.sessionId) !== watch) return;
+      const messages = await watch.watcher.getMessages();
+      if (this.childWatches.get(watch.sessionId) !== watch) return;
+      const child = this.snapshot?.children?.find((candidate) => candidate.id === watch.childId);
+      const fallback: AgentConnectionRlmChild = {
+        id: watch.childId,
+        activeSessionId: watch.sessionId,
+        label: watch.childId,
+        status: watch.state.status as AgentConnectionRlmChild["status"],
+        sessionDir: "",
+      };
+      this.publishChildState(watch, mapChildSessionState(child ?? fallback, messages));
+    }).catch((error) => {
+      if (this.childWatches.get(watch.sessionId) !== watch) return;
+      this.publishChildState(watch, {
+        ...watch.state,
+        status: "error",
+        summary: error instanceof Error ? error.message : String(error),
+      });
+    });
+    await watch.refreshTail;
+  }
+
+  private async closeChildWatch(sessionId: string, reason: string): Promise<void> {
+    const watch = this.childWatches.get(sessionId);
+    if (!watch) return;
+    this.childWatches.delete(sessionId);
+    watch.unsubscribe();
+    await watch.watcher.close().catch(() => {});
+    this.events.onEvent({ type: "agent_watch", event: { kind: "detached", childId: watch.childId, sessionId, reason } });
+  }
+
+  private async closeAllChildWatches(reason: string): Promise<void> {
+    await Promise.all([...this.childWatches.keys()].map((sessionId) => this.closeChildWatch(sessionId, reason)));
+  }
+
   /**
    * Issue a daemon `create` command with the supplied runtime config
    * (cwd + initialGoal), then re-attach the bridge to the new session.
@@ -1305,6 +1696,7 @@ export class ConnectionHolder {
 
   /** Tear down the AgentConnection without disposing the DaemonClient. */
   private async disposeConnectionOnly(): Promise<void> {
+    await this.closeAllChildWatches("reconnect");
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     if (this.conn) {
@@ -1319,6 +1711,7 @@ export class ConnectionHolder {
 
   /** Disconnect from the daemon and release resources. */
   async disconnect(): Promise<void> {
+    await this.closeAllChildWatches("connection closed");
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     if (this.conn) {
@@ -1345,6 +1738,45 @@ export class ConnectionHolder {
       case "session_event": {
         const inner = evt.event as unknown as { type?: string };
         const innerType = typeof inner.type === "string" ? inner.type : "";
+        // RLM child updates are delivered as session events. The upstream
+        // AgentConnection deliberately updates its attach snapshot from these
+        // events, but this adapter used to forward the event only and kept the
+        // original empty child roster. That made getRlmChildren(), attachAgent,
+        // and sendAgentMessage permanently blind to children admitted after
+        // connect.
+        if (innerType === "rlm_child_update") {
+          const child = (evt.event as unknown as { child?: AgentConnectionRlmChild }).child;
+          if (child && typeof child.id === "string") {
+            const existing = this.snapshot?.children ?? [];
+            const children = [...existing.filter((candidate) => candidate.id !== child.id), child];
+            if (this.snapshot) {
+              this.snapshot = { ...this.snapshot, children };
+            }
+            // Push the updated roster to Tauri clients immediately; the RPC
+            // methods also read the same cache, so both polling and events agree.
+            this.refreshSnapshotEvent();
+            const watch = [...this.childWatches.values()].find((candidate) => candidate.childId === child.id);
+            if (watch) {
+              if (child.activeSessionId && child.activeSessionId !== watch.sessionId) {
+                void this.closeChildWatch(watch.sessionId, "child session replaced");
+              } else {
+                this.publishChildState(watch, {
+                  ...watch.state,
+                  status: child.status,
+                  summary: child.recap ?? child.answerPreview,
+                  activity: child.activity && typeof child.activity === "object"
+                    ? (child.activity as { kind?: string }).kind
+                    : undefined,
+                  tokenCount: child.tokenCount,
+                  toolUseCount: child.toolUseCount,
+                });
+                if (child.status === "done" || child.status === "error" || child.status === "cancelled") {
+                  void this.closeChildWatch(watch.sessionId, "child completed");
+                }
+              }
+            }
+          }
+        }
         // State-shape updates: refresh the snapshot so goals / session name /
         // heartbeats stay current in the live ConnectionState.
         if (innerType === "goal_update" || innerType === "session_info_changed") {
@@ -1364,13 +1796,18 @@ export class ConnectionHolder {
         return;
       }
       case "session_replaced": {
-        // The session was swapped out under us — rebuild the snapshot view.
+        // The session was swapped out under us — child watchers belong to the
+        // previous parent connection and must not leak across sessions.
+        void this.closeAllChildWatches("parent session replaced");
         this.latestState = evt.state;
         void this.emitEnrichedSnapshot("snapshot");
         return;
       }
       case "session_resynced": {
-        // Full re-sync — adopt the snapshot's state as authoritative.
+        // Full re-sync — adopt the snapshot's state as authoritative. A
+        // reconnect requires an explicit re-attach so stale child watchers do
+        // not survive a transport generation change.
+        void this.closeAllChildWatches("parent connection resynced");
         this.snapshot = evt.snapshot;
         this.latestState = evt.snapshot.state;
         void this.emitEnrichedSnapshot("resynced");
@@ -1386,6 +1823,7 @@ export class ConnectionHolder {
         return;
       case "connection_status":
         if (evt.status === "reconnecting") {
+          void this.closeAllChildWatches("reconnecting");
           this.setStatus("reconnecting", evt.error);
           this.events.onEvent({ type: "connection_status", status: { kind: "reconnecting" } });
         } else if (evt.status === "connected") {
@@ -1416,6 +1854,7 @@ export class ConnectionHolder {
         });
         return;
       case "closed":
+        void this.closeAllChildWatches("parent connection closed");
         this.setStatus("disconnected", evt.error);
         this.events.onEvent({
           type: "connection_status",
@@ -1435,12 +1874,17 @@ export class ConnectionHolder {
    * async-only daemon fields (schedules, full heartbeat list, cost stats), and
    * emit it as a snapshot/resynced event. This keeps the event-driven live state
    * in agreement with getState() — a refresh no longer wipes the enriched fields.
+   *
+   * Enrichment performs several daemon reads and can overlap with another
+   * refresh. Generation-checking prevents a slow older read from publishing a
+   * stale child roster after a newer event has already been processed.
    */
-  private async emitEnrichedSnapshot(kind: "snapshot" | "resynced"): Promise<void> {
+  private async emitEnrichedSnapshot(kind: "snapshot" | "resynced", generation = ++this.snapshotEventGeneration): Promise<void> {
     const conn = this.conn;
     if (!conn || !this.latestState) return;
     const base = mapConnectionState(this.latestState, this.status, this.disconnectReason, this.snapshot);
     const enriched = await enrichConnectionState(conn, base);
+    if (generation !== this.snapshotEventGeneration || conn !== this.conn) return;
     this.events.onEvent({ type: kind, state: enriched });
   }
 }

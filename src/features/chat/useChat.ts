@@ -5,8 +5,8 @@
 // Two modes:
 //   * Tauri  — real IPC: prompt()/abort()/steer() drive the daemon; session
 //              events update the transcript live.
-//   * Browser — the MockIpcClient has no real stream, so we seed a demo
-//              conversation and simulate a streaming turn for the preview.
+//   * Browser — the MockIpcClient has no real stream, so the preview starts
+//              empty and simulates a streaming turn for the user's input.
 //
 // The message queue mirrors the TUI behavior:
 //   * Enter while busy      → steer (delivered after the current tool calls)
@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useIpc, useIpcEvent, useConnectionState, isTauri } from "../../ipc/client";
 import type { ContextStats, SessionEvent, ToolCall, TranscriptMessage } from "../../ipc/contract";
-import { demoSeed, demoSeedLarge, simulateResponse } from "./demo";
+import { demoSeedLarge, simulateResponse } from "./demo";
 import { setTranscriptMessages } from "./chatBridge";
 
 /**
@@ -85,6 +85,10 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
   const simCleanup = useRef<(() => void) | null>(null);
   const streamingId = useRef<string | null>(null);
+  // The developer-only large transcript is not evidence that the user has
+  // completed onboarding. Keep that fixture separate from real transcript
+  // activity so opening it cannot silently mark first-run complete.
+  const demoFixture = useRef(false);
 
   // ---- Edit-and-resend draft ------------------------------------------
   // Holds the user message being edited (index + original text). The composer
@@ -157,18 +161,27 @@ export function useChat() {
     };
   }, [client]);
 
-  // ---- Seed demo data in browser mode once loaded & empty ----
-  useEffect(() => {
-    if (!isTauri && loaded && messages.length === 0) {
-      setMessages(demoSeed());
-    }
-  }, [isTauri, loaded, messages.length]);
-
   // ---- Publish the transcript to the shared bridge so the ⌘K palette can
   // search it without duplicating the chat state engine. ----
   useEffect(() => {
     setTranscriptMessages(messages);
   }, [messages]);
+
+  // ---- Persist the first-message flag once a transcript exists, so the
+  // onboarding (FirstRunBanner) knows it's complete even across page reloads.
+  // Keyed off messages.length: the flag flips exactly when the first real
+  // message lands (send / edit-and-resend / live session), never from seeding.
+  const hasFirstMessage = messages.length > 0 && !demoFixture.current;
+
+  useEffect(() => {
+    if (hasFirstMessage) {
+      try {
+        window.localStorage.setItem("sophos.hasFirstMessage.v1", "1");
+      } catch {
+        // best-effort — persistence is a nicety, never a hard requirement
+      }
+    }
+  }, [hasFirstMessage]);
 
   // ---- Cleanup simulation on unmount ----
   useEffect(() => {
@@ -210,6 +223,7 @@ export function useChat() {
       case "user_message": {
         const text = typeof e.text === "string" ? e.text : "";
         if (!text) return;
+        demoFixture.current = false;
         setMessages((msgs) => [
           ...msgs,
           { id: `u-${Date.now()}`, role: "user", content: text, timestamp: nowIso(), status: "complete" },
@@ -219,6 +233,7 @@ export function useChat() {
       }
       case "message_delta":
       case "message": {
+        demoFixture.current = false;
         // The daemon emits `message` as a full snapshot with `message.content`
         // (string | content-block array). Parse it into text/thinking/toolCalls.
         const raw = (e.message as Record<string, unknown> | undefined) ?? e;
@@ -258,6 +273,7 @@ export function useChat() {
         return;
       }
       case "text": {
+        demoFixture.current = false;
         // Streaming text delta from the daemon — append to the assistant message.
         const text = typeof e.text === "string" ? e.text : "";
         if (!text) return;
@@ -377,6 +393,7 @@ export function useChat() {
     (index: number, newText: string) => {
       const trimmed = newText.trim();
       if (!trimmed) return;
+      demoFixture.current = false;
       // Branch: keep history up to and including the edited message, replace it
       // with the edited version, and drop everything after. History before the
       // edited message is never mutated.
@@ -420,6 +437,7 @@ export function useChat() {
         }
       }
       if (!userText) return;
+      demoFixture.current = false;
       if (isTauri) {
         void client.retry().catch((err) => {
           setError(err instanceof Error ? err.message : String(err));
@@ -457,6 +475,7 @@ export function useChat() {
         return editAndResend(pending.index, trimmed);
       }
 
+      demoFixture.current = false;
       // Set busyRef synchronously BEFORE any work starts so the follow-up
       // flush loop cannot re-enter in the same microtask. In browser demo
       // mode send() returns an already-resolved promise, so its `.finally`
@@ -674,6 +693,7 @@ export function useChat() {
 
   // ---- Demo: load a large transcript to exercise windowed rendering ----
   const loadDemoMessages = useCallback((count = 500) => {
+    demoFixture.current = true;
     setMessages(demoSeedLarge(count));
   }, []);
 
@@ -682,6 +702,7 @@ export function useChat() {
     busy,
     loaded,
     error,
+    hasFirstMessage,
     send,
     steer,
     abort,

@@ -9,10 +9,10 @@
 // plain hairline-ruled lines instead of nested bordered boxes. The dashed empty
 // state is kept.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
-import { useIpc } from "../../ipc/client";
+import { useIpc, useConnectionState } from "../../ipc/client";
 import { PlusIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
 import { estimateNextDue } from "./nextDue";
@@ -39,7 +39,16 @@ const section: React.CSSProperties = {
 
 export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
   const ipc = useIpc();
+  const connection = useConnectionState();
   const [schedules, setSchedules] = useState<ScheduleEntry[]>(initial);
+
+  // Hydrate from the daemon snapshot so opening Settings does not show a
+  // misleading empty state when jobs were created in another attached view.
+  useEffect(() => {
+    if (connection.schedules) {
+      setSchedules(connection.schedules.map((s) => ({ id: s.id, cron: s.cron, prompt: s.prompt, active: s.active })));
+    }
+  }, [connection.schedules, connection.activeSessionId]);
   const [cron, setCron] = useState("");
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);

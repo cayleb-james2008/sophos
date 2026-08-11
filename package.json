@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "bridge:build": "cd bridge && npm run build",
+    "bridge:verify": "node bridge/verify.mjs",
+    "bridge:verify:concurrent": "node bridge/verify-concurrency.mjs",
     "bridge:dev": "cd bridge && npm run dev"
   },
   "dependencies": {

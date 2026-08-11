@@ -15,9 +15,9 @@
 // Not running badge) + primary Start/Stop action lead before the budget
 // controls. Green is used only as the live/active signal.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Card, Text, Badge, Button, Input } from "../../design";
+import { Card, Text, Badge, Button } from "../../design";
 import { useIpc, useConnectionState } from "../../ipc/client";
 import { ShieldIcon, PlayIcon, CheckIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
@@ -56,11 +56,12 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
   // Live active state from the daemon snapshot; fall back to the prop/local.
   const daemonActive = conn.autonomousConfig?.active ?? defaultActive;
   const [active, setActive] = useState(daemonActive);
-  const [maxTurns, setMaxTurns] = useState("");
-  const [maxTokens, setMaxTokens] = useState("");
-  const [maxTime, setMaxTime] = useState("");
   const [busy, setBusy] = useState(false);
   const { error, run } = useActionError();
+
+  useEffect(() => {
+    setActive(daemonActive);
+  }, [daemonActive]);
 
   // A2: stalled-loop detection — no activity reported for 5+ min while active.
   const stalled = useStall(
@@ -218,35 +219,11 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
             </Text>
           ) : null}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: tokens.space.md }}>
-          <Input
-            label="Max turns"
-            type="number"
-            min={1}
-            placeholder="e.g. 20"
-            value={maxTurns}
-            onChange={(e) => setMaxTurns(e.target.value)}
-            disabled={active || busy}
-          />
-          <Input
-            label="Max tokens"
-            type="number"
-            min={1}
-            placeholder="e.g. 200000"
-            value={maxTokens}
-            onChange={(e) => setMaxTokens(e.target.value)}
-            disabled={active || busy}
-          />
-          <Input
-            label="Max time (min)"
-            type="number"
-            min={1}
-            placeholder="e.g. 90"
-            value={maxTime}
-            onChange={(e) => setMaxTime(e.target.value)}
-            disabled={active || busy}
-          />
-        </div>
+        <Text variant="micro" tone="dim">
+          The active budget is owned by the daemon session and is read-only here. Sophos does not show editable
+          controls that would appear to change limits without an IPC setter. Start a new session with the daemon's
+          autonomous limit flags when you need a different budget; the values above are the limits currently reported.
+        </Text>
       </div>
 
       {/* Quality gates (read-only) — plain ruled rows, not stacked boxes. */}

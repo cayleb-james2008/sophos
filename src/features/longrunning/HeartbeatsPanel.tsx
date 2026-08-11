@@ -9,10 +9,10 @@
 // plain hairline-ruled lines instead of nested bordered boxes. The dashed empty
 // state is kept.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
-import { useIpc } from "../../ipc/client";
+import { useIpc, useConnectionState } from "../../ipc/client";
 import { PlusIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
 import { estimateNextDue } from "./nextDue";
@@ -40,7 +40,17 @@ const section: React.CSSProperties = {
 
 export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
   const ipc = useIpc();
+  const connection = useConnectionState();
   const [heartbeats, setHeartbeats] = useState<Heartbeat[]>(initial);
+
+  // The parent does not need to know daemon state: hydrate directly from the
+  // live connection snapshot whenever the active session changes or a fresh
+  // heartbeat list arrives.
+  useEffect(() => {
+    if (connection.heartbeats) {
+      setHeartbeats(connection.heartbeats.map((h) => ({ id: h.id, interval: h.interval, status: h.active ? "active" : "paused" })));
+    }
+  }, [connection.heartbeats, connection.activeSessionId]);
   const [interval, setInterval] = useState("");
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);

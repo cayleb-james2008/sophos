@@ -40,15 +40,17 @@ export function AgentsView() {
     rows,
     selected,
     selectedId,
+    selectedAgentState,
     setSelectedId,
     thread,
-    attachedId,
+    attachedIds,
     attach,
     detach,
     draft,
     setDraft,
     send,
     sending,
+    deliveryReceipt,
     markRead,
     markAllRead,
     markAgentRead,
@@ -132,10 +134,11 @@ export function AgentsView() {
             <AgentsGraph
               rows={rows}
               connectionStatus={connectionStatus}
-              attachedId={attachedId}
+              attachedIds={attachedIds}
               unreadByAgent={unreadByAgent}
               onSelect={setSelectedId}
               onAttach={attach}
+              onDetach={detach}
               onMessage={setSelectedId}
             />
           ) : null}
@@ -181,7 +184,8 @@ export function AgentsView() {
             <AgentDetail
               agent={selected ?? null}
               runtimeModel={runtimeModel}
-              attached={attachedId === selected?.id}
+              attached={selected ? attachedIds.includes(selected.id) : false}
+              sessionState={selectedAgentState}
               onAttach={() => {
                 if (selected) void attach(selected.id);
               }}
@@ -194,6 +198,7 @@ export function AgentsView() {
               setDraft={setDraft}
               sending={sending}
               onSend={send}
+              deliveryReceipt={deliveryReceipt}
               onMarkRead={markRead}
               onMarkAllRead={markAllRead}
             />

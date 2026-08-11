@@ -1,0 +1,33 @@
+{
+  "url": "http://localhost:1420/",
+  "consoleErrors": [],
+  "checks": [
+    {
+      "name": "preview is unambiguous",
+      "ok": true,
+      "screenshot": "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\adversarial-ux\\01-first-screen.png"
+    },
+    {
+      "name": "friendly health labels",
+      "ok": true
+    },
+    {
+      "name": "developer fixture is deferred",
+      "ok": true
+    },
+    {
+      "name": "first answer remains two actions",
+      "ok": true,
+      "draft": "Help me debug a function",
+      "screenshots": [
+        "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\adversarial-ux\\02-first-response-busy.png",
+        "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\adversarial-ux\\03-first-response-done.png"
+      ]
+    },
+    {
+      "name": "provider flow has bounded modal lifecycle",
+      "ok": true,
+      "screenshot": "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\adversarial-ux\\05-connect-modal.png"
+    }
+  ]
+}

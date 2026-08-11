@@ -59,6 +59,8 @@ pub enum IpcCommand {
     ListAgents {},
     #[serde(rename = "attachAgent")]
     AttachAgent { id: String },
+    #[serde(rename = "detachAgent")]
+    DetachAgent { id: String },
     #[serde(rename = "getState")]
     GetState {},
     #[serde(rename = "getTranscript")]
@@ -101,12 +103,28 @@ pub enum IpcCommand {
     Retry {},
     #[serde(rename = "refine")]
     Refine {},
+    #[serde(rename = "getRuntimeInfo")]
+    GetRuntimeInfo {},
+    #[serde(rename = "getKernelState")]
+    GetKernelState {},
+    #[serde(rename = "getHarnessState")]
+    GetHarnessState {},
+    #[serde(rename = "getAgentState")]
+    GetAgentState { id: String },
+    #[serde(rename = "createSkill")]
+    CreateSkill { name: String, description: String, content: String, #[serde(rename = "pythonImport", skip_serializing_if = "Option::is_none")] python_import: Option<String> },
+    #[serde(rename = "installSkill")]
+    InstallSkill { path: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
+    #[serde(rename = "streamingBehavior", skip_serializing_if = "Option::is_none")]
+    pub streaming_behavior: Option<String>,
+    #[serde(rename = "queueIfBusy", skip_serializing_if = "Option::is_none")]
+    pub queue_if_busy: Option<bool>,
     #[serde(rename = "serviceTier", skip_serializing_if = "Option::is_none")]
     pub service_tier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -139,6 +157,8 @@ pub enum IpcEvent {
     AgentList { agents: Vec<AgentInfo> },
     #[serde(rename = "agent_status")]
     AgentStatus { agent: AgentInfo },
+    #[serde(rename = "agent_watch")]
+    AgentWatch { event: serde_json::Value },
     #[serde(rename = "refinement_result")]
     RefinementResult { result: serde_json::Value },
 }
@@ -227,6 +247,8 @@ pub struct CompactionInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RlmChild {
     pub id: String,
+    #[serde(rename = "sessionId", default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub status: String,
@@ -356,6 +378,27 @@ mod tests {
         match ev {
             IpcEvent::ConnectionStatus { status } => {
                 assert!(matches!(status, ConnectionStatus::Connected));
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn agent_watch_event_round_trips_as_typed_event() {
+        let ev = IpcEvent::AgentWatch {
+            event: serde_json::json!({
+                "kind": "detached",
+                "childId": "child-1",
+                "sessionId": "session-1",
+                "reason": "completed"
+            }),
+        };
+        let json = serde_json::to_string(&ev).unwrap();
+        let decoded: IpcEvent = serde_json::from_str(&json).unwrap();
+        match decoded {
+            IpcEvent::AgentWatch { event } => {
+                assert_eq!(event["kind"], "detached");
+                assert_eq!(event["childId"], "child-1");
             }
             other => panic!("unexpected variant: {other:?}"),
         }

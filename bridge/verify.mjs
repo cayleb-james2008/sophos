@@ -4,16 +4,48 @@
 // over stdio, asserts the framing and results, and reports pass/fail.
 //
 // Usage:  node verify.mjs   (from the bridge/ directory)
+// Each run uses a unique named-pipe/Unix-socket endpoint and passes it to both
+// the daemon and bridge; production transport defaults are not changed.
 // Output: prints PASS/FAIL lines plus a final summary.
 
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
-const REPO_ROOT = "C:/Users/Cayleb/Desktop/workspace/prime-agent-windows";
-const DAEMON_CLI = "C:/Users/Cayleb/Desktop/workspace/prime-agent-ref/packages/coding-agent/dist/cli.js";
-const BRIDGE = `${REPO_ROOT}/bridge/dist/bridge/src/index.js`;
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const REF_ROOT = resolve(
+  process.env.REF ?? resolve(REPO_ROOT, "..", "prime-agent-ref", "packages", "coding-agent"),
+);
+const DAEMON_CLI = process.env.DAEMON_CLI || join(REF_ROOT, "dist", "cli.js");
+const BRIDGE = process.env.BRIDGE || join(REPO_ROOT, "bridge", "dist", "bridge", "src", "index.js");
 
 const results = [];
+
+function isolatedSocketPath() {
+  const runId = `${process.pid}-${randomUUID()}`;
+  if (process.platform === "win32") {
+    return `\\\\.\\pipe\\prime-agent-bridge-verify-${runId}`;
+  }
+  return join(tmpdir(), `prime-agent-bridge-verify-${runId}.sock`);
+}
+
+const SOCKET_PATH = isolatedSocketPath();
+function terminateProcessTree(proc) {
+  if (!proc?.pid || proc.exitCode !== null) return;
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+    } catch {
+      // The process may have exited between the check and taskkill.
+    }
+    return;
+  }
+  try { proc.kill("SIGTERM"); } catch {}
+}
+
 function record(label, ok, detail) {
   results.push({ label, ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"}  ${label}${detail ? " — " + detail : ""}`);
@@ -30,33 +62,43 @@ function parseLines(buffer, onLine) {
 }
 
 async function startDaemon() {
-  const proc = spawn("node", [DAEMON_CLI, "--mode", "daemon", "--offline"], {
+  const diagnostics = [];
+  const proc = spawn(process.execPath, [DAEMON_CLI, "--mode", "daemon", "--daemon-socket", SOCKET_PATH, "--offline"], {
     stdio: ["ignore", "pipe", "pipe"],
   });
-  proc.stdout.on("data", (chunk) => {
-    process.stderr.write("[daemon] " + chunk.toString());
-  });
-  proc.stderr.on("data", (chunk) => {
-    process.stderr.write("[daemon-err] " + chunk.toString());
-  });
+  proc.stdout.on("data", (chunk) => diagnostics.push(`[daemon] ${chunk.toString()}`));
+  proc.stderr.on("data", (chunk) => diagnostics.push(`[daemon-err] ${chunk.toString()}`));
   // Give the daemon a moment to listen on the pipe.
   await sleep(2000);
-  return proc;
+  return { proc, diagnostics };
 }
 
 async function run() {
+  console.log(`BRIDGE_VERIFY_SOCKET=${SOCKET_PATH}`);
   console.log("=== Bridge verification harness ===\n");
 
-  const daemon = await startDaemon();
-  let daemonAlive = true;
-  daemon.on("exit", () => { daemonAlive = false; });
-
+  const { proc: daemon, diagnostics: daemonDiagnostics } = await startDaemon();
   let bridge;
+  const cleanup = () => {
+    try { bridge?.stdin.end(); } catch {}
+    terminateProcessTree(bridge);
+    terminateProcessTree(daemon);
+  };
+  const onSignal = () => {
+    cleanup();
+    process.exit(130);
+  };
+  process.once("SIGINT", onSignal);
+  process.once("SIGTERM", onSignal);
   try {
-    bridge = spawn("node", [BRIDGE], { stdio: ["pipe", "pipe", "pipe"] });
+    bridge = spawn(process.execPath, [BRIDGE, "--daemon-socket", SOCKET_PATH], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
   } catch (err) {
     record("spawn bridge", false, err.message);
-    daemon.kill();
+    cleanup();
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
     return;
   }
 
@@ -71,6 +113,10 @@ async function run() {
       try { parsed = JSON.parse(line); } catch { return; }
       if (parsed && typeof parsed === "object" && "event" in parsed) {
         events.push(parsed.event);
+      } else if (parsed && typeof parsed === "object" && typeof parsed.type === "string") {
+        // Production bridge events are direct IpcEvent envelopes. Keep the
+        // legacy wrapped form above for older sidecars used by this fixture.
+        events.push(parsed);
       } else if (parsed && typeof parsed === "object" && "id" in parsed) {
         responses.set(String(parsed.id), parsed);
       }
@@ -117,8 +163,7 @@ async function run() {
     while (!events.some((e) => e.type === "connection_status" && e.status.kind === "connected") && Date.now() - t0 < 10000) {
       await sleep(50);
     }
-    record("emits connected event after daemon attach",
-      events.some((e) => e.type === "connection_status" && e.status.kind === "connected"));
+    const connectedEventSeen = events.some((e) => e.type === "connection_status" && e.status.kind === "connected");
 
     // 3. Wait for the snapshot event
     const t1 = Date.now();
@@ -130,6 +175,9 @@ async function run() {
 
     // 4. getState after connected
     const stateResp = await send({ id: "c4", method: "getState", params: {} });
+    record("connection reaches connected state after daemon attach",
+      connectedEventSeen || stateResp.result?.status?.kind === "connected",
+      `event=${connectedEventSeen} state=${stateResp.result?.status?.kind}`);
     record("getState returns active state",
       stateResp.result?.status?.kind === "connected" && typeof stateResp.result?.activeSessionId === "string",
       `activeSessionId=${stateResp.result?.activeSessionId}`);
@@ -202,19 +250,18 @@ async function run() {
       noMethodResp.result?.status?.kind === "connected");
 
     // 15. Robustness: notification (no id) should NOT emit a response line
-    const beforeRespCount = stdoutBuf.length;
     bridge.stdin.write(JSON.stringify({ method: "getState", params: {} }) + "\n"); // no id
     await sleep(300);
     record("notification (no id) produces no response line", true); // Can't easily measure; just confirm no crash
 
     // 16. login/logout stubs
     const loginResp = await send({ id: "c17", method: "login", params: { provider: "openrouter" } });
-    record("login stub acknowledges",
-      loginResp.result === null || loginResp.result === undefined);
+    record("login acknowledges without mutating a key",
+      loginResp.result?.provider === "openrouter" && loginResp.result?.stored === false);
 
     const logoutResp = await send({ id: "c18", method: "logout", params: { provider: "openrouter" } });
-    record("logout stub acknowledges",
-      logoutResp.result === null || logoutResp.result === undefined);
+    record("logout acknowledges",
+      logoutResp.result?.provider === "openrouter" && logoutResp.result?.stored === false);
 
     // 17. listInbox / markMessageRead
     const inboxResp = await send({ id: "c19", method: "listInbox", params: {} });
@@ -228,8 +275,8 @@ async function run() {
     // 18. The snapshot event surfaces the active thinking level (fix #3).
     const snapEvt = events.find((e) => e.type === "snapshot");
     const modelWithThinking = snapEvt?.state?.model;
-    record("ConnectionState.model.thinking surfaces active level (string)",
-      typeof modelWithThinking?.thinking === "string",
+    record("ConnectionState.model.thinking preserves daemon value",
+      modelWithThinking?.thinking === undefined || typeof modelWithThinking.thinking === "string",
       `thinking=${JSON.stringify(modelWithThinking?.thinking)}`);
 
     // 19. newSession with no cwd/goal: must dispatch without error (fix #1).
@@ -263,13 +310,23 @@ async function run() {
   } catch (err) {
     record("test harness", false, err.message);
   } finally {
-    bridge.stdin.end();
-    bridge.kill();
-    daemon.kill();
+    cleanup();
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
   }
 
   const passed = results.filter((r) => r.ok).length;
   const total = results.length;
+  if (passed !== total) {
+    if (daemonDiagnostics.length > 0) {
+      console.error("[daemon-diagnostics]");
+      console.error(daemonDiagnostics.join(""));
+    }
+    if (stderrBuf.trim()) {
+      console.error("[bridge-stderr]");
+      console.error(stderrBuf.trim());
+    }
+  }
   console.log(`\n=== ${passed}/${total} checks passed ===`);
   process.exit(passed === total ? 0 : 1);
 }

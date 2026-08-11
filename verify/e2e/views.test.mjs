@@ -12,7 +12,15 @@ export const views = [
       await expect(await page.locator('textarea[aria-label="Message input"]').count() === 1, "composer missing");
       await expect(await page.locator('button[aria-label="Send message"]').count() === 1, "send button missing");
       await expect(await page.locator("text=Demo mode").count() > 0, "demo banner missing");
-      await expect(await page.locator("text=Welcome!").count() > 0, "demo seed message missing");
+      // P3: with no messages and a connected provider, the empty state replaces
+      // the old demo-seed welcome as the first-run experience.
+      await expect(await page.locator("text=Start a conversation").count() > 0, "empty state missing");
+      // First-run onboarding is visible on the first screen and names the free
+      // DeepSeek starter path; the live Tauri variant also renders the five
+      // prerequisite indicators in this same surface.
+      await expect(await page.locator('[data-testid="onboarding-prerequisites"]').count() === 1, "onboarding prerequisite checklist missing");
+      await expect(await page.locator("text=DeepSeek V4 Flash 0731").count() > 0, "free DeepSeek onboarding copy missing");
+      await expect(await page.locator('button[aria-label^="Starter prompt:"]').count() >= 3, "starter prompts missing");
       await shot("chat");
       return true;
     },

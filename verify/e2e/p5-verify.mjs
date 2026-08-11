@@ -76,7 +76,8 @@ try {
   await page.mouse.move(900, 500);
   await page.waitForTimeout(150);
 
-  // Click the demo "Load 500 messages" trigger and time the render.
+  // Open the developer-only preview control, then time the render.
+  await page.locator('summary:has-text("Developer preview")').click();
   const t0 = Date.now();
   await page.click('button:has-text("Load 500 messages")', { timeout: 10000 });
   // The windowed list mounts immediately — wait for any row to appear. The
@@ -85,6 +86,8 @@ try {
   await page.waitForSelector('[data-index]', { timeout: 10000 });
   const renderMs = Date.now() - t0;
   record("perf-load-500-render", renderMs < 3000, `render 500 msgs in ${renderMs}ms`);
+  const onboardingStillVisible = await page.locator('text=Preview mode').count();
+  record("perf-fixture-does-not-complete-onboarding", onboardingStillVisible > 0, `preview onboarding remains visible after fixture load: ${onboardingStillVisible}`);
 
   // Only a window of rows should be mounted (not all 500).
   const mountedRows = await page.evaluate(() => {

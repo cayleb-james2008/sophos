@@ -54,7 +54,6 @@ export default function App() {
     setSessionsSelectedId(sessionId);
     setView("sessions");
   };
-
   return (
     <UnreadProvider>
       <Shell active={view} onNavigate={handleNavigate}>
@@ -68,7 +67,10 @@ export default function App() {
               initialSelectedId={sessionsSelectedId}
             />
           ) : (
-            <ActiveView onNewSession={() => setNewOpen(true)} onSetupProviders={handleSetupProviders} />
+            <ActiveView
+              onNewSession={() => setNewOpen(true)}
+              onSetupProviders={handleSetupProviders}
+            />
           )}
         </ViewTransition>
       </Shell>

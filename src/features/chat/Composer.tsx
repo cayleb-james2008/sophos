@@ -159,7 +159,9 @@ function SideQuestionPanel({
 
 export function Composer({
   busy,
+  setupReady = true,
   editDraft,
+  starterDraft,
   onSend,
   onAbort,
   onSteer,
@@ -176,7 +178,11 @@ export function Composer({
   onSetName,
 }: {
   busy: boolean;
+  /** Real Tauri onboarding health gate; browser preview remains usable. */
+  setupReady?: boolean;
   editDraft: { index: number; text: string } | null;
+  /** A starter prompt picked from the empty state — fills the editor (no auto-send). */
+  starterDraft: { seq: number; text: string } | null;
   onSend: (text: string) => void;
   onAbort: () => void;
   onSteer: (text: string) => void;
@@ -194,7 +200,7 @@ export function Composer({
 }) {
   const [value, setValue] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
-  const canSend = value.trim().length > 0 && !busy;
+  const canSend = value.trim().length > 0 && !busy && setupReady;
 
   // Auto-grow the textarea.
   useEffect(() => {
@@ -225,6 +231,16 @@ export function Composer({
       focusInput();
     }
   }, [editDraft]);
+
+  // Empty-state starter prompt: fill the editor so the user can edit before
+  // sending. Keyed off the seq so picking the same prompt twice still refills.
+  useEffect(() => {
+    if (starterDraft) {
+      setValue(starterDraft.text);
+      focusInput();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [starterDraft?.seq]);
 
   // Route a submitted line to the correct handler based on prefix + busy.
   const submit = () => {
@@ -271,7 +287,7 @@ export function Composer({
       return;
     }
 
-    if (!trimmed) return;
+    if (!trimmed || !setupReady) return;
     if (busy) {
       // Steering — delivered after the current tool calls complete.
       onSteer(trimmed);
@@ -428,7 +444,9 @@ export function Composer({
             placeholder={
               busy
                 ? "Working… type to steer (Enter), queue a follow-up (Alt+Enter)"
-                : "Message Sophos…  (@ file · ! shell · /btw side question)"
+                : setupReady
+                  ? "Message Sophos…  (@ file · ! shell · /btw side question)"
+                  : "Finish setup above to enable your first chat"
             }
             rows={1}
             aria-label="Message input"
@@ -575,7 +593,7 @@ export function Composer({
             </Text>
           </div>
           <Text variant="micro" tone="dim" mono>
-            {busy ? "streaming…" : "ready"}
+            {busy ? "streaming…" : setupReady ? "ready" : "setup required"}
           </Text>
         </div>
       </div>

@@ -10,8 +10,8 @@
     "executable": "C:/Program Files/Google/Chrome/Application/chrome.exe",
     "headless": true
   },
-  "startedAt": "2026-08-10T18:41:21.934Z",
-  "finishedAt": "2026-08-10T18:43:00.959Z",
+  "startedAt": "2026-08-11T05:00:49.993Z",
+  "finishedAt": "2026-08-11T05:02:26.394Z",
   "results": [
     {
       "section": "Views",
@@ -268,9 +268,9 @@
     {
       "section": "Edge",
       "name": "No console/page errors across all views",
-      "ok": false,
-      "detail": "page.waitForTimeout: Target page, context or browser has been closed",
-      "error": "page.waitForTimeout: Target page, context or browser has been closed"
+      "ok": true,
+      "detail": "ok",
+      "error": null
     }
   ],
   "consoleErrors": [],
@@ -315,12 +315,13 @@
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-inbox-view-empty-state-no-relay-traffic--edge-inbox-empty.png",
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-state.png",
     "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-recovered.png",
-    "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-empty-transcript-state-in-session-detail-edge-empty-transcript.png"
+    "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-empty-transcript-state-in-session-detail-edge-empty-transcript.png",
+    "C:\\Users\\Cayleb\\Desktop\\workspace\\prime-agent-windows\\verify\\e2e\\screenshots\\Edge-no-console-page-errors-across-all-views-edge-error-sweep.png"
   ],
   "summary": {
     "total": 37,
-    "passed": 36,
-    "failed": 1,
-    "overall": "FAIL"
+    "passed": 37,
+    "failed": 0,
+    "overall": "PASS"
   }
 }

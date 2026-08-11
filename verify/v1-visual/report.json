@@ -5,10 +5,10 @@
       "banned_color": [],
       "banned_font": [],
       "glow": [],
-      "accentCount": 10,
+      "accentCount": 11,
       "borderColors": {
-        "rgb(42, 42, 42)": 30,
-        "rgba(133, 237, 117, 0.4)": 2,
+        "rgb(42, 42, 42)": 37,
+        "rgba(133, 237, 117, 0.4)": 1,
         "rgb(255, 255, 255)": 1,
         "rgba(0, 0, 0, 0)": 3,
         "rgb(44, 44, 44)": 8,
@@ -16,9 +16,9 @@
       },
       "fonts": {
         "Times New Roman": 23,
-        "Geist": 224,
-        "Geist Mono": 48,
-        "Arial": 54
+        "Geist": 227,
+        "Geist Mono": 49,
+        "Arial": 46
       },
       "bodyBg": "rgb(14, 14, 14)",
       "bodyFg": "rgb(244, 244, 244)",
@@ -123,18 +123,18 @@
       "banned_color": [],
       "banned_font": [],
       "glow": [],
-      "accentCount": 13,
+      "accentCount": 14,
       "borderColors": {
-        "rgb(42, 42, 42)": 29,
-        "rgb(44, 44, 44)": 11,
-        "rgba(133, 237, 117, 0.4)": 5,
-        "rgba(0, 0, 0, 0)": 12,
+        "rgb(42, 42, 42)": 32,
+        "rgb(44, 44, 44)": 12,
+        "rgba(133, 237, 117, 0.4)": 6,
+        "rgba(0, 0, 0, 0)": 14,
         "rgb(239, 68, 68)": 1
       },
       "fonts": {
         "Times New Roman": 23,
-        "Geist": 317,
-        "Geist Mono": 65,
+        "Geist": 347,
+        "Geist Mono": 68,
         "Arial": 26
       },
       "bodyBg": "rgb(14, 14, 14)",

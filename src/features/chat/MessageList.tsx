@@ -20,7 +20,16 @@ import { useMessageFocusRequest, clearMessageFocus } from "./chatBridge";
 const ROW_ESTIMATE = 120;
 const OVERSCAN = 8;
 
-function EmptyChatHint() {
+// Suggested starter prompts shown in the empty state. Clicking one fills the
+// composer (the user edits before sending) — it does NOT auto-send.
+const STARTER_PROMPTS = [
+  "Help me debug a function",
+  "Explain this codebase",
+  "Write a test for my module",
+  "Refactor this file",
+];
+
+function ChatEmptyState({ onFillPrompt }: { onFillPrompt: (text: string) => void }) {
   const hints = [
     { glyph: "@", label: "file", desc: "reference a file" },
     { glyph: "!", label: "shell", desc: "run a command" },
@@ -44,7 +53,7 @@ function EmptyChatHint() {
           flexDirection: "column",
           alignItems: "center",
           gap: tokens.space.lg,
-          maxWidth: 460,
+          maxWidth: 480,
           textAlign: "center",
         }}
       >
@@ -63,6 +72,49 @@ function EmptyChatHint() {
           <Text variant="body" tone="muted">
             Ask for help, point at a file, or delegate a task. Sophos streams its work in real time.
           </Text>
+        </div>
+        {/* Clickable starter prompts — fill the composer, never auto-send. */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: tokens.space.sm,
+          }}
+        >
+          {STARTER_PROMPTS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onFillPrompt(p)}
+              title={`Fill composer with: ${p}`}
+              aria-label={`Starter prompt: ${p}`}
+              className="pa-focus-ring"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "5px 12px",
+                borderRadius: tokens.radius.md,
+                background: tokens.color.bgRaised,
+                border: `1px solid ${tokens.color.border}`,
+                color: tokens.color.textMuted,
+                fontFamily: tokens.font.sans,
+                fontSize: tokens.font.size.sm,
+                cursor: "pointer",
+                transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = tokens.color.accentBorder;
+                e.currentTarget.style.color = tokens.color.text;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = tokens.color.border;
+                e.currentTarget.style.color = tokens.color.textMuted;
+              }}
+            >
+              {p}
+            </button>
+          ))}
         </div>
         <div
           style={{
@@ -107,11 +159,17 @@ export function MessageList({
   busy,
   onRetry,
   onEdit,
+  hasProvider,
+  onFillPrompt,
 }: {
   messages: TranscriptMessage[];
   busy: boolean;
   onRetry: (message: TranscriptMessage) => void;
   onEdit: (index: number, message: TranscriptMessage) => void;
+  /** True when at least one provider is connected — gates the empty state. */
+  hasProvider: boolean;
+  /** Picked a starter prompt in the empty state — fills the composer. */
+  onFillPrompt: (text: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
@@ -189,9 +247,15 @@ export function MessageList({
     };
   }, []);
 
-  // First-run: no transcript yet — show a guided empty state instead of a blank page.
+  // Empty transcript: a provider-gated empty state. With a provider connected
+  // we show the welcoming empty state with starter prompts; without one, the
+  // FirstRunBanner owns the first-run experience, so we render a quiet blank
+  // area rather than a competing empty state.
   if (messages.length === 0) {
-    return <EmptyChatHint />;
+    if (!hasProvider) {
+      return <div style={{ flex: 1, minHeight: 0 }} aria-hidden />;
+    }
+    return <ChatEmptyState onFillPrompt={onFillPrompt} />;
   }
 
   const visible = messages.slice(startIndex, endIndex);
