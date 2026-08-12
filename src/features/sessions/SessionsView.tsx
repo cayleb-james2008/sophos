@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Text, Spinner, IconButton } from "../../design";
 import { useIpc, useConnectionState } from "../../ipc/client";
+import { useAppState } from "../../state/AppState";
 import type { SessionInfo, ContextStats, Goal, RlmChild } from "../../ipc/contract";
 import { SessionDetail } from "./SessionDetail";
 import { PlusIcon, RefreshIcon } from "./icons";
@@ -25,31 +26,25 @@ type SessionEnrichment = {
   rlmChildren?: RlmChild[];
 };
 
-export function SessionsView({
-  onNewSession,
-  initialFilter,
-  initialSelectedId,
-}: {
-  onNewSession?: () => void;
-  /** Optional pre-filter (e.g. from the ⌘K "Find session" command) — seeds the name filter. */
-  initialFilter?: string;
-  /** Optional session id to select on mount (e.g. the session the user picked in the palette). */
-  initialSelectedId?: string;
-}) {
+export function SessionsView() {
+  // Shared app state: the ⌘K "Find session…" pre-filter/selection and the
+  // new-session modal are owned by AppState, so this view reads them directly
+  // instead of receiving props from App.
+  const { sessionsFilter, sessionsSelectedId, setNewSessionOpen } = useAppState();
   const ipc = useIpc();
   const conn = useConnectionState();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [enrichment, setEnrichment] = useState<Record<string, SessionEnrichment>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(sessionsSelectedId ?? null);
   const [actionError, setActionError] = useState<string | undefined>();
   const [viewMode, setViewMode] = useState<"graph" | "tree">("graph");
   // P5: session list filter — narrows the graph by name (case-insensitive
   // substring) and/or status, in real time. Empty filter shows all sessions.
-  const [filter, setFilter] = useState(initialFilter ?? "");
+  const [filter, setFilter] = useState(sessionsFilter ?? "");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "saved" | "idle">("all");
-  const handleNew = onNewSession ?? (() => {});
+  const handleNew = () => setNewSessionOpen(true);
 
   const daemonDown = conn.status.kind === "disconnected";
 

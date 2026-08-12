@@ -3,8 +3,8 @@
 // Skills (discovery + management), and Advanced (context + RLM children +
 // agents + daemon diagnostics + MCP + extensions). Wired to the IPC client.
 
-import { useState } from "react";
 import { Tabs } from "../../design";
+import { useAppState } from "../../state/AppState";
 import { GeneralPanel } from "./GeneralPanel";
 import { ProvidersPanel } from "./ProvidersPanel";
 import { SkillsPanel } from "./SkillsPanel";
@@ -13,8 +13,8 @@ import { LongRunningPanel } from "./LongRunningPanel";
 import { FleetStrip } from "./FleetStrip";
 import "./settings.css";
 
-export function SettingsView({ initialTab = "general" }: { initialTab?: string }) {
-  const [tab, setTab] = useState(initialTab);
+export function SettingsView() {
+  const { settingsTab: tab, setSettingsTab: setTab } = useAppState();
 
   return (
     <main className="settings">
