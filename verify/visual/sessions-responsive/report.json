@@ -1,0 +1,115 @@
+{
+  "all_pass": true,
+  "results": [
+    {
+      "check": "1440 inspector side-by-side visible",
+      "ok": true,
+      "detail": "w=372"
+    },
+    {
+      "check": "1440 toggle hidden",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "1440 no horizontal overflow",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "1440 reset-layout button present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "a session node found",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "node drag moved the node",
+      "ok": true,
+      "detail": "(339,328)->(453,381)"
+    },
+    {
+      "check": "dragged position persists after refresh",
+      "ok": true,
+      "detail": "before=(452.59735107421875, 380.8816833496094) after=(453,381)"
+    },
+    {
+      "check": "Reset layout reapplied dagre (node moved back)",
+      "ok": true,
+      "detail": "after-reset=(339,328)"
+    },
+    {
+      "check": "900 inspector hidden by default",
+      "ok": true,
+      "detail": "x=879 consoleRight=880"
+    },
+    {
+      "check": "900 toggle appears",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 no horizontal overflow (closed)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 inspector opens as overlay",
+      "ok": true,
+      "detail": "x=507 w=372"
+    },
+    {
+      "check": "900 backdrop visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 close button visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 no horizontal overflow (open)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 closes via backdrop",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "768 inspector hidden by default",
+      "ok": true,
+      "detail": "x=747 consoleRight=748"
+    },
+    {
+      "check": "768 toggle appears",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "768 no horizontal overflow (closed)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "768 inspector opens as overlay",
+      "ok": true,
+      "detail": "x=375 w=372"
+    },
+    {
+      "check": "768 no horizontal overflow (open)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "no console errors at any width",
+      "ok": true,
+      "detail": "count=0"
+    }
+  ]
+}
