@@ -13,6 +13,8 @@
     "bridge:verify": "node bridge/verify.mjs",
     "bridge:verify:concurrent": "node bridge/verify-concurrency.mjs",
     "bridge:dev": "cd bridge && npm run dev",
+    "test:visual": "node verify/visual/regression.mjs",
+    "test:visual:update": "node verify/visual/snapshot.mjs",
     "verify:safety": "node verify/e2e-safety.mjs"
   },
   "dependencies": {
@@ -32,7 +34,9 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "pixelmatch": "^7.2.0",
     "playwright-core": "^1.62.1",
+    "pngjs": "^7.0.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.0"
   }

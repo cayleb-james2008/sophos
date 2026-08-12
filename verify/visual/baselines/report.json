@@ -1,0 +1,55 @@
+{
+  "suite": "sophos-visual-snapshot",
+  "mode": "browser-demo (MockIpcClient)",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "startedAt": "2026-08-12T20:47:23.942Z",
+  "finishedAt": "2026-08-12T20:47:32.408Z",
+  "baselinesDir": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines",
+  "captured": [
+    {
+      "view": "chat",
+      "label": "Chat",
+      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\chat.png",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "view": "sessions",
+      "label": "Sessions",
+      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\sessions.png",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "view": "agents",
+      "label": "Agents",
+      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\agents.png",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "view": "inbox",
+      "label": "Inbox",
+      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\inbox.png",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "view": "settings",
+      "label": "Settings",
+      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\settings.png",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "total": 5,
+    "captured": 5,
+    "failed": 0,
+    "overall": "OK"
+  }
+}
