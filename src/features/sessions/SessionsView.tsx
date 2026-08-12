@@ -351,7 +351,7 @@ export function SessionsView() {
             aria-controls="session-inspector"
             title={inspectorOpen ? "Close detail inspector" : "Open detail inspector"}
           >
-            {inspectorOpen ? <ChevronRightGlyph /> : <ChevronLeftGlyph />}
+            {inspectorOpen ? <ChevronLeftGlyph /> : <ChevronRightGlyph />}
             <span>Inspect</span>
           </button>
         </div>

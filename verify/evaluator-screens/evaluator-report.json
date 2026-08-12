@@ -1,0 +1,156 @@
+{
+  "all_pass": false,
+  "results": [
+    {
+      "check": "1440 inspector rendered",
+      "ok": true,
+      "detail": "x=1035 w=372"
+    },
+    {
+      "check": "1440 toggle computed-display is none",
+      "ok": true,
+      "detail": "{'display': 'none', 'visibility': 'visible'}"
+    },
+    {
+      "check": "1440 no horizontal overflow",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "1440 reset-layout button present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "session node found",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "node drag moved node visibly",
+      "ok": true,
+      "detail": "339,328 \u2192 453,381"
+    },
+    {
+      "check": "dragged position preserved after Refresh",
+      "ok": true,
+      "detail": "pre=(453,381) post=(453,381)"
+    },
+    {
+      "check": "second session node available",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "second node's drag also persists",
+      "ok": true,
+      "detail": "pre=(252,468) post=(252,468)"
+    },
+    {
+      "check": "first node still near its dragged position",
+      "ok": true,
+      "detail": "expected\u2248(452.59735107421875, 380.8816833496094) got=(453,381) (note: first_session_node() may return a different one)"
+    },
+    {
+      "check": "Reset layout moved node back toward dagre position",
+      "ok": false,
+      "detail": "original=(339,328) after-reset=(339,328)"
+    },
+    {
+      "check": "901 toggle display:none (above breakpoint)",
+      "ok": true,
+      "detail": "display=none"
+    },
+    {
+      "check": "901 inspector column visible as grid (w>=250)",
+      "ok": true,
+      "detail": "w=372"
+    },
+    {
+      "check": "900 toggle display:inline-flex (at breakpoint)",
+      "ok": true,
+      "detail": "display=flex"
+    },
+    {
+      "check": "900 toggle is visible (Playwright is_visible)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 no horizontal overflow (closed)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 inspector starts at/right of console right edge",
+      "ok": true,
+      "detail": "x=879 consoleRight=880"
+    },
+    {
+      "check": "900 overlay opens (wrap visible inside console)",
+      "ok": true,
+      "detail": "x=507 w=372"
+    },
+    {
+      "check": "900 backdrop visible after open",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 close (\u00d7) button visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 no horizontal overflow (overlay open)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "900 close (\u00d7) hides overlay",
+      "ok": true,
+      "detail": "x=879"
+    },
+    {
+      "check": "900 backdrop click hides overlay",
+      "ok": true,
+      "detail": "x=879"
+    },
+    {
+      "check": "899 toggle visible (below breakpoint)",
+      "ok": true,
+      "detail": "display=flex"
+    },
+    {
+      "check": "768 toggle visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "768 no horizontal overflow (closed)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "768 session node present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "768 drag moves node",
+      "ok": true,
+      "detail": "151,316 \u2192 203,351"
+    },
+    {
+      "check": "768 no horizontal overflow (overlay open)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "no console errors at any width",
+      "ok": true,
+      "detail": "count=0 sample=[]"
+    }
+  ],
+  "errors": []
+}
