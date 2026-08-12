@@ -13,7 +13,9 @@
     "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch",
     "clean": "shx rm -rf dist",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify:settings": "npm run build && node verify-settings.mjs",
+    "verify:lifecycle": "npm run build && node verify-lifecycle.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "file:../../prime-agent-ref/node_modules/@earendil-works/pi-agent-core",

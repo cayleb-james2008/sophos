@@ -3,6 +3,7 @@
 // only changes the first-run presentation and the path into provider setup.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "../../design";
 import { useIpc, isTauri } from "../../ipc/client";
 import type { ModelInfo, ProviderInfo, RuntimeInfo } from "../../ipc/contract";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../providers/useModels";
@@ -213,15 +214,15 @@ export function FirstRunExperience({ onSetupProviders, onStartChat, hasFirstMess
             <p className="pa-onboarding__lede">{lede}</p>
             <div className="pa-onboarding__actions">
               {preview ? (
-                <button type="button" className="pa-onboarding__action-primary" onClick={beginChat}>Start a preview</button>
+                <Button type="button" variant="primary" className="pa-onboarding__action-primary" onClick={beginChat}>Start a preview</Button>
               ) : !providerReady ? (
-                <button type="button" className="pa-onboarding__action-primary" onClick={openProviderSetup}>Set up free model</button>
+                <Button type="button" variant="primary" className="pa-onboarding__action-primary" onClick={openProviderSetup}>Set up free model</Button>
               ) : liveReady ? (
-                <button type="button" className="pa-onboarding__action-primary" onClick={beginChat}>Start your first chat</button>
+                <Button type="button" variant="primary" className="pa-onboarding__action-primary" onClick={beginChat}>Start your first chat</Button>
               ) : (
-                <button type="button" className="pa-onboarding__action-primary" onClick={health.refresh}>Check workspace</button>
+                <Button type="button" variant="primary" className="pa-onboarding__action-primary" onClick={health.refresh}>Check workspace</Button>
               )}
-              <button type="button" className="pa-onboarding__action-secondary" onClick={dismiss}>Skip for now</button>
+              <Button type="button" variant="ghost" className="pa-onboarding__action-secondary" onClick={dismiss}>Skip for now</Button>
             </div>
           </div>
 
@@ -244,7 +245,7 @@ export function FirstRunExperience({ onSetupProviders, onStartChat, hasFirstMess
             </div>
           </div>
           <CheckRail checks={health.checks} />
-          <button type="button" className="pa-onboarding__skip" onClick={dismiss}>Esc to dismiss</button>
+          <Button type="button" variant="ghost" className="pa-onboarding__skip" onClick={dismiss}>Esc to dismiss</Button>
         </footer>
       </div>
     </section>

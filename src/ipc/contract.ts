@@ -471,6 +471,8 @@ export interface Settings {
   defaultCwd?: string;
   defaultProvider?: string;
   defaultModel?: string;
+  /** Thinking level used when a selected model supports reasoning. */
+  defaultThinking?: string;
   theme?: "dark" | "light" | "system";
   daemonCliPath?: string;
   /** TCP-loopback daemon transport fallback (persisted to ~/.prime/agent/settings.json). */

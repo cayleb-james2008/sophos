@@ -3,8 +3,9 @@
 // share the same design-system layer as the shell.
 
 import { useEffect, useRef, useState } from "react";
-import { Text, StatusDot } from "../../design";
+import { Text, StatusDot, Button, IconButton } from "../../design";
 import { useConnectionState, useIpc, isTauri } from "../../ipc/client";
+import { useAppState } from "../../state/AppState";
 import { ModelSelector } from "../providers/ModelSelector";
 import { useChat } from "./useChat";
 import { MessageList } from "./MessageList";
@@ -34,7 +35,13 @@ function CopyIcon({ size = 13, color }: { size?: number; color: string }) {
   return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>;
 }
 
-export function ChatView({ onNewSession, onSetupProviders }: { onNewSession?: () => void; onSetupProviders?: () => void }) {
+export function ChatView() {
+  const { setNewSessionOpen, setSettingsTab, setView } = useAppState();
+  const openNewSession = () => setNewSessionOpen(true);
+  const handleSetupProviders = () => {
+    setSettingsTab("providers");
+    setView("settings");
+  };
   const chat = useChat();
   const ipc = useIpc();
   const state = useConnectionState();
@@ -94,23 +101,21 @@ export function ChatView({ onNewSession, onSetupProviders }: { onNewSession?: ()
             <Text variant="micro" tone="muted" mono uppercase>{state.status.kind}</Text>
           </div>
           {headerButtons.map((button) => (
-            <button key={button.title} type="button" onClick={button.onClick} title={button.title} aria-label={button.title} className="pa-focus-ring chat-action-button">
+            <IconButton key={button.title} title={button.title} className="chat-action-button" onClick={button.onClick}>
               {button.icon("currentColor")}
-            </button>
+            </IconButton>
           ))}
-          {onNewSession ? (
-            <button type="button" onClick={onNewSession} title="New session" className="pa-focus-ring chat-new-button">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              New session
-            </button>
-          ) : null}
+          <Button variant="outline" onClick={openNewSession} title="New session" className="chat-new-button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            New session
+          </Button>
           <ModelSelector />
         </div>
       </header>
 
       {error ? <div className="chat-error"><Text variant="label" tone="danger">{error}</Text></div> : null}
 
-      <FirstRunBanner onSetupProviders={onSetupProviders} onStartChat={onStartChat} hasFirstMessage={hasFirstMessage} setup={onboarding} />
+      <FirstRunBanner onSetupProviders={handleSetupProviders} onStartChat={onStartChat} hasFirstMessage={hasFirstMessage} setup={onboarding} />
 
       {!isTauri ? (
         <div className="chat-demo">
@@ -119,7 +124,7 @@ export function ChatView({ onNewSession, onSetupProviders }: { onNewSession?: ()
           <details open={developerPreviewOpen} className="chat-developer-preview">
             <summary onClick={(event) => { event.preventDefault(); setDeveloperPreviewOpen((open) => !open); }} className="chat-developer-summary">Developer preview</summary>
             <div hidden={!developerPreviewOpen}>
-              <button type="button" onClick={() => loadDemoMessages(500)} title="Seed a 500-message transcript to test windowed rendering" className="chat-demo-button">Load 500 messages</button>
+              <Button variant="outline" type="button" onClick={() => loadDemoMessages(500)} title="Seed a 500-message transcript to test windowed rendering" className="chat-demo-button">Load 500 messages</Button>
             </div>
           </details>
         </div>

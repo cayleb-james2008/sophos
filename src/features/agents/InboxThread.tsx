@@ -3,7 +3,7 @@
 // are marked read on view and can be marked read individually.
 
 import type { AgentMessage } from "../../ipc/contract";
-import { Button } from "../../design";
+import { Button, IconButton } from "../../design";
 import { SELF, type AgentRow } from "./useAgents";
 import { formatDate } from "../../features/sessions/format";
 import { CheckIcon } from "./icons";
@@ -60,14 +60,14 @@ export function InboxThread({ agent, messages, unreadCount, onMarkRead, onMarkAl
                     {m.timestamp ? formatDate(m.timestamp) : ""} {outgoing ? "" : !m.read ? "· UNREAD" : "· READ"}
                   </span>
                   {!outgoing && !m.read ? (
-                    <button
+                    <IconButton
                       className="ag-message__readbtn"
-                      title="Mark as read"
-                      aria-label="Mark message as read"
+                      title="Mark message as read"
+                      size="sm"
                       onClick={() => onMarkRead(m.id)}
                     >
                       <CheckIcon size={11} />
-                    </button>
+                    </IconButton>
                   ) : null}
                 </div>
                 <div className="ag-message__bubble">{m.text}</div>

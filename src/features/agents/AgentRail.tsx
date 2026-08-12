@@ -7,6 +7,7 @@
 
 import type { ReactNode } from "react";
 import { initials } from "../../features/sessions/format";
+import { Button, IconButton } from "../../design";
 import { AttachIcon, DetachIcon } from "./icons";
 import type { AgentRow } from "./useAgents";
 import "./agents.css";
@@ -53,9 +54,9 @@ export function AgentRail({
           <div className="ag-railerror" role="alert">
             <span className="ag-railerror__icon">⚡</span>
             <span className="ag-railerror__msg">{error}</span>
-            <button className="ag-railerror__retry" onClick={() => onRetry()} aria-label="Retry">
+            <Button variant="danger" className="ag-railerror__retry" onClick={() => onRetry()} aria-label="Retry">
               Retry
-            </button>
+            </Button>
           </div>
         ) : null}
 
@@ -167,7 +168,7 @@ function AgentRowItem({ agent, selected, attached, unread, runtimeModel, onAttac
   const model = agent.model ?? runtimeModel;
 
   return (
-    <button
+    <Button
       className={`ag-agent ${selected ? "ag-agent--selected" : ""}`}
       onClick={() => onSelect(agent.id)}
       aria-current={selected ? "page" : undefined}
@@ -199,20 +200,27 @@ function AgentRowItem({ agent, selected, attached, unread, runtimeModel, onAttac
 
       <span className="ag-agent__actions" onClick={(e) => e.stopPropagation()}>
         {attached ? (
-          <button className="ag-act" title="Stop monitoring" aria-label="Detach" onClick={() => onDetach(agent.id)}>
+          <IconButton
+            className="ag-act"
+            title="Stop monitoring"
+            tone="danger"
+            size="sm"
+            onClick={() => onDetach(agent.id)}
+          >
             <DetachIcon size={12} />
-          </button>
+          </IconButton>
         ) : (
-          <button
+          <IconButton
             className="ag-act ag-act--accent"
             title="Attach to relay"
-            aria-label="Attach"
+            tone="accent"
+            size="sm"
             onClick={() => onAttach(agent.id)}
           >
             <AttachIcon size={12} />
-          </button>
+          </IconButton>
         )}
       </span>
-    </button>
+    </Button>
   );
 }

@@ -583,6 +583,7 @@ export interface IconButtonProps {
   size?: "sm" | "md";
   style?: CSS;
   disabled?: boolean;
+  className?: string;
 }
 
 export function IconButton({
@@ -593,6 +594,7 @@ export function IconButton({
   size = "md",
   style,
   disabled = false,
+  className,
 }: IconButtonProps) {
   const tones: Record<string, CSS> = {
     default: { color: tokens.color.textMuted },
@@ -610,7 +612,7 @@ export function IconButton({
       aria-label={title}
       onClick={onClick}
       disabled={disabled}
-      className="pa-focus-ring"
+      className={`pa-focus-ring ${className ?? ""}`.trim()}
       style={{
         background: "transparent",
         border: "none",
@@ -635,5 +637,39 @@ export function IconButton({
     >
       {children}
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton — a quiet loading placeholder with a pulse animation.
+// ---------------------------------------------------------------------------
+
+export function Skeleton({
+  width = "100%",
+  height = 16,
+  radius = tokens.radius.sm,
+  style,
+  className,
+}: {
+  width?: number | string;
+  height?: number | string;
+  radius?: number | string;
+  style?: CSS;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden
+      className={className}
+      style={{
+        display: "inline-block",
+        width,
+        height,
+        borderRadius: radius,
+        background: tokens.color.bgRaised,
+        animation: "pa-skeleton-pulse 1.4s ease-in-out infinite",
+        ...style,
+      }}
+    />
   );
 }

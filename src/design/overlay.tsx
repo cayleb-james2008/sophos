@@ -4,7 +4,7 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { tokens } from "./tokens";
-import { Text } from "./core";
+import { Text, Button } from "./core";
 
 type CSS = React.CSSProperties;
 
@@ -360,4 +360,100 @@ export function Modal({ open, onClose, title, children, footer, width = 480 }: M
     </div>,
     document.body,
   );
+}
+
+// ---------------------------------------------------------------------------
+// ErrorBoundary — catches render errors and shows a design-system fallback.
+// ---------------------------------------------------------------------------
+
+interface ErrorBoundaryProps {
+  children?: React.ReactNode;
+  /** Optional label rendered in the fallback header. */
+  label?: string;
+}
+
+interface ErrorBoundaryState {
+  error: Error | null;
+}
+
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("ErrorBoundary caught a render error:", error);
+  }
+
+  private handleReload = () => {
+    this.setState({ error: null });
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.error) {
+      const { label } = this.props;
+      return (
+        <div
+          role="alert"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: tokens.space.md,
+            minHeight: "100%",
+            padding: tokens.space.xl,
+            background: tokens.color.bg,
+            color: tokens.color.text,
+            fontFamily: tokens.font.sans,
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 480,
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: tokens.space.md,
+              padding: tokens.space.xl,
+              background: tokens.color.bgElevated,
+              border: `1px solid ${tokens.color.border}`,
+              borderRadius: tokens.radius.lg,
+            }}
+          >
+            <Text variant="micro" tone="accent" mono uppercase style={{ letterSpacing: "0.12em" }}>
+              {label ?? "Something went wrong"}
+            </Text>
+            <Text variant="body" tone="muted">
+              A render error occurred in this view. Reload to recover.
+            </Text>
+            <Text
+              variant="micro"
+              tone="danger"
+              mono
+              style={{
+                padding: tokens.space.sm,
+                background: tokens.color.dangerSoft,
+                border: `1px solid ${tokens.color.border}`,
+                borderRadius: tokens.radius.sm,
+                overflowX: "auto",
+                wordBreak: "break-word",
+                textAlign: "left",
+              }}
+            >
+              {this.state.error.message || String(this.state.error)}
+            </Text>
+            <Button variant="accent-soft" size="md" onClick={this.handleReload} style={{ alignSelf: "center" }}>
+              Reload
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }

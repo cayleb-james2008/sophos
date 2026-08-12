@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Text } from "../../design";
+import { Text, Button } from "../../design";
 import type { DiffLine } from "./diff";
 
 // CopyButton — a small icon button that copies text to the clipboard, showing
@@ -39,14 +39,14 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   };
 
   return (
-    <button
+    <Button
+      variant="ghost"
       type="button"
       aria-label={label}
       title={copied ? "Copied" : "Copy"}
       onClick={copy}
       onMouseEnter={() => setVisible(true)}
       onMouseLeave={() => setVisible(false)}
-      className="pa-focus-ring"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -73,7 +73,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
       )}
-    </button>
+    </Button>
   );
 }
 

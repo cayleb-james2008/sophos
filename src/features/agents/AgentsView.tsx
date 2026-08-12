@@ -121,9 +121,9 @@ export function AgentsView() {
         <div className="ag-errorbanner" role="alert">
           <span>⚡</span>
           <span>Agent relay degraded — {error}</span>
-          <button className="ag-errorbanner__action" onClick={() => void refresh()} aria-label="Retry">
+          <Button variant="danger" className="ag-errorbanner__action" onClick={() => void refresh()} aria-label="Retry">
             Retry
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -157,9 +157,9 @@ export function AgentsView() {
               <div className="ag-graphblank__card">
                 <b>Fleet unavailable</b>
                 <span>{error}</span>
-                <button className="ag-graphblank__retry" onClick={() => void refresh()}>
+                <Button variant="outline" className="ag-graphblank__retry" onClick={() => void refresh()}>
                   Retry
-                </button>
+                </Button>
               </div>
             </div>
           ) : !loading && !error && !hasAgents ? (

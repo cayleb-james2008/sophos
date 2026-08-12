@@ -249,11 +249,12 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
             When off (default), every proposed change waits for your explicit Apply.
           </Text>
         </div>
-        <button
+        <Button
           type="button"
           role="switch"
           aria-checked={gate.autoApply}
           onClick={() => gate.setAutoApply(!gate.autoApply)}
+          variant={gate.autoApply ? "accent-soft" : "ghost"}
           style={{
             width: 40,
             height: 22,
@@ -279,7 +280,7 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
               transition: "left 120ms ease",
             }}
           />
-        </button>
+        </Button>
       </div>
 
       {/* Run a refinement — the primary action. */}
@@ -367,7 +368,8 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
                       ) : null}
                     </div>
                     {hasEdits ? (
-                      <button
+                      <Button
+                        variant="ghost"
                         type="button"
                         onClick={() => toggleDiff(r.id)}
                         style={{
@@ -391,7 +393,7 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
                           }}
                         />
                         {diffOpen ? "Hide diff" : "Show diff"}
-                      </button>
+                      </Button>
                     ) : null}
                     <Badge
                       tone={rolledBack ? "warning" : discarded ? "neutral" : "success"}

@@ -7,8 +7,9 @@
 // unreachable — same data logic as the prior rail, a representation change only.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Text, Spinner } from "../../design";
+import { Button, Text, Spinner, IconButton } from "../../design";
 import { useIpc, useConnectionState } from "../../ipc/client";
+import { useAppState } from "../../state/AppState";
 import type { SessionInfo, ContextStats, Goal, RlmChild } from "../../ipc/contract";
 import { SessionDetail } from "./SessionDetail";
 import { PlusIcon, RefreshIcon } from "./icons";
@@ -25,31 +26,25 @@ type SessionEnrichment = {
   rlmChildren?: RlmChild[];
 };
 
-export function SessionsView({
-  onNewSession,
-  initialFilter,
-  initialSelectedId,
-}: {
-  onNewSession?: () => void;
-  /** Optional pre-filter (e.g. from the ⌘K "Find session" command) — seeds the name filter. */
-  initialFilter?: string;
-  /** Optional session id to select on mount (e.g. the session the user picked in the palette). */
-  initialSelectedId?: string;
-}) {
+export function SessionsView() {
+  // Shared app state: the ⌘K "Find session…" pre-filter/selection and the
+  // new-session modal are owned by AppState, so this view reads them directly
+  // instead of receiving props from App.
+  const { sessionsFilter, sessionsSelectedId, setNewSessionOpen } = useAppState();
   const ipc = useIpc();
   const conn = useConnectionState();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [enrichment, setEnrichment] = useState<Record<string, SessionEnrichment>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
-  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(sessionsSelectedId ?? null);
   const [actionError, setActionError] = useState<string | undefined>();
   const [viewMode, setViewMode] = useState<"graph" | "tree">("graph");
   // P5: session list filter — narrows the graph by name (case-insensitive
   // substring) and/or status, in real time. Empty filter shows all sessions.
-  const [filter, setFilter] = useState(initialFilter ?? "");
+  const [filter, setFilter] = useState(sessionsFilter ?? "");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "saved" | "idle">("all");
-  const handleNew = onNewSession ?? (() => {});
+  const handleNew = () => setNewSessionOpen(true);
 
   const daemonDown = conn.status.kind === "disconnected";
 
@@ -199,9 +194,9 @@ export function SessionsView({
           <Text variant="micro" tone="warning">
             {actionError}
           </Text>
-          <button className="sessions__dismiss" onClick={() => setActionError(undefined)}>
+          <IconButton className="sessions__dismiss" title="Dismiss" size="sm" onClick={() => setActionError(undefined)}>
             ✕
-          </button>
+          </IconButton>
         </div>
       )}
 
@@ -209,22 +204,24 @@ export function SessionsView({
       <div className="sessions__toolbar">
         {/* View switch: graph vs context tree */}
         <div className="sessions__modeswitch" role="tablist" aria-label="Session view">
-          <button
+          <Button
             role="tab"
             aria-selected={viewMode === "graph"}
+            variant={viewMode === "graph" ? "accent-soft" : "ghost"}
             className={`sessions__modeswitch-btn${viewMode === "graph" ? " sessions__modeswitch-btn--active" : ""}`}
             onClick={() => setViewMode("graph")}
           >
             Graph
-          </button>
-          <button
+          </Button>
+          <Button
             role="tab"
             aria-selected={viewMode === "tree"}
+            variant={viewMode === "tree" ? "accent-soft" : "ghost"}
             className={`sessions__modeswitch-btn${viewMode === "tree" ? " sessions__modeswitch-btn--active" : ""}`}
             onClick={() => setViewMode("tree")}
           >
             <TreeIcon size={12} /> Tree
-          </button>
+          </Button>
         </div>
 
         {/* P5: session filter — name search + status select, real-time. */}
@@ -242,15 +239,14 @@ export function SessionsView({
               className="sessions__search-input"
             />
             {filter ? (
-              <button
-                type="button"
+              <IconButton
                 className="sessions__search-clear"
                 onClick={() => setFilter("")}
-                aria-label="Clear session filter"
                 title="Clear filter"
+                size="sm"
               >
                 ✕
-              </button>
+              </IconButton>
             ) : null}
           </div>
           <select
@@ -306,9 +302,9 @@ export function SessionsView({
                   <div className="sessions__graphblank__card">
                     <b>Sessions unavailable</b>
                     <span>{error}</span>
-                    <button className="sessions__graphblank__link" onClick={() => void refresh()}>
+                    <Button variant="ghost" className="sessions__graphblank__link" onClick={() => void refresh()}>
                       Try again
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : filteredEmpty ? (
@@ -316,9 +312,9 @@ export function SessionsView({
                   <div className="sessions__graphblank__card">
                     <b>No sessions match your filter</b>
                     <span>Try a different name or status.</span>
-                    <button className="sessions__graphblank__link" onClick={() => { setFilter(""); setStatusFilter("all"); }}>
+                    <Button variant="ghost" className="sessions__graphblank__link" onClick={() => { setFilter(""); setStatusFilter("all"); }}>
                       Clear filter
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : empty ? (
@@ -327,9 +323,9 @@ export function SessionsView({
                     <b>No sessions in range</b>
                     <span>{daemonDown ? "Start the daemon, then refresh." : "Create a session to begin persistent work."}</span>
                     {!daemonDown && (
-                      <button className="sessions__graphblank__link" onClick={handleNew}>
+                      <Button variant="ghost" className="sessions__graphblank__link" onClick={handleNew}>
                         New session
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>

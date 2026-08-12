@@ -113,7 +113,7 @@ export function InboxView() {
       {error && (
         <div className="inbox__error" role="alert">
           Relay degraded · {error}
-          <button onClick={() => void refresh()}>Retry</button>
+          <Button variant="danger" onClick={() => void refresh()}>Retry</Button>
         </div>
       )}
 
@@ -122,8 +122,9 @@ export function InboxView() {
         {sortedAgents.map((agent) => {
           const unread = unreadFor(agent.id);
           return (
-            <button
+            <Button
               key={agent.id}
+              variant={selected === agent.id ? "accent-soft" : "ghost"}
               className={`inbox__chip ${selected === agent.id ? "inbox__chip--active" : ""}`}
               onClick={() => void selectAgent(agent.id)}
               title={agent.name ?? agent.id}
@@ -131,7 +132,7 @@ export function InboxView() {
               <span className="inbox__chip__dot" style={{ background: agent.status === "running" ? tokens.color.ok : agent.status === "idle" ? tokens.color.warn : tokens.color.textDim }} />
               <span className="inbox__chip__name">{agent.name ?? agent.id}</span>
               {unread > 0 && <span className="inbox__chip__unread">{unread}</span>}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -161,7 +162,7 @@ export function InboxView() {
               <div className="inbox__graphblank__card">
                 <b>Relay unavailable</b>
                 <span>{error}</span>
-                <button className="inbox__graphblank__retry" onClick={() => void refresh()}>Retry</button>
+                <Button variant="outline" className="inbox__graphblank__retry" onClick={() => void refresh()}>Retry</Button>
               </div>
             </div>
           ) : empty ? (
