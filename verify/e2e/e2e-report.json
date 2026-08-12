@@ -2,16 +2,17 @@
   "suite": "sophos-browser-e2e",
   "mode": "browser-demo (MockIpcClient)",
   "app": {
-    "url": "http://localhost:1420/",
-    "devServer": "vite :1420"
+    "url": "http://127.0.0.1:46436/",
+    "devServer": "owned ephemeral Vite server",
+    "mode": "browser-demo (MockIpcClient)"
   },
   "browser": {
     "engine": "chromium",
     "executable": "C:/Program Files/Google/Chrome/Application/chrome.exe",
     "headless": true
   },
-  "startedAt": "2026-08-11T05:47:01.587Z",
-  "finishedAt": "2026-08-11T05:48:41.017Z",
+  "startedAt": "2026-08-12T20:32:17.266Z",
+  "finishedAt": "2026-08-12T20:33:53.641Z",
   "results": [
     {
       "section": "Views",

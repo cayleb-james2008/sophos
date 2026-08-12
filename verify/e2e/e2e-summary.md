@@ -1,6 +1,6 @@
 # Sophos Browser E2E — Summary
 
-Date: 2026-08-11T05:48:41.020Z · Mode: browser-demo (MockIpcClient) · App: `npm run dev` on :1420
+Date: 2026-08-12T20:33:53.642Z · Mode: browser-demo (MockIpcClient) · App: owned ephemeral Vite server
 
 ## Result: PASS (37/37 passed)
 
