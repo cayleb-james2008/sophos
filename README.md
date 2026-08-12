@@ -23,6 +23,25 @@ near-black surfaces.
 
 ---
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/sophos-chat.png" alt="Chat view" /></td>
+    <td width="50%"><img src="assets/sophos-sessions.png" alt="Sessions graph" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/sophos-agents.png" alt="Agents fleet" /></td>
+    <td width="50%"><img src="assets/sophos-inbox.png" alt="Inbox relay" /></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/sophos-settings.png" alt="Settings" /></td>
+    <td width="50%"><img src="assets/sophos-skills.png" alt="Skills panel" /></td>
+  </tr>
+</table>
+
+---
+
 ## Quick start — download & run
 
 | Step | What |
