@@ -13,6 +13,7 @@
 
 import { useState } from "react";
 import { tokens } from "../../design/tokens";
+import { Button } from "../../design";
 
 function ActionButton({
   label,
@@ -26,12 +27,12 @@ function ActionButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <Button
+      variant="ghost"
       type="button"
       aria-label={label}
       title={title}
       onClick={onClick}
-      className="pa-focus-ring"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -55,7 +56,7 @@ function ActionButton({
       }}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

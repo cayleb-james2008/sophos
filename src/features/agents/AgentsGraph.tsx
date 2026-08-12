@@ -22,6 +22,7 @@ import {
 } from "@xyflow/react";
 import { GraphFlow, NodeFrame, PulseEdge, statusColor, dagreLayout, type PulseEdgeData } from "../graph";
 import { tokens } from "../../design/tokens";
+import { Button } from "../../design";
 import type { AgentRow } from "./useAgents";
 import type { ConnectionStatus } from "../../ipc/contract";
 import { AttachIcon, DetachIcon, MessageIcon } from "./icons";
@@ -72,22 +73,22 @@ function AgentNode({ data }: NodeProps<AgentGraphNode>) {
     data.kind === "agent" || data.kind === "rlm" ? (
       <>
         {data.attached ? (
-          <button className="pg-btn pg-btn--danger" onClick={(e) => { e.stopPropagation(); data.onDetach?.(); }} title="Stop monitoring">
+          <Button variant="danger" className="pg-btn pg-btn--danger" onClick={(e) => { e.stopPropagation(); data.onDetach?.(); }} title="Stop monitoring">
             <DetachIcon size={11} /> Detach
-          </button>
+          </Button>
         ) : (
           // Neutral, not accent: every unattached node rendered a green Attach
           // button, so the accent appeared on all of them at once and competed
           // with the left-border selection marker that actually encodes state
           // (vision-critic D4). Green stays on the *attached* indicator and the
           // node's own status, where it means something.
-          <button className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onAttach?.(); }} title="Attach to relay">
+          <Button variant="outline" className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onAttach?.(); }} title="Attach to relay">
             <AttachIcon size={11} /> Attach
-          </button>
+          </Button>
         )}
-        <button className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onMessage?.(); }} title="Open coordination thread">
+        <Button variant="outline" className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onMessage?.(); }} title="Open coordination thread">
           <MessageIcon size={11} /> Message
-        </button>
+        </Button>
       </>
     ) : undefined;
 

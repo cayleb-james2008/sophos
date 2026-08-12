@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Text, Badge, type BadgeTone } from "../../design";
+import { Text, Badge, type BadgeTone, Button } from "../../design";
 import type { ToolCall } from "../../ipc/contract";
 import { HighlightedCode, detectLang } from "./highlight";
 import { DiffView } from "./DiffView";
@@ -85,10 +85,10 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
         {call.status === "running" ? <span className="tool-call-card__spinner" aria-label="Tool running" /> : null}
         <span key={call.status} className={`tool-call-card__state-flash tool-call-card__state-flash--${call.status}`} aria-hidden="true" />
         {hasInput ? (
-          <button
+          <Button
+            variant="ghost"
             type="button"
             onClick={() => setShowInput((s) => !s)}
-            className="pa-focus-ring"
             style={{
               marginLeft: "auto",
               background: "transparent",
@@ -102,13 +102,13 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
             }}
           >
             {showInput ? "hide input" : "input"}
-          </button>
+          </Button>
         ) : null}
         {isEdit && hasOutput ? (
-          <button
+          <Button
+            variant="ghost"
             type="button"
             onClick={() => setShowOutput((s) => !s)}
-            className="pa-focus-ring"
             style={{
               background: "transparent",
               border: "none",
@@ -121,7 +121,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
             }}
           >
             {showOutput ? "hide output" : "output"}
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -206,10 +206,10 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
             <Text variant="micro" tone="dim" mono uppercase>
               Output
             </Text>
-            <button
+            <Button
+              variant="ghost"
               type="button"
               onClick={() => setShowOutput((s) => !s)}
-              className="pa-focus-ring"
               style={{
                 background: "transparent",
                 border: "none",
@@ -222,7 +222,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
               }}
             >
               {showOutput ? "collapse" : "expand"}
-            </button>
+            </Button>
           </div>
           {showOutput ? (
             <HighlightedCode

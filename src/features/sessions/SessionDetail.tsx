@@ -201,10 +201,10 @@ export function SessionDetail({
               }}
             />
           ) : (
-            <button className="detail__title-edit" onClick={startRename} title="Rename session">
+            <Button variant="ghost" className="detail__title-edit" onClick={startRename} title="Rename session">
               <b>{title}</b>
               <PencilIcon size={11} />
-            </button>
+            </Button>
           )}
           <span>
             <i className={`status status--${status}`} /> {statusLabel} · session {session.id}
@@ -223,9 +223,9 @@ export function SessionDetail({
             <Text variant="micro" tone="danger">
               ✕ {error}
             </Text>
-            <button className="detail__retry" onClick={() => void load()}>
+            <Button variant="outline" className="detail__retry" onClick={() => void load()}>
               Retry
-            </button>
+            </Button>
           </div>
         )}
 
@@ -491,20 +491,20 @@ function TranscriptRow({
         <span className="transcript__time">
           {msg.timestamp ? relativeTime(msg.timestamp) : ""}
           {isUser && (
-            <button className="transcript__fork" title="Fork a new session from this message" onClick={onForkRequest}>
+            <Button variant="ghost" className="transcript__fork" title="Fork a new session from this message" onClick={onForkRequest}>
               <ForkIcon size={10} /> Fork from here
-            </button>
+            </Button>
           )}
         </span>
         {forkConfirm && (
           <div className="transcript__forkconfirm">
             <span>Fork a new session from this point?</span>
-            <button className="transcript__forkconfirm-yes" onClick={onConfirmFork}>
+            <Button variant="accent-soft" className="transcript__forkconfirm-yes" onClick={onConfirmFork}>
               <CheckIcon size={11} /> Fork
-            </button>
-            <button className="transcript__forkconfirm-no" onClick={onCancelFork}>
+            </Button>
+            <Button variant="ghost" className="transcript__forkconfirm-no" onClick={onCancelFork}>
               <XIcon size={11} /> Cancel
-            </button>
+            </Button>
           </div>
         )}
         <p className="transcript__text">{msg.content}</p>

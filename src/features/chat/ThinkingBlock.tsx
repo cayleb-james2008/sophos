@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Text } from "../../design";
+import { Text, Button } from "../../design";
 
 function ThinkingIcon({ size = 13, color }: { size?: number; color: string }) {
   return (
@@ -38,11 +38,11 @@ export function ThinkingBlock({
         transition: `border-color ${tokens.motion.fast} ${tokens.motion.ease}`,
       }}
     >
-      <button
+      <Button
+        variant="ghost"
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="pa-focus-ring"
         style={{
           display: "flex",
           alignItems: "center",
@@ -97,7 +97,7 @@ export function ThinkingBlock({
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </span>
-      </button>
+      </Button>
 
       {open ? (
         <div

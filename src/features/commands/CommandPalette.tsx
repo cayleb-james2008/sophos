@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { tokens } from "../../design/tokens";
-import { Text, Kbd } from "../../design";
+import { Text, Kbd, Button } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { View } from "../../shell/nav";
 import type { SessionInfo, TranscriptMessage } from "../../ipc/contract";
@@ -441,28 +441,28 @@ export function CommandPalette({
                 <span style={{ color: tokens.color.danger, fontSize: 12 }}>{nameErr}</span>
               ) : null}
               <div style={{ display: "flex", gap: 8 }}>
-                <button
+                <Button
+                  variant="accent-soft"
                   type="button"
                   onClick={() => void submitName()}
                   disabled={nameBusy || !nameValue.trim()}
-                  className="pa-focus-ring"
                   style={{
                     padding: "6px 14px",
                     borderRadius: tokens.radius.md,
                     background: nameValue.trim() && !nameBusy ? tokens.color.accent : tokens.color.bgOverlay,
                     border: `1px solid ${tokens.color.accent}`,
-                    color: nameValue.trim() && !nameBusy ? "#fff" : tokens.color.textDim,
+                    color: nameValue.trim() && !nameBusy ? tokens.color.text : tokens.color.textDim,
                     cursor: nameValue.trim() && !nameBusy ? "pointer" : "not-allowed",
                     fontFamily: tokens.font.sans,
                     fontSize: tokens.font.size.sm,
                   }}
                 >
                   {nameBusy ? "Saving…" : "Save"}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => setSubmode("none")}
-                  className="pa-focus-ring"
                   style={{
                     padding: "6px 14px",
                     borderRadius: tokens.radius.md,
@@ -475,7 +475,7 @@ export function CommandPalette({
                   }}
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           ) : submode === "findSession" ? (
@@ -515,8 +515,9 @@ export function CommandPalette({
                   {sessionResults.map((r, i) => {
                     const active = searchSel === i;
                     return (
-                      <button
+                      <Button
                         key={r.item.id}
+                        variant={active ? "accent-soft" : "ghost"}
                         data-search-idx={i}
                         onMouseEnter={() => setSearchSel(i)}
                         onClick={() => selectSession(i)}
@@ -532,7 +533,7 @@ export function CommandPalette({
                           </span>
                         </span>
                         <span className="palette__rowhint">↵ open</span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -575,8 +576,9 @@ export function CommandPalette({
                   {transcriptResults.map((r, i) => {
                     const active = searchSel === i;
                     return (
-                      <button
+                      <Button
                         key={r.message.id}
+                        variant={active ? "accent-soft" : "ghost"}
                         data-search-idx={i}
                         onMouseEnter={() => setSearchSel(i)}
                         onClick={() => selectTranscript(i)}
@@ -594,7 +596,7 @@ export function CommandPalette({
                           </span>
                         </span>
                         <span className="palette__rowhint">↵ jump</span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -614,8 +616,9 @@ export function CommandPalette({
               }
               const active = cmdIndexes[selected] === i;
               return (
-                <button
+                <Button
                   key={item.cmd.id}
+                  variant={active ? "accent-soft" : "ghost"}
                   data-palette-idx={i}
                   onMouseEnter={() => setSelected(cmdIndexes.indexOf(i))}
                   onClick={() => {
@@ -636,7 +639,7 @@ export function CommandPalette({
                     <span className="palette__rowdesc">{item.cmd.description}</span>
                   </span>
                   <span className="palette__rowhint">↵ run</span>
-                </button>
+                </Button>
               );
             })
           )}

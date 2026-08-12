@@ -9,6 +9,7 @@ import { useEffect, useMemo } from "react";
 import { Handle, Position, useNodesState, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import { GraphFlow, NodeFrame, PulseEdge, dagreLayout, type PulseEdgeData } from "../graph";
 import { tokens } from "../../design/tokens";
+import { Button } from "../../design";
 import type { SessionInfo, ContextStats, Goal, RlmChild } from "../../ipc/contract";
 import { formatTokens } from "./format";
 import "./sessions.css";
@@ -61,12 +62,12 @@ function SessionNode({ data, selected }: NodeProps<SessionGraphNode>) {
       actions={
         data.kind === "session"
           ? [
-              <button key="r" className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onResume?.(); }} title="Resume session">
+              <Button key="r" variant="outline" className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onResume?.(); }} title="Resume session">
                 Resume
-              </button>,
-              <button key="f" className="pg-btn pg-btn--accent" onClick={(e) => { e.stopPropagation(); data.onFork?.(); }} title="Fork session">
+              </Button>,
+              <Button key="f" variant="accent-soft" className="pg-btn pg-btn--accent" onClick={(e) => { e.stopPropagation(); data.onFork?.(); }} title="Fork session">
                 Fork
-              </button>,
+              </Button>,
             ]
           : undefined
       }

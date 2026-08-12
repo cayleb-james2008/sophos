@@ -12,7 +12,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Text, Kbd, StatusDot } from "../../design";
+import { Text, Kbd, StatusDot, Button, IconButton } from "../../design";
 import type { FollowUp, SideQuestion, SideQuestionStatus } from "./useChat";
 
 function SendIcon({ size = 15, color }: { size?: number; color: string }) {
@@ -88,12 +88,12 @@ function SideQuestionPanel({
           {meta.label}
         </Text>
         <div style={{ flex: 1 }} />
-        <button
+        <Button
+          variant="ghost"
           type="button"
           onClick={() => setOpen((o) => !o)}
           title={open ? "Hide reply" : "Show reply"}
           aria-label={open ? "Hide reply" : "Show reply"}
-          className="pa-focus-ring"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -112,13 +112,10 @@ function SideQuestionPanel({
             reply
           </Text>
           <ChevronIcon open={open} color={tokens.color.textDim} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDismiss(sq.id)}
+        </Button>
+        <IconButton
           title="Dismiss side question"
-          aria-label="Dismiss side question"
-          className="pa-focus-ring"
+          onClick={() => onDismiss(sq.id)}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -132,7 +129,7 @@ function SideQuestionPanel({
           }}
         >
           <XSmall color={tokens.color.textDim} />
-        </button>
+        </IconButton>
       </div>
       <Text variant="body" tone="default" style={{ whiteSpace: "pre-wrap" }}>
         {sq.question}
@@ -469,12 +466,12 @@ export function Composer({
           />
 
           {busy ? (
-            <button
+            <Button
+              variant="danger"
               type="button"
               onClick={onAbort}
               title="Stop generating"
               aria-label="Stop generating"
-              className="pa-focus-ring"
               style={{
                 flexShrink: 0,
                 display: "flex",
@@ -497,15 +494,15 @@ export function Composer({
               }}
             >
               <StopIcon color={tokens.color.danger} />
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
+              variant="primary"
               type="button"
               onClick={submit}
               disabled={!canSend}
               title="Send (Enter)"
               aria-label="Send message"
-              className="pa-focus-ring"
               style={{
                 flexShrink: 0,
                 display: "flex",
@@ -514,22 +511,22 @@ export function Composer({
                 width: 34,
                 height: 34,
                 borderRadius: tokens.radius.md,
-                background: canSend ? "#fff" : tokens.color.bgOverlay,
-                border: `1px solid ${canSend ? "#fff" : tokens.color.border}`,
-                color: canSend ? "#000" : tokens.color.textDim,
+                background: canSend ? tokens.color.text : tokens.color.bgOverlay,
+                border: `1px solid ${canSend ? tokens.color.text : tokens.color.border}`,
+                color: canSend ? tokens.color.bg : tokens.color.textDim,
                 cursor: canSend ? "pointer" : "not-allowed",
                 opacity: canSend ? 1 : 0.6,
                 transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
               }}
               onMouseEnter={(e) => {
-                if (canSend) e.currentTarget.style.background = "#f4f4f4";
+                if (canSend) e.currentTarget.style.background = tokens.color.text;
               }}
               onMouseLeave={(e) => {
-                if (canSend) e.currentTarget.style.background = "#fff";
+                if (canSend) e.currentTarget.style.background = tokens.color.text;
               }}
             >
-              <SendIcon color={canSend ? "#000" : tokens.color.textDim} />
-            </button>
+              <SendIcon color={canSend ? tokens.color.bg : tokens.color.textDim} />
+            </Button>
           )}
         </div>
 

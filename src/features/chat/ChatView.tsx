@@ -3,7 +3,7 @@
 // share the same design-system layer as the shell.
 
 import { useEffect, useRef, useState } from "react";
-import { Text, StatusDot } from "../../design";
+import { Text, StatusDot, Button, IconButton } from "../../design";
 import { useConnectionState, useIpc, isTauri } from "../../ipc/client";
 import { ModelSelector } from "../providers/ModelSelector";
 import { useChat } from "./useChat";
@@ -94,15 +94,15 @@ export function ChatView({ onNewSession, onSetupProviders }: { onNewSession?: ()
             <Text variant="micro" tone="muted" mono uppercase>{state.status.kind}</Text>
           </div>
           {headerButtons.map((button) => (
-            <button key={button.title} type="button" onClick={button.onClick} title={button.title} aria-label={button.title} className="pa-focus-ring chat-action-button">
+            <IconButton key={button.title} title={button.title} className="chat-action-button" onClick={button.onClick}>
               {button.icon("currentColor")}
-            </button>
+            </IconButton>
           ))}
           {onNewSession ? (
-            <button type="button" onClick={onNewSession} title="New session" className="pa-focus-ring chat-new-button">
+            <Button variant="outline" onClick={onNewSession} title="New session" className="chat-new-button">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
               New session
-            </button>
+            </Button>
           ) : null}
           <ModelSelector />
         </div>
@@ -119,7 +119,7 @@ export function ChatView({ onNewSession, onSetupProviders }: { onNewSession?: ()
           <details open={developerPreviewOpen} className="chat-developer-preview">
             <summary onClick={(event) => { event.preventDefault(); setDeveloperPreviewOpen((open) => !open); }} className="chat-developer-summary">Developer preview</summary>
             <div hidden={!developerPreviewOpen}>
-              <button type="button" onClick={() => loadDemoMessages(500)} title="Seed a 500-message transcript to test windowed rendering" className="chat-demo-button">Load 500 messages</button>
+              <Button variant="outline" type="button" onClick={() => loadDemoMessages(500)} title="Seed a 500-message transcript to test windowed rendering" className="chat-demo-button">Load 500 messages</Button>
             </div>
           </details>
         </div>

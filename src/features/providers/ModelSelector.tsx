@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Text, Spinner, Select } from "../../design";
+import { Text, Spinner, Select, Button } from "../../design";
 import { useConnectionState } from "../../ipc/client";
 import { useModels, DEFAULT_PROVIDER, DEFAULT_MODEL, type ModelSelection, type ThinkingLevel } from "./useModels";
 import { ProviderGlyph } from "./providerGlyphs";
@@ -74,12 +74,12 @@ export function ModelSelector() {
   return (
     <div ref={rootRef} style={{ position: "relative" }}>
       {/* Trigger */}
-      <button
+      <Button
+        variant="outline"
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="pa-focus-ring"
         style={{
           display: "flex",
           alignItems: "center",
@@ -118,7 +118,7 @@ export function ModelSelector() {
             {currentModel?.name ?? current.model}
           </Text>
         </span>
-        {applying ? (
+          {applying ? (
           <Spinner size={12} />
         ) : (
           <svg
@@ -135,7 +135,7 @@ export function ModelSelector() {
             <polyline points="6 9 12 15 18 9" />
           </svg>
         )}
-      </button>
+      </Button>
 
       {/* Panel */}
       {open ? (
@@ -216,13 +216,13 @@ export function ModelSelector() {
                 {group.models.map((m) => {
                   const isCurrent = m.id === current.model && m.provider === current.provider;
                   return (
-                    <button
+                    <Button
                       key={`${m.provider}:${m.id}`}
+                      variant={isCurrent ? "accent-soft" : "ghost"}
                       type="button"
                       role="option"
                       aria-selected={isCurrent}
                       onClick={() => handleSelect(m.provider, m.id)}
-                      className="pa-focus-ring"
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -263,7 +263,7 @@ export function ModelSelector() {
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       ) : null}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

@@ -221,10 +221,10 @@ function ProviderCard({
                     transition: `border-color ${tokens.motion.fast} ${tokens.motion.ease}`,
                   }}
                 >
-                  <button
+                  <Button
+                    variant="ghost"
                     type="button"
                     onClick={() => onToggle(key)}
-                    className="pa-focus-ring"
                     aria-expanded={open}
                     style={{
                       display: "flex",
@@ -280,7 +280,7 @@ function ProviderCard({
                       </span>
                       <Chevron open={open} />
                     </span>
-                  </button>
+                  </Button>
 
                   {open ? (
                     <ModelConfigEditor

@@ -5,6 +5,7 @@
 
 import type { SessionInfo, ContextStats, Goal, RlmChild } from "../../ipc/contract";
 import { initials, durationLabel, formatTokens } from "./format";
+import { IconButton } from "../../design";
 import { PlayIcon, ForkIcon, RefreshIcon, TargetIcon, LayersIcon } from "./icons";
 
 export function SessionCard({
@@ -103,15 +104,15 @@ export function SessionCard({
         )}
       </span>
       <span className="session__actions" onClick={(e) => e.stopPropagation()}>
-        <button className="session__act" title="Switch to session" onClick={onSwitch}>
+        <IconButton className="session__act" title="Switch to session" size="sm" onClick={onSwitch}>
           <PlayIcon size={13} />
-        </button>
-        <button className="session__act" title="Resume session" onClick={onResume}>
+        </IconButton>
+        <IconButton className="session__act" title="Resume session" size="sm" onClick={onResume}>
           <RefreshIcon size={13} />
-        </button>
-        <button className="session__act" title="Fork session" onClick={onFork}>
+        </IconButton>
+        <IconButton className="session__act" title="Fork session" size="sm" onClick={onFork}>
           <ForkIcon size={13} />
-        </button>
+        </IconButton>
       </span>
     </div>
   );

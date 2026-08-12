@@ -166,6 +166,17 @@ body {
   }
 }
 
+/* Loading skeleton pulse — a gentle opacity fade for placeholder blocks */
+@keyframes pa-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 @keyframes pa-shimmer {
   0% {
     background-position: -200% 0;

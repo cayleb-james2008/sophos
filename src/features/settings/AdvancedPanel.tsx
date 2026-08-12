@@ -194,7 +194,8 @@ function DaemonToggle({
   disabled?: boolean;
 }) {
   return (
-    <button
+    <Button
+      variant={checked ? "accent-soft" : "ghost"}
       type="button"
       role="switch"
       aria-checked={checked}
@@ -225,7 +226,7 @@ function DaemonToggle({
           transition: "left 120ms ease",
         }}
       />
-    </button>
+    </Button>
   );
 }
 

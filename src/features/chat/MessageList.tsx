@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { tokens } from "../../design/tokens";
-import { Text } from "../../design";
+import { Text, Button } from "../../design";
 import type { TranscriptMessage } from "../../ipc/contract";
 import { MessageRow } from "./MessageRow";
 import { useVirtualList } from "./useVirtualList";
@@ -83,13 +83,13 @@ function ChatEmptyState({ onFillPrompt }: { onFillPrompt: (text: string) => void
           }}
         >
           {STARTER_PROMPTS.map((p) => (
-            <button
+            <Button
               key={p}
+              variant="outline"
               type="button"
               onClick={() => onFillPrompt(p)}
               title={`Fill composer with: ${p}`}
               aria-label={`Starter prompt: ${p}`}
-              className="pa-focus-ring"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -113,7 +113,7 @@ function ChatEmptyState({ onFillPrompt }: { onFillPrompt: (text: string) => void
               }}
             >
               {p}
-            </button>
+            </Button>
           ))}
         </div>
         <div

@@ -9,7 +9,7 @@
 // graceful empty state.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Text } from "../../design";
+import { Button, Text, IconButton } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { SessionInfo, SessionTreeNode } from "../../ipc/contract";
 import { useSessionEvent } from "./useSessionEvent";
@@ -137,9 +137,9 @@ export function SessionTree({ session }: { session?: SessionInfo | null }) {
           <Text variant="micro" tone="danger">
             ✕ {error}
           </Text>
-          <button className="sessions__linkbtn" onClick={() => void load()}>
+          <Button variant="outline" className="sessions__linkbtn" onClick={() => void load()}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -175,9 +175,9 @@ export function SessionTree({ session }: { session?: SessionInfo | null }) {
       {toast && (
         <div className="session-tree__toast">
           <span>✓ {toast}</span>
-          <button onClick={() => setToast(null)} aria-label="Dismiss">
+          <IconButton title="Dismiss" size="sm" onClick={() => setToast(null)}>
             <XIcon size={12} />
-          </button>
+          </IconButton>
         </div>
       )}
 
@@ -188,9 +188,9 @@ export function SessionTree({ session }: { session?: SessionInfo | null }) {
               {preview.type.toUpperCase()}
             </span>
             <span className="session-tree__preview-time">{preview.timestamp ? relativeTime(preview.timestamp) : ""}</span>
-            <button className="session-tree__preview-close" onClick={() => setPreview(null)} aria-label="Close preview">
+            <IconButton className="session-tree__preview-close" title="Close preview" size="sm" onClick={() => setPreview(null)}>
               <XIcon size={12} />
-            </button>
+            </IconButton>
           </div>
           <p className="session-tree__preview-text">{preview.label || "(empty)"}</p>
           <div className="session-tree__preview-actions">
@@ -238,7 +238,8 @@ function TreeRow({
 
   return (
     <div className="session-tree__branch">
-      <button
+      <Button
+        variant="ghost"
         className={`session-tree__node session-tree__node--${cls}${selected ? " session-tree__node--selected" : ""}`}
         style={{ paddingLeft: 12 + depth * 18 }}
         onClick={() => onSelect(node)}
@@ -274,7 +275,7 @@ function TreeRow({
             {busy ? "…" : "Continue"}
           </span>
         )}
-      </button>
+      </Button>
       {hasChildren && !isCollapsed && (
         <div className="session-tree__children">
           {children.map((child) => (
