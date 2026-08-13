@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi } from "vitest";
+import React from "react";
 import {
   Text,
   Button,
@@ -79,6 +80,19 @@ describe("Input", () => {
     fireEvent.change(screen.getByDisplayValue("hello"), { target: { value: "hi" } });
     expect(onChange).toHaveBeenCalled();
   });
+
+  it("forwards a ref to the native input element", () => {
+    const ref = React.createRef<HTMLInputElement>();
+    render(<Input ref={ref} />);
+    expect(ref.current).toBeInstanceOf(HTMLInputElement);
+  });
+
+  it("forwards a ref alongside other props and reflects the value", () => {
+    const ref = React.createRef<HTMLInputElement>();
+    render(<Input ref={ref} label="Test" value="hello" onChange={() => {}} />);
+    expect(ref.current).toBeInstanceOf(HTMLInputElement);
+    expect(ref.current?.value).toBe("hello");
+  });
 });
 
 describe("TextArea", () => {
@@ -90,6 +104,12 @@ describe("TextArea", () => {
   it("shows the error state and message", () => {
     render(<TextArea error="Too long" />);
     expect(screen.getByText("Too long")).toBeInTheDocument();
+  });
+
+  it("forwards a ref to the native textarea element", () => {
+    const ref = React.createRef<HTMLTextAreaElement>();
+    render(<TextArea ref={ref} />);
+    expect(ref.current).toBeInstanceOf(HTMLTextAreaElement);
   });
 });
 
@@ -109,6 +129,12 @@ describe("Select", () => {
   it("renders a placeholder option when provided", () => {
     render(<Select options={options} placeholder="Pick one" />);
     expect(screen.getByText("Pick one")).toBeInTheDocument();
+  });
+
+  it("forwards a ref to the native select element", () => {
+    const ref = React.createRef<HTMLSelectElement>();
+    render(<Select ref={ref} options={options} />);
+    expect(ref.current).toBeInstanceOf(HTMLSelectElement);
   });
 });
 

@@ -132,6 +132,10 @@ describe("ErrorBoundary", () => {
     throw new Error("boom");
   };
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("catches a throwing child and renders the fallback", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     render(
@@ -143,6 +147,96 @@ describe("ErrorBoundary", () => {
     expect(screen.getByText("boom")).toBeInTheDocument();
     expect(screen.getByText("View")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+    spy.mockRestore();
+  });
+
+  it("renders a custom label in the fallback", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <ErrorBoundary label="Custom Label">
+        <Bomb />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Custom Label")).toBeInTheDocument();
+    spy.mockRestore();
+  });
+
+  it("replaces all children with the fallback when one child throws", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <ErrorBoundary label="View">
+        <div>Good child</div>
+        <Bomb />
+        <div>Another good child</div>
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText("Good child")).not.toBeInTheDocument();
+    expect(screen.queryByText("Another good child")).not.toBeInTheDocument();
+    spy.mockRestore();
+  });
+
+  it("lets an outer boundary catch a failure in the inner boundary's fallback", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // A component rendered as the inner boundary's label throws when the
+    // inner fallback renders it. That throw happens inside the inner
+    // boundary's own render, which a boundary does not catch — so the outer
+    // boundary must catch it.
+    const ThrowingLabel = () => {
+      throw new Error("fallback boom");
+    };
+    render(
+      <ErrorBoundary label="Outer">
+        <ErrorBoundary label={<ThrowingLabel /> as unknown as string}>
+          <Bomb />
+        </ErrorBoundary>
+      </ErrorBoundary>,
+    );
+    // The inner boundary catches Bomb and renders its fallback, but that
+    // fallback throws, so the outer boundary renders its own fallback.
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("Outer")).toBeInTheDocument();
+    // The inner boundary's default fallback text must not be present.
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+    spy.mockRestore();
+  });
+
+  it("recovers when the error clears and reload is mocked", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const reloadSpy = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { reload: reloadSpy },
+    });
+
+    const { rerender } = render(
+      <ErrorBoundary label="View">
+        <Bomb />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    // Rerender with a non-throwing child. The boundary is still in its error
+    // state, so it keeps showing the fallback until the state is reset.
+    rerender(
+      <ErrorBoundary label="View">
+        <div>Recovered</div>
+      </ErrorBoundary>,
+    );
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    // Clicking Reload resets the error state and calls reload.
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+    // After the state reset the boundary renders its children again.
+    expect(screen.getByText("Recovered")).toBeInTheDocument();
+
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: originalLocation,
+    });
     spy.mockRestore();
   });
 });
