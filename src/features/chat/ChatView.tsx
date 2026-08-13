@@ -11,7 +11,8 @@ import { useChat } from "./useChat";
 import { MessageList } from "./MessageList";
 import { Composer } from "./Composer";
 import { ContextBar } from "./ContextBar";
-import { FirstRunBanner, useOnboardingStatus } from "../settings/FirstRunBanner";
+import { useOnboardingStatus } from "../settings/FirstRunBanner";
+import { OnboardingWizard } from "../settings/OnboardingWizard";
 import "./chat.css";
 
 function statusDotState(status: { kind: string }): "connecting" | "connected" | "disconnected" | "reconnecting" {
@@ -115,7 +116,7 @@ export function ChatView() {
 
       {error ? <div className="chat-error"><Text variant="label" tone="danger">{error}</Text></div> : null}
 
-      <FirstRunBanner onSetupProviders={handleSetupProviders} onStartChat={onStartChat} hasFirstMessage={hasFirstMessage} setup={onboarding} />
+      <OnboardingWizard onSetupProviders={handleSetupProviders} onStartChat={onStartChat} hasFirstMessage={hasFirstMessage} setup={onboarding} />
 
       {import.meta.env.DEV && !isTauri ? (
         <div className="chat-demo">

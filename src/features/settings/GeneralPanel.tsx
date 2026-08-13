@@ -5,6 +5,8 @@
 import { useEffect, useState } from "react";
 import { Text, Card, Input, Select, Button, Badge } from "../../design";
 import { useIpc } from "../../ipc/client";
+import { useAppState } from "../../state/AppState";
+import { clearOnboardingDismissed } from "./FirstRunBanner";
 import type { Settings } from "../../ipc/contract";
 
 const THEME_OPTIONS = [
@@ -15,6 +17,7 @@ const THEME_OPTIONS = [
 
 export function GeneralPanel() {
   const ipc = useIpc();
+  const { setView } = useAppState();
   const [draft, setDraft] = useState<Settings>({});
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -49,6 +52,11 @@ export function GeneralPanel() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const runOnboardingAgain = () => {
+    clearOnboardingDismissed();
+    setView("chat");
   };
 
   return (
@@ -113,6 +121,9 @@ export function GeneralPanel() {
         <div className="gp-foot">
           <Button variant="ghost" onClick={() => setDraft({})} disabled={!loaded}>
             Reset
+          </Button>
+          <Button variant="ghost" onClick={runOnboardingAgain} title="Clear the first-run dismiss flag and relaunch the onboarding wizard">
+            Run onboarding again
           </Button>
           <Button variant="primary" onClick={save} loading={saving} disabled={!loaded}>
             Save changes

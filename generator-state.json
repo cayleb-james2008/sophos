@@ -1,45 +1,14 @@
 {
-  "piece": "P3 — Slash-Command Autocomplete in the Composer (gauntlet-sessions)",
-  "status": "BUILT — awaiting critic re-verification (round 2)",
-  "date": "2026-08-13",
-  "breadcrumbs": [
-    {
-      "t": "round1-verdict",
-      "note": "Critic round 1 FAIL claimed the piece was not built (said SlashAutocomplete.tsx does not exist, no getSlashCommands in IPC, ComposerInput untouched). That verdict was based on stale state: generator-state.json still described a prior P1 build and the critic evidently read a stale checkout. The P3 code was already present in the working tree. Re-verified the working tree, added the missing CSS, fixed one TS6133 (unused onDismiss -> renamed _onDismiss), and re-ran gates."
-    },
-    {
-      "t": "contract-append",
-      "note": "contract.ts: appended `| { method: \"getSlashCommands\"; params: {} }` to IpcCommand union (after testMcpServer, which another worker added) and SlashCommand interface at end of Data shapes. Append-only; no existing lines touched."
-    },
-    {
-      "t": "client-append",
-      "note": "client.ts: added getSlashCommands to IpcClient interface, TauriIpcClient (send getSlashCommands), MockIpcClient (returns mockSlashCommands — 31 builtin commands derived from the prime-agent reference). Imported SlashCommand."
-    },
-    {
-      "t": "component",
-      "note": "SlashAutocomplete.tsx (NEW): fuzzy subsequence match, rank exact-prefix > startsWith > subsequence > alphabetical, max 8 visible, selected highlight, click-to-select, mono command names + dim descriptions. Exports filterSlashCommands for reuse."
-    },
-    {
-      "t": "composer-integration",
-      "note": "ComposerInput.tsx: useIpc() + useEffect fetch getSlashCommands on mount; updateSlashState opens dropdown when value starts with '/' and cursor on first line and no space after command; onKeyDown intercepts ArrowDown/ArrowUp/Enter/Escape ONLY while open; Enter inserts '/name ' and closes; renders SlashAutocomplete below textarea. Existing Enter/Alt+Enter/Escape/Alt+Up handling preserved."
-    },
-    {
-      "t": "css",
-      "note": "chat.css: appended .slash-autocomplete (absolute above input, dark #151515, green ring, max-height 264px scroll) + item/name/desc/more styles."
-    },
-    {
-      "t": "verify",
-      "note": "npx tsc --noEmit -> 0 errors. npx vitest run -> 86/86 pass."
-    }
+  "piece": "Onboarding Wizard",
+  "generator": "5402881a-fac7-4df5-ab73-ae62f102698c",
+  "sprint": 1,
+  "timeline": [
+    { "t": "start", "note": "Read role docs, loop protocol, and all context files (FirstRunBanner, GeneralPanel, onboarding.css, ChatView, AppState, design core/tokens, ipc client/contract, useModels, ModelSelector, SettingsView, App.tsx)." },
+    { "t": "design", "note": "Chose new OnboardingWizard.tsx over in-place refactor; kept FirstRunBanner.tsx as re-export home for useOnboardingStatus + FirstRunBanner alias + new clearOnboardingDismissed helper. Avoided circular import by keeping useOnboardingStatus in FirstRunBanner and importing its type into the wizard." },
+    { "t": "build", "note": "Created OnboardingWizard.tsx with 4 steps (welcome/provider/model/firstPrompt), progress rail, Skip at every step + footer Esc-to-dismiss, reuses setup prop from useOnboardingStatus, uses useConnectionState + useModels for model step. Wired ChatView to OnboardingWizard. Added 'Run onboarding again' button in GeneralPanel (clears dismiss flag + setView('chat')). Added wizard CSS to onboarding.css." },
+    { "t": "fix", "note": "tsc TS6133: removed unused useIpc import and unused liveReady prop in ProviderStep. tsc clean after." },
+    { "t": "verify", "note": "tsc --noEmit exit 0. vitest run 6 files / 86 tests pass. npm run build succeeds. Dev server on :1420 serves HTTP 200; OnboardingWizard/GeneralPanel/ChatView/FirstRunBanner modules transform with no vite errors." }
   ],
-  "files_changed": [
-    "src/features/chat/SlashAutocomplete.tsx",
-    "src/features/chat/ComposerInput.tsx",
-    "src/ipc/contract.ts",
-    "src/ipc/client.ts",
-    "src/features/chat/chat.css"
-  ],
-  "unverified": [
-    "real daemon (Tauri) getSlashCommands path — verified against MockIpcClient; the Tauri client forwards the command to the sidecar which owns the real command discovery"
-  ]
+  "gates": { "tsc": "pass", "vitest": "pass (86/86)", "build": "pass", "dev_server": "pass (HTTP 200, no transform errors)" },
+  "preserved": ["useOnboardingStatus export", "FirstRunBanner alias export", "onSetupProviders/onStartChat callback pattern", "IPC contract types unchanged", "no new npm deps"]
 }
