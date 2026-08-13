@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    # verify/e2e.mjs is Windows-specific: it drives named-pipe transports
+    # (`\\.\pipe\...`), uses `taskkill /T` for process-tree teardown, and boots
+    # a bundled `node-v24.18.0-win-x64` runtime. Run the whole job on Windows.
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npx vitest run
+
+      # e2e.mjs boots the BUNDLED runtime (resources/node/<version>/node.exe +
+      # resources/daemon/dist + resources/bridge/dist + shared node_modules),
+      # which is gitignored and assembled only on the developer machine by
+      # `node scripts/bundle.mjs` (it needs a local prime-agent-ref checkout and
+      # the AppData node_modules ship — neither exists in a fresh CI checkout).
+      # So this step is best-effort here: it still runs, but a failure does not
+      # red the build. Run `node scripts/bundle.mjs && node verify/e2e.mjs`
+      # locally before merge; see CONTRIBUTING.md.
+      - name: End-to-end verification (best-effort)
+        run: node verify/e2e.mjs
+        continue-on-error: true

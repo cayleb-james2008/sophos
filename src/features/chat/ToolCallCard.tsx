@@ -44,39 +44,16 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
   const showDiff = isEdit && edit !== null;
 
   return (
-    <div
-      className="tool-call-card"
-      style={{
-        border: `1px solid ${tokens.color.border}`,
-        borderLeft: `3px solid ${tokens.color.tool}`,
-        borderRadius: tokens.radius.md,
-        background: tokens.color.bgElevated,
-        overflow: "hidden",
-      }}
-    >
+    <div className="tool-call-card">
       {/* Header */}
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.sm,
-          padding: "7px 12px",
-          borderBottom: hasOutput || hasInput ? `1px solid ${tokens.color.border}` : "none",
-        }}
+        className={`tool-call-header${!hasOutput && !hasInput ? " tool-call-header--noborder" : ""}`}
       >
         <ToolIcon color={call.status === "error" ? tokens.color.danger : tokens.color.tool} />
-        <span
-          style={{
-            fontFamily: tokens.font.mono,
-            fontSize: 12.5,
-            lineHeight: 1,
-            color: tokens.color.accent,
-            userSelect: "none",
-          }}
-        >
+        <span className="tool-call-prompt">
           $
         </span>
-        <Text variant="label" weight="medium" mono style={{ fontSize: 12.5 }}>
+        <Text variant="label" weight="medium" mono className="tool-call-name">
           {call.name}
         </Text>
         <Badge tone={meta.tone} dot>
@@ -89,17 +66,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
             variant="ghost"
             type="button"
             onClick={() => setShowInput((s) => !s)}
-            style={{
-              marginLeft: "auto",
-              background: "transparent",
-              border: "none",
-              color: tokens.color.textDim,
-              cursor: "pointer",
-              fontFamily: tokens.font.sans,
-              fontSize: tokens.font.size.xs,
-              padding: "2px 6px",
-              borderRadius: tokens.radius.sm,
-            }}
+            className="tool-call-btn tool-call-btn--right"
           >
             {showInput ? "hide input" : "input"}
           </Button>
@@ -109,16 +76,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
             variant="ghost"
             type="button"
             onClick={() => setShowOutput((s) => !s)}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: tokens.color.textDim,
-              cursor: "pointer",
-              fontFamily: tokens.font.sans,
-              fontSize: tokens.font.size.xs,
-              padding: "2px 6px",
-              borderRadius: tokens.radius.sm,
-            }}
+            className="tool-call-btn"
           >
             {showOutput ? "hide output" : "output"}
           </Button>
@@ -127,13 +85,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
 
       {/* Diff — the default view for file-edit calls */}
       {showDiff ? (
-        <div
-          style={{
-            padding: `${tokens.space.sm} ${tokens.space.md}`,
-            borderBottom: `1px solid ${tokens.color.border}`,
-            background: tokens.color.bg,
-          }}
-        >
+        <div className="tool-call-pad">
           <DiffView
             filePath={edit!.filePath || call.name}
             lines={diffLines(edit!.before, edit!.after)}
@@ -144,27 +96,11 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
 
       {/* Input */}
       {hasInput && showInput ? (
-        <div
-          style={{
-            padding: `${tokens.space.sm} ${tokens.space.md}`,
-            borderBottom: `1px solid ${tokens.color.border}`,
-            background: tokens.color.bg,
-          }}
-        >
-          <Text variant="micro" tone="dim" mono uppercase style={{ marginBottom: tokens.space.xs }}>
+        <div className="tool-call-pad">
+          <Text variant="micro" tone="dim" mono uppercase className="tool-call-label">
             Input
           </Text>
-          <pre
-            style={{
-              margin: 0,
-              fontFamily: tokens.font.mono,
-              fontSize: tokens.font.size.xs,
-              lineHeight: 1.6,
-              color: tokens.color.textMuted,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
+          <pre className="tool-call-pre">
             {call.input}
           </pre>
         </div>
@@ -174,35 +110,18 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
           "output" button (the diff is the default view); for all other tools
           the existing highlighted output with collapse/expand is kept. */}
       {isEdit && hasOutput && showOutput ? (
-        <div style={{ padding: `${tokens.space.sm} ${tokens.space.md}`, background: tokens.color.bg }}>
-          <Text variant="micro" tone="dim" mono uppercase style={{ marginBottom: tokens.space.xs }}>
+        <div className="tool-call-pad tool-call-pad--last">
+          <Text variant="micro" tone="dim" mono uppercase className="tool-call-label">
             Output
           </Text>
-          <pre
-            style={{
-              margin: 0,
-              fontFamily: tokens.font.mono,
-              fontSize: tokens.font.size.xs,
-              lineHeight: 1.6,
-              color: tokens.color.textMuted,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
+          <pre className="tool-call-pre">
             {call.output}
           </pre>
         </div>
       ) : null}
       {!isEdit && hasOutput ? (
-        <div style={{ padding: `${tokens.space.sm} ${tokens.space.md}`, background: tokens.color.bg }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: tokens.space.xs,
-            }}
-          >
+        <div className="tool-call-pad">
+          <div className="tool-call-outrow">
             <Text variant="micro" tone="dim" mono uppercase>
               Output
             </Text>
@@ -210,16 +129,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
               variant="ghost"
               type="button"
               onClick={() => setShowOutput((s) => !s)}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: tokens.color.textDim,
-                cursor: "pointer",
-                fontFamily: tokens.font.sans,
-                fontSize: tokens.font.size.xs,
-                padding: "2px 6px",
-                borderRadius: tokens.radius.sm,
-              }}
+              className="tool-call-btn"
             >
               {showOutput ? "collapse" : "expand"}
             </Button>

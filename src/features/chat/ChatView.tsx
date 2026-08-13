@@ -51,7 +51,7 @@ export function ChatView() {
     messages, busy, loaded, error, hasFirstMessage, send, steer, abort,
     queueFollowUp, clearFollowUps, popFollowUp, followUps, steered,
     shellNotice, askSideQuestion, dismissSideQuestion, sideQuestions,
-    runShell, contextStats, setSessionName, loadDemoMessages, editDraft,
+    runShell, contextStats, setSessionName, editDraft,
     requestEdit, retry,
   } = chat;
 
@@ -117,14 +117,14 @@ export function ChatView() {
 
       <FirstRunBanner onSetupProviders={handleSetupProviders} onStartChat={onStartChat} hasFirstMessage={hasFirstMessage} setup={onboarding} />
 
-      {!isTauri ? (
+      {import.meta.env.DEV && !isTauri ? (
         <div className="chat-demo">
           <span className="chat-demo-dot" aria-hidden="true" />
           <Text variant="label" tone="muted">Demo mode — engine not connected. Responses here are simulated and do not reflect real tools or data.</Text>
           <details open={developerPreviewOpen} className="chat-developer-preview">
             <summary onClick={(event) => { event.preventDefault(); setDeveloperPreviewOpen((open) => !open); }} className="chat-developer-summary">Developer preview</summary>
             <div hidden={!developerPreviewOpen}>
-              <Button variant="outline" type="button" onClick={() => loadDemoMessages(500)} title="Seed a 500-message transcript to test windowed rendering" className="chat-demo-button">Load 500 messages</Button>
+              <Button variant="outline" type="button" onClick={() => chat.loadDemoMessages(500)} title="Seed a 500-message transcript to test windowed rendering" className="chat-demo-button">Load 500 messages</Button>
             </div>
           </details>
         </div>

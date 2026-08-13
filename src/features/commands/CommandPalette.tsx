@@ -11,7 +11,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { tokens } from "../../design/tokens";
 import { Text, Kbd, Button } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { View } from "../../shell/nav";
@@ -57,7 +56,7 @@ function HighlightedSnippet({ snippet }: { snippet: { text: string; matchStart: 
   return (
     <span>
       {before}
-      <span style={{ color: tokens.color.accentHover, background: tokens.color.accentSoft }}>{match}</span>
+      <span className="palette__match">{match}</span>
       {after}
     </span>
   );
@@ -389,23 +388,8 @@ export function CommandPalette({
         {/* List / sub-mode UI */}
         <div ref={listRef} className="palette__list">
           {submode === "naming" ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                padding: "14px 16px",
-              }}
-            >
-              <label
-                style={{
-                  fontFamily: tokens.font.mono,
-                  fontSize: 12,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  color: tokens.color.textMuted,
-                }}
-              >
+            <div className="palette__form">
+              <label className="palette__formlabel">
                 Set session name
               </label>
               <input
@@ -424,38 +408,18 @@ export function CommandPalette({
                 }}
                 placeholder="e.g. My task"
                 aria-label="Session name"
-                className="pa-focus-ring"
-                style={{
-                  width: "100%",
-                  padding: "7px 10px",
-                  borderRadius: tokens.radius.md,
-                  background: tokens.color.bgElevated,
-                  border: `1px solid ${tokens.color.borderStrong}`,
-                  color: tokens.color.text,
-                  fontFamily: tokens.font.sans,
-                  fontSize: tokens.font.size.md,
-                  outline: "none",
-                }}
+                className="palette__field pa-focus-ring"
               />
               {nameErr ? (
-                <span style={{ color: tokens.color.danger, fontSize: 12 }}>{nameErr}</span>
+                <span className="palette__error">{nameErr}</span>
               ) : null}
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className="palette__actions">
                 <Button
                   variant="accent-soft"
                   type="button"
                   onClick={() => void submitName()}
                   disabled={nameBusy || !nameValue.trim()}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: tokens.radius.md,
-                    background: nameValue.trim() && !nameBusy ? tokens.color.accent : tokens.color.bgOverlay,
-                    border: `1px solid ${tokens.color.accent}`,
-                    color: nameValue.trim() && !nameBusy ? tokens.color.text : tokens.color.textDim,
-                    cursor: nameValue.trim() && !nameBusy ? "pointer" : "not-allowed",
-                    fontFamily: tokens.font.sans,
-                    fontSize: tokens.font.size.sm,
-                  }}
+                  className={`palette__savebtn ${nameValue.trim() && !nameBusy ? "palette__savebtn--on" : "palette__savebtn--off"}`}
                 >
                   {nameBusy ? "Saving…" : "Save"}
                 </Button>
@@ -463,16 +427,7 @@ export function CommandPalette({
                   variant="ghost"
                   type="button"
                   onClick={() => setSubmode("none")}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: tokens.radius.md,
-                    background: "transparent",
-                    border: `1px solid ${tokens.color.borderStrong}`,
-                    color: tokens.color.textMuted,
-                    cursor: "pointer",
-                    fontFamily: tokens.font.sans,
-                    fontSize: tokens.font.size.sm,
-                  }}
+                  className="palette__cancelbtn"
                 >
                   Cancel
                 </Button>
@@ -491,18 +446,7 @@ export function CommandPalette({
                 onKeyDown={(e) => onSearchKeyDown(e, sessionResults.length, selectSession)}
                 placeholder="Search session titles…"
                 aria-label="Search sessions"
-                className="pa-focus-ring"
-                style={{
-                  width: "100%",
-                  padding: "7px 10px",
-                  borderRadius: tokens.radius.md,
-                  background: tokens.color.bgElevated,
-                  border: `1px solid ${tokens.color.borderStrong}`,
-                  color: tokens.color.text,
-                  fontFamily: tokens.font.sans,
-                  fontSize: tokens.font.size.md,
-                  outline: "none",
-                }}
+                className="palette__field pa-focus-ring"
               />
               {sessionsError ? (
                 <div className="palette__empty">Sessions unavailable — {sessionsError}</div>
@@ -552,18 +496,7 @@ export function CommandPalette({
                 onKeyDown={(e) => onSearchKeyDown(e, transcriptResults.length, selectTranscript)}
                 placeholder="Search the current session's messages…"
                 aria-label="Search transcript"
-                className="pa-focus-ring"
-                style={{
-                  width: "100%",
-                  padding: "7px 10px",
-                  borderRadius: tokens.radius.md,
-                  background: tokens.color.bgElevated,
-                  border: `1px solid ${tokens.color.borderStrong}`,
-                  color: tokens.color.text,
-                  fontFamily: tokens.font.sans,
-                  fontSize: tokens.font.size.md,
-                  outline: "none",
-                }}
+                className="palette__field pa-focus-ring"
               />
               {messages.length === 0 ? (
                 <div className="palette__empty">No messages in the current session to search</div>
@@ -632,7 +565,7 @@ export function CommandPalette({
                   className={`palette__row ${active ? "palette__row--active" : ""}`}
                 >
                   <span className="palette__rowicon">
-                    {item.cmd.icon ?? <span style={{ fontFamily: tokens.font.mono, fontSize: 13 }}>›</span>}
+                    {item.cmd.icon ?? <span className="palette__glyphicon">›</span>}
                   </span>
                   <span className="palette__rowmeta">
                     <span className="palette__rowlabel">{item.cmd.label}</span>

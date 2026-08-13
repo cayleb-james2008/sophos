@@ -3,7 +3,6 @@
 // 80%, centered with the live percentage and token count. Pure presentational;
 // the caller owns the ContextStats lookup.
 
-import { tokens } from "../../design/tokens";
 import { formatTokens } from "./format";
 
 export function ContextRing({
@@ -40,7 +39,7 @@ export function ContextRing({
         />
       </svg>
       <div className="ctx-ring__center">
-        <b style={{ color: danger ? tokens.color.err : tokens.color.accentHover }}>{pct}%</b>
+        <b className={`ctx-ring__pct${danger ? " ctx-ring__pct--danger" : ""}`}>{pct}%</b>
         <span title={`${t ?? "—"} of ${contextWindow ?? "—"} tokens`}>{formatTokens(t)}</span>
         {messages != null && <em>{messages}</em>}
       </div>

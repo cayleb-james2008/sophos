@@ -1,0 +1,75 @@
+/* Goals — the persistent-goals panel. Flat, ruled, same language as the
+   other long-running panels. */
+
+.goals-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.goals-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #2a2a2a;
+}
+.goals-headmain { flex: 1; min-width: 0; }
+.goals-headsub { margin-left: 8px; }
+.goals-chevron {
+  display: inline-flex;
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.goals-chevron.is-open { transform: rotate(90deg); }
+.goals-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 22px;
+}
+.goals-section {
+  border-top: 1px solid #2a2a2a;
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.goals-stalled {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 0;
+  background: rgba(243, 188, 86, 0.078);
+  border: 1px solid rgba(243, 188, 86, 0.25);
+}
+.goals-stalledmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.goals-form { display: flex; gap: 8px; align-items: flex-end; }
+.goals-formmain { flex: 1; }
+.goals-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 0;
+  background: #151515;
+  border: 1px dashed #2c2c2c;
+}
+.goals-list { display: flex; flex-direction: column; gap: 12px; }
+.goals-row { display: flex; align-items: flex-start; gap: 12px; }
+.goals-rowdot {
+  margin-top: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(244, 244, 244, 0.45);
+}
+.goals-rowdot--active { background: #85ed75; }
+.goals-rowdot--paused { background: #f3bc56; }
+.goals-rowdot--completed { background: #9fff8a; }
+.goals-rowmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.goals-rowtitle { line-height: 1.5; }
+.goals-rowbadges { display: flex; align-items: center; gap: 8px; }
+.goals-rowprogress { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.goals-rowactions { display: flex; gap: 8px; margin-top: 2px; }
+.goals-head--closed { border-bottom: none; }

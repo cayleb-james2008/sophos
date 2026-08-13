@@ -1517,3 +1517,17 @@
   }
   .sessions__inspector-close:hover { color: #f4f4f4; background: #151515; }
 }
+.ctx-ring__pct { color: #9fff8a; }
+.ctx-ring__pct--danger { color: #ef4444; }
+
+/* ---- Inline-style purge ---- */
+.detail { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.ns-form { display: flex; flex-direction: column; gap: 22px; }
+.ns-field { display: flex; flex-direction: column; gap: 8px; }
+.ns-row { display: flex; align-items: center; gap: 8px; }
+.ns-check { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.ns-checkbox { width: 14px; height: 14px; accent-color: #85ed75; cursor: pointer; }
+.goal__dot--active { background: #85ed75; }
+.goal__dot--completed { background: #8b7cf6; }
+.goal__dot--paused { background: #f3bc56; }
+.goal__dot--idle { background: rgba(244, 244, 244, 0.45); }

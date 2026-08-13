@@ -4,22 +4,8 @@
 // output is rendered as React elements, so it stays XSS-safe.
 
 import React from "react";
-import { tokens } from "../../design/tokens";
 
 type CSS = React.CSSProperties;
-
-// Palette tuned to the terminal-minimal aesthetic (green / amber / cyan).
-const C = {
-  keyword: tokens.color.accentHover, // terminal green (light)
-  string: tokens.color.ok, // terminal green
-  number: tokens.color.warning, // amber
-  comment: tokens.color.textDim,
-  key: tokens.color.tool, // cyan
-  bool: tokens.color.warning, // amber
-  func: tokens.color.accentHover, // terminal green (light)
-  plain: tokens.color.textMuted,
-  punct: tokens.color.textDim,
-};
 
 export type Lang = "json" | "python" | "shell" | "plain";
 
@@ -38,7 +24,7 @@ export function detectLang(text: string): Lang {
 
 interface Tok {
   text: string;
-  cls: keyof typeof C;
+  cls: "keyword" | "string" | "number" | "comment" | "key" | "bool" | "func" | "plain" | "punct";
 }
 
 function tokenizeJson(text: string): Tok[] {
@@ -141,20 +127,9 @@ export function HighlightedCode({ code, lang, style }: { code: string; lang?: La
     detected === "json" ? tokenizeJson(code) : detected === "python" ? tokenizePython(code) : detected === "shell" ? tokenizeShell(code) : tokenizePlain(code);
 
   return (
-    <pre
-      style={{
-        margin: 0,
-        fontFamily: tokens.font.mono,
-        fontSize: tokens.font.size.xs,
-        lineHeight: 1.6,
-        color: C.plain,
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-word",
-        ...style,
-      }}
-    >
+    <pre className="hl-code" style={style}>
       {tokensArr.map((t, i) => (
-        <span key={i} style={{ color: C[t.cls] }}>
+        <span key={i} className={`hl-tok hl-tok--${t.cls}`}>
           {t.text}
         </span>
       ))}

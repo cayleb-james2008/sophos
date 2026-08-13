@@ -2,9 +2,9 @@
 // and the composer. Displays token count, context window, and message count
 // from ContextStats (ipc.getContextStats / context_stats|usage events).
 
-import { tokens } from "../../design/tokens";
 import { Text } from "../../design";
 import type { ContextStats } from "../../ipc/contract";
+import type { CSSProperties } from "react";
 
 function fmt(n: number | undefined): string {
   if (typeof n !== "number" || !Number.isFinite(n)) return "—";
@@ -27,23 +27,8 @@ export function ContextBar({ stats }: { stats: ContextStats | null }) {
       : undefined;
 
   return (
-    <div
-      style={{
-        flexShrink: 0,
-        padding: `${tokens.space.sm} ${tokens.space.xl}`,
-        borderTop: `1px solid ${tokens.color.border}`,
-        background: `linear-gradient(180deg, ${tokens.color.bgElevated}66, transparent)`,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: tokens.layout.maxContentW,
-          margin: "0 auto",
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.md,
-        }}
-      >
+    <div className="context-bar">
+      <div className="context-bar-inner">
         <Text variant="micro" tone="dim" mono uppercase>
           context
         </Text>
@@ -61,25 +46,15 @@ export function ContextBar({ stats }: { stats: ContextStats | null }) {
             aria-valuemin={0}
             aria-valuemax={100}
             title={`${percent.toFixed(1)}% of context window`}
-            style={{
-              width: 96,
-              height: 4,
-              borderRadius: tokens.radius.sm,
-              background: tokens.color.bgOverlay,
-              overflow: "hidden",
-            }}
+            className="context-bar-meter"
           >
             <div
-              style={{
-                height: "100%",
-                width: `${percent}%`,
-                borderRadius: tokens.radius.sm,
-                background: percent > 80 ? tokens.color.warning : percent > 50 ? tokens.color.accent : tokens.color.success,
-              }}
+              className={`context-bar-meter-fill${percent > 80 ? " context-bar-meter-fill--warn" : ""}`}
+              style={{ "--ctx": `${percent}%` } as CSSProperties}
             />
           </div>
         ) : null}
-        <div style={{ flex: 1 }} />
+        <div className="context-bar-spacer" />
         <Text variant="micro" tone="muted" mono>
           {fmt(messagesN)} messages
         </Text>

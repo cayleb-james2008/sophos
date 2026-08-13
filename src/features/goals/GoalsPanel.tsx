@@ -12,13 +12,13 @@
 // them done.
 
 import { useEffect, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input, IconButton, type BadgeTone } from "../../design";
 import { useIpc, useConnectionState } from "../../ipc/client";
 import type { Goal } from "../../ipc/contract";
 import { PlusIcon, ChevronRightIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "../longrunning/useActionError";
 import { useStall } from "../longrunning/useStall";
+import "./goals.css";
 
 function goalBadge(status: Goal["status"]): { label: string; tone: BadgeTone } {
   switch (status) {
@@ -41,14 +41,6 @@ export interface GoalsPanelProps {
   /** Optional header title override. */
   title?: string;
 }
-
-const section: React.CSSProperties = {
-  borderTop: `1px solid ${tokens.color.line}`,
-  paddingTop: tokens.space.lg,
-  display: "flex",
-  flexDirection: "column",
-  gap: tokens.space.md,
-};
 
 export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Goals" }: GoalsPanelProps) {
   const ipc = useIpc();
@@ -122,20 +114,12 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
   return (
     <Card variant="raised" padding="none" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Header — the active-goal state answer. */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.md,
-          padding: `${tokens.space.md} ${tokens.space.lg}`,
-          borderBottom: open ? `1px solid ${tokens.color.border}` : "none",
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
+      <div className={`goals-head${open ? "" : " goals-head--closed"}`}>
+        <div className="goals-headmain">
           <Text variant="label" weight="semibold">
             {title}
           </Text>
-          <Text variant="micro" tone="dim" style={{ marginLeft: tokens.space.sm }}>
+          <Text variant="micro" tone="dim" className="goals-headsub">
             {activeCount > 0 ? `${activeCount} active` : "no active goals"}
           </Text>
         </div>
@@ -148,7 +132,7 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
             onClick={() => setOpen((o) => !o)}
             size="sm"
           >
-            <span style={{ display: "inline-flex", transform: open ? "rotate(90deg)" : "none", transition: "transform 160ms cubic-bezier(0.16,1,0.3,1)" }}>
+            <span className={`goals-chevron${open ? " is-open" : ""}`}>
               <ChevronRightIcon size={14} />
             </span>
           </IconButton>
@@ -156,9 +140,9 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
       </div>
 
       {open ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg, padding: tokens.space.lg }}>
+        <div className="goals-body">
           {/* State + action: set a goal up front, then the list. */}
-          <div style={section}>
+          <div className="goals-section">
             <Text variant="label" weight="semibold" tone={activeCount > 0 ? "success" : "default"}>
               {activeCount > 0
                 ? `${activeCount} active goal${activeCount > 1 ? "s" : ""} in progress — manage or set another.`
@@ -176,17 +160,9 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
             {stalled ? (
               <div
                 role="alert"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: tokens.space.md,
-                  padding: `${tokens.space.sm} ${tokens.space.md}`,
-                  borderRadius: tokens.radius.md,
-                  background: tokens.color.warning + "14",
-                  border: `1px solid ${tokens.color.warning}40`,
-                }}
+                className="goals-stalled"
               >
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                <div className="goals-stalledmain">
                   <Text variant="label" weight="semibold" tone="warning">
                     No progress reported for 5+ min
                   </Text>
@@ -219,9 +195,9 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
                 clearError();
                 void setGoal();
               }}
-              style={{ display: "flex", gap: tokens.space.sm, alignItems: "flex-end" }}
+              className="goals-form"
             >
-              <div style={{ flex: 1 }}>
+              <div className="goals-formmain">
                 <Input
                   label="Set goal"
                   placeholder="e.g. Ship the release and verify every artifact"
@@ -237,22 +213,12 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
           </div>
 
           {/* List — plain ruled rows, not nested bordered boxes. */}
-          <div style={section}>
+          <div className="goals-section">
             <Text variant="micro" tone="dim" uppercase>
               Goals
             </Text>
             {goals.length === 0 ? (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: tokens.space.sm,
-                  padding: tokens.space.lg,
-                  borderRadius: tokens.radius.md,
-                  background: tokens.color.bgElevated,
-                  border: `1px dashed ${tokens.color.borderStrong}`,
-                }}
-              >
+              <div className="goals-empty">
                 <Text variant="label" tone="muted">
                   No active goals
                 </Text>
@@ -263,50 +229,32 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
                 </Text>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.md }}>
+              <div className="goals-list">
                 {goals.map((g) => {
                   const b = goalBadge(g.status);
                   return (
                     <div
                       key={g.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: tokens.space.md,
-                      }}
+                      className="goals-row"
                     >
                       <span
-                        style={{
-                          marginTop: 3,
-                          width: 8,
-                          height: 8,
-                          borderRadius: "50%",
-                          flexShrink: 0,
-                          background:
-                            g.status === "active"
-                              ? tokens.color.success
-                              : g.status === "paused"
-                                ? tokens.color.warning
-                                : g.status === "completed"
-                                  ? tokens.color.accentHover
-                                  : tokens.color.textDim,
-                        }}
+                        className={`goals-rowdot${g.status === "active" ? " goals-rowdot--active" : g.status === "paused" ? " goals-rowdot--paused" : g.status === "completed" ? " goals-rowdot--completed" : ""}`}
                       />
-                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-                        <Text variant="label" weight="medium" style={{ lineHeight: tokens.font.leading.normal }}>
+                      <div className="goals-rowmain">
+                        <Text variant="label" weight="medium" className="goals-rowtitle">
                           {g.objective}
                         </Text>
-                        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+                        <div className="goals-rowbadges">
                           <Badge tone={b.tone} dot>
                             {b.label}
                           </Badge>
                           {g.progress ? (
-                            <Text variant="micro" tone="dim" mono style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            <Text variant="micro" tone="dim" mono className="goals-rowprogress">
                               {g.progress}
                             </Text>
                           ) : null}
                         </div>
-                        <div style={{ display: "flex", gap: tokens.space.sm, marginTop: 2 }}>
+                        <div className="goals-rowactions">
                           {g.status === "active" ? (
                             <Button variant="ghost" size="sm" onClick={() => void update("pause", g.id)} disabled={busy}>
                               Pause

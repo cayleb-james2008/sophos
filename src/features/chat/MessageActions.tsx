@@ -12,7 +12,6 @@
 // clipboard API is unavailable.
 
 import { useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Button } from "../../design";
 
 function ActionButton({
@@ -33,27 +32,7 @@ function ActionButton({
       aria-label={label}
       title={title}
       onClick={onClick}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 22,
-        height: 22,
-        borderRadius: tokens.radius.sm,
-        background: "transparent",
-        border: "none",
-        color: tokens.color.textDim,
-        cursor: "pointer",
-        transition: `color ${tokens.motion.fast} ${tokens.motion.ease}, background ${tokens.motion.fast} ${tokens.motion.ease}`,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.color = tokens.color.text;
-        e.currentTarget.style.background = tokens.color.bgRaised;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.color = tokens.color.textDim;
-        e.currentTarget.style.background = "transparent";
-      }}
+      className="message-action-btn"
     >
       {children}
     </Button>
@@ -139,14 +118,7 @@ export function MessageActions({
     <div
       onMouseEnter={() => setVisible(true)}
       onMouseLeave={() => setVisible(false)}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 2,
-        opacity: visible || copied ? 1 : 0,
-        transform: visible || copied ? "translateY(0)" : "translateY(-2px)",
-        transition: `opacity ${tokens.motion.fast} ${tokens.motion.ease}, transform ${tokens.motion.fast} ${tokens.motion.ease}`,
-      }}
+      className={`message-actions${visible || copied ? " is-visible" : ""}`}
     >
       <ActionButton label="Copy message" title={copied ? "Copied" : "Copy"} onClick={copy}>
         {copied ? <CheckGlyph /> : <CopyGlyph />}

@@ -3,7 +3,6 @@
 // persists via setSettings().
 
 import { useEffect, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, Card, Input, Select, Button, Badge } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { Settings } from "../../ipc/contract";
@@ -54,15 +53,15 @@ export function GeneralPanel() {
 
   return (
     <Card variant="raised" padding="lg">
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="gp-form">
+        <div className="gp-head">
           <Text variant="label" weight="semibold">
             General preferences
           </Text>
           {saved ? <Badge tone="success" dot>Saved</Badge> : <Badge tone="neutral">Local</Badge>}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: tokens.space.lg }}>
+        <div className="gp-grid">
           <Select
             label="Theme"
             options={THEME_OPTIONS}
@@ -86,7 +85,7 @@ export function GeneralPanel() {
           hint="Model used for new sessions"
         />
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: tokens.space.lg }}>
+        <div className="gp-grid">
           <Input
             label="Shell path"
             value={draft.shellPath ?? ""}
@@ -111,7 +110,7 @@ export function GeneralPanel() {
           hint="Optional — path to the daemon CLI binary"
         />
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: tokens.space.sm, borderTop: `1px solid ${tokens.color.border}`, paddingTop: tokens.space.lg }}>
+        <div className="gp-foot">
           <Button variant="ghost" onClick={() => setDraft({})} disabled={!loaded}>
             Reset
           </Button>

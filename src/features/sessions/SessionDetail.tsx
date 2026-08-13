@@ -12,7 +12,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Text, Badge, Modal, TextArea } from "../../design";
-import { tokens } from "../../design/tokens";
 import type {
   SessionInfo,
   TranscriptMessage,
@@ -180,7 +179,7 @@ export function SessionDetail({
     : "No prior compaction recorded";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+    <div className="detail">
       {/* Head */}
       <div className="detail__head">
         <div className="detail__avatar">
@@ -388,7 +387,7 @@ export function SessionDetail({
           </>
         }
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+        <div className="ns-form">
           <div className="compact-status">
             <span className={`compact-status__dot${compacting ? " compact-status__dot--active" : ""}`} />
             <div>
@@ -436,9 +435,15 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function GoalStatusDot({ status }: { status: Goal["status"] }) {
-  const color =
-    status === "active" ? tokens.color.ok : status === "completed" ? tokens.color.info : status === "paused" ? tokens.color.warn : tokens.color.textDim;
-  return <span className="goal__dot" style={{ background: color }} />;
+  const cls =
+    status === "active"
+      ? " goal__dot--active"
+      : status === "completed"
+        ? " goal__dot--completed"
+        : status === "paused"
+          ? " goal__dot--paused"
+          : " goal__dot--idle";
+  return <span className={`goal__dot${cls}`} />;
 }
 
 function goalTone(status: Goal["status"]): "success" | "accent" | "warning" | "neutral" {

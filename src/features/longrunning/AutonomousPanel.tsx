@@ -16,12 +16,12 @@
 // controls. Green is used only as the live/active signal.
 
 import { useEffect, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button } from "../../design";
 import { useIpc, useConnectionState } from "../../ipc/client";
 import { ShieldIcon, PlayIcon, CheckIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
 import { useStall } from "./useStall";
+import "./longrunning.css";
 
 export interface AutonomousBudget {
   maxTurns?: number;
@@ -41,14 +41,6 @@ export interface AutonomousPanelProps {
   /** Read-only quality gates surfaced from the daemon. */
   gates?: QualityGate[];
 }
-
-const section: React.CSSProperties = {
-  borderTop: `1px solid ${tokens.color.line}`,
-  paddingTop: tokens.space.lg,
-  display: "flex",
-  flexDirection: "column",
-  gap: tokens.space.md,
-};
 
 export function AutonomousPanel({ defaultActive = false, gates = [] }: AutonomousPanelProps) {
   const ipc = useIpc();
@@ -110,9 +102,9 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
     : null;
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       {/* State answer up top: is this on? */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="lr-headrow">
         <Text variant="label" weight="semibold">
           Autonomous mode
         </Text>
@@ -122,7 +114,7 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
       </div>
 
       {/* Description + the one action the operator needs. */}
-      <div style={section}>
+      <div className="lr-section">
         <Text variant="label" weight="semibold" tone={active ? "success" : "default"}>
           {active
             ? "Autonomous mode is running — stop it to hand control back."
@@ -135,7 +127,7 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
         </Text>
 
         {active ? (
-          <div style={{ display: "flex", gap: tokens.space.sm }}>
+          <div className="lr-actions">
             <Button variant="danger" size="md" icon={<XIcon size={13} />} onClick={() => void stop()} loading={busy}>
               Stop autonomous
             </Button>
@@ -149,22 +141,8 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
           </Button>
         )}
 
-        {/* Flattened to a hairline-ruled section rather than a dashed box with
-            its own fill (vision-critic D5): a bordered container nested inside
-            the card was the last box-in-box on this surface, and its "Not
-            running" heading repeated the status badge in the card header. The
-            DNA divides with hairlines and whitespace, so this is now an
-            explanatory note under a rule, not a second container. */}
         {!active ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: tokens.space.sm,
-              paddingTop: tokens.space.lg,
-              borderTop: `1px solid ${tokens.color.border}`,
-            }}
-          >
+          <div className="lr-note">
             <Text variant="micro" tone="dim">
               Autonomous mode is off. Start it explicitly to let the agent continue without human input. While
               active, the SystemBar shows a green AUTO indicator and the budget above is enforced. Expect it to
@@ -177,19 +155,8 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
 
         {/* A2: stalled-loop warning with recovery actions */}
         {stalled ? (
-          <div
-            role="alert"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: tokens.space.md,
-              padding: `${tokens.space.sm} ${tokens.space.md}`,
-              borderRadius: tokens.radius.md,
-              background: tokens.color.warning + "14",
-              border: `1px solid ${tokens.color.warning}40`,
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+          <div role="alert" className="lr-stalled">
+            <div className="lr-stalledmain">
               <Text variant="label" weight="semibold" tone="warning">
                 No progress reported for 5+ min
               </Text>
@@ -208,8 +175,8 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
       </div>
 
       {/* Budget config — the controls come after the state + action. */}
-      <div style={section}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="lr-section">
+        <div className="lr-headrow">
           <Text variant="micro" tone="dim" uppercase>
             Budget
           </Text>
@@ -227,8 +194,8 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
       </div>
 
       {/* Quality gates (read-only) — plain ruled rows, not stacked boxes. */}
-      <div style={section}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+      <div className="lr-section">
+        <div className="lr-headrow lr-headrow--left">
           <ShieldIcon size={13} />
           <Text variant="micro" tone="dim" uppercase>
             Quality gates
@@ -240,15 +207,15 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
             No quality gates configured. Gates run before the session may finish; a failed gate returns its output for another attempt.
           </Text>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+          <div className="lr-list">
             {gates.map((g) => (
-              <div key={g.id} style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
-                <CheckIcon size={13} style={{ color: tokens.color.success, flexShrink: 0 }} />
+              <div key={g.id} className="lr-row">
+                <span className="lr-gate-check"><CheckIcon size={13} /></span>
                 <Text variant="micro" mono>
                   {g.command}
                 </Text>
                 {g.description ? (
-                  <Text variant="micro" tone="dim" style={{ flex: 1, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <Text variant="micro" tone="dim" className="lr-ellipsis">
                     {g.description}
                   </Text>
                 ) : null}

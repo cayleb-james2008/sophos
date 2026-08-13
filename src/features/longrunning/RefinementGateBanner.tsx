@@ -14,11 +14,11 @@
 // and never fabricates content the daemon did not report.
 
 import { useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, Button } from "../../design";
 import { CheckIcon, XIcon, ChevronRightIcon } from "../sessions/icons";
 import { useRefinementGate, describeRefinement } from "./useRefinementGate";
 import { DiffView } from "./DiffView";
+import "./longrunning.css";
 
 export function RefinementGateBanner() {
   const gate = useRefinementGate();
@@ -30,37 +30,14 @@ export function RefinementGateBanner() {
   const hasDiff = diff.length > 0;
 
   return (
-    <div
-      role="alert"
-      style={{
-        flexShrink: 0,
-        background: tokens.color.accentSoft,
-        borderBottom: `1px solid ${tokens.color.accentBorder}`,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.md,
-          padding: `${tokens.space.sm} ${tokens.space.xl}`,
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: tokens.color.accentHover,
-            flexShrink: 0,
-          }}
-          aria-hidden
-        />
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+    <div role="alert" className="lr-gate">
+      <div className="lr-gate__row">
+        <span className="lr-gate__dot" aria-hidden />
+        <div className="lr-gate__main">
           <Text variant="label" weight="semibold" tone="accent">
             Refinement awaiting your review
           </Text>
-          <Text variant="micro" tone="muted" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <Text variant="micro" tone="muted" className="lr-gate__desc">
             {describeRefinement(pending.result)}
           </Text>
         </div>
@@ -73,7 +50,7 @@ export function RefinementGateBanner() {
                 size={12}
                 style={{
                   transform: showDiff ? "rotate(90deg)" : "none",
-                  transition: `transform ${tokens.motion.fast} ${tokens.motion.ease}`,
+                  transition: "transform 100ms cubic-bezier(0.3, 0, 0.2, 1)",
                 }}
               />
             }
@@ -90,12 +67,7 @@ export function RefinementGateBanner() {
         </Button>
       </div>
       {showDiff && hasDiff ? (
-        <div
-          style={{
-            padding: `0 ${tokens.space.xl} ${tokens.space.sm}`,
-            borderTop: `1px solid ${tokens.color.accentBorder}`,
-          }}
-        >
+        <div className="lr-gate__diff">
           <DiffView lines={diff} />
         </div>
       ) : null}

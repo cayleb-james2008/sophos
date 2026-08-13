@@ -43,7 +43,7 @@ function InboxNode({ data, selected }: NodeProps<InboxGraphNode>) {
   const corner = isMsg && data.unread ? (
     <span className="pg-pill">UNREAD</span>
   ) : isMsg ? (
-    <span className="pg-pill" style={{ background: tokens.color.bgOverlay, borderColor: tokens.color.border, color: tokens.color.textDim }}>
+    <span className="pg-pill pg-pill--muted">
       {data.direction === "out" ? "SENT" : "READ"}
     </span>
   ) : undefined;
@@ -180,13 +180,13 @@ export function InboxGraph({ peerId, peerName, peerStatus, thread, onSelectMsg }
     >
       <div className="pg-legend">
         <span>
-          <i className="pg-legend__swatch" style={{ background: tokens.color.accent }} />sent →
+          <i className="pg-legend__swatch pg-legend__swatch--accent" />sent →
         </span>
         <span>
-          <i className="pg-legend__swatch" style={{ background: tokens.color.ok }} />received → you
+          <i className="pg-legend__swatch pg-legend__swatch--ok" />received → you
         </span>
         <span>
-          <i className="pg-legend__swatch" style={{ background: tokens.color.err }} />unread
+          <i className="pg-legend__swatch pg-legend__swatch--err" />unread
         </span>
       </div>
     </GraphFlow>

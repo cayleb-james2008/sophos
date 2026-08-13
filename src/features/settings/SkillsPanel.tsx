@@ -9,7 +9,6 @@
 // arbitrary keys per the IPC contract).
 
 import { useCallback, useEffect, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, Card, Button, Input, Spinner, TextArea, Badge } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { RuntimeInfo, Settings } from "../../ipc/contract";
@@ -141,35 +140,22 @@ export function SkillsPanel() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+    <div className="gp-form">
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: tokens.space["3xl"] }}>
+        <div className="ap-loading">
           <Spinner size={22} />
         </div>
       ) : (
         <>
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
             {/* Header row: the icon tile is neutral, not accent-washed — green
                 is a status signal, and a section icon carries no status. The
                 Reload control is vertically centred against the 34px tile so
                 the title does not read as pulled off-centre (vision-critic
                 D5). */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 34 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-                <span
-                  style={{
-                    width: 34,
-                    height: 34,
-                    flexShrink: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: tokens.radius.md,
-                    background: tokens.color.surface2,
-                    border: `1px solid ${tokens.color.border}`,
-                    color: tokens.color.textMuted,
-                  }}
-                >
+            <div className="ep-head">
+              <div className="sp-headrow">
+                <span className="sp-icon">
                   <BookIcon size={16} />
                 </span>
                 <Text variant="label" weight="semibold">
@@ -188,47 +174,38 @@ export function SkillsPanel() {
             </Text>
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
+          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            <div className="sp-head">
+              <div className="sp-headrow">
                 <Text variant="label" weight="semibold">Discovered skills</Text>
                 <Text variant="micro" tone="dim" mono>{runtime?.skills.length ?? 0}</Text>
               </div>
               {runtime?.skillDiagnostics.length ? <Text variant="micro" tone="warning">{runtime.skillDiagnostics.length} diagnostic{runtime.skillDiagnostics.length === 1 ? "" : "s"}</Text> : null}
             </div>
             {runtime?.skills.length ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+              <div className="sp-list">
                 {runtime.skills.map((skill) => {
                   const disabled = disabledSkills.includes(skill.name);
                   const justInstalled = skill.name === lastCreatedSkill;
                   return (
                     <div
                       key={`${skill.name}:${skill.filePath ?? ""}`}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: tokens.space.md,
-                        padding: tokens.space.md,
-                        borderRadius: tokens.radius.md,
-                        background: tokens.color.bgElevated,
-                        border: `1px solid ${tokens.color.border}`,
-                        opacity: disabled ? 0.5 : 1,
-                      }}
+                      className={`sp-row${disabled ? " sp-row--disabled" : ""}`}
                     >
-                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+                      <div className="sp-rowmain">
+                        <div className="sp-headrow--sm">
                           <Text variant="label" mono>{skill.name}</Text>
                           {justInstalled ? <Badge tone="success">Just installed</Badge> : null}
                         </div>
                         <Text variant="micro" tone="muted">{skill.description ?? "No description reported by daemon."}</Text>
-                        {skill.filePath ? <Text variant="micro" tone="dim" mono style={{ wordBreak: "break-all" }}>{skill.filePath}{skill.source ? ` · ${skill.source}` : ""}</Text> : null}
+                        {skill.filePath ? <Text variant="micro" tone="dim" mono className="ap-cwd">{skill.filePath}{skill.source ? ` · ${skill.source}` : ""}</Text> : null}
                       </div>
-                      <label style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, cursor: "pointer" }}>
+                      <label className="sp-check">
                         <input
                           type="checkbox"
                           checked={!disabled}
                           onChange={(e) => void toggleSkill(skill.name, e.target.checked)}
-                          style={{ width: 16, height: 16, accentColor: tokens.color.accent }}
+                          className="sp-checkbox"
                         />
                         <Text variant="micro" tone="muted">Enable</Text>
                       </label>
@@ -244,8 +221,8 @@ export function SkillsPanel() {
             ))}
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-            <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
+          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            <div className="sp-headrow">
               <Text variant="label" weight="semibold">Create or install a skill</Text>
               <Badge tone="info">live daemon</Badge>
             </div>
@@ -255,53 +232,30 @@ export function SkillsPanel() {
             <Input label="New skill name" value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="release-audit" />
             <Input label="Description" value={createDescription} onChange={(e) => setCreateDescription(e.target.value)} placeholder="Audit a release artifact" />
             <TextArea label="SKILL.md instructions" value={createContent} onChange={(e) => setCreateContent(e.target.value)} placeholder="Explain when and how the agent should use this skill." rows={6} />
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div className="kp-runfoot">
               <Button variant="primary" onClick={() => void createSkill()} disabled={!createName.trim() || !createDescription.trim() || !createContent.trim()}>Create and install</Button>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+            <div className="sk-preview">
               <Text variant="micro" tone="dim" uppercase>Preview</Text>
               {previewEmpty ? (
                 <Text variant="body" tone="dim">Start typing to see a preview...</Text>
               ) : (
-                <pre
-                  style={{
-                    margin: 0,
-                    padding: tokens.space.md,
-                    background: tokens.color.bgElevated,
-                    border: `1px solid ${tokens.color.border}`,
-                    borderRadius: tokens.radius.md,
-                    fontFamily: tokens.font.mono,
-                    fontSize: tokens.font.size.xs,
-                    color: tokens.color.textMuted,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
+                <pre className="sk-pre">
                   {previewBody}
                 </pre>
               )}
             </div>
-            <div style={{ borderTop: `1px solid ${tokens.color.line}`, paddingTop: tokens.space.md, display: "flex", gap: tokens.space.sm, alignItems: "flex-end" }}>
-              <Input label="Existing skill path" value={installPath} onChange={(e) => setInstallPath(e.target.value)} placeholder="C:\\work\\skills\\my-skill" style={{ flex: 1 }} />
+            <div className="ep-installrow">
+              <div className="ep-installfield">
+                <Input label="Existing skill path" value={installPath} onChange={(e) => setInstallPath(e.target.value)} placeholder="C:\\work\\skills\\my-skill" />
+              </div>
               <Button variant="outline" onClick={() => void installSkill()} disabled={!installPath.trim()}>Install path</Button>
             </div>
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-            <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-              <span
-                style={{
-                  width: 34,
-                  height: 34,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: tokens.radius.md,
-                  background: tokens.color.bgOverlay,
-                  border: `1px solid ${tokens.color.border}`,
-                  color: tokens.color.textDim,
-                }}
-              >
+          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            <div className="sp-headrow">
+              <span className="sp-icon sp-icon--dim">
                 <SparkIcon size={16} />
               </span>
               <Text variant="label" weight="semibold">
@@ -309,37 +263,39 @@ export function SkillsPanel() {
               </Text>
             </div>
 
-            <Text variant="body" tone="muted" style={{ fontSize: tokens.font.size.sm }}>
+            <Text variant="body" tone="muted" className="sk-desc">
               Add directories or .md files. Supports glob patterns. Prefix with "!" to exclude,
               "+" to force-include. Changes apply on Save.
             </Text>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+            <div className="sp-list">
               {skillPathsDraft.length === 0 ? (
-                <Text variant="body" tone="dim" style={{ padding: tokens.space.md, background: tokens.color.bgElevated, borderRadius: tokens.radius.md, border: `1px solid ${tokens.color.border}` }}>
+                <Text variant="body" tone="dim" className="sk-empty">
                   No skill paths configured. Add paths below and click Save.
                 </Text>
               ) : (
                 skillPathsDraft.map((p, idx) => (
-                  <div key={idx} style={{ display: "flex", gap: tokens.space.sm }}>
-                    <Input
-                      value={p}
-                      onChange={(e) => updateSkillPath(idx, e.target.value)}
-                      placeholder="~/.prime/agent/skills/my-skill"
-                      style={{ flex: 1 }}
-                    />
+                  <div key={idx} className="sk-pathrow">
+                    <div className="ep-installfield">
+                      <Input
+                        value={p}
+                        onChange={(e) => updateSkillPath(idx, e.target.value)}
+                        placeholder="~/.prime/agent/skills/my-skill"
+                      />
+                    </div>
                     <Button variant="ghost" size="sm" icon={<XIcon size={13} />} onClick={() => removeSkillPath(idx)} />
                   </div>
                 ))
               )}
 
-              <div style={{ display: "flex", gap: tokens.space.sm }}>
-                <Input
-                  value={newSkillPath}
-                  onChange={(e) => setNewSkillPath(e.target.value)}
-                  placeholder="~/.prime/agent/skills/new-skill"
-                  style={{ flex: 1 }}
-                />
+              <div className="sk-pathrow">
+                <div className="ep-installfield">
+                  <Input
+                    value={newSkillPath}
+                    onChange={(e) => setNewSkillPath(e.target.value)}
+                    placeholder="~/.prime/agent/skills/new-skill"
+                  />
+                </div>
                 <Button variant="primary" size="sm" icon={<CheckIcon size={13} />} onClick={addSkillPath}>
                   Add
                 </Button>
@@ -347,22 +303,8 @@ export function SkillsPanel() {
 
             </div>
 
-            {/* Reference documentation sits ABOVE the action row so the card
-                reads state → controls → reference → commit, and the primary
-                action is the last thing in the card — the same rule card 1
-                follows with Reload (vision-critic D7: one action was inside its
-                card, the other stranded mid-card above the help text).
-                Wrapped in a hairline #2a2a2a card outline so the discovery
-                locations read as a config block, not a paragraph. */}
-            <div
-              style={{
-                border: `1px solid ${tokens.color.border}`,
-                borderRadius: tokens.radius.md,
-                background: tokens.color.bgElevated,
-                padding: `${tokens.space.md} ${tokens.space.lg}`,
-              }}
-            >
-              <Text variant="micro" tone="dim" mono style={{ letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: tokens.space.sm, display: "block" }}>
+            <div className="ep-disc">
+              <Text variant="micro" tone="dim" mono className="ep-disclabel">
                 Discovery locations
               </Text>
               <Text variant="micro" tone="dim">
@@ -380,7 +322,7 @@ export function SkillsPanel() {
               </Text>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: tokens.space.sm, borderTop: `1px solid ${tokens.color.border}`, paddingTop: tokens.space.lg }}>
+            <div className="gp-foot">
               <Button variant="ghost" onClick={refresh} disabled={saving}>
                 Cancel
               </Button>

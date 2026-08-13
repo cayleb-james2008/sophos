@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, Text } from "../../design";
-import { tokens } from "../../design/tokens";
 import { useIpc } from "../../ipc/client";
 import type { HarnessEntry, HarnessState } from "../../ipc/contract";
 import { RefreshIcon, XIcon } from "../sessions/icons";
+import "./longrunning.css";
 
 const kinds: Array<HarnessEntry["kind"]> = ["memory", "prompt", "skill", "subagent"];
 
@@ -44,11 +44,11 @@ export function HarnessStatePanel() {
   const entries = (state?.entries ?? []).filter((entry) => filter === "all" || entry.kind === filter);
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: tokens.space.md }}>
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <div className="lr-headrow">
         <div>
           <Text variant="label" weight="semibold">Continual harness state</Text>
-          <Text variant="micro" tone="dim" mono style={{ display: "block", marginTop: 3 }}>{state?.source ?? "daemon-owned state"}</Text>
+          <Text variant="micro" tone="dim" mono className="lr-harness-sub">{state?.source ?? "daemon-owned state"}</Text>
         </div>
         <Button variant="ghost" size="sm" icon={<RefreshIcon size={13} />} onClick={() => void refresh()}>Reload</Button>
       </div>
@@ -57,7 +57,7 @@ export function HarnessStatePanel() {
       </Text>
       {error ? <Text variant="micro" tone="danger">{error}</Text> : null}
 
-      <div style={{ display: "flex", gap: tokens.space.sm, flexWrap: "wrap" }}>
+      <div className="lr-row lr-row--wrap">
         <Button variant={filter === "all" ? "accent-soft" : "ghost"} size="sm" onClick={() => setFilter("all")}>All · {state?.entries.length ?? 0}</Button>
         {kinds.map((kind) => (
           <Button key={kind} variant={filter === kind ? "accent-soft" : "ghost"} size="sm" onClick={() => setFilter(kind)}>{kind} · {state?.entries.filter((entry) => entry.kind === kind).length ?? 0}</Button>
@@ -66,31 +66,31 @@ export function HarnessStatePanel() {
 
       {loading && !state ? <Text variant="body" tone="dim">Reading continual harness state from the live daemon…</Text> : null}
       {!loading && entries.length === 0 ? <Text variant="body" tone="dim">No saved entries in this scope yet.</Text> : null}
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+      <div className="lr-list">
         {entries.map((entry) => (
-          <div key={`${entry.scope ?? "global"}:${entry.kind}:${entry.id}`} style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, padding: tokens.space.md, border: `1px solid ${tokens.color.border}`, background: tokens.color.bgElevated }}>
-            <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+          <div key={`${entry.scope ?? "global"}:${entry.kind}:${entry.id}`} className="lr-harness-entry">
+            <div className="lr-row">
               <Text variant="label" weight="medium">{entry.title}</Text>
               <Badge tone={entry.scope === "local" ? "info" : "neutral"}>{entry.scope ?? "global"}</Badge>
               <Badge tone="accent">{entry.kind}</Badge>
               {entry.version ? <Text variant="micro" tone="dim" mono>v{entry.version}</Text> : null}
             </div>
-            <Text variant="body" tone="muted" style={{ whiteSpace: "pre-wrap" }}>{entry.content}</Text>
+            <Text variant="body" tone="muted" className="lr-harness-content">{entry.content}</Text>
             {entry.kind === "skill" && entry.reference ? <Text variant="micro" tone="dim" mono>reference {JSON.stringify(entry.reference)}</Text> : null}
-            {entry.path ? <Text variant="micro" tone="dim" mono style={{ wordBreak: "break-all" }}>{entry.path}</Text> : null}
+            {entry.path ? <Text variant="micro" tone="dim" mono className="lr-harness-path">{entry.path}</Text> : null}
           </div>
         ))}
       </div>
 
-      <div style={{ borderTop: `1px solid ${tokens.color.line}`, paddingTop: tokens.space.lg, display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="lr-section">
+        <div className="lr-headrow">
           <Text variant="micro" tone="dim" uppercase>Refinement / rollback history</Text>
           <Badge tone="neutral">{state?.refinements.length ?? 0}</Badge>
         </div>
         {state?.refinements.length ? state.refinements.slice().reverse().map((refinement) => (
-          <div key={refinement.id} style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, padding: tokens.space.sm, background: tokens.color.bgElevated, border: `1px solid ${tokens.color.border}` }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Text variant="label" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{refinement.summary ?? refinement.trigger ?? refinement.id}</Text>
+          <div key={refinement.id} className="lr-harness-ref">
+            <div className="lr-harness-refmain">
+              <Text variant="label" className="lr-harness-refsum">{refinement.summary ?? refinement.trigger ?? refinement.id}</Text>
               <Text variant="micro" tone="dim" mono>{refinement.timestamp ?? refinement.id}{refinement.rollbackOf ? ` · rollback of ${refinement.rollbackOf}` : ""}</Text>
             </div>
             <Button variant="ghost" size="sm" icon={<XIcon size={12} />} onClick={() => void rollback(refinement.id)} title="Request rollback">Rollback</Button>

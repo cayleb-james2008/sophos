@@ -8,7 +8,7 @@
 // a streaming message grows.
 
 import { useEffect, useRef, useState } from "react";
-import { tokens } from "../../design/tokens";
+import type { CSSProperties } from "react";
 import { Text, Button } from "../../design";
 import type { TranscriptMessage } from "../../ipc/contract";
 import { MessageRow } from "./MessageRow";
@@ -37,51 +37,19 @@ function ChatEmptyState({ onFillPrompt }: { onFillPrompt: (text: string) => void
     { glyph: "⌘K", label: "palette", desc: "jump anywhere" },
   ];
   return (
-    <div
-      style={{
-        flex: 1,
-        minHeight: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: tokens.space["2xl"],
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: tokens.space.lg,
-          maxWidth: 480,
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            fontFamily: tokens.font.mono,
-            fontSize: tokens.font.size.sm,
-            color: tokens.color.textMuted,
-            letterSpacing: "0.02em",
-          }}
-        >
-          <span style={{ color: tokens.color.accent }}>$</span>{" "}sophos
+    <div className="msglist-empty">
+      <div className="msglist-empty-inner">
+        <div className="msglist-empty-prompt">
+          <span className="msglist-empty-prompt-acc">$</span>{" "}sophos
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs }}>
+        <div className="msglist-empty-title">
           <Text variant="title">Start a conversation</Text>
           <Text variant="body" tone="muted">
             Ask for help, point at a file, or delegate a task. Sophos streams its work in real time.
           </Text>
         </div>
         {/* Clickable starter prompts — fill the composer, never auto-send. */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: tokens.space.sm,
-          }}
-        >
+        <div className="msglist-empty-starters">
           {STARTER_PROMPTS.map((p) => (
             <Button
               key={p}
@@ -90,53 +58,15 @@ function ChatEmptyState({ onFillPrompt }: { onFillPrompt: (text: string) => void
               onClick={() => onFillPrompt(p)}
               title={`Fill composer with: ${p}`}
               aria-label={`Starter prompt: ${p}`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "5px 12px",
-                borderRadius: tokens.radius.md,
-                background: tokens.color.bgRaised,
-                border: `1px solid ${tokens.color.border}`,
-                color: tokens.color.textMuted,
-                fontFamily: tokens.font.sans,
-                fontSize: tokens.font.size.sm,
-                cursor: "pointer",
-                transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = tokens.color.accentBorder;
-                e.currentTarget.style.color = tokens.color.text;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = tokens.color.border;
-                e.currentTarget.style.color = tokens.color.textMuted;
-              }}
+              className="msglist-starter-btn"
             >
               {p}
             </Button>
           ))}
         </div>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: tokens.space.sm,
-          }}
-        >
+        <div className="msglist-empty-hints">
           {hints.map((h) => (
-            <div
-              key={h.label}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: tokens.space.xs,
-                padding: "4px 10px",
-                borderRadius: tokens.radius.md,
-                background: tokens.color.bgRaised,
-                border: `1px solid ${tokens.color.border}`,
-              }}
-            >
+            <div key={h.label} className="msglist-hint-chip">
               <Text variant="micro" tone="accent" mono>
                 {h.glyph}
               </Text>
@@ -253,7 +183,7 @@ export function MessageList({
   // area rather than a competing empty state.
   if (messages.length === 0) {
     if (!hasProvider) {
-      return <div style={{ flex: 1, minHeight: 0 }} aria-hidden />;
+      return <div className="msglist-blank" aria-hidden />;
     }
     return <ChatEmptyState onFillPrompt={onFillPrompt} />;
   }
@@ -264,25 +194,11 @@ export function MessageList({
     <div
       ref={scrollRef}
       onScroll={onScrollStick}
-      style={{
-        flex: 1,
-        minHeight: 0,
-        overflowY: "auto",
-        overflowX: "hidden",
-        padding: `${tokens.space.xl} ${tokens.space.xl} ${tokens.space["2xl"]}`,
-      }}
+      className="msglist"
     >
-      <div
-        style={{
-          maxWidth: tokens.layout.maxContentW,
-          margin: "0 auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: tokens.space.md,
-        }}
-      >
+      <div className="msglist-inner">
         {/* Top spacer — reserves the height of rows above the window. */}
-        <div style={{ height: topPad, flexShrink: 0 }} aria-hidden />
+        <div className="msglist-spacer" style={{ "--pad": `${topPad}px` } as CSSProperties} aria-hidden />
 
         {visible.map((m, i) => {
           const index = startIndex + i;
@@ -296,15 +212,7 @@ export function MessageList({
               data-index={index}
               data-message-id={m.id}
               ref={measureRowRef}
-              style={{
-                borderRadius: 0,
-                ...(highlightIndex === index
-                  ? {
-                      background: tokens.color.accentSoft,
-                      boxShadow: `inset 2px 0 0 ${tokens.color.accent}`,
-                    }
-                  : {}),
-              }}
+              className={`msglist-row${highlightIndex === index ? " msglist-row--highlight" : ""}`}
             >
               <MessageRow
                 message={m}
@@ -318,7 +226,7 @@ export function MessageList({
         })}
 
         {/* Bottom spacer — reserves the height of rows below the window. */}
-        <div style={{ height: bottomPad, flexShrink: 0 }} aria-hidden />
+        <div className="msglist-spacer" style={{ "--pad": `${bottomPad}px` } as CSSProperties} aria-hidden />
       </div>
     </div>
   );

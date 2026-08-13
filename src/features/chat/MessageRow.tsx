@@ -17,15 +17,7 @@ import { MessageActions } from "./MessageActions";
 // Mono, replacing the old Prime bolt glyph.
 function SophosMark({ size = 12, color }: { size?: number; color: string }) {
   return (
-    <span
-      style={{
-        fontFamily: tokens.font.mono,
-        fontSize: size,
-        lineHeight: 1,
-        fontWeight: tokens.font.weight.semibold,
-        color,
-      }}
-    >
+    <span className="msg-avatar-glyph" style={{ fontSize: size, color }}>
       Σ
     </span>
   );
@@ -60,19 +52,9 @@ export function MessageRow({
   // ---- System ----
   if (message.role === "system") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: tokens.space.xs, padding: `${tokens.space.sm} 0` }}>
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: tokens.space.sm,
-            padding: "4px 12px",
-            borderRadius: tokens.radius.sm,
-            background: tokens.color.bgElevated,
-            border: `1px solid ${tokens.color.border}`,
-          }}
-        >
-          <span style={{ width: 5, height: 5, borderRadius: "50%", background: tokens.color.textDim }} />
+      <div className="msg-row--system">
+        <div className="msg-system-pill">
+          <span className="msg-system-dot" />
           <Text variant="micro" tone="dim" mono>
             {message.content}
           </Text>
@@ -85,7 +67,7 @@ export function MessageRow({
   // ---- Tool (standalone) ----
   if (message.role === "tool") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: tokens.space.xs, padding: `${tokens.space.xs} 0 ${tokens.space.xs} ${tokens.space["2xl"]}` }}>
+      <div className="msg-row--tool">
         <ToolCallCard
           call={{
             id: message.id,
@@ -103,8 +85,8 @@ export function MessageRow({
   // ---- User ----
   if (message.role === "user") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: tokens.space.xs }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+      <div className="msg-row--user">
+        <div className="msg-user-head">
           <Text variant="micro" tone="dim" mono uppercase>
             You
           </Text>
@@ -114,21 +96,7 @@ export function MessageRow({
             </Text>
           ) : null}
         </div>
-        <div
-          style={{
-            maxWidth: "78%",
-            padding: `${tokens.space.md} ${tokens.space.lg}`,
-            borderRadius: tokens.radius.lg,
-            borderTopRightRadius: tokens.radius.sm,
-            background: tokens.color.surface,
-            border: `1px solid ${tokens.color.border}`,
-            color: tokens.color.user,
-            fontSize: tokens.font.size.md,
-            lineHeight: tokens.font.leading.relaxed,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-          }}
-        >
+        <div className="msg-user-bubble">
           {message.content}
         </div>
         <MessageActions role="user" content={message.content} onEdit={() => onEdit(message)} canEdit={canEdit} />
@@ -143,33 +111,19 @@ export function MessageRow({
   const isError = message.status === "error";
 
   return (
-    <div style={{ display: "flex", gap: tokens.space.md, padding: `${tokens.space.sm} 0` }}>
+    <div className="msg-row">
       {/* Avatar chip — a brand mark, not a status signal, so it must not be the
           loudest accent object on the page (vision-critic D9). A solid green
           fill made it exactly that. Soft accent wash + hairline accent border +
           full-opacity glyph keeps the identity while returning green to its job
           as a signal for live/active state. */}
-      <div
-        style={{
-          flexShrink: 0,
-          width: 30,
-          height: 30,
-          borderRadius: tokens.radius.md,
-          background: tokens.color.accentSoft,
-          border: `1px solid ${tokens.color.accentBorder}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginTop: 2,
-          boxSizing: "border-box",
-        }}
-      >
+      <div className="msg-avatar">
         <SophosMark color={tokens.color.accentHover} />
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+      <div className="msg-body">
+        <div className="msg-head">
           <Text variant="micro" tone="muted" mono uppercase>
             Sophos
           </Text>
@@ -188,7 +142,7 @@ export function MessageRow({
         {hasThinking ? <ThinkingBlock thinking={message.thinking ?? ""} streaming={isStreaming} /> : null}
 
         {hasToolCalls ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+          <div className="msg-toolcalls">
             {message.toolCalls!.map((tc) => (
               <ToolCallCard key={tc.id} call={tc} />
             ))}
@@ -197,20 +151,14 @@ export function MessageRow({
 
         {message.content ? (
           <div
-            className={`message-row__content${isStreaming ? " message-row__content--streaming" : ""}`}
-            style={{
-              color: isError ? tokens.color.danger : tokens.color.assistant,
-              fontSize: tokens.font.size.md,
-              lineHeight: tokens.font.leading.relaxed,
-              wordBreak: "break-word",
-            }}
+            className={`msg-content${isStreaming ? " message-row__content--streaming" : ""}${isError ? " msg-content--error" : ""}`}
           >
             <Markdown content={message.content} />
             {isStreaming ? <StreamingCaret /> : null}
           </div>
         ) : isStreaming ? (
-          <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, padding: `${tokens.space.xs} 0` }}>
-            <span style={{ display: "inline-flex", gap: 4 }}>
+          <div className="msg-working">
+            <span className="msg-working-dots">
               {[0, 1, 2].map((i) => (
                 <span key={i} className="message-row__working-dot" />
               ))}
@@ -223,7 +171,7 @@ export function MessageRow({
 
         {/* Copy + retry on hover for assistant content */}
         {message.content && !isStreaming ? (
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -2 }}>
+          <div className="msg-actions-wrap">
             <MessageActions
               role="assistant"
               content={message.content}

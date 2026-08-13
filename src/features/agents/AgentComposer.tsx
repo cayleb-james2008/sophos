@@ -51,7 +51,6 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
           loading={sending}
           disabled={!canSend}
           onClick={onSend}
-          style={{ whiteSpace: "nowrap" }}
         >
           Send
         </Button>

@@ -10,12 +10,12 @@
 // state is kept.
 
 import { useEffect, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
 import { useIpc, useConnectionState } from "../../ipc/client";
 import { PlusIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
 import { estimateNextDue } from "./nextDue";
+import "./longrunning.css";
 
 export interface ScheduleEntry {
   id: string;
@@ -28,14 +28,6 @@ export interface SchedulesPanelProps {
   /** Seed schedules from daemon state when available. */
   initial?: ScheduleEntry[];
 }
-
-const section: React.CSSProperties = {
-  borderTop: `1px solid ${tokens.color.line}`,
-  paddingTop: tokens.space.lg,
-  display: "flex",
-  flexDirection: "column",
-  gap: tokens.space.md,
-};
 
 export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
   const ipc = useIpc();
@@ -80,9 +72,9 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
   const activeCount = schedules.filter((s) => s.active !== false).length;
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       {/* State answer: is anything scheduled? */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="lr-headrow">
         <Text variant="label" weight="semibold">
           Schedules
         </Text>
@@ -92,7 +84,7 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
       </div>
 
       {/* State + action: add a schedule up front. */}
-      <div style={section}>
+      <div className="lr-section">
         <Text variant="label" weight="semibold" tone={activeCount > 0 ? "success" : "default"}>
           {activeCount > 0
             ? `${activeCount} schedule${activeCount > 1 ? "s" : ""} armed — add or remove below.`
@@ -105,9 +97,9 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
 
         {error ? <ActionErrorBanner message={error} /> : null}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-          <div style={{ display: "flex", gap: tokens.space.sm, alignItems: "flex-end" }}>
-            <div style={{ flex: 1 }}>
+        <div className="lr-hb-fieldset">
+          <div className="lr-hb-row">
+            <div className="lr-hb-main">
               <Input
                 label="Cron expression"
                 placeholder='e.g. "0 9 * * 1-5"'
@@ -137,22 +129,12 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
       </div>
 
       {/* List — plain ruled rows. */}
-      <div style={section}>
+      <div className="lr-section">
         <Text variant="micro" tone="dim" uppercase>
           Scheduled jobs
         </Text>
         {schedules.length === 0 ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: tokens.space.sm,
-              padding: tokens.space.lg,
-              borderRadius: tokens.radius.md,
-              background: tokens.color.bgElevated,
-              border: `1px dashed ${tokens.color.borderStrong}`,
-            }}
-          >
+          <div className="lr-hb-empty">
             <Text variant="label" tone="muted">
               No schedules
             </Text>
@@ -162,30 +144,20 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
             </Text>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.md }}>
+          <div className="lr-hb-list">
             {schedules.map((s) => (
               <div
                 key={s.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: tokens.space.md,
-                }}
+                className="lr-hb-item"
               >
                 <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    background: s.active === false ? tokens.color.textDim : tokens.color.success,
-                  }}
+                  className={`lr-hb-dot${s.active === false ? "" : " lr-hb-dot--active"}`}
                 />
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                <div className="lr-hb-itemmain">
                   <Text variant="label" weight="medium" mono>
                     {s.cron}
                   </Text>
-                  <Text variant="micro" tone="dim" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <Text variant="micro" tone="dim" className="lr-hb-itemprompt">
                     {s.prompt}
                   </Text>
                   <Text variant="micro" tone="dim" mono>

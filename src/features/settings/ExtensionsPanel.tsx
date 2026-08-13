@@ -8,7 +8,6 @@
 // arbitrary keys per the IPC contract).
 
 import { useCallback, useEffect, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, Card, Button, Input, Spinner, Badge } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { RuntimeInfo, Settings } from "../../ipc/contract";
@@ -77,30 +76,17 @@ export function ExtensionsPanel() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+    <div className="gp-form">
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: tokens.space["3xl"] }}>
+        <div className="ap-loading">
           <Spinner size={22} />
         </div>
       ) : (
         <>
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 34 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-                <span
-                  style={{
-                    width: 34,
-                    height: 34,
-                    flexShrink: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: tokens.radius.md,
-                    background: tokens.color.surface2,
-                    border: `1px solid ${tokens.color.border}`,
-                    color: tokens.color.textMuted,
-                  }}
-                >
+          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            <div className="ep-head">
+              <div className="sp-headrow">
+                <span className="sp-icon">
                   <PlugIcon size={16} />
                 </span>
                 <Text variant="label" weight="semibold">
@@ -119,17 +105,17 @@ export function ExtensionsPanel() {
             </Text>
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-            <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
+          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            <div className="sp-headrow">
               <Text variant="label" weight="semibold">Live extensions</Text>
               <Text variant="micro" tone="dim" mono>{runtime?.extensions.length ?? 0}</Text>
               <Badge tone="info">live daemon</Badge>
             </div>
             {runtime?.extensions.length ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+              <div className="sp-list">
                 {runtime.extensions.map((path) => (
-                  <div key={path} style={{ display: "flex", flexDirection: "column", gap: 2, paddingBottom: tokens.space.sm, borderBottom: `1px solid ${tokens.color.border}` }}>
-                    <Text variant="micro" tone="dim" mono style={{ wordBreak: "break-all" }}>{path}</Text>
+                  <div key={path} className="ep-liverow">
+                    <Text variant="micro" tone="dim" mono className="ap-cwd">{path}</Text>
                   </div>
                 ))}
               </div>
@@ -138,47 +124,36 @@ export function ExtensionsPanel() {
             )}
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-            <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
+          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            <div className="sp-headrow">
               <Text variant="label" weight="semibold">Configured extensions</Text>
               <Text variant="micro" tone="dim" mono>{configured.length}</Text>
             </div>
             {configured.length === 0 ? (
               <Text variant="body" tone="dim">No extensions configured. Install an extension below.</Text>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+              <div className="sp-list">
                 {configured.map((e, idx) => (
-                  <div
-                    key={e.path}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: tokens.space.md,
-                      padding: tokens.space.md,
-                      borderRadius: tokens.radius.md,
-                      background: tokens.color.bgElevated,
-                      border: `1px solid ${tokens.color.border}`,
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
-                        <Text variant="label" weight="medium" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div key={e.path} className="sp-row">
+                    <div className="sp-rowmain">
+                      <div className="sp-headrow--sm">
+                        <Text variant="label" weight="medium" className="sp-ellipsis">
                           {e.name}
                         </Text>
                         <Badge tone={e.enabled ? "success" : "neutral"} dot>
                           {e.enabled ? "Enabled" : "Disabled"}
                         </Badge>
                       </div>
-                      <Text variant="micro" tone="dim" mono style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <Text variant="micro" tone="dim" mono className="sp-ellipsis">
                         {e.path}
                       </Text>
                     </div>
-                    <label style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, cursor: "pointer" }}>
+                    <label className="sp-check">
                       <input
                         type="checkbox"
                         checked={e.enabled}
                         onChange={(ev) => void toggleExtension(idx, ev.target.checked)}
-                        style={{ width: 16, height: 16, accentColor: tokens.color.accent }}
+                        className="sp-checkbox"
                       />
                       <Text variant="micro" tone="muted">Enable</Text>
                     </label>
@@ -189,29 +164,24 @@ export function ExtensionsPanel() {
             )}
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-            <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
+          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            <div className="sp-headrow">
               <Text variant="label" weight="semibold">Install an extension</Text>
             </div>
             <Text variant="body" tone="muted">Add an extension directory or file path. The daemon reloads and picks it up on the next session.</Text>
             {actionError ? <Text variant="micro" tone="danger">{actionError}</Text> : null}
             {actionMessage ? <Text variant="micro" tone="success">{actionMessage}</Text> : null}
-            <div style={{ display: "flex", gap: tokens.space.sm, alignItems: "flex-end" }}>
-              <Input label="Extension path" value={installPath} onChange={(e) => setInstallPath(e.target.value)} placeholder="C:\\work\\extensions\\my-extension" style={{ flex: 1 }} />
+            <div className="ep-installrow">
+              <div className="ep-installfield">
+                <Input label="Extension path" value={installPath} onChange={(e) => setInstallPath(e.target.value)} placeholder="C:\\work\\extensions\\my-extension" />
+              </div>
               <Button variant="primary" onClick={() => void installExtension()} disabled={!installPath.trim()}>Install</Button>
             </div>
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-            <div
-              style={{
-                border: `1px solid ${tokens.color.border}`,
-                borderRadius: tokens.radius.md,
-                background: tokens.color.bgElevated,
-                padding: `${tokens.space.md} ${tokens.space.lg}`,
-              }}
-            >
-              <Text variant="micro" tone="dim" mono style={{ letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: tokens.space.sm, display: "block" }}>
+          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+            <div className="ep-disc">
+              <Text variant="micro" tone="dim" mono className="ep-disclabel">
                 Discovery locations
               </Text>
               <Text variant="micro" tone="dim">

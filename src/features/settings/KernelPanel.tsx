@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Button, Card, Text, TextArea } from "../../design";
-import { tokens } from "../../design/tokens";
 import { useIpc, useIpcEvent } from "../../ipc/client";
 import type { KernelHealthDiagnostic, KernelState } from "../../ipc/contract";
 import { CpuIcon, RefreshIcon } from "../sessions/icons";
@@ -81,9 +80,9 @@ export function KernelPanel() {
   const statusTone = status === "running" ? "info" : status === "configured" ? "success" : status === "browser-preview" ? "neutral" : "warning";
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: tokens.space.md }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <div className="sp-head">
+        <div className="sp-headrow--sm">
           <CpuIcon size={16} />
           <Text variant="label" weight="semibold">Persistent IPython notebook</Text>
           <Badge tone={statusTone} dot>{status}</Badge>
@@ -93,43 +92,43 @@ export function KernelPanel() {
       <Text variant="micro" tone="dim">
         This is the daemon-backed IPython state: execution counts and cell results come from real kernel/tool metadata, while names and imports come from the live namespace. The kernel is persistent and is not a security sandbox.
       </Text>
-      <div role="status" style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, padding: tokens.space.md, border: `1px solid ${tokens.color.border}`, background: tokens.color.bgElevated }}>
+      <div role="status" className="kp-diag">
         <Text variant="micro" weight="semibold">{diagnostic.message}</Text>
         <Text variant="micro" tone="dim">Next step: {diagnostic.nextStep}</Text>
       </div>
       {error ? <Text variant="micro" tone="danger">{error}</Text> : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: tokens.space.md }}>
+      <div className="kp-grid2">
         <StateList label="Variables" values={kernel?.variables ?? []} empty="No live names reported yet." />
         <StateList label="Imports" values={kernel?.imports ?? []} empty="No live module imports reported yet." />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs }}>
+      <div className="kp-execcol">
         <Text variant="micro" tone="dim">Last execution count: {kernel?.executionCount ?? "—"}</Text>
-        {kernel?.lastOutput ? <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: tokens.color.textMuted, fontFamily: tokens.font.mono, fontSize: tokens.font.size.xs }}>{kernel.lastOutput}</pre> : null}
+        {kernel?.lastOutput ? <pre className="kp-pre kp-pre--dim">{kernel.lastOutput}</pre> : null}
         {kernel?.lastError ? <Text variant="micro" tone="danger">{kernel.lastError}</Text> : null}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+      <div className="kp-run">
         <Text variant="micro" tone="dim" uppercase>Run a code cell</Text>
         <TextArea value={code} onChange={(event) => setCode(event.target.value)} placeholder="x = 42\nprint(x)" rows={5} />
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div className="kp-runfoot">
           <Button variant="accent-soft" onClick={() => void runCell()} loading={running}>Execute in kernel</Button>
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.md }}>
+      <div className="kp-hist">
         <Text variant="micro" tone="dim" uppercase>Cell history · {kernel?.cells.length ?? 0}</Text>
         {(kernel?.cells.length ?? 0) === 0 ? (
           <Text variant="body" tone="dim">No IPython cells have been reported for this session.</Text>
         ) : (
           kernel!.cells.slice().reverse().map((cell) => (
-            <div key={cell.id} style={{ border: `1px solid ${tokens.color.border}`, background: tokens.color.bgElevated, padding: tokens.space.md, display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: tokens.space.md }}>
+            <div key={cell.id} className="kp-cell">
+              <div className="sp-head">
                 <Text variant="micro" tone="dim" mono>In [{cell.executionCount ?? "—"}] · {cell.id}</Text>
                 <Badge tone={cell.status === "ok" ? "success" : cell.status === "error" ? "danger" : "info"} dot>{cell.status}</Badge>
               </div>
-              <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: tokens.color.text, fontFamily: tokens.font.mono, fontSize: tokens.font.size.xs }}>{cell.code}</pre>
-              {cell.output ? <pre style={{ margin: 0, whiteSpace: "pre-wrap", color: tokens.color.textMuted, fontFamily: tokens.font.mono, fontSize: tokens.font.size.xs }}>{cell.output}</pre> : null}
+              <pre className="kp-pre">{cell.code}</pre>
+              {cell.output ? <pre className="kp-pre kp-pre--dim">{cell.output}</pre> : null}
               {cell.error ? <Text variant="micro" tone="danger">{cell.error}</Text> : null}
             </div>
           ))
@@ -141,7 +140,7 @@ export function KernelPanel() {
 
 function StateList({ label, values, empty }: { label: string; values: string[]; empty: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm, padding: tokens.space.md, background: tokens.color.bgElevated, border: `1px solid ${tokens.color.border}` }}>
+    <div className="kp-stat">
       <Text variant="micro" tone="dim" uppercase>{label} · {values.length}</Text>
       {values.length ? <Text variant="label" mono>{values.join(", ")}</Text> : <Text variant="micro" tone="dim">{empty}</Text>}
     </div>

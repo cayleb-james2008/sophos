@@ -7,8 +7,8 @@
 // and `ActionErrorBanner` renders the message on the panel.
 
 import { useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text } from "../../design";
+import "./longrunning.css";
 
 export function useActionError() {
   const [error, setError] = useState<string | null>(null);
@@ -30,20 +30,8 @@ export function useActionError() {
 
 export function ActionErrorBanner({ message }: { message: string }) {
   return (
-    <div
-      role="alert"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: tokens.space.sm,
-        padding: `${tokens.space.sm} ${tokens.space.md}`,
-        borderRadius: tokens.radius.md,
-        background: "rgba(239,68,68,0.12)",
-        border: `1px solid ${tokens.color.danger}55`,
-        color: tokens.color.danger,
-      }}
-    >
-      <span style={{ fontSize: 12, flexShrink: 0, lineHeight: 1 }}>!</span>
+    <div role="alert" className="lr-error">
+      <span className="lr-error-glyph">!</span>
       <Text variant="micro" tone="danger">
         {message}
       </Text>

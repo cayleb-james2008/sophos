@@ -66,15 +66,13 @@ export function ProvidersPanel() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+    <div className="gp-form">
       {loading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: tokens.space["3xl"] }}>
+        <div className="ap-loading">
           <Spinner size={22} />
         </div>
       ) : (
-        <div
-          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: tokens.space.lg }}
-        >
+        <div className="pp-grid">
           {/* The local (Ollama / OpenAI-compatible) endpoint is a FIRST-CLASS card,
               rendered separately from the daemon-discovered providers so the
               getProviders() array — and its index-0 `ollama-cloud` e2e assumption —
@@ -147,26 +145,13 @@ function ProviderCard({
 }) {
   const managed = provider.kind === "subscription";
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: tokens.space.md }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-          <span
-            style={{
-              width: 36,
-              height: 36,
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: tokens.radius.md,
-              background: provider.connected ? tokens.color.accentSoft : tokens.color.bgOverlay,
-              border: `1px solid ${provider.connected ? tokens.color.accentBorder : tokens.color.border}`,
-              color: provider.connected ? tokens.color.accentHover : tokens.color.textDim,
-            }}
-          >
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <div className="sp-head--start">
+        <div className="sp-headrow">
+          <span className={`pp-icon${provider.connected ? " pp-icon--connected" : ""}`}>
             <PlugIcon size={17} />
           </span>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div className="pp-title">
             <Text variant="label" weight="semibold">
               {provider.name}
             </Text>
@@ -187,7 +172,7 @@ function ProviderCard({
             D1/D2). The pill keeps its dot — which is the state marker — but
             drops to neutral so the signal is said once per card. "Managed" is a
             kind, not a state, so it is neutral too. */}
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, flexShrink: 0 }}>
+        <div className="pp-badges">
           <Badge tone="neutral">{managed ? "Managed" : "API key"}</Badge>
           <Badge tone="neutral" dot dotTone={provider.connected ? "success" : "neutral"}>
             {provider.connected ? "Connected" : "Offline"}
@@ -196,85 +181,42 @@ function ProviderCard({
       </div>
 
       {/* Models — each row can expand into a runtime-config adjuster */}
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+      <div className="pp-models">
+        <div className="sp-headrow--sm">
           <CpuIcon size={12} color={tokens.color.textDim} />
           <Text variant="micro" tone="dim" uppercase>
             Models
           </Text>
         </div>
         {models.length ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs }}>
+          <div className="pp-modellist">
             {models.map((m) => {
               const key = modelKey(m.provider, m.id);
               const open = expandedKey === key;
               return (
                 <div
                   key={m.id}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    border: `1px solid ${open ? tokens.color.accentBorder : tokens.color.border}`,
-                    borderRadius: tokens.radius.md,
-                    background: open ? tokens.color.bgOverlay : tokens.color.bgOverlay,
-                    overflow: "hidden",
-                    transition: `border-color ${tokens.motion.fast} ${tokens.motion.ease}`,
-                  }}
+                  className={`pp-model${open ? " pp-model--open" : ""}`}
                 >
                   <Button
                     variant="ghost"
                     type="button"
                     onClick={() => onToggle(key)}
                     aria-expanded={open}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: tokens.space.sm,
-                      width: "100%",
-                      padding: "7px 10px",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      color: tokens.color.text,
-                      fontFamily: tokens.font.mono,
-                      fontSize: tokens.font.size.xs,
-                      textAlign: "left",
-                    }}
+                    className="pp-modelbtn"
                   >
-                    <span style={{ display: "flex", alignItems: "center", gap: tokens.space.xs, minWidth: 0 }}>
-                      <span
-                        style={{
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          color: open ? tokens.color.accentHover : tokens.color.textMuted,
-                        }}
-                      >
+                    <span className="pp-modelname">
+                      <span className={`pp-modeltext${open ? " pp-modeltext--open" : ""}`}>
                         {m.name ?? m.id}
                       </span>
                       {m.supportsThinking && (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 14,
-                            height: 14,
-                            borderRadius: tokens.radius.full,
-                            background: tokens.color.accentSoft,
-                            color: tokens.color.accentHover,
-                            fontSize: 8,
-                            flexShrink: 0,
-                          }}
-                          title="Supports thinking"
-                        >
+                        <span className="pp-thinking" title="Supports thinking">
                           🧠
                         </span>
                       )}
                     </span>
-                    <span style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
-                      <span style={{ color: tokens.color.textDim, fontSize: tokens.font.size.xs }}>
+                    <span className="pp-modelright">
+                      <span className="pp-modelctx">
                         {m.contextWindow ? `${m.contextWindow.toLocaleString()} ctx` : ""}
                         {m.contextWindow && m.maxOutputTokens ? ` · ${m.maxOutputTokens.toLocaleString()} out` : ""}
                       </span>
@@ -301,14 +243,14 @@ function ProviderCard({
       </div>
 
       {provider.id === "ollama-cloud" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, padding: tokens.space.md, background: tokens.color.accentSoft, border: `1px solid ${tokens.color.accentBorder}`, borderRadius: tokens.radius.md }}>
+        <div className="pp-starter">
           <Text variant="micro" tone="accent" mono uppercase>Free starter model</Text>
           <Text variant="label" weight="semibold">DeepSeek V4 Flash 0731</Text>
           <Text variant="micro" tone="muted">Connect here once; Sophos selects this model automatically for new sessions. No settings file editing required.</Text>
         </div>
       ) : null}
 
-      <div style={{ borderTop: `1px solid ${tokens.color.border}`, paddingTop: tokens.space.md }}>
+      <div className="pp-foot">
         {provider.connected ? (
           <Button variant="outline" size="sm" icon={<LogoutIcon size={13} />} onClick={onLogout}>
             Log out
@@ -348,8 +290,8 @@ function ModelConfigEditor({
   };
 
   return (
-    <div style={{ borderTop: `1px solid ${tokens.color.border}`, padding: tokens.space.md, display: "flex", flexDirection: "column", gap: tokens.space.md }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: tokens.space.sm }}>
+    <div className="pp-editor">
+      <div className="sp-head">
         <Text variant="micro" tone="dim" mono uppercase>
           Runtime config
         </Text>
@@ -373,7 +315,7 @@ function ModelConfigEditor({
         onChange={setOut}
       />
 
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div className="kp-runfoot">
         <Button variant="accent-soft" size="sm" onClick={apply}>
           Apply to model
         </Button>
@@ -404,8 +346,8 @@ function TokenField({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: tokens.space.sm }}>
+    <div className="pp-token">
+      <div className="sp-head">
         <Text variant="micro" tone="muted" uppercase>
           {label}
         </Text>
@@ -413,7 +355,7 @@ function TokenField({
           {value.toLocaleString()} / {max.toLocaleString()}
         </Text>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+      <div className="pp-tokenrow">
         <input
           type="range"
           min={min}
@@ -422,26 +364,9 @@ function TokenField({
           value={value}
           aria-label={label}
           onChange={(e) => commit(Number(e.target.value))}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            accentColor: tokens.color.accent,
-            height: 4,
-            cursor: "pointer",
-          }}
+          className="pp-range"
         />
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: tokens.space.xs,
-            width: 132,
-            background: tokens.color.bgElevated,
-            border: `1px solid ${tokens.color.border}`,
-            borderRadius: tokens.radius.sm,
-            padding: "0 8px",
-          }}
-        >
+        <div className="pp-numbox">
           <input
             type="number"
             min={min}
@@ -449,37 +374,15 @@ function TokenField({
             value={value}
             aria-label={`${label} value`}
             onChange={(e) => commit(Number(e.target.value))}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              color: tokens.color.text,
-              fontFamily: tokens.font.mono,
-              fontSize: tokens.font.size.xs,
-              padding: "5px 0",
-            }}
+            className="pp-numinput"
           />
-          <span style={{ color: tokens.color.textDim, fontSize: 9, fontFamily: tokens.font.mono }}>tok</span>
+          <span className="pp-tok">tok</span>
         </div>
       </div>
-      <div
-        style={{
-          height: 3,
-          borderRadius: tokens.radius.sm,
-          background: tokens.color.bgElevated,
-          overflow: "hidden",
-          marginTop: 1,
-        }}
-      >
+      <div className="pp-meter">
         <div
-          style={{
-            height: "100%",
-            width: `${Math.min(100, Math.max(0, pct))}%`,
-            background: tokens.color.accent,
-            transition: `width ${tokens.motion.fast} ${tokens.motion.ease}`,
-          }}
+          className="pp-meterfill"
+          style={{ "--w": `${Math.min(100, Math.max(0, pct))}%` } as React.CSSProperties}
         />
       </div>
     </div>
@@ -493,11 +396,11 @@ function Chevron({ open }: { open: boolean }) {
       height="11"
       viewBox="0 0 24 24"
       fill="none"
-      stroke={tokens.color.textDim}
+      stroke="rgba(244, 244, 244, 0.45)"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ transform: open ? "rotate(180deg)" : undefined, transition: `transform ${tokens.motion.fast} ${tokens.motion.ease}`, flexShrink: 0 }}
+      className={`pp-chevron${open ? " pp-chevron--open" : ""}`}
     >
       <polyline points="6 9 12 15 18 9" />
     </svg>
@@ -531,35 +434,22 @@ function LocalProviderCard({
   const name = config?.name ?? "Local";
   const sub = config ? config.baseUrl : "Not connected";
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: tokens.space.md }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-          <span
-            style={{
-              width: 36,
-              height: 36,
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: tokens.radius.md,
-              background: connected ? tokens.color.accentSoft : tokens.color.bgOverlay,
-              border: `1px solid ${connected ? tokens.color.accentBorder : tokens.color.border}`,
-              color: connected ? tokens.color.accentHover : tokens.color.textDim,
-            }}
-          >
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <div className="sp-head--start">
+        <div className="sp-headrow">
+          <span className={`pp-icon${connected ? " pp-icon--connected" : ""}`}>
             <PlugIcon size={17} />
           </span>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+          <div className="pp-title">
             <Text variant="label" weight="semibold">
               {name}
             </Text>
-            <Text variant="micro" tone="dim" mono style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>
+            <Text variant="micro" tone="dim" mono className="pp-sub">
               {sub}
             </Text>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, flexShrink: 0 }}>
+        <div className="pp-badges">
           <Badge tone="neutral">Local</Badge>
           <Badge tone="neutral" dot dotTone={connected ? "success" : "neutral"}>
             {connected ? "Connected" : "Offline"}
@@ -567,33 +457,21 @@ function LocalProviderCard({
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+      <div className="pp-models">
+        <div className="sp-headrow--sm">
           <CpuIcon size={12} color={tokens.color.textDim} />
           <Text variant="micro" tone="dim" uppercase>
             Models
           </Text>
         </div>
         {connected && models.length ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs }}>
+          <div className="pp-modellist">
             {models.map((m) => (
-              <div
-                key={m.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: tokens.space.sm,
-                  border: `1px solid ${tokens.color.border}`,
-                  borderRadius: tokens.radius.md,
-                  background: tokens.color.bgOverlay,
-                  padding: "7px 10px",
-                }}
-              >
-                <Text variant="micro" mono style={{ color: tokens.color.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div key={m.id} className="pp-localmodel">
+                <Text variant="micro" mono className="pp-localname">
                   {m.name ?? m.id}
                 </Text>
-                <Text variant="micro" tone="dim" mono style={{ flexShrink: 0 }}>
+                <Text variant="micro" tone="dim" mono className="pp-localctx">
                   {m.contextWindow ? `${m.contextWindow.toLocaleString()} ctx` : ""}
                   {m.contextWindow && m.maxOutputTokens ? ` · ${m.maxOutputTokens.toLocaleString()} out` : ""}
                 </Text>
@@ -607,7 +485,7 @@ function LocalProviderCard({
         )}
       </div>
 
-      <div style={{ borderTop: `1px solid ${tokens.color.border}`, paddingTop: tokens.space.md }}>
+      <div className="pp-foot">
         {connected ? (
           <Button variant="outline" size="sm" icon={<LogoutIcon size={13} />} onClick={onLogout}>
             Log out
@@ -669,7 +547,7 @@ function LocalConnectModal({
         </>
       }
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+      <div className="ns-form">
         <Text variant="micro" tone="dim">
           Point Sophos at a local (self-hosted) model endpoint. The config is stored in your settings.
         </Text>
@@ -726,21 +604,9 @@ function CopyField({ value, ariaLabel }: { value: string; ariaLabel: string }) {
   };
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
-      <div
-        style={{
-          flex: 1,
-          minWidth: 0,
-          display: "flex",
-          alignItems: "center",
-          background: tokens.color.bgElevated,
-          border: `1px solid ${tokens.color.border}`,
-          borderRadius: tokens.radius.md,
-          padding: "0 10px",
-          height: 34,
-        }}
-      >
-        <Text variant="micro" tone="muted" mono style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+    <div className="pp-copy">
+      <div className="pp-copyfield">
+        <Text variant="micro" tone="muted" mono className="sp-ellipsis">
           {value}
         </Text>
       </div>
@@ -791,11 +657,11 @@ function LoginModal({
         </>
       }
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+      <div className="ns-form">
         {managed ? (
           <>
-            <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-              <Text variant="micro" tone="dim" uppercase style={{ letterSpacing: "0.1em" }}>
+            <div className="pp-oauth">
+              <Text variant="micro" tone="dim" uppercase className="pp-oauthlabel">
                 Sign in with OAuth
               </Text>
               <CopyField value={oauthUrl(provider.id)} ariaLabel={`Copy ${provider.name} sign-in link`} />
@@ -803,17 +669,17 @@ function LoginModal({
                 If the browser doesn't open automatically, copy this link and open it manually.
               </Text>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-              <span style={{ flex: 1, height: 1, background: tokens.color.border }} />
+            <div className="pp-divider">
+              <span className="pp-dividerline" />
               <Text variant="micro" tone="dim" uppercase>
                 or
               </Text>
-              <span style={{ flex: 1, height: 1, background: tokens.color.border }} />
+              <span className="pp-dividerline" />
             </div>
           </>
         ) : null}
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-          <Text variant="micro" tone="dim" uppercase style={{ letterSpacing: "0.1em" }}>
+        <div className="pp-apikey">
+          <Text variant="micro" tone="dim" uppercase className="pp-oauthlabel">
             Use an API key
           </Text>
           <Input

@@ -4,7 +4,6 @@
 // workflow folder.
 
 import { useEffect, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Modal, Button, Input, TextArea, Text } from "../../design";
 import { useIpc, isTauri } from "../../ipc/client";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -109,8 +108,8 @@ export function NewSessionModal({
         </>
       }
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+      <div className="ns-form">
+        <div className="ns-field">
           <Input
             label="Working directory"
             value={cwd}
@@ -118,29 +117,16 @@ export function NewSessionModal({
             placeholder="C:\work\project"
             hint={browseHint ? "Folder picker unavailable — type the full path instead." : "Where should this session work?"}
           />
-          <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+          <div className="ns-row">
             <Button variant="outline" size="sm" onClick={browse}>
               Browse…
             </Button>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: tokens.space.sm,
-                cursor: "pointer",
-                userSelect: "none",
-              }}
-            >
+            <label className="ns-check">
               <input
                 type="checkbox"
                 checked={saveDefault}
                 onChange={(e) => setSaveDefault(e.target.checked)}
-                style={{
-                  width: 14,
-                  height: 14,
-                  accentColor: tokens.color.accent,
-                  cursor: "pointer",
-                }}
+                className="ns-checkbox"
               />
               <Text variant="label" tone="muted">
                 Save as default for all sessions

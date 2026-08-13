@@ -10,10 +10,10 @@
 //        active, with one-click Pause/Stop recovery and a "resume?" override.
 
 import { useRef, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, Button } from "../../design";
 import { useIpc } from "../../ipc/client";
 import { useRunGuard } from "./useRunGuard";
+import "./longrunning.css";
 
 const GRACE_MS = 60_000;
 
@@ -30,29 +30,9 @@ export function RunGuardBanner() {
   // (e1) Engine down while a loop is active.
   if (guard.engineDown && guard.active) {
     return (
-      <div
-        role="alert"
-        style={{
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.md,
-          padding: `${tokens.space.sm} ${tokens.space.xl}`,
-          background: tokens.color.danger + "1a",
-          borderBottom: `1px solid ${tokens.color.danger}55`,
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: tokens.color.danger,
-            flexShrink: 0,
-          }}
-          aria-hidden
-        />
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+      <div role="alert" className="lr-guard lr-guard--danger">
+        <span className="lr-guard__dot lr-guard__dot--danger" aria-hidden />
+        <div className="lr-guard__main">
           <Text variant="label" weight="semibold" tone="danger">
             Engine is down — the {guard.goalActive ? "goal" : "autonomous"} loop can't continue
           </Text>
@@ -71,29 +51,9 @@ export function RunGuardBanner() {
   // (e2) Budget reached — paused. Resume?
   if (paused && guard.budgetTripped) {
     return (
-      <div
-        role="alert"
-        style={{
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.md,
-          padding: `${tokens.space.sm} ${tokens.space.xl}`,
-          background: tokens.color.warning + "14",
-          borderBottom: `1px solid ${tokens.color.warning}40`,
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: tokens.color.warning,
-            flexShrink: 0,
-          }}
-          aria-hidden
-        />
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+      <div role="alert" className="lr-guard lr-guard--warn">
+        <span className="lr-guard__dot lr-guard__dot--warn" aria-hidden />
+        <div className="lr-guard__main">
           <Text variant="label" weight="semibold" tone="warning">
             Run budget reached — paused
           </Text>
@@ -120,29 +80,9 @@ export function RunGuardBanner() {
   // (e2) Budget reached while the loop is still running.
   if (showBudget) {
     return (
-      <div
-        role="alert"
-        style={{
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.md,
-          padding: `${tokens.space.sm} ${tokens.space.xl}`,
-          background: tokens.color.warning + "14",
-          borderBottom: `1px solid ${tokens.color.warning}40`,
-        }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: tokens.color.warning,
-            flexShrink: 0,
-          }}
-          aria-hidden
-        />
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+      <div role="alert" className="lr-guard lr-guard--warn">
+        <span className="lr-guard__dot lr-guard__dot--warn" aria-hidden />
+        <div className="lr-guard__main">
           <Text variant="label" weight="semibold" tone="warning">
             Run budget reached — {guard.reason}
           </Text>
