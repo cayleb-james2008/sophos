@@ -40,6 +40,9 @@ export function SessionsView() {
   const [selectedId, setSelectedId] = useState<string | null>(sessionsSelectedId ?? null);
   const [actionError, setActionError] = useState<string | undefined>();
   const [viewMode, setViewMode] = useState<"graph" | "tree">("graph");
+  // Responsive detail inspector: below 900px the right-hand inspector becomes
+  // a slide-in overlay toggled by a floating button (B part). Default closed.
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   // P5: session list filter — narrows the graph by name (case-insensitive
   // substring) and/or status, in real time. Empty filter shows all sessions.
   const [filter, setFilter] = useState(sessionsFilter ?? "");
@@ -273,8 +276,12 @@ export function SessionsView() {
         </div>
       </div>
 
-      {/* Console: node graph + inspector */}
-      <section className="sessions__console sessions__console--graph">
+      {/* Console: node graph + inspector. The `--inspector-open` class drives
+          the slide-in overlay below 900px; above 900px it is a no-op (grid
+          column, always visible). */}
+      <section
+        className={`sessions__console sessions__console--graph${inspectorOpen ? " sessions__console--inspector-open" : ""}`}
+      >
         <div className="sessions__graphwrap">
           {viewMode === "graph" ? (
             <>
@@ -334,9 +341,35 @@ export function SessionsView() {
           ) : (
             <SessionTree session={selected} />
           )}
+
+          {/* Inspector toggle — floating control, shown below 900px. */}
+          <button
+            type="button"
+            className="sessions__inspector-toggle"
+            onClick={() => setInspectorOpen((o) => !o)}
+            aria-expanded={inspectorOpen}
+            aria-controls="session-inspector"
+            title={inspectorOpen ? "Close detail inspector" : "Open detail inspector"}
+          >
+            {inspectorOpen ? <ChevronLeftGlyph /> : <ChevronRightGlyph />}
+            <span>Inspect</span>
+          </button>
         </div>
 
-        <div className="sessions__detailwrap">
+        {/* Backdrop — only meaningful below 900px when the inspector is an
+            overlay (CSS-gated). Clicking it dismisses the inspector. */}
+        <div className="sessions__inspector-backdrop" onClick={() => setInspectorOpen(false)} aria-hidden="true" />
+
+        <div className="sessions__detailwrap" id="session-inspector">
+          {/* Close control — only rendered below 900px overlay mode (CSS-gated). */}
+          <button
+            type="button"
+            className="sessions__inspector-close"
+            onClick={() => setInspectorOpen(false)}
+            aria-label="Close inspector"
+          >
+            ✕
+          </button>
           {selected ? (
             <div className="sessions__detail">
               <SessionDetail
@@ -358,3 +391,21 @@ export function SessionsView() {
     </main>
   );
 }
+
+/* Chevron glyphs for the responsive inspector toggle (B part). */
+function ChevronGlyph({ dir }: { dir: "left" | "right" }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+      style={dir === "right" ? { transform: "rotate(180deg)" } : undefined}
+    >
+      <path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+const ChevronLeftGlyph = () => <ChevronGlyph dir="left" />;
+const ChevronRightGlyph = () => <ChevronGlyph dir="right" />;

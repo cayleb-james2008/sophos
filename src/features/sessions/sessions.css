@@ -895,6 +895,33 @@
   background: rgba(14, 14, 14, 0.35);
   backdrop-filter: blur(2px);
 }
+
+/* ---- Reset layout (drag-to-arrange) ----
+   Floating control over the graph canvas (top-left) that clears manual node
+   positions and reapplies the dagre auto-layout. Sits below the blank-state
+   overlay (z 6) so it is hidden while the graph is degraded. */
+.sessions__resetlayout {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(21, 21, 21, 0.88);
+  border: 1px solid #2a2a2a;
+  border-radius: 0;
+  color: rgba(244, 244, 244, 0.75);
+  font: 500 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: 0.12s ease;
+}
+.sessions__resetlayout svg { color: rgba(244, 244, 244, 0.45); }
+.sessions__resetlayout:hover { color: #85ed75; border-color: rgba(133, 237, 117, 0.4); }
+.sessions__resetlayout:hover svg { color: #85ed75; }
 /* No box-in-box: the graph canvas already provides the frame. Matches the
    Inbox and Agents empty states. */
 .sessions__graphblank__card {
@@ -1387,3 +1414,106 @@
   color: rgba(244, 244, 244, 0.6);
 }
 .transcript__forkconfirm-no:hover { background: rgba(255, 255, 255, 0.06); color: #f4f4f4; }
+
+/* =====================================================================
+   Responsive detail inspector (B part) — sessions graph
+   Above 900px the graph + inspector stay side by side (grid column),
+   untouched. Below 900px the graph takes the full console width and the
+   inspector becomes a slide-in overlay driven by `inspectorOpen` state
+   (.sessions__console--inspector-open). The toggle / close / backdrop
+   controls only surface below 900px. All rules are additive — no existing
+   rule is removed.
+   ===================================================================== */
+
+.sessions__inspector-toggle,
+.sessions__inspector-close,
+.sessions__inspector-backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  /* Graph takes the full console width; the inspector is pulled out of the
+     grid and becomes an absolutely-positioned overlay. */
+  .sessions__console--graph {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Floating "Inspect" toggle over the graph canvas (top-right). */
+  .sessions__inspector-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 7;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: rgba(21, 21, 21, 0.88);
+    border: 1px solid #2a2a2a;
+    border-radius: 0;
+    color: rgba(244, 244, 244, 0.75);
+    font: 500 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: 0.12s ease;
+  }
+  .sessions__inspector-toggle svg { color: rgba(244, 244, 244, 0.45); }
+  .sessions__inspector-toggle:hover { color: #85ed75; border-color: rgba(133, 237, 117, 0.4); }
+  .sessions__inspector-toggle:hover svg { color: #85ed75; }
+
+  /* Backdrop between the graph and the overlay inspector. */
+  .sessions__console--inspector-open .sessions__inspector-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 9;
+    display: block;
+    background: rgba(14, 14, 14, 0.45);
+    backdrop-filter: blur(1px);
+  }
+
+  /* Overlay inspector: slides in from the right, clipped by the console's
+     overflow:hidden when hidden so it never causes horizontal overflow. */
+  .sessions__detailwrap {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(372px, 100%);
+    z-index: 11;
+    border-left: 1px solid #2a2a2a;
+    box-shadow: -14px 0 36px rgba(0, 0, 0, 0.55);
+    transform: translateX(100%);
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .sessions__console--inspector-open .sessions__detailwrap {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  /* Close control on the overlay inspector (×, top-right). */
+  .sessions__inspector-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 12;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: rgba(21, 21, 21, 0.88);
+    border: 1px solid #2a2a2a;
+    border-radius: 0;
+    color: rgba(244, 244, 244, 0.6);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    transition: 0.12s ease;
+  }
+  .sessions__inspector-close:hover { color: #f4f4f4; background: #151515; }
+}

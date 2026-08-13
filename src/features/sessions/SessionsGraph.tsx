@@ -5,8 +5,8 @@
 // Wired to the same real IPC data as the prior rail (listSessions + per-session
 // context / goals / rlmChildren enrichment) — a representation change only.
 
-import { useEffect, useMemo } from "react";
-import { Handle, Position, useNodesState, type Edge, type Node, type NodeProps } from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { Handle, Position, useNodesState, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import { GraphFlow, NodeFrame, PulseEdge, dagreLayout, type PulseEdgeData } from "../graph";
 import { tokens } from "../../design/tokens";
 import { Button } from "../../design";
@@ -213,19 +213,59 @@ export function SessionsGraph({
   }, [sessions, enrichment, activeSessionId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<SessionGraphNode>([]);
+
+  /* Drag-to-arrange (D7): dagre auto-layout recomputes on every data change.
+     Without a guard that would overwrite any node the user has already dragged.
+     We track the node ids the user has manually positioned in a ref, and when
+     the fresh layout arrives we only adopt dagre positions for nodes the user
+     has never touched — dragged nodes keep their position across re-renders
+     while still receiving fresh data/status from the new layout. */
+  const userPositioned = useRef<Set<string>>(new Set());
+
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<SessionGraphNode>[]) => {
+      for (const c of changes) {
+        // A position change = the user dragged (or is dragging) the node.
+        if (c.type === "position" && c.position) userPositioned.current.add(c.id);
+      }
+      onNodesChange(changes);
+    },
+    [onNodesChange],
+  );
+
   useEffect(() => {
+    // Merge the fresh dagre layout without clobbering user-dragged positions.
+    setNodes((current) => {
+      const byId = new Map(current.map((n) => [n.id, n]));
+      return layout.positioned.map((pn) => {
+        const existing = byId.get(pn.id);
+        if (!existing) return pn;
+        return {
+          ...pn,
+          position: userPositioned.current.has(pn.id) ? existing.position : pn.position,
+          selected: existing.selected ?? false,
+          dragging: existing.dragging ?? false,
+        };
+      });
+    });
+  }, [layout, setNodes]);
+
+  const resetLayout = useCallback(() => {
+    // Drop every manual position and reapply the full dagre layout.
+    userPositioned.current.clear();
     setNodes(layout.positioned);
   }, [layout, setNodes]);
 
   if (layout.positioned.length === 0) return null;
 
   return (
-    <GraphFlow
-      nodes={nodes}
-      edges={layout.edges}
-      onNodesChange={onNodesChange}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
+    <>
+      <GraphFlow
+        nodes={nodes}
+        edges={layout.edges}
+        onNodesChange={handleNodesChange}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
       /* The session tree is laid out to fit the canvas, so a mini-map added no
          navigational value and read as a stray UI element mid-canvas
          (vision-critic D2). Matches the Agents fleet graph. */
@@ -234,7 +274,27 @@ export function SessionsGraph({
         const kind = layout.positioned.find((n) => n.id === id)?.data?.kind;
         if (kind === "session") onSelect(id);
       }}
-    />
+      />
+      {/* Reset layout — drops manual drags and reapplies the dagre auto-layout. */}
+      <button
+        type="button"
+        className="sessions__resetlayout"
+        onClick={resetLayout}
+        title="Reset to automatic layout"
+      >
+        <ResetGlyph />
+        Reset layout
+      </button>
+    </>
+  );
+}
+
+function ResetGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M20 3v5h-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 

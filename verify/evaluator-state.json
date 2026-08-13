@@ -1,0 +1,27 @@
+{
+  "round": 1,
+  "verdict": "PASS",
+  "contract_score": 1.0,
+  "bar_score": 1.0,
+  "checks_run": 29,
+  "checks_passed": 29,
+  "checks_failed": 0,
+  "tool": "playwright-core (chromium, headless)",
+  "viewport_widths_tested": [1440, 901, 900, 899, 768],
+  "evidence_dir": "verify/evaluator-screens/",
+  "tsc_clean": true,
+  "console_errors": 0,
+  "page_errors": 0,
+  "notes": [
+    "Drag-to-arrange: node moved (339,328) -> (453,381), Refresh preserved position exactly. Second node drag also persisted across a second Refresh — multi-node works.",
+    "Reset layout: node returned from (453,381) back to (339,328) — dagre reapplied. Visible in 1440-after-reset.png.",
+    "Boundary: 901px toggle display:none + inspector visible as grid column. 900px toggle display:flex + overlay. 899px also collapsed. Breakpoint is exact.",
+    "Inspector overlay: opens via Inspect button, closes via × and via backdrop, no horizontal overflow open or closed at 900/768. aria-expanded/aria-controls on toggle; aria-label on close.",
+    "Reset Layout button + Inspect toggle both visible and clickable at all narrow widths."
+  ],
+  "minor_observations": [
+    "Toggle chevron direction is inverted: closed shows '<' (left), open shows '>' (right). Conventional UX expects the opposite — close = chevron pointing away from the open panel (left when open, right when closed). Not a functional defect; polish only.",
+    "'New session' button text wraps to two lines at 768px and 900px because the toolbar compresses. Still legible and clickable; not broken.",
+    "Pre-existing: at narrow widths the active Sessions sidebar item's Tooltip can overlap the main h1 on hover. Not introduced by this work and is hover-only."
+  ]
+}
