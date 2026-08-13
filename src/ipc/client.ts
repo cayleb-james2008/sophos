@@ -91,6 +91,8 @@ export interface IpcClient {
   getAgentState(id: string): Promise<AgentSessionState>;
   createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill>;
   installSkill(path: string): Promise<RuntimeSkill[]>;
+  installExtension(path: string): Promise<void>;
+  removeExtension(path: string): Promise<void>;
 
   // Events
   onEvent(cb: (event: IpcEvent) => void): () => void;
@@ -354,6 +356,12 @@ export class TauriIpcClient implements IpcClient {
   installSkill(path: string): Promise<RuntimeSkill[]> {
     return this.send("installSkill", { path }) as Promise<RuntimeSkill[]>;
   }
+  installExtension(path: string): Promise<void> {
+    return this.send("installExtension", { path }) as Promise<void>;
+  }
+  removeExtension(path: string): Promise<void> {
+    return this.send("removeExtension", { path }) as Promise<void>;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -472,6 +480,16 @@ export class MockIpcClient implements IpcClient {
   };
   private simulated = false;
   private timers: number[] = [];
+
+  /** Demo skills surfaced by the browser-preview runtime so the Skills panel
+   * has something to render and the enable/disable + "Just installed" flows are
+   * demonstrable without a live daemon. */
+  private mockSkills: RuntimeSkill[] = [
+    { name: "release-audit", description: "Audit a release artifact", source: "project" },
+    { name: "code-review", description: "Review code for quality", source: "global" },
+    { name: "websearch", description: "Search the web for current information", source: "built-in" },
+  ];
+  private mockExtensions: Array<{ name: string; path: string; enabled: boolean }> = [];
 
   // The active session is the one surfaced by the UI. Keeping a single object
   // on the mock makes enrichment (context / goals / rlm / transcript) coherent
@@ -698,7 +716,7 @@ export class MockIpcClient implements IpcClient {
     }
   }
   async getSettings(): Promise<Settings> {
-    return { ...this.mockSettings, modelConfig: { ...(this.mockSettings.modelConfig ?? {}) } };
+    return { ...this.mockSettings, modelConfig: { ...(this.mockSettings.modelConfig ?? {}) }, extensions: this.mockExtensions } as unknown as Settings;
   }
   async setSettings(settings: Settings): Promise<void> {
     const next = { ...this.mockSettings, ...settings };
@@ -871,9 +889,9 @@ export class MockIpcClient implements IpcClient {
   async getRuntimeInfo(): Promise<RuntimeInfo> {
     return {
       kernel: { status: "browser-preview", persistent: false, toolAvailable: false },
-      skills: [],
+      skills: this.mockSkills,
       skillDiagnostics: [],
-      extensions: [],
+      extensions: this.mockExtensions.map((e) => e.path),
     };
   }
   async getKernelState(): Promise<KernelState> {
@@ -899,10 +917,19 @@ export class MockIpcClient implements IpcClient {
     return { id, status: "browser-preview", transcript: [] };
   }
   async createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill> {
-    return { name: input.name, description: input.description, source: "browser-preview" };
+    const skill: RuntimeSkill = { name: input.name, description: input.description, source: "browser-preview" };
+    this.mockSkills = [...this.mockSkills, skill];
+    return skill;
   }
   async installSkill(_path: string): Promise<RuntimeSkill[]> {
-    return [];
+    return this.mockSkills;
+  }
+  async installExtension(path: string): Promise<void> {
+    const name = path.split(/[/\\]/).pop() ?? path;
+    this.mockExtensions = [...this.mockExtensions, { name, path, enabled: true }];
+  }
+  async removeExtension(path: string): Promise<void> {
+    this.mockExtensions = this.mockExtensions.filter((e) => e.path !== path);
   }
 }
 

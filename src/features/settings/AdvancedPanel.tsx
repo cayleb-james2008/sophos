@@ -19,8 +19,7 @@ export function AdvancedPanel() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [daemonStatus, setDaemonStatus] = useState<{ connected: boolean; tcpEnabled?: boolean; socketPath?: string }>({ connected: false });
   const [mcpServers, setMcpServers] = useState<Array<{ name: string; command: string; args?: string[]; enabled: boolean }>>([]);
-  const [extensions, setExtensions] = useState<Array<{ name: string; path: string; enabled: boolean }>>([]);
-  const [settings, setSettings] = useState<Settings & { mcpServers?: Array<{ name: string; command: string; args?: string[]; enabled: boolean }>; extensions?: Array<{ name: string; path: string; enabled: boolean }> }>({});
+  const [settings, setSettings] = useState<Settings & { mcpServers?: Array<{ name: string; command: string; args?: string[]; enabled: boolean }> }>({});
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -48,16 +47,13 @@ export function AdvancedPanel() {
         socketPath: undefined,
       });
 
-      // MCP servers and extensions — read from settings if available
+      // MCP servers — read from settings if available
       // The daemon owns the real config; these are surfaced from settings.json
       const extendedSettings = s as Settings & {
         mcpServers?: Array<{ name: string; command: string; args?: string[]; enabled: boolean }>;
-        extensions?: Array<{ name: string; path: string; enabled: boolean }>;
       };
       const mcp = extendedSettings.mcpServers;
       if (Array.isArray(mcp)) setMcpServers(mcp);
-      const ext = extendedSettings.extensions;
-      if (Array.isArray(ext)) setExtensions(ext);
     } finally {
       setLoading(false);
     }
@@ -88,7 +84,6 @@ export function AdvancedPanel() {
           <AgentsCard agents={agents} onAttach={(id) => void ipc.attachAgent(id).then(() => refresh())} onRefresh={() => void refresh()} />
           <DaemonDiagnosticsCard status={daemonStatus} onRefresh={() => void refresh()} />
           <McpServersCard servers={mcpServers} onChange={(next) => void ipc.setSettings({ ...settings, mcpServers: next } as Record<string, unknown>).then(() => refresh())} />
-          <ExtensionsCard extensions={extensions} onChange={(next) => void ipc.setSettings({ ...settings, extensions: next } as Record<string, unknown>).then(() => refresh())} />
         </>
       )}
     </div>
@@ -745,90 +740,6 @@ function McpServersCard({ servers, onChange }: { servers: Array<{ name: string; 
 
       <Text variant="micro" tone="dim">
         MCP servers are configured in the daemon's settings.json. Changes here persist to settings and take effect on daemon restart.
-      </Text>
-    </Card>
-  );
-}
-
-function ExtensionsCard({ extensions, onChange }: { extensions: Array<{ name: string; path: string; enabled: boolean }>; onChange: (next: Array<{ name: string; path: string; enabled: boolean }>) => void }) {
-  return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
-          <span
-            style={{
-              width: 34,
-              height: 34,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: tokens.radius.md,
-              background: tokens.color.bgOverlay,
-              border: `1px solid ${tokens.color.border}`,
-              color: tokens.color.textDim,
-            }}
-          >
-            <ShieldIcon size={16} />
-          </span>
-          <Text variant="label" weight="semibold">
-            Extensions
-          </Text>
-          <Badge tone="neutral">{extensions.length}</Badge>
-        </div>
-      </div>
-
-      {extensions.length === 0 ? (
-        <Text variant="body" tone="dim">
-          No extensions configured. Add extensions in settings.json under "extensions" or place them in ~/.prime/agent/extensions/.
-        </Text>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-          {extensions.map((e, idx) => (
-            <div
-              key={e.name}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: tokens.space.md,
-                padding: tokens.space.md,
-                borderRadius: tokens.radius.md,
-                background: tokens.color.bgElevated,
-                border: `1px solid ${tokens.color.border}`,
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
-                  <Text variant="label" weight="medium" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {e.name}
-                  </Text>
-                  <Badge tone={e.enabled ? "success" : "neutral"} dot>
-                    {e.enabled ? "Enabled" : "Disabled"}
-                  </Badge>
-                </div>
-                <Text variant="micro" tone="dim" mono style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {e.path}
-                </Text>
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={e.enabled}
-                  onChange={(e) => {
-                    const next = [...extensions];
-                    next[idx] = { ...next[idx], enabled: e.target.checked };
-                    onChange(next);
-                  }}
-                  style={{ width: 16, height: 16, accentColor: tokens.color.accent }}
-                />
-                <Text variant="micro" tone="muted">Enable</Text>
-              </label>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <Text variant="micro" tone="dim">
-        Extensions are TypeScript modules loaded by the daemon. Enable/disable here persists to settings.json and takes effect on daemon restart or /reload.
       </Text>
     </Card>
   );
