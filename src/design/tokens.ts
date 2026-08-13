@@ -6,50 +6,59 @@
 // Existing token names are kept stable so feature modules keep compiling;
 // the spec-named aliases (surface / surface2 / line / muted / ok / warn / err /
 // display) are provided alongside. P7 restyles the whole app onto these.
+//
+// THEME: the color values below are CSS custom-property references (var(--pa-*))
+// resolved at the DOM level, so the whole palette switches with the theme. The
+// actual values live in src/design/global.css — `:root` carries the dark
+// defaults and `:root[data-theme="light"]` overrides them. The JS token names
+// stay stable; only the values are indirection. Non-color tokens (font, space,
+// radius, motion, shadow, layout) are theme-independent and stay literal.
 
 export const tokens = {
   // ---- Color ----
   color: {
     // Surfaces (near-black ink scale)
-    bg: "#0e0e0e",
-    surface: "#151515",
-    bgElevated: "#151515",
-    surface2: "#202020",
-    bgRaised: "#202020",
-    bgOverlay: "#111",
-    line: "#2a2a2a",
-    border: "#2a2a2a",
-    borderStrong: "#2c2c2c",
+    bg: "var(--pa-ink)",
+    surface: "var(--pa-card)",
+    bgElevated: "var(--pa-card)",
+    surface2: "var(--pa-secondary)",
+    bgRaised: "var(--pa-secondary)",
+    bgOverlay: "var(--pa-overlay)",
+    line: "var(--pa-border)",
+    border: "var(--pa-border)",
+    borderStrong: "var(--pa-border-strong)",
 
-    // Text (opacity-based on off-white #f4f4f4)
-    text: "#f4f4f4",
-    muted: "rgba(244,244,244,0.6)",
-    textMuted: "rgba(244,244,244,0.6)",
-    textDim: "rgba(244,244,244,0.45)",
+    // Text (opacity-based on the paper color)
+    text: "var(--pa-paper)",
+    muted: "var(--pa-paper-muted)",
+    textMuted: "var(--pa-paper-muted)",
+    textDim: "var(--pa-paper-dim)",
+    // Primary button text — the button is always solid white bg + black text,
+    // so this stays literal in both themes.
     textInverse: "#0e0e0e",
 
     // Signature accent — terminal green (the ONE place of color)
-    accent: "#85ed75",
-    accentHover: "#9fff8a",
-    accentSoft: "rgba(133,237,117,0.12)",
-    accentBorder: "rgba(133,237,117,0.4)",
+    accent: "var(--pa-green)",
+    accentHover: "var(--pa-green-hover)",
+    accentSoft: "var(--pa-green-soft)",
+    accentBorder: "var(--pa-green-border)",
 
     // Semantic (functional status, muted & non-blaring)
-    ok: "#85ed75",
-    success: "#85ed75",
-    warn: "#f3bc56",
-    warning: "#f3bc56",
-    danger: "#ef4444",
-    err: "#ef4444",
-    dangerSoft: "rgba(239,68,68,0.10)",
-    info: "#8b7cf6",
+    ok: "var(--pa-green)",
+    success: "var(--pa-green)",
+    warn: "var(--pa-amber)",
+    warning: "var(--pa-amber)",
+    danger: "var(--pa-danger)",
+    err: "var(--pa-danger)",
+    dangerSoft: "var(--pa-danger-soft)",
+    info: "var(--pa-info)",
 
     // Role colors
-    user: "#f4f4f4",
-    assistant: "rgba(244,244,244,0.9)",
-    system: "rgba(244,244,244,0.45)",
-    tool: "#38bdf8",
-    thinking: "rgba(244,244,244,0.6)",
+    user: "var(--pa-paper)",
+    assistant: "var(--pa-paper-strong)",
+    system: "var(--pa-paper-dim)",
+    tool: "var(--pa-tool)",
+    thinking: "var(--pa-paper-muted)",
   },
 
   // ---- Typography ----

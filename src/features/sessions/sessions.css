@@ -10,10 +10,10 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   background:
-    radial-gradient(circle at 84% 4%, rgba(133, 237, 117, 0.055), transparent 22rem),
-    linear-gradient(180deg, rgba(21,21,21,0.34), #0e0e0e 26rem);
+    radial-gradient(circle at 84% 4%, rgba(var(--pa-green-rgb), 0.055), transparent 22rem),
+    linear-gradient(180deg, rgba(var(--pa-card-rgb), 0.34), var(--pa-ink) 26rem);
 }
 
 .sessions__header {
@@ -23,12 +23,12 @@
   gap: 20px;
 }
 .sessions__header h1 { margin: 6px 0 3px; font-size: 26px; font-weight: 600; letter-spacing: -0.015em; font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif; }
-.sessions__header p { margin: 0; font-size: 14px; color: rgba(244, 244, 244, 0.6); }
+.sessions__header p { margin: 0; font-size: 14px; color: rgba(var(--pa-paper-rgb), 0.6); }
 
 .sessions__eyebrow {
   font: 600 10px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.16em;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
 }
 
 /* One restrained header band: heading left, hairline-separated telemetry right.
@@ -44,12 +44,12 @@
   align-items: center;
   gap: 12px;
   font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   white-space: nowrap;
 }
-.sessions__telemetry b { color: #f4f4f4; font-weight: 600; }
-.sessions__telemetry i { width: 1px; height: 14px; background: #2a2a2a; }
-.sessions__sync { color: rgba(244, 244, 244, 0.6); }
+.sessions__telemetry b { color: var(--pa-paper); font-weight: 600; }
+.sessions__telemetry i { width: 1px; height: 14px; background: var(--pa-border); }
+.sessions__sync { color: rgba(var(--pa-paper-rgb), 0.6); }
 
 /* Toolbar: view switch + filter + actions on one restrained row. */
 .sessions__toolbar {
@@ -74,20 +74,20 @@
   align-items: center;
   gap: 6px;
   padding: 0 8px;
-  background: rgba(21, 21, 21, 0.75);
-  border: 1px solid #2a2a2a;
+  background: rgba(var(--pa-card-rgb), 0.75);
+  border: 1px solid var(--pa-border);
   border-radius: 0;
   min-width: 220px;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .sessions__search:focus-within {
-  border-color: rgba(133, 237, 117, 0.4);
-  box-shadow: 0 0 0 3px rgba(133, 237, 117, 0.12);
+  border-color: rgba(var(--pa-green-rgb), 0.4);
+  box-shadow: 0 0 0 3px rgba(var(--pa-green-rgb), 0.12);
 }
 .sessions__search-icon {
   font-size: 12px;
   line-height: 1;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   flex: none;
 }
 .sessions__search-input {
@@ -96,17 +96,17 @@
   background: transparent;
   border: none;
   outline: none;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   font: 12px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   padding: 7px 0;
 }
 .sessions__search-input::placeholder {
-  color: rgba(244, 244, 244, 0.35);
+  color: rgba(var(--pa-paper-rgb), 0.35);
 }
 .sessions__search-clear {
   background: transparent;
   border: none;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   cursor: pointer;
   font-size: 11px;
   line-height: 1;
@@ -116,13 +116,13 @@
   transition: color 0.12s ease;
 }
 .sessions__search-clear:hover {
-  color: #f4f4f4;
+  color: var(--pa-paper);
 }
 .sessions__status-select {
-  background: rgba(21, 21, 21, 0.75);
-  border: 1px solid #2a2a2a;
+  background: rgba(var(--pa-card-rgb), 0.75);
+  border: 1px solid var(--pa-border);
   border-radius: 0;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   padding: 7px 8px;
   outline: none;
@@ -130,12 +130,12 @@
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .sessions__status-select:focus {
-  border-color: rgba(133, 237, 117, 0.4);
-  box-shadow: 0 0 0 3px rgba(133, 237, 117, 0.12);
+  border-color: rgba(var(--pa-green-rgb), 0.4);
+  box-shadow: 0 0 0 3px rgba(var(--pa-green-rgb), 0.12);
 }
 .sessions__status-select option {
-  background: #151515;
-  color: #f4f4f4;
+  background: var(--pa-card);
+  color: var(--pa-paper);
 }
 
 .sessions__console {
@@ -143,11 +143,11 @@
   flex: 1;
   display: grid;
   grid-template-columns: 330px minmax(0, 1fr);
-  border: 1px solid rgba(244,244,244,0.14);
+  border: 1px solid rgba(var(--pa-paper-rgb), 0.14);
   border-radius: 0;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(21,21,21,0.72), rgba(14,14,14,0.82));
-  box-shadow: inset 0 1px rgba(255,255,255,0.025);
+  background: linear-gradient(135deg, rgba(var(--pa-card-rgb), 0.72), rgba(var(--pa-ink-rgb), 0.82));
+  box-shadow: inset 0 1px rgba(var(--pa-paper-rgb), 0.025);
   backdrop-filter: blur(8px);
 }
 
@@ -156,17 +156,17 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid #2a2a2a;
-  background: linear-gradient(180deg, rgba(32, 32, 32, 0.86), rgba(21, 21, 21, 0.93));
+  border-right: 1px solid var(--pa-border);
+  background: linear-gradient(180deg, rgba(var(--pa-secondary-rgb), 0.86), rgba(var(--pa-card-rgb), 0.93));
 }
 .sessions__railhead {
   padding: 16px 18px 12px;
   display: flex;
   justify-content: space-between;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--pa-border);
   font: 600 10px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.16em;
-  color: #85ed75;
+  color: var(--pa-green);
 }
 .sessions__groups { padding: 10px; overflow: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
 .sessions__grouphead {
@@ -176,18 +176,18 @@
   padding: 0 4px 5px;
   font: 600 9px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.14em;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   text-transform: uppercase;
 }
 .sessions__grouphead span:last-child {
   min-width: 16px;
   height: 16px;
   border-radius: 0;
-  background: #2a2a2a;
+  background: var(--pa-border);
   display: grid;
   place-items: center;
   font-size: 9px;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
 }
 
 /* ---- Session card ---- */
@@ -207,15 +207,15 @@
   transition: 0.18s ease;
   margin-bottom: 3px;
 }
-.session:hover { background: #202020; }
+.session:hover { background: var(--pa-secondary); }
 .session--active {
-  background: linear-gradient(90deg, rgba(133, 237, 117, 0.1), rgba(133, 237, 117, 0.03));
-  border-color: rgba(133, 237, 117, 0.4);
+  background: linear-gradient(90deg, rgba(var(--pa-green-rgb), 0.1), rgba(var(--pa-green-rgb), 0.03));
+  border-color: rgba(var(--pa-green-rgb), 0.4);
 }
 .session--selected {
-  background: linear-gradient(90deg, rgba(133, 237, 117, 0.12), rgba(133, 237, 117, 0.04));
-  border-color: rgba(133, 237, 117, 0.4);
-  box-shadow: inset 2px 0 #85ed75;
+  background: linear-gradient(90deg, rgba(var(--pa-green-rgb), 0.12), rgba(var(--pa-green-rgb), 0.04));
+  border-color: rgba(var(--pa-green-rgb), 0.4);
+  box-shadow: inset 2px 0 var(--pa-green);
 }
 .session__edge {
   position: absolute;
@@ -224,32 +224,32 @@
   bottom: 8px;
   width: 3px;
   border-radius: 0;
-  background: #2a2a2a;
+  background: var(--pa-border);
 }
 .session--active .session__edge {
-  background: #85ed75;
+  background: var(--pa-green);
   box-shadow: none;
 }
-.session--saved .session__edge { background: rgba(133, 237, 117, 0.4); }
+.session--saved .session__edge { background: rgba(var(--pa-green-rgb), 0.4); }
 
 .session__avatar {
   width: 34px;
   height: 34px;
   flex: none;
   border-radius: 0;
-  background: linear-gradient(145deg, #202020, #151515);
-  border: 1px solid #2c2c2c;
+  background: linear-gradient(145deg, var(--pa-secondary), var(--pa-card));
+  border: 1px solid var(--pa-border-strong);
   display: grid;
   place-items: center;
   position: relative;
   font: 600 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: #85ed75;
+  color: var(--pa-green);
 }
 .session__avatar .status {
   position: absolute;
   right: -2px;
   bottom: -2px;
-  border: 2px solid #0e0e0e;
+  border: 2px solid var(--pa-ink);
   box-sizing: content-box;
 }
 .status {
@@ -257,11 +257,11 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: rgba(244, 244, 244, 0.3);
+  background: rgba(var(--pa-paper-rgb), 0.3);
 }
-.status--active { background: #85ed75; box-shadow: none; }
-.status--saved { background: #85ed75; box-shadow: none; }
-.status--idle { background: #f3bc56; }
+.status--active { background: var(--pa-green); box-shadow: none; }
+.status--saved { background: var(--pa-green); box-shadow: none; }
+.status--idle { background: var(--pa-amber); }
 
 .session__meta {
   min-width: 0;
@@ -279,7 +279,7 @@
 }
 .session__meta small {
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
@@ -298,21 +298,21 @@
   height: 24px;
   border: 0;
   background: transparent;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   border-radius: 0;
   cursor: pointer;
   display: grid;
   place-items: center;
   transition: 0.12s ease;
 }
-.session__act:hover { background: #111; color: #f4f4f4; }
+.session__act:hover { background: var(--pa-overlay); color: var(--pa-paper); }
 
 .sessions__legend {
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid var(--pa-border);
   padding: 12px 16px;
   display: flex;
   gap: 15px;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   text-transform: uppercase;
 }
@@ -320,15 +320,15 @@
 
 .sessions__emptyrail {
   text-align: center;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   padding: 40px 18px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   font-size: 11px;
 }
-.sessions__emptyrail b { color: rgba(244, 244, 244, 0.6); }
-.radar { font-size: 26px; color: #85ed75; }
+.sessions__emptyrail b { color: rgba(var(--pa-paper-rgb), 0.6); }
+.radar { font-size: 26px; color: var(--pa-green); }
 
 /* ---- Detail ---- */
 .sessions__detail {
@@ -336,13 +336,13 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(rgba(32, 32, 32, 0.82), rgba(21, 21, 21, 0.95)),
-    repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(255, 255, 255, 0.012) 32px);
+  background: linear-gradient(rgba(var(--pa-secondary-rgb), 0.82), rgba(var(--pa-card-rgb), 0.95)),
+    repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(var(--pa-paper-rgb), 0.012) 32px);
 }
 .detail__head {
   height: 76px;
   flex: none;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--pa-border);
   display: flex;
   align-items: center;
   padding: 0 22px;
@@ -353,15 +353,15 @@
   height: 40px;
   flex: none;
   border-radius: 0;
-  background: linear-gradient(145deg, #202020, #151515);
-  border: 1px solid #2c2c2c;
+  background: linear-gradient(145deg, var(--pa-secondary), var(--pa-card));
+  border: 1px solid var(--pa-border-strong);
   display: grid;
   place-items: center;
   font: 600 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: #85ed75;
+  color: var(--pa-green);
   position: relative;
 }
-.detail__avatar .status { position: absolute; right: -2px; bottom: -2px; border: 2px solid #0e0e0e; box-sizing: content-box; }
+.detail__avatar .status { position: absolute; right: -2px; bottom: -2px; border: 2px solid var(--pa-ink); box-sizing: content-box; }
 .detail__head > div:nth-child(2) { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 /* Session title: allow up to two lines instead of ellipsising a single word.
    `white-space: nowrap` truncated "Refactor auth module" to "Ref…", which told
@@ -375,9 +375,9 @@
   overflow-wrap: anywhere;
   line-height: 1.25;
 }
-.detail__head span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; text-transform: uppercase; color: rgba(244, 244, 244, 0.45); letter-spacing: 0.06em; }
+.detail__head span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; text-transform: uppercase; color: rgba(var(--pa-paper-rgb), 0.45); letter-spacing: 0.06em; }
 .detail__head span i { margin-right: 4px; }
-.detail__id { margin-left: auto; font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.3); letter-spacing: 0.12em; white-space: nowrap; }
+.detail__id { margin-left: auto; font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.3); letter-spacing: 0.12em; white-space: nowrap; }
 
 .detail__body {
   flex: 1;
@@ -399,19 +399,19 @@
   padding: 9px 0;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--pa-border);
   border-radius: 0;
 }
 .detail__row:last-child { border-bottom: 0; }
-.detail__row label { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; letter-spacing: 0.12em; color: rgba(244, 244, 244, 0.45); text-transform: uppercase; }
-.detail__row span { font: 12px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: #f4f4f4; overflow-wrap: anywhere; }
+.detail__row label { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; letter-spacing: 0.12em; color: rgba(var(--pa-paper-rgb), 0.45); text-transform: uppercase; }
+.detail__row span { font: 12px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: var(--pa-paper); overflow-wrap: anywhere; }
 
 .detail__actions {
   flex: none;
   display: flex;
   gap: 9px;
   padding: 16px 22px;
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid var(--pa-border);
   flex-wrap: wrap;
 }
 
@@ -419,14 +419,14 @@
   margin: auto;
   text-align: center;
   max-width: 320px;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
 }
 .detail__empty .radar { font-size: 30px; }
-.detail__empty b { color: rgba(244, 244, 244, 0.6); font-size: 14px; }
+.detail__empty b { color: rgba(var(--pa-paper-rgb), 0.6); font-size: 14px; }
 .detail__empty p { font-size: 12px; line-height: 1.6; margin: 0; }
 
 @media (max-width: 900px) {
@@ -438,20 +438,20 @@
 
 /* ---- P3 additions: context / goals / rlm / transcript / degradation ---- */
 
-.sessions__sync--down { color: #ef4444; }
+.sessions__sync--down { color: var(--pa-danger); }
 
 .sessions__daemon-down {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 13px 16px;
-  background: rgba(243, 188, 86, 0.08);
-  border: 1px solid rgba(243, 188, 86, 0.25);
+  background: rgba(var(--pa-amber-rgb), 0.08);
+  border: 1px solid rgba(var(--pa-amber-rgb), 0.25);
   border-radius: 0;
 }
 .sessions__daemon-icon {
   font-size: 20px;
-  color: #f3bc56;
+  color: var(--pa-amber);
   line-height: 1;
 }
 .sessions__daemon-body {
@@ -468,25 +468,25 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
-  background: rgba(243, 188, 86, 0.08);
-  border: 1px solid rgba(243, 188, 86, 0.2);
+  background: rgba(var(--pa-amber-rgb), 0.08);
+  border: 1px solid rgba(var(--pa-amber-rgb), 0.2);
   border-radius: 0;
 }
 .sessions__dismiss {
   background: transparent;
   border: none;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   cursor: pointer;
   font-size: 12px;
   padding: 2px 6px;
   border-radius: 0;
 }
-.sessions__dismiss:hover { background: rgba(255,255,255,0.06); color: #f4f4f4; }
+.sessions__dismiss:hover { background: rgba(var(--pa-paper-rgb), 0.06); color: var(--pa-paper); }
 
 .sessions__linkbtn {
   background: transparent;
   border: none;
-  color: #85ed75;
+  color: var(--pa-green);
   font: 600 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -496,7 +496,7 @@
   border-radius: 0;
   transition: 0.12s ease;
 }
-.sessions__linkbtn:hover { background: rgba(133, 237, 117, 0.12); color: #9fff8a; }
+.sessions__linkbtn:hover { background: rgba(var(--pa-green-rgb), 0.12); color: var(--pa-green-hover); }
 
 /* ---- Session card chips (context/goals/rlm) ---- */
 .session__chips {
@@ -510,27 +510,27 @@
   align-items: center;
   gap: 4px;
   font: 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   letter-spacing: 0.02em;
 }
 .session__ctx-dot {
   display: inline-block;
   height: 3px;
   border-radius: 0;
-  background: #85ed75;
+  background: var(--pa-green);
   max-width: 22px;
 }
-.session__ctx--danger { color: #ef4444; }
-.session__ctx--danger .session__ctx-dot { background: #ef4444; }
+.session__ctx--danger { color: var(--pa-danger); }
+.session__ctx--danger .session__ctx-dot { background: var(--pa-danger); }
 .session__chip {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   font: 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   padding: 1px 4px;
   border-radius: 0;
-  background: rgba(255,255,255,0.04);
+  background: rgba(var(--pa-paper-rgb), 0.04);
 }
 
 /* ---- Detail sections ---- */
@@ -544,16 +544,16 @@
   align-items: center;
   gap: 6px;
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(42, 42, 42, 0.6);
+  border-bottom: 1px solid rgba(var(--pa-border-rgb), 0.6);
 }
 .detail__sectionicon {
   display: inline-flex;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
 }
 .detail__sectionlabel {
   font: 600 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.14em;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   text-transform: uppercase;
 }
 .detail__sectioncount {
@@ -563,15 +563,15 @@
   place-items: center;
   padding: 0 5px;
   border-radius: 0;
-  background: #2a2a2a;
+  background: var(--pa-border);
   font: 600 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
 }
 
 .detail__skeleton {
   height: 24px;
   border-radius: 0;
-  background: linear-gradient(90deg, rgba(42,42,42,0.5) 0%, rgba(42,42,42,0.15) 50%, rgba(42,42,42,0.5) 100%);
+  background: linear-gradient(90deg, rgba(var(--pa-border-rgb), 0.5) 0%, rgba(var(--pa-border-rgb), 0.15) 50%, rgba(var(--pa-border-rgb), 0.5) 100%);
   background-size: 200% 100%;
   animation: pa-shimmer 1.5s ease infinite;
 }
@@ -582,14 +582,14 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: rgba(var(--pa-danger-rgb), 0.08);
+  border: 1px solid rgba(var(--pa-danger-rgb), 0.22);
   border-radius: 0;
 }
 .detail__retry {
   background: transparent;
-  border: 1px solid rgba(239,68,68,0.3);
-  color: #ef4444;
+  border: 1px solid rgba(var(--pa-danger-rgb), 0.3);
+  color: var(--pa-danger);
   font: 600 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -598,7 +598,7 @@
   cursor: pointer;
   transition: 0.12s ease;
 }
-.detail__retry:hover { background: rgba(239,68,68,0.12); }
+.detail__retry:hover { background: rgba(var(--pa-danger-rgb), 0.12); }
 
 .detail__metadata {
   display: flex;
@@ -615,36 +615,36 @@
 .context-meter__bar {
   height: 6px;
   border-radius: 0;
-  background: #2a2a2a;
+  background: var(--pa-border);
   overflow: hidden;
 }
 .context-meter__fill {
   height: 100%;
   border-radius: 0;
-  background: #85ed75;
+  background: var(--pa-green);
   transition: width 0.3s ease;
   box-shadow: none;
 }
 .context-meter__fill--danger {
-  background: linear-gradient(90deg, #ef4444, #ef4444);
+  background: linear-gradient(90deg, var(--pa-danger), var(--pa-danger));
   box-shadow: none;
 }
 .context-meter__stats {
   display: flex;
   justify-content: space-between;
   font: 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   letter-spacing: 0.02em;
 }
-.context-meter__stats b { color: #f4f4f4; }
+.context-meter__stats b { color: var(--pa-paper); }
 .context-meter__messages {
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   letter-spacing: 0.04em;
 }
 .context-meter__compaction {
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: #f3bc56;
+  color: var(--pa-amber);
   letter-spacing: 0.02em;
   padding-top: 2px;
 }
@@ -662,7 +662,7 @@
   padding: 9px 0;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--pa-border);
   border-radius: 0;
 }
 .goal:last-child { border-bottom: 0; }
@@ -683,12 +683,12 @@
 .goal__body b {
   font-size: 12px;
   font-weight: 600;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   line-height: 1.4;
 }
 .goal__body small {
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   letter-spacing: 0.02em;
 }
 
@@ -705,7 +705,7 @@
   padding: 9px 0;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--pa-border);
   border-radius: 0;
 }
 .rlm-child:last-child { border-bottom: 0; }
@@ -714,19 +714,19 @@
   height: 28px;
   flex: none;
   border-radius: 0;
-  background: linear-gradient(145deg, #202020, #151515);
-  border: 1px solid #2c2c2c;
+  background: linear-gradient(145deg, var(--pa-secondary), var(--pa-card));
+  border: 1px solid var(--pa-border-strong);
   display: grid;
   place-items: center;
   position: relative;
   font: 600 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: #85ed75;
+  color: var(--pa-green);
 }
 .rlm-child__avatar .status {
   position: absolute;
   right: -2px;
   bottom: -2px;
-  border: 2px solid #0e0e0e;
+  border: 2px solid var(--pa-ink);
   box-sizing: content-box;
 }
 .rlm-child__meta {
@@ -738,11 +738,11 @@
 .rlm-child__meta b {
   font-size: 12px;
   font-weight: 600;
-  color: #f4f4f4;
+  color: var(--pa-paper);
 }
 .rlm-child__meta small {
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
@@ -764,7 +764,7 @@
   padding: 9px 0;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--pa-border);
   border-radius: 0;
 }
 .transcript__row:last-child { border-bottom: 0; }
@@ -778,9 +778,9 @@
   padding-top: 2px;
   text-transform: uppercase;
 }
-.transcript__role--user { color: #85ed75; }
-.transcript__role--assistant { color: #85ed75; }
-.transcript__role--system { color: rgba(244, 244, 244, 0.45); }
+.transcript__role--user { color: var(--pa-green); }
+.transcript__role--assistant { color: var(--pa-green); }
+.transcript__role--system { color: rgba(var(--pa-paper-rgb), 0.45); }
 .transcript__content {
   flex: 1;
   min-width: 0;
@@ -790,29 +790,29 @@
 }
 .transcript__time {
   font: 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   letter-spacing: 0.04em;
 }
 .transcript__text {
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   word-break: break-word;
   white-space: pre-wrap;
 }
 .transcript__thinking {
   margin-top: 4px;
   padding: 6px 8px;
-  background: rgba(244, 244, 244, 0.06);
-  border-left: 2px solid rgba(244, 244, 244, 0.3);
+  background: rgba(var(--pa-paper-rgb), 0.06);
+  border-left: 2px solid rgba(var(--pa-paper-rgb), 0.3);
   border-radius: 0;
 }
 .transcript__thinking-label {
   display: block;
   font: 600 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.08em;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   text-transform: uppercase;
   margin-bottom: 3px;
 }
@@ -820,7 +820,7 @@
   margin: 0;
   font-size: 11px;
   line-height: 1.5;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   font-style: italic;
   white-space: pre-wrap;
 }
@@ -837,19 +837,19 @@
   gap: 4px;
   padding: 2px 6px;
   border-radius: 0;
-  background: rgba(133, 237, 117, 0.08);
-  border: 1px solid rgba(133, 237, 117, 0.2);
+  background: rgba(var(--pa-green-rgb), 0.08);
+  border: 1px solid rgba(var(--pa-green-rgb), 0.2);
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
-.transcript__tool-name { color: #38bdf8; }
+.transcript__tool-name { color: var(--pa-tool); }
 .transcript__tool-status {
   font-size: 8px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.transcript__tool-status--complete { color: #85ed75; }
-.transcript__tool-status--running { color: #f3bc56; }
-.transcript__tool-status--error { color: #ef4444; }
+.transcript__tool-status--complete { color: var(--pa-green); }
+.transcript__tool-status--running { color: var(--pa-amber); }
+.transcript__tool-status--error { color: var(--pa-danger); }
 
 @keyframes pa-shimmer {
   0% { background-position: 200% 0; }
@@ -867,15 +867,15 @@
   min-height: 0;
   position: relative;
   background:
-    linear-gradient(135deg, rgba(133,237,117,0.025), transparent 42%),
-    #0e0e0e;
+    linear-gradient(135deg, rgba(var(--pa-green-rgb), 0.025), transparent 42%),
+    var(--pa-ink);
 }
 .sessions__detailwrap {
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #2a2a2a;
+  border-left: 1px solid var(--pa-border);
   overflow: hidden;
 }
 .sessions__detailwrap .sessions__detail {
@@ -892,7 +892,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(14, 14, 14, 0.35);
+  background: rgba(var(--pa-ink-rgb), 0.35);
   backdrop-filter: blur(2px);
 }
 
@@ -909,19 +909,19 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: rgba(21, 21, 21, 0.88);
-  border: 1px solid #2a2a2a;
+  background: rgba(var(--pa-card-rgb), 0.88);
+  border: 1px solid var(--pa-border);
   border-radius: 0;
-  color: rgba(244, 244, 244, 0.75);
+  color: rgba(var(--pa-paper-rgb), 0.75);
   font: 500 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
   transition: 0.12s ease;
 }
-.sessions__resetlayout svg { color: rgba(244, 244, 244, 0.45); }
-.sessions__resetlayout:hover { color: #85ed75; border-color: rgba(133, 237, 117, 0.4); }
-.sessions__resetlayout:hover svg { color: #85ed75; }
+.sessions__resetlayout svg { color: rgba(var(--pa-paper-rgb), 0.45); }
+.sessions__resetlayout:hover { color: var(--pa-green); border-color: rgba(var(--pa-green-rgb), 0.4); }
+.sessions__resetlayout:hover svg { color: var(--pa-green); }
 /* No box-in-box: the graph canvas already provides the frame. Matches the
    Inbox and Agents empty states. */
 .sessions__graphblank__card {
@@ -931,7 +931,7 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   font-size: 12.5px;
   line-height: 1.6;
 }
@@ -940,7 +940,7 @@
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   font-size: 15px;
   font-weight: 500;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   margin-bottom: 6px;
 }
 .sessions__graphblank__link {
@@ -948,7 +948,7 @@
   margin-top: 12px;
   background: none;
   border: none;
-  color: #85ed75;
+  color: var(--pa-green);
   font-size: 12.5px;
   cursor: pointer;
   padding: 0;
@@ -965,8 +965,8 @@
   align-items: center;
   gap: 2px;
   padding: 3px;
-  background: rgba(21, 21, 21, 0.75);
-  border: 1px solid #2a2a2a;
+  background: rgba(var(--pa-card-rgb), 0.75);
+  border: 1px solid var(--pa-border);
   border-radius: 0;
 }
 .sessions__modeswitch-btn {
@@ -975,18 +975,18 @@
   gap: 6px;
   background: transparent;
   border: none;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   font: 500 11px "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   padding: 5px 13px;
   border-radius: 0;
   cursor: pointer;
   transition: 0.12s ease;
 }
-.sessions__modeswitch-btn:hover { color: #f4f4f4; }
+.sessions__modeswitch-btn:hover { color: var(--pa-paper); }
 .sessions__modeswitch-btn--active {
-  background: rgba(133, 237, 117, 0.12);
-  color: #85ed75;
-  box-shadow: inset 0 0 0 1px rgba(133, 237, 117, 0.35);
+  background: rgba(var(--pa-green-rgb), 0.12);
+  color: var(--pa-green);
+  box-shadow: inset 0 0 0 1px rgba(var(--pa-green-rgb), 0.35);
 }
 
 /* ---- Session tree ---- */
@@ -995,8 +995,8 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: #0e0e0e;
-  color: #f4f4f4;
+  background: var(--pa-ink);
+  color: var(--pa-paper);
   min-height: 0;
 }
 .session-tree__toolbar {
@@ -1005,7 +1005,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--pa-border);
 }
 .session-tree__label {
   display: inline-flex;
@@ -1013,12 +1013,12 @@
   gap: 6px;
   font: 600 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.16em;
-  color: #85ed75;
+  color: var(--pa-green);
 }
 .session-tree__count {
   flex: 1;
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   letter-spacing: 0.06em;
 }
 .session-tree__list {
@@ -1043,10 +1043,10 @@
   cursor: pointer;
   transition: 0.12s ease;
 }
-.session-tree__node:hover { background: #202020; }
+.session-tree__node:hover { background: var(--pa-secondary); }
 .session-tree__node--selected {
-  background: linear-gradient(90deg, rgba(133, 237, 117, 0.12), rgba(133, 237, 117, 0.03));
-  border-color: rgba(133, 237, 117, 0.4);
+  background: linear-gradient(90deg, rgba(var(--pa-green-rgb), 0.12), rgba(var(--pa-green-rgb), 0.03));
+  border-color: rgba(var(--pa-green-rgb), 0.4);
 }
 .session-tree__caret {
   flex: none;
@@ -1055,7 +1055,7 @@
   justify-content: center;
   width: 14px;
   height: 14px;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   transition: transform 0.15s ease;
   cursor: pointer;
 }
@@ -1071,15 +1071,15 @@
   font: 600 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.02em;
 }
-.session-tree__role--user { background: rgba(133, 237, 117, 0.18); color: #85ed75; }
-.session-tree__role--assistant { background: rgba(133, 237, 117, 0.14); color: #85ed75; }
-.session-tree__role--tool { background: rgba(56, 189, 248, 0.18); color: #38bdf8; }
-.session-tree__role--system { background: rgba(244, 244, 244, 0.12); color: rgba(244, 244, 244, 0.6); }
+.session-tree__role--user { background: rgba(var(--pa-green-rgb), 0.18); color: var(--pa-green); }
+.session-tree__role--assistant { background: rgba(var(--pa-green-rgb), 0.14); color: var(--pa-green); }
+.session-tree__role--tool { background: rgba(var(--pa-tool-rgb), 0.18); color: var(--pa-tool); }
+.session-tree__role--system { background: rgba(var(--pa-paper-rgb), 0.12); color: rgba(var(--pa-paper-rgb), 0.6); }
 .session-tree__text {
   flex: 1;
   min-width: 0;
   font-size: 12px;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1089,14 +1089,14 @@
   font: 600 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #85ed75;
+  color: var(--pa-green);
   padding: 2px 6px;
   border-radius: 0;
   opacity: 0;
   transition: 0.12s ease;
 }
 .session-tree__node:hover .session-tree__continue { opacity: 1; }
-.session-tree__continue:hover { background: rgba(133, 237, 117, 0.12); }
+.session-tree__continue:hover { background: rgba(var(--pa-green-rgb), 0.12); }
 .session-tree__children { display: flex; flex-direction: column; }
 
 .session-tree__state {
@@ -1107,11 +1107,11 @@
   justify-content: center;
   gap: 8px;
   padding: 30px;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   font-size: 12.5px;
   text-align: center;
 }
-.session-tree__state b { font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif; color: rgba(244, 244, 244, 0.6); font-size: 15px; font-weight: 500; }
+.session-tree__state b { font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif; color: rgba(var(--pa-paper-rgb), 0.6); font-size: 15px; font-weight: 500; }
 .session-tree__state p { margin: 0; max-width: 300px; line-height: 1.6; }
 .session-tree__skeleton { width: 78%; height: 26px; }
 .session-tree__skeleton--short { width: 46%; }
@@ -1119,14 +1119,14 @@
   margin: auto;
   text-align: center;
   max-width: 300px;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
 }
 .session-tree__empty .radar { font-size: 30px; }
-.session-tree__empty b { color: rgba(244, 244, 244, 0.6); font-size: 14px; }
+.session-tree__empty b { color: rgba(var(--pa-paper-rgb), 0.6); font-size: 14px; }
 .session-tree__empty p { font-size: 12px; line-height: 1.6; margin: 0; }
 
 .session-tree__error {
@@ -1136,8 +1136,8 @@
   gap: 12px;
   margin: 10px 16px 0;
   padding: 9px 12px;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(var(--pa-danger-rgb), 0.12);
+  border: 1px solid rgba(var(--pa-danger-rgb), 0.4);
   border-radius: 0;
 }
 .session-tree__error .sessions__linkbtn { margin-top: 0; }
@@ -1152,24 +1152,24 @@
   align-items: center;
   gap: 10px;
   padding: 8px 12px 8px 14px;
-  background: #111;
-  border: 1px solid rgba(133, 237, 117, 0.4);
+  background: var(--pa-overlay);
+  border: 1px solid rgba(var(--pa-green-rgb), 0.4);
   border-radius: 0;
   font-size: 11px;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   box-shadow: none;
   animation: pa-scale-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .session-tree__toast button {
   background: transparent;
   border: none;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   cursor: pointer;
   display: grid;
   place-items: center;
   padding: 2px;
 }
-.session-tree__toast button:hover { color: #f4f4f4; }
+.session-tree__toast button:hover { color: var(--pa-paper); }
 
 .session-tree__preview {
   flex: none;
@@ -1179,8 +1179,8 @@
   gap: 8px;
   margin: 0 10px 10px;
   padding: 12px 14px;
-  background: #151515;
-  border: 1px solid #2c2c2c;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border-strong);
   border-radius: 0;
   animation: pa-scale-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1192,23 +1192,23 @@
 .session-tree__preview-time {
   flex: 1;
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
 }
 .session-tree__preview-close {
   background: transparent;
   border: none;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   cursor: pointer;
   display: grid;
   place-items: center;
   padding: 2px;
 }
-.session-tree__preview-close:hover { color: #f4f4f4; }
+.session-tree__preview-close:hover { color: var(--pa-paper); }
 .session-tree__preview-text {
   margin: 0;
   font-size: 12.5px;
   line-height: 1.6;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   white-space: pre-wrap;
   word-break: break-word;
   overflow-y: auto;
@@ -1224,17 +1224,17 @@
   flex: none;
 }
 .ctx-ring svg { display: block; }
-.ctx-ring__track { fill: none; stroke: #2a2a2a; stroke-width: 7; }
+.ctx-ring__track { fill: none; stroke: var(--pa-border); stroke-width: 7; }
 .ctx-ring__fill {
   fill: none;
-  stroke: #85ed75;
+  stroke: var(--pa-green);
   stroke-width: 7;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.3s ease;
   filter: none;
 }
 .ctx-ring__fill--danger {
-  stroke: #ef4444;
+  stroke: var(--pa-danger);
   filter: none;
 }
 .ctx-ring__center {
@@ -1247,8 +1247,8 @@
   gap: 1px;
 }
 .ctx-ring__center b { font: 600 15px "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif; line-height: 1; }
-.ctx-ring__center span { font: 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.6); }
-.ctx-ring__center em { font-style: normal; font: 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.45); }
+.ctx-ring__center span { font: 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.6); }
+.ctx-ring__center em { font-style: normal; font: 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.45); }
 
 .context-block {
   display: flex;
@@ -1257,7 +1257,7 @@
   padding: 9px 0;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--pa-border);
   border-radius: 0;
 }
 .context-block__meta {
@@ -1267,9 +1267,9 @@
   flex-direction: column;
   gap: 3px;
   font: 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
 }
-.context-block__meta b { color: #f4f4f4; font-weight: 600; }
+.context-block__meta b { color: var(--pa-paper); font-weight: 600; }
 
 /* ---- Inline title rename ---- */
 .detail__title { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
@@ -1294,18 +1294,18 @@
   text-overflow: ellipsis;
   transition: color 0.12s ease;
 }
-.detail__title-edit svg { color: rgba(244, 244, 244, 0.45); opacity: 0; transition: 0.12s ease; flex: none; }
+.detail__title-edit svg { color: rgba(var(--pa-paper-rgb), 0.45); opacity: 0; transition: 0.12s ease; flex: none; }
 .detail__title-edit:hover svg { opacity: 1; }
-.detail__title-edit:hover b { color: #85ed75; }
+.detail__title-edit:hover b { color: var(--pa-green); }
 .detail__title-input {
-  background: #151515;
-  border: 1px solid #85ed75;
-  color: #f4f4f4;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-green);
+  color: var(--pa-paper);
   font: 600 15px "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   border-radius: 0;
   padding: 4px 8px;
   outline: none;
-  box-shadow: 0 0 0 3px rgba(133, 237, 117, 0.15);
+  box-shadow: 0 0 0 3px rgba(var(--pa-green-rgb), 0.15);
   min-width: 180px;
   max-width: 340px;
 }
@@ -1318,11 +1318,11 @@
   bottom: 14px;
   z-index: 8;
   padding: 9px 14px;
-  background: #111;
-  border: 1px solid rgba(133, 237, 117, 0.4);
+  background: var(--pa-overlay);
+  border: 1px solid rgba(var(--pa-green-rgb), 0.4);
   border-radius: 0;
   font-size: 11.5px;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   box-shadow: none;
   animation: pa-scale-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1336,25 +1336,25 @@
   padding: 9px 0;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--pa-border);
   border-radius: 0;
 }
 .compact-status__dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #85ed75;
+  background: var(--pa-green);
   box-shadow: none;
   flex: none;
 }
 .compact-status__dot--active {
-  background: #f3bc56;
+  background: var(--pa-amber);
   box-shadow: none;
   animation: pa-pulse 1.1s ease-in-out infinite;
 }
 .compact-status div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.compact-status b { font-size: 12.5px; font-weight: 600; color: #f4f4f4; }
-.compact-status small { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(244, 244, 244, 0.45); letter-spacing: 0.02em; }
+.compact-status b { font-size: 12.5px; font-weight: 600; color: var(--pa-paper); }
+.compact-status small { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.45); letter-spacing: 0.02em; }
 
 /* ---- Fork from here ---- */
 .transcript__fork {
@@ -1364,7 +1364,7 @@
   margin-left: 10px;
   background: transparent;
   border: none;
-  color: #85ed75;
+  color: var(--pa-green);
   font: 600 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1374,21 +1374,21 @@
   transition: 0.12s ease;
   vertical-align: middle;
 }
-.transcript__fork:hover { background: rgba(133, 237, 117, 0.12); }
+.transcript__fork:hover { background: rgba(var(--pa-green-rgb), 0.12); }
 .transcript__forkconfirm {
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 6px 9px;
-  background: rgba(133, 237, 117, 0.08);
-  border: 1px solid rgba(133, 237, 117, 0.28);
+  background: rgba(var(--pa-green-rgb), 0.08);
+  border: 1px solid rgba(var(--pa-green-rgb), 0.28);
   border-radius: 0;
   margin-bottom: 6px;
 }
 .transcript__forkconfirm span {
   flex: 1;
   font-size: 10.5px;
-  color: #f4f4f4;
+  color: var(--pa-paper);
 }
 .transcript__forkconfirm button {
   display: inline-flex;
@@ -1404,16 +1404,16 @@
   transition: 0.12s ease;
 }
 .transcript__forkconfirm-yes {
-  background: rgba(133, 237, 117, 0.16);
-  color: #85ed75;
-  border-color: rgba(133, 237, 117, 0.4) !important;
+  background: rgba(var(--pa-green-rgb), 0.16);
+  color: var(--pa-green);
+  border-color: rgba(var(--pa-green-rgb), 0.4) !important;
 }
-.transcript__forkconfirm-yes:hover { background: rgba(133, 237, 117, 0.28); }
+.transcript__forkconfirm-yes:hover { background: rgba(var(--pa-green-rgb), 0.28); }
 .transcript__forkconfirm-no {
   background: transparent;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
 }
-.transcript__forkconfirm-no:hover { background: rgba(255, 255, 255, 0.06); color: #f4f4f4; }
+.transcript__forkconfirm-no:hover { background: rgba(var(--pa-paper-rgb), 0.06); color: var(--pa-paper); }
 
 /* =====================================================================
    Responsive detail inspector (B part) — sessions graph
@@ -1449,19 +1449,19 @@
     align-items: center;
     gap: 6px;
     padding: 6px 10px;
-    background: rgba(21, 21, 21, 0.88);
-    border: 1px solid #2a2a2a;
+    background: rgba(var(--pa-card-rgb), 0.88);
+    border: 1px solid var(--pa-border);
     border-radius: 0;
-    color: rgba(244, 244, 244, 0.75);
+    color: rgba(var(--pa-paper-rgb), 0.75);
     font: 500 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     cursor: pointer;
     transition: 0.12s ease;
   }
-  .sessions__inspector-toggle svg { color: rgba(244, 244, 244, 0.45); }
-  .sessions__inspector-toggle:hover { color: #85ed75; border-color: rgba(133, 237, 117, 0.4); }
-  .sessions__inspector-toggle:hover svg { color: #85ed75; }
+  .sessions__inspector-toggle svg { color: rgba(var(--pa-paper-rgb), 0.45); }
+  .sessions__inspector-toggle:hover { color: var(--pa-green); border-color: rgba(var(--pa-green-rgb), 0.4); }
+  .sessions__inspector-toggle:hover svg { color: var(--pa-green); }
 
   /* Backdrop between the graph and the overlay inspector. */
   .sessions__console--inspector-open .sessions__inspector-backdrop {
@@ -1469,7 +1469,7 @@
     inset: 0;
     z-index: 9;
     display: block;
-    background: rgba(14, 14, 14, 0.45);
+    background: rgba(var(--pa-ink-rgb), 0.45);
     backdrop-filter: blur(1px);
   }
 
@@ -1482,7 +1482,7 @@
     bottom: 0;
     width: min(372px, 100%);
     z-index: 11;
-    border-left: 1px solid #2a2a2a;
+    border-left: 1px solid var(--pa-border);
     box-shadow: -14px 0 36px rgba(0, 0, 0, 0.55);
     transform: translateX(100%);
     transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1506,19 +1506,19 @@
     justify-content: center;
     width: 28px;
     height: 28px;
-    background: rgba(21, 21, 21, 0.88);
-    border: 1px solid #2a2a2a;
+    background: rgba(var(--pa-card-rgb), 0.88);
+    border: 1px solid var(--pa-border);
     border-radius: 0;
-    color: rgba(244, 244, 244, 0.6);
+    color: rgba(var(--pa-paper-rgb), 0.6);
     font-size: 13px;
     line-height: 1;
     cursor: pointer;
     transition: 0.12s ease;
   }
-  .sessions__inspector-close:hover { color: #f4f4f4; background: #151515; }
+  .sessions__inspector-close:hover { color: var(--pa-paper); background: var(--pa-card); }
 }
-.ctx-ring__pct { color: #9fff8a; }
-.ctx-ring__pct--danger { color: #ef4444; }
+.ctx-ring__pct { color: var(--pa-green-hover); }
+.ctx-ring__pct--danger { color: var(--pa-danger); }
 
 /* ---- Inline-style purge ---- */
 .detail { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -1526,8 +1526,8 @@
 .ns-field { display: flex; flex-direction: column; gap: 8px; }
 .ns-row { display: flex; align-items: center; gap: 8px; }
 .ns-check { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
-.ns-checkbox { width: 14px; height: 14px; accent-color: #85ed75; cursor: pointer; }
-.goal__dot--active { background: #85ed75; }
-.goal__dot--completed { background: #8b7cf6; }
-.goal__dot--paused { background: #f3bc56; }
-.goal__dot--idle { background: rgba(244, 244, 244, 0.45); }
+.ns-checkbox { width: 14px; height: 14px; accent-color: var(--pa-green); cursor: pointer; }
+.goal__dot--active { background: var(--pa-green); }
+.goal__dot--completed { background: var(--pa-info); }
+.goal__dot--paused { background: var(--pa-amber); }
+.goal__dot--idle { background: rgba(var(--pa-paper-rgb), 0.45); }
