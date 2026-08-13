@@ -273,69 +273,100 @@ async function main() {
     }
   }
 
-  // 9. Verify the signature is cryptographically valid against the public key
-  // The Tauri signer uses minisign format. We verify by checking that the
-  // signature file and public key file are valid base64 and have the expected
-  // minisign structure.
-  console.log("\n→ Verifying signature format...");
-  if (existsSync(sigPath) && existsSync(pubPath)) {
+  // 9. Cryptographically verify the signature against the public key.
+  // The Tauri updater uses minisign format with Ed25519 over Blake2b-512
+  // prehash. We reproduce the exact verification path the updater plugin
+  // (minisign-verify) follows: parse the minisign public key + signature,
+  // match key IDs, compute blake2b-512 of the update binary, and verify
+  // the Ed25519 signature over the prehash using Node.js crypto.
+  console.log("\n→ Cryptographically verifying signature...");
+  if (existsSync(sigPath) && existsSync(pubPath) && existsSync(updatePath)) {
     const sigContent = readFileSync(sigPath, "utf-8").trim();
     const pubContent = readFileSync(pubPath, "utf-8").trim();
+    const updateData = readFileSync(updatePath);
 
-    // Check that both are valid base64
-    const isBase64 = (s) => {
+    // Both files are base64-encoded; decoding gives the minisign text format
+    // (comment line + key/sig line separated by newlines).
+    const sigDecoded = Buffer.from(sigContent, "base64").toString("utf-8");
+    const pubDecoded = Buffer.from(pubContent, "base64").toString("utf-8");
+
+    const sigLines = sigDecoded.split("\n").filter((l) => l.trim());
+    const pubLines = pubDecoded.split("\n").filter((l) => l.trim());
+
+    check("Signature file has comment + signature lines", sigLines.length >= 2, `lines=${sigLines.length}`) || (allPass = false);
+    check("Public key file has comment + key lines", pubLines.length >= 2, `lines=${pubLines.length}`) || (allPass = false);
+
+    if (sigLines.length >= 2 && pubLines.length >= 2) {
       try {
-        Buffer.from(s, "base64");
-        return true;
-      } catch {
-        return false;
+        // Parse the minisign public key line (base64 of: Ed[2] + keyId[8] + pubKey[32] = 42 bytes)
+        const pubRaw = Buffer.from(pubLines[1].trim(), "base64");
+        check("Public key raw data is 42 bytes", pubRaw.length === 42, `length=${pubRaw.length}`) || (allPass = false);
+
+        // Parse the minisign signature line.
+        // Standard minisign: Ed[2] + flags[2] + keyId[8] + sig[64] = 76 bytes.
+        // Tauri's signer may omit flags: Ed[2] + keyId[8] + sig[64] = 74 bytes.
+        const sigRaw = Buffer.from(sigLines[1].trim(), "base64");
+        const sigLen = sigRaw.length;
+        const hasFlags = sigLen === 76;
+        check(`Signature raw data is ${hasFlags ? 76 : 74} bytes`, sigLen === 74 || sigLen === 76, `length=${sigLen}`) || (allPass = false);
+
+        if (pubRaw.length === 42 && (sigLen === 74 || sigLen === 76)) {
+          // Extract components
+          const pubMagic = pubRaw.subarray(0, 2).toString("ascii");  // "Ed"
+          const pubKeyId = pubRaw.subarray(2, 10);                     // 8 bytes
+          const pubKeyBytes = pubRaw.subarray(10, 42);                 // 32 bytes raw Ed25519 public key
+
+          const sigMagic = sigRaw.subarray(0, 2).toString("ascii");  // "Ed"
+          let sigFlags, sigKeyId, sigBytes;
+          if (hasFlags) {
+            sigFlags = sigRaw.readUInt16LE(2);
+            sigKeyId = sigRaw.subarray(4, 12);
+            sigBytes = sigRaw.subarray(12, 76);
+          } else {
+            sigFlags = 0x01; // Tauri always uses Blake2b-512 prehash
+            sigKeyId = sigRaw.subarray(2, 10);
+            sigBytes = sigRaw.subarray(10, 74);
+          }
+
+          check("Public key magic is 'Ed'", pubMagic === "Ed", `magic='${pubMagic}'`) || (allPass = false);
+          check("Signature magic is 'ED' (minisign sig magic)", sigMagic === "ED" || sigMagic === "Ed", `magic='${sigMagic}'`) || (allPass = false);
+
+          // Key ID must match between public key and signature
+          const keyIdMatch = pubKeyId.equals(sigKeyId);
+          check("Key ID matches between pubkey and signature", keyIdMatch, `pub=${pubKeyId.toString("hex")} sig=${sigKeyId.toString("hex")}`) || (allPass = false);
+
+          // The prehash flag (bit 0) indicates Blake2b-512 prehash.
+          // Tauri's updater uses prehash, so we hash the data with blake2b512.
+          const usesPrehash = (sigFlags & 0x01) !== 0;
+          check("Signature uses prehash (Blake2b-512)", usesPrehash, `flags=0x${sigFlags.toString(16).padStart(4, "0")}`) || (allPass = false);
+
+          // Compute the prehash: blake2b-512 of the update binary
+          const { createHash, createPublicKey, verify: cryptoVerify } = await import("node:crypto");
+          const prehash = createHash("blake2b512").update(updateData).digest();
+
+          // Wrap the raw 32-byte Ed25519 public key in SPKI DER format for Node.js crypto.
+          // SPKI for Ed25519: 30 2a 30 05 06 03 2b 65 70 03 21 00 <32 bytes>
+          const spkiDer = Buffer.concat([
+            Buffer.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00]),
+            pubKeyBytes,
+          ]);
+          const keyObj = createPublicKey({ key: spkiDer, format: "der", type: "spki" });
+
+          // Verify the Ed25519 signature over the prehash.
+          // Ed25519 in Node.js uses algorithm=null (the key type determines the algorithm).
+          const isValid = cryptoVerify(null, prehash, keyObj, sigBytes);
+          check("Ed25519 signature verifies over Blake2b-512 prehash", isValid, isValid ? "cryptographically valid ✓" : "INVALID — signature does not match") || (allPass = false);
+
+          // Also verify that a tampered binary FAILS (negative test)
+          const tamperedData = Buffer.concat([updateData.subarray(0, -1), Buffer.from([updateData[updateData.length - 1] ^ 0xff])]);
+          const tamperedHash = createHash("blake2b512").update(tamperedData).digest();
+          const tamperedValid = cryptoVerify(null, tamperedHash, keyObj, sigBytes);
+          check("Tampered binary correctly REJECTS signature", !tamperedValid, !tamperedValid ? "rejected ✓" : "BUG: tampered data passed verification!") || (allPass = false);
+        }
+      } catch (e) {
+        check("Cryptographic signature verification", false, e.message);
+        allPass = false;
       }
-    };
-
-    check(
-      "Signature is valid base64",
-      isBase64(sigContent),
-    ) || (allPass = false);
-
-    check(
-      "Public key is valid base64",
-      isBase64(pubContent),
-    ) || (allPass = false);
-
-    // Decode and check the minisign structure
-    try {
-      const sigDecoded = Buffer.from(sigContent, "base64").toString("utf-8");
-      const pubDecoded = Buffer.from(pubContent, "base64").toString("utf-8");
-
-      check(
-        "Signature has minisign comment line",
-        sigDecoded.includes("untrusted comment:"),
-        `decoded prefix: ${sigDecoded.substring(0, 40)}...`,
-      ) || (allPass = false);
-
-      check(
-        "Public key has minisign comment line",
-        pubDecoded.includes("untrusted comment: minisign public key:"),
-      ) || (allPass = false);
-
-      // The signature should have a signature line (second line)
-      const sigLines = sigDecoded.split("\n").filter((l) => l.trim());
-      check(
-        "Signature has at least 2 lines (comment + signature)",
-        sigLines.length >= 2,
-        `lines=${sigLines.length}`,
-      ) || (allPass = false);
-
-      // The public key should have a key line (second line)
-      const pubLines = pubDecoded.split("\n").filter((l) => l.trim());
-      check(
-        "Public key has at least 2 lines (comment + key)",
-        pubLines.length >= 2,
-        `lines=${pubLines.length}`,
-      ) || (allPass = false);
-    } catch (e) {
-      check("Signature format verification", false, e.message);
-      allPass = false;
     }
   }
 
