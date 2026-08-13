@@ -23,6 +23,7 @@ import { NewSessionModal } from "./features/sessions/NewSessionModal";
 import { UnreadProvider } from "./ipc/unread";
 import { AppStateProvider, useAppState } from "./state/AppState";
 import { useHotkeys } from "./hooks/useHotkeys";
+import { useTheme } from "./hooks/useTheme";
 
 const VIEWS: Record<Exclude<View, "settings">, React.ComponentType> = {
   chat: ChatView,
@@ -100,6 +101,7 @@ function AppShell() {
 }
 
 export default function App() {
+  useTheme();
   return (
     <UnreadProvider>
       <AppStateProvider>

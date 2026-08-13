@@ -51,10 +51,36 @@ export function statusColor(status?: string): string {
   }
 }
 
-/** A soft, transparent wash of the status color — used for node glows / edges. */
+/** A soft, transparent wash of the status color — used for node glows / edges.
+ *
+ * Returns a CSS custom-property reference (the soft variant of the status
+ * color) rather than appending an alpha hex to a literal, because the token
+ * colors are now `var(--pa-*)` references that resolve at the DOM level —
+ * string-concatenating an alpha suffix onto a var() would be invalid CSS. */
 export function statusWash(status?: string): string {
-  const hex = statusColor(status);
-  return `${hex}22`;
+  switch (status) {
+    case "running":
+    case "connected":
+    case "active":
+    case "live":
+    case "ok":
+    case "success":
+    case "daemon_alive":
+      return "var(--pa-green-soft)";
+    case "warn":
+    case "connecting":
+    case "reconnecting":
+    case "paused":
+      return "var(--pa-amber-soft)";
+    case "err":
+    case "error":
+    case "disconnected":
+    case "failed":
+    case "offline":
+      return "var(--pa-danger-soft)";
+    default:
+      return "var(--pa-paper-dim)";
+  }
 }
 
 export const ACCENT = tokens.color.accent;

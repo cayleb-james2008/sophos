@@ -1,42 +1,101 @@
 {
-  "piece": "Onboarding Wizard",
-  "evaluator": "43a96ed1-339e-4b73-a0bd-9bd6a90b052a",
-  "sprint": 1,
-  "timeline": [
-    { "t": "start", "note": "Read role docs, loop protocol; read changed files (OnboardingWizard, FirstRunBanner, GeneralPanel, ChatView, onboarding.css)." },
-    { "t": "gates", "note": "tsc --noEmit exit 0 (no output). vitest run: 6 files / 86 tests pass (overlay.test.tsx Error:boom traces are intentional thrown errors testing error boundaries)." },
-    { "t": "browser", "note": "Dev server already up on :1420 (PID 62428 serving this worktree). Headless chromium-1234 launched." },
-    { "t": "first-run", "note": "Cleared localStorage flags, reloaded → wizard appeared with 4 steps (Welcome → Provider → Model → First Prompt). Clicked through all 4; Skip visible on every step; footer Skip + Esc-to-dismiss." },
-    { "t": "rerun", "note": "Ctrl+, opened Settings → General. 'Run onboarding again' button found. Clicked it → view switched to chat → wizard re-mounted with Welcome step. localStorage flag was correctly cleared then re-applied by dismiss path." },
-    { "t": "shortcuts", "note": "Esc dismissed the wizard. Skip on Welcome set localStorage flag. Both behaviors covered." },
-    { "t": "console", "note": "Zero pageerrors. Only vite HMR connect messages and React DevTools info tip. Clean." },
-    { "t": "screenshots", "note": "Saved 6 PNGs to eval-shots/: 01-welcome, 02-provider, 03-model, 04-firstPrompt, 05-settings-general, 06-retriggered." }
-  ],
-  "evidence": {
-    "gates": { "tsc": "pass", "vitest": "pass (6 files / 86 tests)" },
-    "first_run": {
-      "wizard_visible_after_wipe": true,
-      "step_count": 4,
-      "skip_visible_every_step": true
-    },
-    "rerun_button": {
-      "label": "Run onboarding again",
-      "found_in_settings_general": true,
-      "wizard_re_appeared_on_click": true
-    },
-    "console_errors": 0,
-    "screenshots": [
-      "eval-shots/01-welcome.png",
-      "eval-shots/02-provider.png",
-      "eval-shots/03-model.png",
-      "eval-shots/04-firstPrompt.png",
-      "eval-shots/05-settings-general.png",
-      "eval-shots/06-retriggered.png"
-    ]
+  "round": 1,
+  "piece": "Theme System",
+  "verdict": {
+    "contract": "FAIL",
+    "bar": "FAIL"
   },
-  "contract_verdict": "pass",
-  "bar_verdict": "pass",
-  "accepted_shortfalls": [
-    "Welcome step has two skip CTAs ('Skip for now' inline + 'Skip · Esc to dismiss' footer) — slight visual redundancy, not a contract violation."
+  "summary": "CSS variables are defined correctly in global.css and the JS theme application layer (applyTheme, useTheme, resolveTheme) works as designed. The anti-flash script preserves the theme across reloads. The dark theme has no visual regression. HOWEVER, the light theme is fundamentally broken: 14 feature CSS files contain 576 hardcoded hex colors (zero use of var(--pa-*)), so when the theme switches to light, body background flips but the entire app shell, sidebar, top bar, cards, composer, and graph nodes stay dark. 99 rendered elements still have white text (rgb(244,244,244)) in light mode — unreadable on a white background.",
+  "evidence": {
+    "gates": {
+      "tsc": "PASS (exit 0)",
+      "vitest": "PASS (86/86 tests, 6 test files)"
+    },
+    "cssVariableAdoption": {
+      "files_with_var(--pa-*)": ["src/design/tokens.ts (31 uses)", "src/design/global.css (7 uses)", "src/features/graph/theme.ts (5 uses)"],
+      "files_with_hardcoded_hex": "14 of 14 feature/design CSS files (576 total hex colors)",
+      "feature_css_files_with_var(--pa-*)": 0
+    },
+    "darkTheme": {
+      "bg": "#0e0e0e ✓",
+      "text": "#f4f4f4 ✓",
+      "card": "#151515 ✓",
+      "border": "#2a2a2a ✓",
+      "green": "#85ed75 ✓",
+      "visual_regression": "none — dark-sessions.png matches 1440-baseline.png"
+    },
+    "lightTheme": {
+      "bg": "body flips to rgb(244,244,244) ✓",
+      "text": "body flips to rgb(14,14,14) ✓",
+      "card_token": "flips to #ffffff ✓",
+      "sidebar": "STAYS DARK (rgba(14,14,14,0.78) — shell.css local var) ✗",
+      "topBar": "STAYS DARK (rgba(14,14,14,0.78) — shell.css local var) ✗",
+      "main_text": "STAYS LIGHT (rgb(244,244,244)) — hardcoded #f4f4f4 in shell.css ✗",
+      "graph_nodes": "STAYS DARK (graph.css hardcoded) ✗",
+      "composer": "STAYS DARK (rgb(21,21,21) — chat.css hardcoded) ✗",
+      "dom_sweep": "6 dark surfaces, 9 light surfaces, 99 elements with light text color in light mode"
+    },
+    "antiFlash": {
+      "script_present": true,
+      "executes_before_react": true,
+      "data-theme_before_react": "verified ✓"
+    },
+    "systemTheme": {
+      "os_prefers_dark": "resolves to dark ✓",
+      "os_prefers_light": "resolves to light ✓",
+      "live_updates": "via matchMedia listener in useTheme ✓"
+    },
+    "persistence": {
+      "light_3_reloads": "all 3 reloads show data-theme=light ✓",
+      "generalpanel_immediate_apply": "verified ✓ (select change triggers applyTheme)"
+    },
+    "consoleErrors": "0 in all tests (after fixing my own test script's bug)"
+  },
+  "defects": [
+    {
+      "id": "D1-LIGHT-BROKEN",
+      "severity": "critical",
+      "summary": "Light theme is broken for the entire app shell and components",
+      "evidence": "Sidebar bg: rgba(14,14,14,0.78); topBar bg: rgba(14,14,14,0.78); shell bg: linear-gradient(135deg, #0e0e0e 0%, #121212 52%, #0e0e0e 100%); main: linear-gradient(180deg, rgba(14,14,14,0.7), rgba(14,14,14,0.96)); composer: #151515; graph nodes: hardcoded dark. Body bg and the GeneralPanel card use tokens.color.* so they DO switch, but everything else stays dark.",
+      "fix": "Replace hardcoded values in shell.css, agents.css, chat.css, graph.css, sessions.css, inbox.css, goals.css, providers.css, longrunning.css, settings.css, onboarding.css, commands/palette.css, engine.css with var(--pa-*) references. The shell.css in particular has local --glass/--hairline vars that are hardcoded to dark; these must be wired to global --pa-*."
+    },
+    {
+      "id": "D2-WHITE-TEXT-ON-LIGHT",
+      "severity": "critical",
+      "summary": "Light text on light background — unreadable",
+      "evidence": "99 DOM elements have computed color rgb(244,244,244) in light theme. Sidebar nav items, system bar text, and all shell chrome text are still white.",
+      "fix": "Wire text colors to var(--pa-paper)/var(--pa-paper-muted) — currently #f4f4f4 literals in shell.css and feature CSS files."
+    },
+    {
+      "id": "D3-COMPONENTS-NO-VARS",
+      "severity": "high",
+      "summary": "14 feature CSS files have 576 hardcoded hex colors; 0 use var(--pa-*)",
+      "evidence": "grep -rE 'var\\(--pa-' src --include='*.css' returns 0 hits in feature files. grep -rE '#[0-9a-fA-F]{6}\\b' src --include='*.css' returns 576 hits across 14 files.",
+      "fix": "Convert all hardcoded colors to var(--pa-*) references. The facility is in place (CSS variables defined in global.css, referenced via tokens.ts and tokens.color.*); the surface adoption is the missing piece."
+    },
+    {
+      "id": "D4-LIGHT-BACKGROUND-INSIDE-DARK-SHELL",
+      "severity": "medium",
+      "summary": "Light theme body bg is partially visible behind dark shell",
+      "evidence": "When the body is light (#f4f4f4) but the shell is dark, the user sees a dark UI with a light border around it — the visual is incoherent.",
+      "fix": "Subsumed by D1 (fix shell.css to use vars)."
+    }
+  ],
+  "screenshots": [
+    "verify/evaluator-screens/dark.png",
+    "verify/evaluator-screens/light.png",
+    "verify/evaluator-screens/settings.png",
+    "verify/evaluator-screens/light-chat.png",
+    "verify/evaluator-screens/light-sessions.png",
+    "verify/evaluator-screens/light-agents.png",
+    "verify/evaluator-screens/light-inbox.png",
+    "verify/evaluator-screens/light-settings.png",
+    "verify/evaluator-screens/dark-sessions.png"
+  ],
+  "testScripts": [
+    "verify/eval-theme-screens.py",
+    "verify/eval-theme-views.py",
+    "verify/eval-system-persistence.py",
+    "verify/eval-components.py"
   ]
 }

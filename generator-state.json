@@ -1,14 +1,80 @@
 {
-  "piece": "Onboarding Wizard",
-  "generator": "5402881a-fac7-4df5-ab73-ae62f102698c",
-  "sprint": 1,
-  "timeline": [
-    { "t": "start", "note": "Read role docs, loop protocol, and all context files (FirstRunBanner, GeneralPanel, onboarding.css, ChatView, AppState, design core/tokens, ipc client/contract, useModels, ModelSelector, SettingsView, App.tsx)." },
-    { "t": "design", "note": "Chose new OnboardingWizard.tsx over in-place refactor; kept FirstRunBanner.tsx as re-export home for useOnboardingStatus + FirstRunBanner alias + new clearOnboardingDismissed helper. Avoided circular import by keeping useOnboardingStatus in FirstRunBanner and importing its type into the wizard." },
-    { "t": "build", "note": "Created OnboardingWizard.tsx with 4 steps (welcome/provider/model/firstPrompt), progress rail, Skip at every step + footer Esc-to-dismiss, reuses setup prop from useOnboardingStatus, uses useConnectionState + useModels for model step. Wired ChatView to OnboardingWizard. Added 'Run onboarding again' button in GeneralPanel (clears dismiss flag + setView('chat')). Added wizard CSS to onboarding.css." },
-    { "t": "fix", "note": "tsc TS6133: removed unused useIpc import and unused liveReady prop in ProviderStep. tsc clean after." },
-    { "t": "verify", "note": "tsc --noEmit exit 0. vitest run 6 files / 86 tests pass. npm run build succeeds. Dev server on :1420 serves HTTP 200; OnboardingWizard/GeneralPanel/ChatView/FirstRunBanner modules transform with no vite errors." }
+  "piece": "Theme System (light/dark/system) — gauntlet-theme",
+  "status": "BUILT — awaiting critic round 2 re-verification",
+  "date": "2026-08-13",
+  "breadcrumbs": [
+    {
+      "t": "round1-critic",
+      "note": "Round 1 critic: contract PASS, bar FAIL — only global.css + tokens.ts used the CSS vars; 14 feature CSS files had 576 hardcoded hex colors and 0 var(--pa-*) uses, so the shell/sidebar/composer/views stayed dark in light mode. D1 convert feature CSS, D2 fix shell.css local --glass/--hairline, D3 verify light, D4 no dark regression."
+    },
+    {
+      "t": "css-vars",
+      "note": "global.css: added --pa-* surface/border/text/accent/semantic/scrollbar/focus/glow vars for dark (:root) and light (:root[data-theme=light]). Added --pa-X-rgb channel vars so alpha variants use rgba(var(--pa-X-rgb), A) — color-mix with transparent blends toward black (wrong for 'color at opacity'), so rgb-channel vars are the correct mechanism."
+    },
+    {
+      "t": "tokens",
+      "note": "tokens.ts color values now reference var(--pa-*) so all 128 inline-style consumers switch automatically. textInverse stays literal #0e0e0e (primary button is always white bg + black text)."
+    },
+    {
+      "t": "feature-css-conversion",
+      "note": "Python script converted ~700 hardcoded colors across 13 feature CSS files to var(--pa-*) / rgba(var(--pa-X-rgb), A). Hex: #0e0e0e->ink, #f4f4f4->paper, #151515->card, #202020->secondary, #2a2a2a->border, #2c2c2c->border-strong, #111->overlay, #85ed75->green, #9fff8a->green-hover, #f3bc56->amber, #ef4444->danger, #8b7cf6->info, #38bdf8->tool. rgba(244,244,244,X)->rgba(var(--pa-paper-rgb),X) etc. Kept dark scrims (rgba(14,14,14,X) modal backdrops, rgba(0,0,0,X) shadows) dark; inverted translucent panel/glass backgrounds to rgba(var(--pa-ink-rgb),X)."
+    },
+    {
+      "t": "shell-css",
+      "note": "shell.css local --glass/--glass-raised/--glass-soft/--hairline/--hairline-strong now alias the global theme vars (--pa-glass, --pa-card-rgb, --pa-paper-rgb, --pa-line, --pa-line-strong). Main bg gradient + system-bar glass invert via --pa-ink-rgb / --pa-glass."
+    },
+    {
+      "t": "ts-hardcoded",
+      "note": "Converted TS hardcoded colors: core.tsx badge soft tones -> rgba(var(--pa-X-rgb),0.12); ModelSelector/ProvidersPanel SVG strokes -> rgba(var(--pa-paper-rgb),0.45); ModelSelector check stroke -> var(--pa-green-hover); DaemonStatusBanner border -> var(--pa-border); icons.tsx SigmaGlyph defaults -> var(--pa-paper)/var(--pa-green); Sidebar icon color -> var(--pa-green)/rgba(var(--pa-paper-rgb),0.45). Fixed onboarding primary button color var(--pa-ink)->#0e0e0e (white button + black text in both themes)."
+    },
+    {
+      "t": "graph-theme",
+      "note": "theme.ts statusWash now returns var(--pa-green-soft)/--pa-amber-soft/--pa-danger-soft/--pa-paper-dim instead of `${hex}22` (string concat on a var() would be invalid CSS). graph.css: .pa-graph .react-flow.dark background-color overridden to var(--pa-ink) so the React Flow canvas follows the theme (colorMode='dark' kept for internal node/edge defaults)."
+    },
+    {
+      "t": "theme-mechanism",
+      "note": "src/design/theme.ts: reactive store — Theme type, resolveTheme (system->matchMedia), applyTheme (sets data-theme + notifies subscribers), subscribeTheme, getTheme. src/hooks/useTheme.ts: reads settings once, subscribes to theme store so GeneralPanel changes re-apply + keep the system matchMedia subscription live. App.tsx calls useTheme(). index.html: inline anti-flash script reads localStorage prime-agent.settings.v1 and sets data-theme before CSS applies."
+    },
+    {
+      "t": "general-panel",
+      "note": "GeneralPanel theme Select now calls applyTheme(theme) on change (immediate, not just on save)."
+    },
+    {
+      "t": "verify",
+      "note": "npx tsc --noEmit -> 0 errors. npx vitest run -> 86/86 pass. npm run build -> success. Dark visual harness (v1-visual-match.py via system Chrome) -> PASS, 0 blockers, 0 console errors. Light theme verified across all views: body rgb(244,244,244), text rgb(14,14,14), 0 white-text-on-light, 0 dark backgrounds. System theme follows OS live (emulateMedia flip re-resolves). Anti-flash: data-theme=light at DOMContentLoaded with seeded localStorage. GeneralPanel Select applies immediately."
+    }
   ],
-  "gates": { "tsc": "pass", "vitest": "pass (86/86)", "build": "pass", "dev_server": "pass (HTTP 200, no transform errors)" },
-  "preserved": ["useOnboardingStatus export", "FirstRunBanner alias export", "onSetupProviders/onStartChat callback pattern", "IPC contract types unchanged", "no new npm deps"]
+  "files_changed": [
+    "src/design/global.css",
+    "src/design/tokens.ts",
+    "src/design/theme.ts (NEW)",
+    "src/design/index.tsx",
+    "src/design/core.tsx",
+    "src/hooks/useTheme.ts (NEW)",
+    "src/App.tsx",
+    "index.html",
+    "src/features/settings/GeneralPanel.tsx",
+    "src/features/graph/theme.ts",
+    "src/features/graph/graph.css",
+    "src/shell/shell.css",
+    "src/shell/icons.tsx",
+    "src/shell/Sidebar.tsx",
+    "src/features/providers/ModelSelector.tsx",
+    "src/features/settings/ProvidersPanel.tsx",
+    "src/features/settings/DaemonStatusBanner.tsx",
+    "src/features/settings/onboarding.css",
+    "src/features/agents/agents.css",
+    "src/features/chat/chat.css",
+    "src/features/commands/palette.css",
+    "src/features/engine/engine.css",
+    "src/features/goals/goals.css",
+    "src/features/inbox/inbox.css",
+    "src/features/longrunning/longrunning.css",
+    "src/features/providers/providers.css",
+    "src/features/sessions/sessions.css",
+    "src/features/settings/settings.css"
+  ],
+  "unverified": [
+    "real daemon (Tauri) settings path — theme applied via useTheme after async getSettings; verified against MockIpcClient/browser preview"
+  ]
 }

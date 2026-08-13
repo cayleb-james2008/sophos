@@ -3,7 +3,7 @@
 // persists via setSettings().
 
 import { useEffect, useState } from "react";
-import { Text, Card, Input, Select, Button, Badge } from "../../design";
+import { Text, Card, Input, Select, Button, Badge, applyTheme, type Theme } from "../../design";
 import { useIpc } from "../../ipc/client";
 import { useAppState } from "../../state/AppState";
 import { clearOnboardingDismissed } from "./FirstRunBanner";
@@ -74,7 +74,13 @@ export function GeneralPanel() {
             label="Theme"
             options={THEME_OPTIONS}
             value={draft.theme ?? "dark"}
-            onChange={(e) => set({ theme: e.target.value as Settings["theme"] })}
+            onChange={(e) => {
+              const theme = e.target.value as Theme;
+              set({ theme });
+              // Apply immediately so the palette switches as the user picks,
+              // not only when they hit Save.
+              applyTheme(theme);
+            }}
           />
           <Input
             label="Default provider"

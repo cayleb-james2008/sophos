@@ -32,16 +32,16 @@
   width: 7px;
   height: 7px;
   border-radius: 0;
-  background: #202020;
-  border: 1px solid #2c2c2c;
+  background: var(--pa-secondary);
+  border: 1px solid var(--pa-border-strong);
 }
 .react-flow__handle.connectionindicator {
-  border-color: #85ed75;
+  border-color: var(--pa-green);
 }
 
 /* ---- Edges: quiet hairlines by default, flowing dash when active ---- */
 .react-flow__edge-path {
-  stroke: #2a2a2a;
+  stroke: var(--pa-border);
   stroke-width: 1.25;
 }
 .react-flow__edge-path.pg-animated {
@@ -51,29 +51,35 @@
 
 /* ---- Background: precision dot grid ---- */
 .pa-graph .react-flow__background {
-  background-color: #0e0e0e;
+  background-color: var(--pa-ink);
 }
 .pa-graph .react-flow__background-pattern {
-  color: #2a2a2a;
+  color: var(--pa-border);
+}
+/* The graph canvas follows the app theme. React Flow's `dark` class (from
+   colorMode="dark") sets its own near-black container background; override it
+   so the canvas tracks the active palette (light in light mode). */
+.pa-graph .react-flow.dark {
+  background-color: var(--pa-ink);
 }
 
 /* ---- Controls (zoom / fit) ---- */
 .react-flow__controls {
   box-shadow: none;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--pa-border);
   border-radius: 0;
   overflow: hidden;
 }
 .react-flow__controls-button {
-  background: #151515;
-  border-bottom: 1px solid #2a2a2a;
-  color: rgba(244, 244, 244, 0.6);
+  background: var(--pa-card);
+  border-bottom: 1px solid var(--pa-border);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   width: 26px;
   height: 26px;
 }
 .react-flow__controls-button:hover {
-  background: #202020;
-  color: #f4f4f4;
+  background: var(--pa-secondary);
+  color: var(--pa-paper);
 }
 .react-flow__controls-button svg {
   fill: currentColor;
@@ -84,15 +90,15 @@
 
 /* ---- Minimap ---- */
 .react-flow__minimap {
-  background: #0e0e0e;
-  border: 1px solid #2a2a2a;
+  background: var(--pa-ink);
+  border: 1px solid var(--pa-border);
   border-radius: 0;
 }
 
 /* ---- Selection / attribution ---- */
 .react-flow__node.selected .pg-node {
-  border-color: rgba(133, 237, 117, 0.55);
-  box-shadow: 0 0 0 1px rgba(133, 237, 117, 0.2);
+  border-color: rgba(var(--pa-green-rgb), 0.55);
+  box-shadow: 0 0 0 1px rgba(var(--pa-green-rgb), 0.2);
 }
 .react-flow__attribution {
   display: none;
@@ -105,14 +111,14 @@
   flex-direction: column;
   gap: 7px;
   padding: 12px 14px 12px 16px;
-  background: #151515;
-  border: 1px solid #2a2a2a;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
   border-radius: 0;
   transition: border-color 0.18s cubic-bezier(0.3, 0, 0.2, 1), box-shadow 0.18s ease;
   height: 100%;
 }
 .pg-node:hover {
-  border-color: #2c2c2c;
+  border-color: var(--pa-border-strong);
 }
 /* Status rail — the thin colored edge down the left */
 .pg-node__edge {
@@ -134,7 +140,7 @@
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -149,7 +155,7 @@
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   font-size: 14px;
   font-weight: 500;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   line-height: 1.2;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -159,7 +165,7 @@
 .pg-node__sub {
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   font-size: 11.5px;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -169,7 +175,7 @@
 .pg-node__mono {
   font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   font-size: 10.5px;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
@@ -189,9 +195,9 @@
   gap: 5px;
   padding: 3px 9px;
   border-radius: 0;
-  border: 1px solid #2c2c2c;
+  border: 1px solid var(--pa-border-strong);
   background: transparent;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   font-size: 11px;
   font-weight: 500;
@@ -200,26 +206,26 @@
   white-space: nowrap;
 }
 .pg-btn:hover {
-  color: #f4f4f4;
-  border-color: #2c2c2c;
-  background: #202020;
+  color: var(--pa-paper);
+  border-color: var(--pa-border-strong);
+  background: var(--pa-secondary);
 }
 .pg-btn--accent {
-  color: #85ed75;
-  border-color: rgba(133, 237, 117, 0.4);
-  background: rgba(133, 237, 117, 0.1);
+  color: var(--pa-green);
+  border-color: rgba(var(--pa-green-rgb), 0.4);
+  background: rgba(var(--pa-green-rgb), 0.1);
 }
 .pg-btn--accent:hover {
-  background: rgba(133, 237, 117, 0.2);
-  color: #9fff8a;
+  background: rgba(var(--pa-green-rgb), 0.2);
+  color: var(--pa-green-hover);
 }
 .pg-btn--danger {
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.4);
+  color: var(--pa-danger);
+  border-color: rgba(var(--pa-danger-rgb), 0.4);
 }
 .pg-btn--danger:hover {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  background: rgba(var(--pa-danger-rgb), 0.12);
+  color: var(--pa-danger);
 }
 
 /* Compact context readout on session nodes (S5) — a small bar + `CTX n%`,
@@ -235,7 +241,7 @@
   position: relative;
   width: 34px;
   height: 4px;
-  background: #202020;
+  background: var(--pa-secondary);
   border-radius: 0;
   overflow: hidden;
 }
@@ -244,15 +250,15 @@
   left: 0;
   top: 0;
   bottom: 0;
-  background: #85ed75;
+  background: var(--pa-green);
 }
 .pg-ctx__fill--danger {
-  background: #ef4444;
+  background: var(--pa-danger);
 }
 .pg-ctx__pct {
   font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   font-size: 9px;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
@@ -264,23 +270,23 @@
   gap: 4px;
   padding: 1px 7px;
   border-radius: 0;
-  background: rgba(133, 237, 117, 0.12);
-  border: 1px solid rgba(133, 237, 117, 0.45);
-  color: #9fff8a;
+  background: rgba(var(--pa-green-rgb), 0.12);
+  border: 1px solid rgba(var(--pa-green-rgb), 0.45);
+  color: var(--pa-green-hover);
   font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.06em;
 }
 .pg-pill--err {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.45);
-  color: #ef4444;
+  background: rgba(var(--pa-danger-rgb), 0.12);
+  border-color: rgba(var(--pa-danger-rgb), 0.45);
+  color: var(--pa-danger);
 }
 .pg-pill--ok {
-  background: rgba(133, 237, 117, 0.1);
-  border-color: rgba(133, 237, 117, 0.4);
-  color: #85ed75;
+  background: rgba(var(--pa-green-rgb), 0.1);
+  border-color: rgba(var(--pa-green-rgb), 0.4);
+  color: var(--pa-green);
 }
 
 /* Inline status legend */
@@ -293,17 +299,17 @@
   flex-wrap: wrap;
   gap: 6px 14px;
   padding: 6px 12px;
-  background: rgba(14, 14, 14, 0.78);
-  border: 1px solid #2a2a2a;
+  background: rgba(var(--pa-ink-rgb), 0.78);
+  border: 1px solid var(--pa-border);
   border-radius: 0;
   backdrop-filter: blur(6px);
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   font-size: 10.5px;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   pointer-events: none;
 }
 .pg-legend b {
-  color: #f4f4f4;
+  color: var(--pa-paper);
   font-weight: 500;
 }
 .pg-legend__swatch {
@@ -323,15 +329,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(14, 14, 14, 0.4);
+  background: rgba(var(--pa-ink-rgb), 0.4);
   backdrop-filter: blur(2px);
 }
 .pg-blank__card {
   max-width: 360px;
   text-align: center;
   padding: 26px 30px;
-  background: #151515;
-  border: 1px solid #2a2a2a;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
   border-radius: 0;
   box-shadow: none;
 }
@@ -340,24 +346,24 @@
   height: 40px;
   margin: 0 auto 12px;
   border-radius: 50%;
-  background: #202020;
-  border: 1px solid #2a2a2a;
+  background: var(--pa-secondary);
+  border: 1px solid var(--pa-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(244, 244, 244, 0.45);
+  color: rgba(var(--pa-paper-rgb), 0.45);
   font-size: 18px;
 }
 .pg-blank__title {
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   font-size: 15px;
   font-weight: 500;
-  color: #f4f4f4;
+  color: var(--pa-paper);
   margin-bottom: 6px;
 }
 .pg-blank__body {
   font-size: 12.5px;
-  color: rgba(244, 244, 244, 0.6);
+  color: rgba(var(--pa-paper-rgb), 0.6);
   line-height: 1.5;
   margin-bottom: 14px;
 }
@@ -378,8 +384,8 @@
 .pa-graph__minimap { z-index: 5; width: 140px; height: 90px; }
 
 /* ---- Inline-style purge: legend + pill modifiers ---- */
-.pg-legend__swatch--accent { background: #85ed75; }
-.pg-legend__swatch--ok { background: #85ed75; }
-.pg-legend__swatch--err { background: #ef4444; }
-.pg-legend__preview { color: rgba(244, 244, 244, 0.45); }
-.pg-pill--muted { background: #111; border-color: #2a2a2a; color: rgba(244, 244, 244, 0.45); }
+.pg-legend__swatch--accent { background: var(--pa-green); }
+.pg-legend__swatch--ok { background: var(--pa-green); }
+.pg-legend__swatch--err { background: var(--pa-danger); }
+.pg-legend__preview { color: rgba(var(--pa-paper-rgb), 0.45); }
+.pg-pill--muted { background: var(--pa-overlay); border-color: var(--pa-border); color: rgba(var(--pa-paper-rgb), 0.45); }

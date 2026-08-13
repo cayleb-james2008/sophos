@@ -5,6 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/sophos-icon.svg" />
     <title>Sophos</title>
+    <script>
+      /* Anti-flash theme bootstrap: set data-theme on <html> before the CSS
+         (imported via the JS module) applies, so a light-theme user never sees
+         a dark flash on launch. Reads the persisted setting from localStorage
+         (the browser-preview MockIpcClient store); falls back to the OS
+         preference for "system" and to dark otherwise. In Tauri the real
+         settings live in the daemon, so this defaults to dark and the useTheme
+         hook applies the persisted theme once it loads. */
+      (function () {
+        try {
+          var theme = "dark";
+          var raw = localStorage.getItem("prime-agent.settings.v1");
+          if (raw) {
+            var s = JSON.parse(raw);
+            if (s && typeof s.theme === "string") theme = s.theme;
+          }
+          if (theme === "system") {
+            theme =
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          }
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

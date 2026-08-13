@@ -5,6 +5,9 @@
 export { tokens } from "./tokens";
 export type { DesignTokens } from "./tokens";
 
+export { applyTheme, resolveTheme } from "./theme";
+export type { Theme } from "./theme";
+
 export * from "./core";
 export * from "./overlay";
 export * from "./motion";
