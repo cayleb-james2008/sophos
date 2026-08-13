@@ -59,7 +59,10 @@ export type IpcCommand =
   | { method: "createSkill"; params: { name: string; description: string; content: string; pythonImport?: string } }
   | { method: "installSkill"; params: { path: string } }
   | { method: "installExtension"; params: { path: string } }
-  | { method: "removeExtension"; params: { path: string } };
+  | { method: "removeExtension"; params: { path: string } }
+  | { method: "getExtensions"; params: {} }
+  | { method: "testMcpServer"; params: { name: string; command: string; args?: string[] } }
+  | { method: "getSlashCommands"; params: {} };
 
 export interface PromptOptions {
   thinking?: string;
@@ -501,4 +504,41 @@ export interface Settings {
    * settings.json, so no new IPC methods are needed.
    */
   disabledSkills?: string[];
+}
+
+/** A tool registered by an extension (surfaced in the Extensions panel). */
+export interface ExtensionTool {
+  name: string;
+  description?: string;
+}
+
+/** A slash command registered by an extension (surfaced in the Extensions panel). */
+export interface ExtensionSlashCommand {
+  name: string;
+  description?: string;
+}
+
+/** Rich detail for a configured extension: its registered tools and slash commands. */
+export interface ExtensionInfo {
+  name: string;
+  path: string;
+  enabled: boolean;
+  tools: ExtensionTool[];
+  slashCommands: ExtensionSlashCommand[];
+}
+
+/** Result of a connection test for an MCP server (testMcpServer). */
+export interface McpTestResult {
+  serverName: string;
+  connected: boolean;
+  latencyMs?: number;
+  error?: string;
+  tools?: string[];
+}
+
+/** A slash command discovered by the daemon or registered by an extension. */
+export interface SlashCommand {
+  name: string;
+  description: string;
+  source?: "builtin" | "extension" | "skill";
 }

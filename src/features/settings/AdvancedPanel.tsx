@@ -84,7 +84,19 @@ export function AdvancedPanel() {
           <RlmChildrenPanel children={children} onRefresh={() => void refresh()} />
           <AgentsPanel agents={agents} onAttach={(id) => void ipc.attachAgent(id).then(() => refresh())} onRefresh={() => void refresh()} />
           <DaemonDiagnosticsCard status={daemonStatus} onRefresh={() => void refresh()} />
-          <McpServersPanel servers={mcpServers} onChange={(next) => void ipc.setSettings({ ...settings, mcpServers: next } as Record<string, unknown>).then(() => refresh())} />
+          <McpServersPanel
+            servers={mcpServers}
+            onChange={(next) => void ipc.setSettings({ ...settings, mcpServers: next } as Record<string, unknown>).then(() => refresh())}
+            onAdd={(name, command, args) => {
+              const next = [...mcpServers, { name, command, args, enabled: true }];
+              void ipc.setSettings({ ...settings, mcpServers: next } as Record<string, unknown>).then(() => refresh());
+            }}
+            onTest={(name, command, args) => ipc.testMcpServer(name, command, args)}
+            onRemove={(name) => {
+              const next = mcpServers.filter((s) => s.name !== name);
+              void ipc.setSettings({ ...settings, mcpServers: next } as Record<string, unknown>).then(() => refresh());
+            }}
+          />
         </>
       )}
     </div>

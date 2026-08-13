@@ -1,37 +1,45 @@
 {
-  "piece": "Sessions graph drag-to-arrange + responsive detail inspector (gauntlet-sessions)",
-  "status": "BUILT — awaiting critic verdict",
-  "date": "2026-08-12",
+  "piece": "P3 — Slash-Command Autocomplete in the Composer (gauntlet-sessions)",
+  "status": "BUILT — awaiting critic re-verification (round 2)",
+  "date": "2026-08-13",
   "breadcrumbs": [
     {
-      "t": "setup",
-      "note": "worktree clean checkpoint; npm install root (esbuild postinstall skipped by allow-scripts but vite build still green). tsc --noEmit + npm run build both pass."
+      "t": "round1-verdict",
+      "note": "Critic round 1 FAIL claimed the piece was not built (said SlashAutocomplete.tsx does not exist, no getSlashCommands in IPC, ComposerInput untouched). That verdict was based on stale state: generator-state.json still described a prior P1 build and the critic evidently read a stale checkout. The P3 code was already present in the working tree. Re-verified the working tree, added the missing CSS, fixed one TS6133 (unused onDismiss -> renamed _onDismiss), and re-ran gates."
     },
     {
-      "t": "partA-drag",
-      "note": "SessionsGraph: dagre layout recomputed in useMemo on every sessions/enrichment/activeSessionId change and useEffect setNodes(layout.positioned) overwrote user-dragged positions. Fix: userPositioned ref (Set<string>) tracks node ids the user dragged (position changes in onNodesChange). Merge effect only adopts dagre position for nodes NOT in the set; dragged nodes keep position but still receive fresh data/status. Reset layout button clears the set and reapplies dagre."
+      "t": "contract-append",
+      "note": "contract.ts: appended `| { method: \"getSlashCommands\"; params: {} }` to IpcCommand union (after testMcpServer, which another worker added) and SlashCommand interface at end of Data shapes. Append-only; no existing lines touched."
     },
     {
-      "t": "partB-responsive",
-      "note": "SessionsView: added inspectorOpen state; console gets --inspector-open class; floating Inspect toggle (aria-expanded/aria-controls) in graphwrap; backdrop + close (x) on detailwrap. CSS: below 900px .sessions__console--graph becomes 1 column, detailwrap becomes absolute slide-in overlay (translateX, clipped by console overflow:hidden so no horizontal overflow), toggle/close/backdrop only surface below 900px. Above 900px untouched (grid column)."
+      "t": "client-append",
+      "note": "client.ts: added getSlashCommands to IpcClient interface, TauriIpcClient (send getSlashCommands), MockIpcClient (returns mockSlashCommands — 31 builtin commands derived from the prime-agent reference). Imported SlashCommand."
+    },
+    {
+      "t": "component",
+      "note": "SlashAutocomplete.tsx (NEW): fuzzy subsequence match, rank exact-prefix > startsWith > subsequence > alphabetical, max 8 visible, selected highlight, click-to-select, mono command names + dim descriptions. Exports filterSlashCommands for reuse."
+    },
+    {
+      "t": "composer-integration",
+      "note": "ComposerInput.tsx: useIpc() + useEffect fetch getSlashCommands on mount; updateSlashState opens dropdown when value starts with '/' and cursor on first line and no space after command; onKeyDown intercepts ArrowDown/ArrowUp/Enter/Escape ONLY while open; Enter inserts '/name ' and closes; renders SlashAutocomplete below textarea. Existing Enter/Alt+Enter/Escape/Alt+Up handling preserved."
+    },
+    {
+      "t": "css",
+      "note": "chat.css: appended .slash-autocomplete (absolute above input, dark #151515, green ring, max-height 264px scroll) + item/name/desc/more styles."
     },
     {
       "t": "verify",
-      "note": "verify/sessions-responsive.py drives live vite dev (localhost:1420, MockIpcClient). 22 checks ALL PASS: 1440 side-by-side + toggle hidden + no overflow; drag persists after Refresh (enrichment reload); Reset layout reapplies dagre; 900/768 hidden-by-default, toggle surfaces overlay, backdrop + close work, no horizontal overflow open or closed; zero console errors. Screenshots -> verify/visual/sessions-responsive/*.png"
-    },
-    {
-      "t": "test-threshold-fix",
-      "note": "Initial test asserted hidden inspector x>=899; actual hidden x=879 (console right edge 880, clipped). Behavior correct; fixed test to compare against console right edge."
+      "note": "npx tsc --noEmit -> 0 errors. npx vitest run -> 86/86 pass."
     }
   ],
   "files_changed": [
-    "src/features/sessions/SessionsGraph.tsx",
-    "src/features/sessions/SessionsView.tsx",
-    "src/features/sessions/sessions.css",
-    "verify/sessions-responsive.py",
-    "verify/visual/sessions-responsive/*.png"
+    "src/features/chat/SlashAutocomplete.tsx",
+    "src/features/chat/ComposerInput.tsx",
+    "src/ipc/contract.ts",
+    "src/ipc/client.ts",
+    "src/features/chat/chat.css"
   ],
   "unverified": [
-    "real daemon (Tauri) path — verified against MockIpcClient in browser; drag/position logic is representation-only and daemon-independent"
+    "real daemon (Tauri) getSlashCommands path — verified against MockIpcClient; the Tauri client forwards the command to the sidecar which owns the real command discovery"
   ]
 }

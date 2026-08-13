@@ -2,6 +2,10 @@
 // daemon-discovered extensions from the resource snapshot, the configured
 // extensions persisted in settings.json, and an install/uninstall form.
 //
+// Each configured extension renders as an expandable row that surfaces the
+// tools and slash commands it registers, so the panel is a real inventory of
+// what an extension contributes — not just a name + path list.
+//
 // Note: The Settings type in the IPC contract doesn't include extension
 // fields. We use a local ExtendedSettings interface for the UI state, and
 // cast through Record<string, unknown> when calling setSettings (which accepts
@@ -10,11 +14,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { Text, Card, Button, Input, Spinner, Badge } from "../../design";
 import { useIpc } from "../../ipc/client";
-import type { RuntimeInfo, Settings } from "../../ipc/contract";
+import type { ExtensionInfo, RuntimeInfo, Settings } from "../../ipc/contract";
 import { RefreshIcon, PlugIcon, XIcon } from "../sessions/icons";
 
 interface ExtendedSettings extends Settings {
   extensions?: Array<{ name: string; path: string; enabled: boolean }>;
+}
+
+/** A configured extension merged with its rich detail (tools + slash commands). */
+interface ConfiguredExtension {
+  name: string;
+  path: string;
+  enabled: boolean;
+  tools: ExtensionInfo["tools"];
+  slashCommands: ExtensionInfo["slashCommands"];
 }
 
 export function ExtensionsPanel() {
@@ -22,6 +35,8 @@ export function ExtensionsPanel() {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<ExtendedSettings>({});
   const [runtime, setRuntime] = useState<RuntimeInfo>();
+  const [details, setDetails] = useState<ExtensionInfo[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [installPath, setInstallPath] = useState("");
   const [actionError, setActionError] = useState<string>();
   const [actionMessage, setActionMessage] = useState<string>();
@@ -32,6 +47,14 @@ export function ExtensionsPanel() {
       const [s, liveRuntime] = await Promise.all([ipc.getSettings(), ipc.getRuntimeInfo()]);
       setSettings(s as ExtendedSettings);
       setRuntime(liveRuntime);
+      // Rich per-extension detail (tools + slash commands). Falls back to an
+      // empty list when getExtensions is unavailable, so the panel still shows
+      // name + path + toggle from the configured settings.
+      try {
+        setDetails(await ipc.getExtensions());
+      } catch {
+        setDetails([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -42,6 +65,32 @@ export function ExtensionsPanel() {
   }, [refresh]);
 
   const configured = settings.extensions ?? [];
+
+  // Merge configured extensions with their rich detail, keyed by path (falling
+  // back to name when paths don't line up). Extensions configured but missing
+  // from getExtensions still render with empty tools/commands.
+  const merged: ConfiguredExtension[] = configured.map((e) => {
+    const detail = details.find((d) => d.path === e.path || d.name === e.name);
+    return {
+      name: e.name,
+      path: e.path,
+      enabled: e.enabled,
+      tools: detail?.tools ?? [],
+      slashCommands: detail?.slashCommands ?? [],
+    };
+  });
+
+  const toggleExpanded = (path: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  };
 
   const toggleExtension = async (idx: number, enabled: boolean) => {
     const next = configured.map((e, i) => (i === idx ? { ...e, enabled } : e));
@@ -102,6 +151,7 @@ export function ExtensionsPanel() {
               Extension discovery is managed by the daemon. This panel reads the live resource snapshot,
               so the list below is what this session can actually load — not a browser-side catalog.
               Configured extension paths remain editable here and are applied on the next daemon session.
+              Expand an extension to see the tools and slash commands it registers.
             </Text>
           </Card>
 
@@ -133,33 +183,81 @@ export function ExtensionsPanel() {
               <Text variant="body" tone="dim">No extensions configured. Install an extension below.</Text>
             ) : (
               <div className="sp-list">
-                {configured.map((e, idx) => (
-                  <div key={e.path} className="sp-row">
-                    <div className="sp-rowmain">
-                      <div className="sp-headrow--sm">
-                        <Text variant="label" weight="medium" className="sp-ellipsis">
-                          {e.name}
-                        </Text>
-                        <Badge tone={e.enabled ? "success" : "neutral"} dot>
-                          {e.enabled ? "Enabled" : "Disabled"}
-                        </Badge>
+                {merged.map((e, idx) => {
+                  const isOpen = expanded.has(e.path);
+                  return (
+                    <div key={e.path} className="ep-card">
+                      <div className="sp-row">
+                        <div className="sp-rowmain">
+                          <div className="sp-headrow--sm">
+                            <Text variant="label" weight="medium" className="sp-ellipsis">
+                              {e.name}
+                            </Text>
+                            <Badge tone={e.enabled ? "success" : "neutral"} dot>
+                              {e.enabled ? "Enabled" : "Disabled"}
+                            </Badge>
+                          </div>
+                          <Text variant="micro" tone="dim" mono className="sp-ellipsis">
+                            {e.path}
+                          </Text>
+                        </div>
+                        <label className="sp-check">
+                          <input
+                            type="checkbox"
+                            checked={e.enabled}
+                            onChange={(ev) => void toggleExtension(idx, ev.target.checked)}
+                            className="sp-checkbox"
+                          />
+                          <Text variant="micro" tone="muted">Enable</Text>
+                        </label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleExpanded(e.path)}
+                          aria-label={`Toggle details for ${e.name}`}
+                          aria-expanded={isOpen}
+                        >
+                          {isOpen ? "Hide" : "Details"}
+                        </Button>
+                        <Button variant="ghost" size="sm" icon={<XIcon size={13} />} onClick={() => void removeExtension(e.path)} aria-label={`Remove ${e.name}`} />
                       </div>
-                      <Text variant="micro" tone="dim" mono className="sp-ellipsis">
-                        {e.path}
-                      </Text>
+                      {isOpen ? (
+                        <div className="ep-detail">
+                          <div className="ep-detailcol">
+                            <Text variant="micro" tone="dim" className="ep-detailhead">Tools</Text>
+                            {e.tools.length ? (
+                              <div className="ep-itemlist">
+                                {e.tools.map((t) => (
+                                  <div key={t.name} className="ep-item">
+                                    <Text variant="micro" mono className="ep-itemname">{t.name}</Text>
+                                    {t.description ? <Text variant="micro" tone="dim">{t.description}</Text> : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <Text variant="micro" tone="dim">No tools registered</Text>
+                            )}
+                          </div>
+                          <div className="ep-detailcol">
+                            <Text variant="micro" tone="dim" className="ep-detailhead">Slash commands</Text>
+                            {e.slashCommands.length ? (
+                              <div className="ep-itemlist">
+                                {e.slashCommands.map((c) => (
+                                  <div key={c.name} className="ep-item">
+                                    <Text variant="micro" mono className="ep-itemname">/{c.name}</Text>
+                                    {c.description ? <Text variant="micro" tone="dim">{c.description}</Text> : null}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <Text variant="micro" tone="dim">No slash commands registered</Text>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
-                    <label className="sp-check">
-                      <input
-                        type="checkbox"
-                        checked={e.enabled}
-                        onChange={(ev) => void toggleExtension(idx, ev.target.checked)}
-                        className="sp-checkbox"
-                      />
-                      <Text variant="micro" tone="muted">Enable</Text>
-                    </label>
-                    <Button variant="ghost" size="sm" icon={<XIcon size={13} />} onClick={() => void removeExtension(e.path)} aria-label={`Remove ${e.name}`} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>

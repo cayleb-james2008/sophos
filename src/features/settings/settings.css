@@ -156,6 +156,18 @@
 /* ---- mcp / extensions ---- */
 .sp-check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .sp-checkbox { width: 16px; height: 16px; accent-color: #85ed75; }
+.mcp-add { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid #2a2a2a; border-radius: 0; background: #151515; }
+.mcp-addgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mcp-addfoot { display: flex; justify-content: flex-end; }
+.mcp-row { align-items: flex-start; }
+.mcp-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.mcp-test { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.mcp-test--pending { color: rgba(244, 244, 244, 0.6); }
+.mcp-test--ok { color: #85ed75; }
+.mcp-test--err { color: #ef4444; }
+@media (max-width: 720px) {
+  .mcp-addgrid { grid-template-columns: 1fr; }
+}
 .ep-head { display: flex; align-items: center; justify-content: space-between; min-height: 34px; }
 .ep-liverow { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid #2a2a2a; }
 .ep-installrow { display: flex; gap: 8px; align-items: flex-end; }
@@ -213,3 +225,16 @@
 .sk-preview { display: flex; flex-direction: column; gap: 8px; }
 .sk-pre { margin: 0; padding: 12px; background: #151515; border: 1px solid #2a2a2a; border-radius: 0; font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; font-size: 11px; color: rgba(244, 244, 244, 0.6); white-space: pre-wrap; word-break: break-word; }
 .ep-installfield { flex: 1; min-width: 0; }
+
+/* ---- extensions: rich detail (tools + slash commands) ---- */
+.ep-card { display: flex; flex-direction: column; border: 1px solid #2a2a2a; border-radius: 0; background: #151515; }
+.ep-card .sp-row { border: none; background: transparent; }
+.ep-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 12px 12px; border-top: 1px solid #2a2a2a; }
+.ep-detailcol { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ep-detailhead { letter-spacing: 0.08em; text-transform: uppercase; }
+.ep-itemlist { display: flex; flex-direction: column; gap: 4px; }
+.ep-item { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; background: #111; border: 1px solid #2a2a2a; border-radius: 0; }
+.ep-itemname { color: #9fff8a; }
+@media (max-width: 640px) {
+  .ep-detail { grid-template-columns: 1fr; }
+}

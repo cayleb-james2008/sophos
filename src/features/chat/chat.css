@@ -772,3 +772,57 @@
 .diff-copy.is-visible { opacity: 1 !important; transform: translateY(0) !important; }
 .chat-chevron { transition: transform 120ms ease; }
 .chat-chevron.is-open { transform: rotate(90deg); }
+
+/* ---- SlashAutocomplete ---- */
+.slash-autocomplete {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  max-height: 264px; /* 8 items × 33px */
+  overflow-y: auto;
+  background: #151515;
+  border: 1px solid #2c2c2c;
+  border-radius: 0;
+  box-shadow: 0 0 0 1px rgba(133, 237, 117, 0.28);
+  padding: 4px;
+}
+.slash-autocomplete-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: #f4f4f4;
+  text-align: left;
+  cursor: pointer;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.slash-autocomplete-item:hover,
+.slash-autocomplete-item--selected {
+  background: rgba(133, 237, 117, 0.12);
+}
+.slash-autocomplete-name {
+  flex-shrink: 0;
+  color: #9fff8a;
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 12.5px;
+}
+.slash-autocomplete-desc {
+  color: rgba(244, 244, 244, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slash-autocomplete-more {
+  padding: 6px 10px;
+  color: rgba(244, 244, 244, 0.45);
+  font-size: 11px;
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+}
