@@ -1,7 +1,7 @@
 {
   "name": "sophos",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Sophos — a Windows-native port of Prime Intellect's Prime Agent. Credits: PrimeIntellect-ai/prime-agent (upstream).",
   "scripts": {
@@ -15,7 +15,11 @@
     "bridge:dev": "cd bridge && npm run dev",
     "test:visual": "node verify/visual/regression.mjs",
     "test:visual:update": "node verify/visual/snapshot.mjs",
-    "verify:safety": "node verify/e2e-safety.mjs"
+    "verify:safety": "node verify/e2e-safety.mjs",
+    "updater:keys": "node scripts/gen-updater-keys.mjs",
+    "updater:serve": "node scripts/serve-update-feed.mjs",
+    "updater:build": "node scripts/build-signed-update.mjs",
+    "test:updater": "node verify/updater-test.mjs"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",
