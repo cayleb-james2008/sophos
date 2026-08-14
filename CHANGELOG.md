@@ -7,15 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-14
+
 ### Added
-- ErrorBoundary component in the design system — catches render errors with a token-styled fallback UI
-- Skeleton primitive in the design system — pulse-animation loading placeholder
-- Keyboard shortcut registry (`useHotkeys` hook) for global shortcut registration
-- App-level state context to reduce prop-drilling across views
+- **Test suite** — vitest + @testing-library/react + jsdom; 6 test files, 86 tests covering design-system primitives and critical hooks (useChat, useAgents, useRefinementGate, useModels)
+- **CI pipeline** — GitHub Actions workflow (`.github/workflows/ci.yml`) runs `tsc --noEmit`, `vitest run`, and best-effort `verify/e2e.mjs` on every push and PR (Windows runner)
+- **CONTRIBUTING.md** — build-from-source, testing, code style, and PR process guide for open-source contributors
+- **Interactive MCP config** — add, remove, test connection, and toggle MCP servers entirely from the UI (no manual JSON editing); new `McpServersPanel` with `testMcpServer` IPC method
+- **Extensions panel** — first-class `ExtensionsPanel` listing each extension's tools and slash commands with enable/disable toggles
+- **Slash-command autocomplete** — typing `/` in the Composer surfaces a fuzzy-matched dropdown of all available slash commands (daemon-discovered + extension-provided) with descriptions, arrow-key navigation, and Enter to insert; new `SlashAutocomplete` component and `getSlashCommands` IPC method
+- **Guided onboarding wizard** — 4-step wizard (Welcome → Provider → Model → First Prompt) replacing the FirstRunBanner checklist; launches on first run, re-triggerable from Settings → General; Skip at every step + Esc-to-dismiss
+- **Light/dark/system theme** — full theme switching via CSS custom properties (`--pa-*` vars); dark mode default, light mode uses the Prime Intellect site's light palette; `system` follows OS preference; persists across restarts; no flash of wrong theme on launch (new `useTheme` hook + `theme.ts`)
+- **Skill creator preview + enable/disable** — `SkillsPanel` updated with skill preview and per-skill enable/disable toggles
+- **ErrorBoundary** — catches render errors with a token-styled fallback UI
+- **Skeleton** — pulse-animation loading placeholder in the design system
+- **Keyboard shortcut registry** (`useHotkeys` hook) — global shortcut registration (Cmd+1-4 view switching, Cmd+N new session, Cmd+, settings)
+- **App-level state context** — reduces prop-drilling across views
+- **Component sub-splits** — `Composer` split into `ComposerInput`, `FollowUpQueue`, `SideQuestionPanel`, `ShellNoticeBar`; `AdvancedPanel` split into `McpServersPanel`, `ExtensionsPanel`, focused context/RLM panels; `useChat` split into composable hooks (`useSideQuestions`, `useTranscript`)
+- **Tauri v2 auto-updater** — signed update feed for seamless updates
+- **Visual regression harness** — snapshot + visual regression tests for all 5 views
+- **Sessions drag-to-arrange** — graph nodes can be dragged and positioned; layout persists across reloads
+- **Responsive detail inspector** — Sessions detail inspector collapses cleanly under 900px width
 
 ### Changed
 - All 65 raw `<button>` elements in feature components replaced with design-system `<Button>`/`<IconButton>` primitives
-- All inline hex color literals in feature components replaced with token references
+- Inline `style={{}}` blocks in feature components reduced from 551 to 48 (token references or CSS classes instead)
+- Demo code gated behind `import.meta.env.DEV` — no longer renders in the shipped app
+- `Input`, `TextArea`, `Select` forward refs for test accessibility
+- Tokens now reference CSS custom properties (`var(--pa-*)`) so the entire app switches theme automatically
+
+### Fixed
+- Sessions inspector toggle chevron direction corrected
+- Signature verification test hardened with real cryptographic checks
+
+### Removed
+- Transient gauntlet state files (`evaluator-state.json`, `generator-state.json`) removed from tracking and gitignored
 
 ## [0.1.0] — 2026-08-12
 
