@@ -504,6 +504,20 @@ export interface Settings {
    * settings.json, so no new IPC methods are needed.
    */
   disabledSkills?: string[];
+  /**
+   * Saved composer prompt templates, managed from the ⌘K palette. Persisted via
+   * getSettings/setSettings (the bridge SettingsStore already carries arbitrary
+   * fields), so no new IPC methods are needed.
+   */
+  promptTemplates?: PromptTemplate[];
+}
+
+/** A saved composer prompt template, managed from the ⌘K palette. */
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  body: string;
+  createdAt: string;
 }
 
 /** A tool registered by an extension (surfaced in the Extensions panel). */

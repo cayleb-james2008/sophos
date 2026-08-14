@@ -8,6 +8,7 @@ import { useIpc } from "../../ipc/client";
 import type { SlashCommand } from "../../ipc/contract";
 import { SendIcon, StopIcon } from "./chatIcons";
 import { SlashAutocomplete, filterSlashCommands } from "./SlashAutocomplete";
+import { setComposerText, subscribeComposerText } from "./composerTextRef";
 
 type Props = {
   busy: boolean;
@@ -60,8 +61,20 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const v = e.target.value;
     setValue(v);
+    setComposerText(v);
     updateSlashState(v, e.target.selectionStart);
   };
+
+  // Keep the composer in sync with external writes (e.g. the ⌘K palette
+  // inserting a saved template body). When setComposerText fires from outside
+  // this component, update the local value state so the controlled textarea
+  // reflects the new text.
+  useEffect(() => {
+    return subscribeComposerText((next) => {
+      setValue(next);
+      if (taRef.current) taRef.current.value = next;
+    });
+  }, []);
 
 
   // Auto-grow the textarea.

@@ -476,6 +476,7 @@ export class MockIpcClient implements IpcClient {
     theme: INITIAL_LOCAL_SETTINGS.theme ?? "dark",
     modelConfig: { ...(INITIAL_LOCAL_SETTINGS.modelConfig ?? {}), ...readLocalModelConfig() },
     localProviders: readLocalProviders() ?? [LOCAL_DEFAULT_CONFIG],
+    promptTemplates: INITIAL_LOCAL_SETTINGS.promptTemplates ?? [],
   };
   private state: ConnectionState = {
     status: { kind: "connecting" },

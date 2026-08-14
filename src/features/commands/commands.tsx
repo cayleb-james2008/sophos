@@ -98,6 +98,28 @@ function SearchIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+function TemplateIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="8" y1="13" x2="16" y2="13" />
+      <line x1="8" y1="17" x2="13" y2="17" />
+    </svg>
+  );
+}
+
+function TrashIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
+}
+
 export interface PaletteCommand {
   id: string;
   group: string;
@@ -124,6 +146,9 @@ export function buildPaletteCommands(
   onNameRequest: () => void,
   onFindSessionRequest: () => void,
   onSearchTranscriptRequest: () => void,
+  onSaveTemplate: () => void,
+  onListTemplates: () => void,
+  onDeleteTemplate: () => void,
 ): PaletteGroup[] {
   return [
     {
@@ -369,6 +394,42 @@ export function buildPaletteCommands(
           run: () => {
             void ipc.runCommand("copy");
           },
+        },
+      ],
+    },
+    {
+      id: "templates",
+      label: "Prompt Templates",
+      commands: [
+        {
+          id: "template-save",
+          group: "Prompt Templates",
+          label: "Save current prompt as template…",
+          description: "Save the composer's current text as a reusable template",
+          keywords: "template save prompt store reuse",
+          icon: <TemplateIcon />,
+          keepOpen: true,
+          run: onSaveTemplate,
+        },
+        {
+          id: "template-list",
+          group: "Prompt Templates",
+          label: "Insert template…",
+          description: "Insert a saved template's body into the composer",
+          keywords: "template insert load prompt reuse",
+          icon: <TemplateIcon />,
+          keepOpen: true,
+          run: onListTemplates,
+        },
+        {
+          id: "template-delete",
+          group: "Prompt Templates",
+          label: "Delete template…",
+          description: "Remove a saved template",
+          keywords: "template delete remove trash",
+          icon: <TrashIcon />,
+          keepOpen: true,
+          run: onDeleteTemplate,
         },
       ],
     },

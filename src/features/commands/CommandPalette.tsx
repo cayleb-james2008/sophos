@@ -14,16 +14,18 @@ import { createPortal } from "react-dom";
 import { Text, Kbd, Button } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { View } from "../../shell/nav";
-import type { SessionInfo, TranscriptMessage } from "../../ipc/contract";
+import type { SessionInfo, TranscriptMessage, PromptTemplate } from "../../ipc/contract";
 import { buildPaletteCommands, type PaletteCommand } from "./commands";
 import { fuzzyRank } from "./search";
 import { useTranscriptMessages, requestMessageFocus } from "../chat/chatBridge";
+import { getComposerText, setComposerText } from "../chat/composerTextRef";
+import { createPromptTemplate, addTemplate, removeTemplate, listTemplates } from "./promptTemplates";
 import { relativeTime } from "../sessions/format";
 import "./palette.css";
 
 type FlatItem = { type: "header"; label: string; count: number } | { type: "cmd"; cmd: PaletteCommand };
 
-type Submode = "none" | "naming" | "findSession" | "searchTranscript";
+type Submode = "none" | "naming" | "findSession" | "searchTranscript" | "saveTemplate" | "listTemplates" | "deleteTemplate";
 
 const MAX_HISTORY = 5;
 
@@ -32,6 +34,28 @@ function SearchGlyph({ size = 15 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="7" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function TemplateGlyph({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="8" y1="13" x2="16" y2="13" />
+      <line x1="8" y1="17" x2="13" y2="17" />
+    </svg>
+  );
+}
+
+function TrashGlyph({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
     </svg>
   );
 }
@@ -87,6 +111,11 @@ export function CommandPalette({
   const [searchSel, setSearchSel] = useState(0);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [sessionsError, setSessionsError] = useState<string | undefined>();
+  const [templateName, setTemplateName] = useState("");
+  const [templateNameErr, setTemplateNameErr] = useState("");
+  const [templateNameBusy, setTemplateNameBusy] = useState(false);
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [templatesError, setTemplatesError] = useState<string | undefined>();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const searchListRef = useRef<HTMLDivElement>(null);
@@ -105,6 +134,64 @@ export function CommandPalette({
       setNameErr(err instanceof Error ? err.message : String(err));
     } finally {
       setNameBusy(false);
+    }
+  };
+
+  // ---- Prompt-template sub-mode handlers ----
+  const loadTemplates = async () => {
+    setTemplatesError(undefined);
+    try {
+      const settings = await ipc.getSettings();
+      setTemplates(settings.promptTemplates ?? []);
+    } catch (err) {
+      setTemplatesError(err instanceof Error ? err.message : "Templates unavailable");
+    }
+  };
+
+  const submitTemplate = async () => {
+    const name = templateName.trim();
+    const body = getComposerText();
+    if (!name || templateNameBusy) return;
+    if (!body.trim()) {
+      setTemplateNameErr("The composer is empty — type a prompt to save first");
+      return;
+    }
+    setTemplateNameBusy(true);
+    setTemplateNameErr("");
+    try {
+      const settings = await ipc.getSettings();
+      const next = addTemplate(settings.promptTemplates ?? [], createPromptTemplate(name, body));
+      await ipc.setSettings({ ...settings, promptTemplates: next });
+      pushHistory(`save template ${name}`);
+      setSubmode("none");
+      setOpen(false);
+    } catch (err) {
+      setTemplateNameErr(err instanceof Error ? err.message : String(err));
+    } finally {
+      setTemplateNameBusy(false);
+    }
+  };
+
+  const selectTemplate = (i: number) => {
+    const r = templateResults[i];
+    if (!r) return;
+    pushHistory(`insert template ${r.item.name}`);
+    setComposerText(r.item.body);
+    onNavigate("chat");
+    setOpen(false);
+  };
+
+  const deleteTemplate = async (i: number) => {
+    const r = templateResults[i];
+    if (!r) return;
+    try {
+      const settings = await ipc.getSettings();
+      const next = removeTemplate(settings.promptTemplates ?? [], r.item.id);
+      await ipc.setSettings({ ...settings, promptTemplates: next });
+      setTemplates(next);
+      pushHistory(`delete template ${r.item.name}`);
+    } catch (err) {
+      setTemplatesError(err instanceof Error ? err.message : "Could not delete template");
     }
   };
 
@@ -133,6 +220,25 @@ export function CommandPalette({
           setSearchQuery("");
           setSearchSel(0);
           setSubmode("searchTranscript");
+        },
+        () => {
+          setTemplateName("");
+          setTemplateNameErr("");
+          setSubmode("saveTemplate");
+        },
+        () => {
+          setSearchQuery("");
+          setSearchSel(0);
+          setTemplatesError(undefined);
+          setSubmode("listTemplates");
+          void loadTemplates();
+        },
+        () => {
+          setSearchQuery("");
+          setSearchSel(0);
+          setTemplatesError(undefined);
+          setSubmode("deleteTemplate");
+          void loadTemplates();
         },
       ),
     [ipc, onNavigate, onNewSession],
@@ -201,6 +307,16 @@ export function CommandPalette({
     return out;
   }, [searchQuery, messages]);
 
+  // Template list results — all templates (sorted by name) when the query is
+  // empty, fuzzy-ranked otherwise. Shared by the insert and delete sub-modes.
+  const templateResults = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      return listTemplates(templates).map((t) => ({ item: t, match: { score: 0, indices: [] as number[] } }));
+    }
+    return fuzzyRank(searchQuery, templates, (t) => t.name);
+  }, [searchQuery, templates]);
+
   const selectSession = (i: number) => {
     const r = sessionResults[i];
     if (!r) return;
@@ -263,6 +379,10 @@ export function CommandPalette({
       setNameErr("");
       setSearchQuery("");
       setSearchSel(0);
+      setTemplateName("");
+      setTemplateNameErr("");
+      setTemplates([]);
+      setTemplatesError(undefined);
       const t = window.setTimeout(() => inputRef.current?.focus(), 0);
       return () => window.clearTimeout(t);
     }
@@ -529,6 +649,150 @@ export function CommandPalette({
                           </span>
                         </span>
                         <span className="palette__rowhint">↵ jump</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : submode === "saveTemplate" ? (
+            <div className="palette__form">
+              <label className="palette__formlabel">Save current prompt as template</label>
+              <input
+                autoFocus
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void submitTemplate();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSubmode("none");
+                  }
+                }}
+                placeholder="e.g. Code review"
+                aria-label="Template name"
+                className="palette__field pa-focus-ring"
+              />
+              {templateNameErr ? (
+                <span className="palette__error">{templateNameErr}</span>
+              ) : null}
+              <div className="palette__actions">
+                <Button
+                  variant="accent-soft"
+                  type="button"
+                  onClick={() => void submitTemplate()}
+                  disabled={templateNameBusy || !templateName.trim()}
+                  className={`palette__savebtn ${templateName.trim() && !templateNameBusy ? "palette__savebtn--on" : "palette__savebtn--off"}`}
+                >
+                  {templateNameBusy ? "Saving…" : "Save"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => setSubmode("none")}
+                  className="palette__cancelbtn"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : submode === "listTemplates" ? (
+            <div className="palette__search">
+              <label className="palette__searchlabel">Insert template</label>
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSearchSel(0);
+                }}
+                onKeyDown={(e) => onSearchKeyDown(e, templateResults.length, selectTemplate)}
+                placeholder="Search templates…"
+                aria-label="Search templates"
+                className="palette__field pa-focus-ring"
+              />
+              {templatesError ? (
+                <div className="palette__empty">Templates unavailable — {templatesError}</div>
+              ) : templateResults.length === 0 ? (
+                <div className="palette__empty">
+                  {templates.length === 0 ? "No saved templates yet — save one first" : "No templates match"}
+                </div>
+              ) : (
+                <div ref={searchListRef} className="palette__searchlist">
+                  {templateResults.map((r, i) => {
+                    const active = searchSel === i;
+                    return (
+                      <Button
+                        key={r.item.id}
+                        variant={active ? "accent-soft" : "ghost"}
+                        data-search-idx={i}
+                        onMouseEnter={() => setSearchSel(i)}
+                        onClick={() => selectTemplate(i)}
+                        className={`palette__row ${active ? "palette__row--active" : ""}`}
+                      >
+                        <span className="palette__rowicon">
+                          <TemplateGlyph />
+                        </span>
+                        <span className="palette__rowmeta">
+                          <span className="palette__rowlabel">{r.item.name}</span>
+                          <span className="palette__rowdesc">
+                            {r.item.body.length > 60 ? `${r.item.body.slice(0, 60)}…` : r.item.body}
+                          </span>
+                        </span>
+                        <span className="palette__rowhint">↵ insert</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : submode === "deleteTemplate" ? (
+            <div className="palette__search">
+              <label className="palette__searchlabel">Delete template</label>
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSearchSel(0);
+                }}
+                onKeyDown={(e) => onSearchKeyDown(e, templateResults.length, (i) => void deleteTemplate(i))}
+                placeholder="Search templates to delete…"
+                aria-label="Search templates to delete"
+                className="palette__field pa-focus-ring"
+              />
+              {templatesError ? (
+                <div className="palette__empty">Templates unavailable — {templatesError}</div>
+              ) : templateResults.length === 0 ? (
+                <div className="palette__empty">
+                  {templates.length === 0 ? "No saved templates yet" : "No templates match"}
+                </div>
+              ) : (
+                <div ref={searchListRef} className="palette__searchlist">
+                  {templateResults.map((r, i) => {
+                    const active = searchSel === i;
+                    return (
+                      <Button
+                        key={r.item.id}
+                        variant={active ? "accent-soft" : "ghost"}
+                        data-search-idx={i}
+                        onMouseEnter={() => setSearchSel(i)}
+                        onClick={() => void deleteTemplate(i)}
+                        className={`palette__row ${active ? "palette__row--active" : ""}`}
+                      >
+                        <span className="palette__rowicon">
+                          <TrashGlyph />
+                        </span>
+                        <span className="palette__rowmeta">
+                          <span className="palette__rowlabel">{r.item.name}</span>
+                          <span className="palette__rowdesc">
+                            {r.item.body.length > 60 ? `${r.item.body.slice(0, 60)}…` : r.item.body}
+                          </span>
+                        </span>
+                        <span className="palette__rowhint">↵ delete</span>
                       </Button>
                     );
                   })}
