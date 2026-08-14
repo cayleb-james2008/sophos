@@ -1,0 +1,70 @@
+{
+  "results": [
+    {
+      "check": "light theme applied",
+      "ok": true,
+      "detail": "data-theme=light"
+    },
+    {
+      "check": "onboarding wizard visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "saved sophos-onboarding.png",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "onboarding dismissed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "saved sophos-light-theme.png",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "slash autocomplete dropdown visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "saved sophos-slash-autocomplete.png",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "MCP servers panel present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "saved sophos-mcp-servers.png",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "command palette opened",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "Prompt Templates group filtered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "saved sophos-prompt-templates.png",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "no console errors during capture",
+      "ok": true,
+      "detail": "0 errors"
+    }
+  ],
+  "consoleErrors": []
+}

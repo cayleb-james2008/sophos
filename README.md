@@ -27,18 +27,37 @@ near-black surfaces.
 
 <table>
   <tr>
-    <td width="50%"><img src="assets/sophos-chat.png" alt="Chat view" /></td>
-    <td width="50%"><img src="assets/sophos-sessions.png" alt="Sessions graph" /></td>
+    <td width="50%"><img src="assets/sophos-chat.png" alt="Chat view — the main conversation surface" /></td>
+    <td width="50%"><img src="assets/sophos-onboarding.png" alt="Onboarding wizard — first-run guided setup in light theme" /></td>
   </tr>
   <tr>
-    <td width="50%"><img src="assets/sophos-agents.png" alt="Agents fleet" /></td>
-    <td width="50%"><img src="assets/sophos-inbox.png" alt="Inbox relay" /></td>
+    <td width="50%"><img src="assets/sophos-light-theme.png" alt="Light theme — the chat view in light mode" /></td>
+    <td width="50%"><img src="assets/sophos-slash-autocomplete.png" alt="Slash autocomplete — type / for command suggestions" /></td>
   </tr>
   <tr>
-    <td width="50%"><img src="assets/sophos-settings.png" alt="Settings" /></td>
-    <td width="50%"><img src="assets/sophos-skills.png" alt="Skills panel" /></td>
+    <td width="50%"><img src="assets/sophos-mcp-servers.png" alt="MCP servers panel — add, test, and manage MCP servers" /></td>
+    <td width="50%"><img src="assets/sophos-prompt-templates.png" alt="Command palette (⌘K) — prompt templates group" /></td>
   </tr>
 </table>
+
+<details>
+  <summary>V0.1 screenshots — Sessions, Agents, Inbox, Settings, Skills</summary>
+
+  <table>
+    <tr>
+      <td width="50%"><img src="assets/sophos-sessions.png" alt="Sessions graph" /></td>
+      <td width="50%"><img src="assets/sophos-agents.png" alt="Agents fleet" /></td>
+    </tr>
+    <tr>
+      <td width="50%"><img src="assets/sophos-inbox.png" alt="Inbox relay" /></td>
+      <td width="50%"><img src="assets/sophos-settings.png" alt="Settings" /></td>
+    </tr>
+    <tr>
+      <td width="50%"><img src="assets/sophos-skills.png" alt="Skills panel" /></td>
+      <td width="50%"></td>
+    </tr>
+  </table>
+</details>
 
 ---
 
