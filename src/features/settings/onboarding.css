@@ -1,0 +1,199 @@
+/* First-run — a designed sequence, not a banner. It temporarily turns Chat
+   into an editorial welcome surface, then hands the user back to Operate. */
+
+.pa-onboarding {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: clamp(24px, 5vw, 72px);
+  background:
+    linear-gradient(135deg, rgba(var(--pa-ink-rgb), 0.94), rgba(var(--pa-ink-rgb), 0.78)),
+    radial-gradient(circle at 76% 8%, rgba(var(--pa-green-rgb), 0.12), transparent 28rem),
+    var(--pa-ink);
+  animation: pa-fade-in 180ms cubic-bezier(0.16,1,0.3,1) both;
+}
+.pa-onboarding::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  opacity: 0.42;
+  background-image: radial-gradient(rgba(var(--pa-paper-rgb), 0.05) 0.6px, transparent 0.6px);
+  background-size: 5px 5px;
+  mask-image: linear-gradient(125deg, transparent 0%, black 24%, black 76%, transparent 100%);
+}
+.pa-onboarding__frame {
+  position: relative;
+  width: min(100%, 980px);
+  overflow: hidden;
+  border: 1px solid rgba(var(--pa-paper-rgb), 0.18);
+  background:
+    linear-gradient(145deg, rgba(var(--pa-secondary-rgb), 0.7), rgba(var(--pa-ink-rgb), 0.82)),
+    var(--pa-overlay);
+  box-shadow: 0 28px 80px rgba(0,0,0,0.38), inset 0 1px rgba(var(--pa-paper-rgb), 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: pa-slide-up 180ms cubic-bezier(0.16,1,0.3,1) both;
+}
+.pa-onboarding__edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 42%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--pa-green));
+}
+.pa-onboarding__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(var(--pa-paper-rgb), 0.12);
+}
+.pa-onboarding__brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--pa-paper);
+  font: 600 12px/1 "Geist", sans-serif;
+  letter-spacing: 0.1em;
+}
+.pa-onboarding__brand-mark {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--pa-green-rgb), 0.45);
+  color: var(--pa-green);
+  font: 600 10px/1 "Geist Mono", monospace;
+}
+.pa-onboarding__eyebrow {
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  font: 10px/1 "Geist Mono", monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pa-onboarding__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(290px, 0.9fr);
+  gap: 0;
+}
+.pa-onboarding__hero {
+  display: flex;
+  min-width: 0;
+  padding: clamp(28px, 5vw, 58px);
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  border-right: 1px solid rgba(var(--pa-paper-rgb), 0.12);
+}
+.pa-onboarding__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: var(--pa-green);
+  font: 10px/1 "Geist Mono", monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pa-onboarding__kicker::before { width: 18px; height: 1px; content: ""; background: currentColor; }
+.pa-onboarding__title {
+  max-width: 600px;
+  margin: 0;
+  color: var(--pa-paper);
+  font: 500 clamp(34px, 5vw, 62px)/0.98 "Geist", sans-serif;
+  letter-spacing: -0.055em;
+}
+.pa-onboarding__title em { color: var(--pa-green); font-style: normal; }
+.pa-onboarding__lede {
+  max-width: 500px;
+  margin: 20px 0 0;
+  color: rgba(var(--pa-paper-rgb), 0.62);
+  font: 16px/1.6 "Geist", sans-serif;
+}
+.pa-onboarding__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
+.pa-onboarding__action-primary {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid #fff;
+  background: #fff;
+  color: #0e0e0e;
+  cursor: pointer;
+  font: 500 12px/1 "Geist", sans-serif;
+  transition: background 100ms ease, transform 100ms ease;
+}
+.pa-onboarding__action-primary:hover { background: var(--pa-paper); transform: translateY(-1px); }
+.pa-onboarding__action-secondary {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(var(--pa-paper-rgb), 0.16);
+  background: rgba(var(--pa-paper-rgb), 0.04);
+  color: rgba(var(--pa-paper-rgb), 0.62);
+  cursor: pointer;
+  font: 11px/1 "Geist Mono", monospace;
+}
+.pa-onboarding__action-secondary:hover { border-color: rgba(var(--pa-paper-rgb), 0.28); color: var(--pa-paper); }
+.pa-onboarding__aside { display: flex; flex-direction: column; background: rgba(var(--pa-ink-rgb), 0.12); }
+.pa-onboarding__aside-label { padding: 22px 22px 12px; color: rgba(var(--pa-paper-rgb), 0.45); font: 10px/1 "Geist Mono", monospace; letter-spacing: 0.14em; text-transform: uppercase; }
+.pa-onboarding__archetypes { display: grid; grid-template-columns: 1fr; }
+.pa-onboarding__archetype {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0,1fr);
+  gap: 12px;
+  padding: 16px 22px;
+  border-top: 1px solid rgba(var(--pa-paper-rgb), 0.1);
+}
+.pa-onboarding__archetype::after { position: absolute; inset: auto 0 0 0; height: 1px; content: ""; background: linear-gradient(90deg, transparent, rgba(var(--pa-green-rgb), 0.22), transparent); }
+.pa-onboarding__archetype-mark {
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(var(--pa-paper-rgb), 0.16);
+  background: linear-gradient(145deg, rgba(var(--pa-paper-rgb), 0.1), rgba(var(--pa-paper-rgb), 0.02));
+  color: var(--pa-green);
+  font: 11px/1 "Geist Mono", monospace;
+}
+.pa-onboarding__archetype-copy { display: flex; flex-direction: column; gap: 4px; }
+.pa-onboarding__archetype-title { color: var(--pa-paper); font: 500 13px/1.2 "Geist", sans-serif; }
+.pa-onboarding__archetype-detail { color: rgba(var(--pa-paper-rgb), 0.5); font: 11px/1.45 "Geist", sans-serif; }
+.pa-onboarding__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 15px 22px;
+  border-top: 1px solid rgba(var(--pa-paper-rgb), 0.12);
+  background: rgba(var(--pa-paper-rgb), 0.025);
+}
+.pa-onboarding__status { display: flex; min-width: 0; align-items: center; gap: 9px; }
+.pa-onboarding__status-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--pa-amber); }
+.pa-onboarding__status-dot--ready { background: var(--pa-green); animation: pa-beat 1.8s ease-in-out infinite; }
+.pa-onboarding__status-copy { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.pa-onboarding__status-title { color: rgba(var(--pa-paper-rgb), 0.72); font: 11px/1 "Geist Mono", monospace; }
+.pa-onboarding__status-detail { overflow: hidden; color: rgba(var(--pa-paper-rgb), 0.4); text-overflow: ellipsis; white-space: nowrap; font: 10px/1 "Geist Mono", monospace; }
+.pa-onboarding__checks { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pa-onboarding__check { display: inline-flex; align-items: center; gap: 5px; color: rgba(var(--pa-paper-rgb), 0.45); font: 9px/1 "Geist Mono", monospace; }
+.pa-onboarding__check-dot { width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: var(--pa-amber); }
+.pa-onboarding__check-dot--ready { background: var(--pa-green); }
+.pa-onboarding__check-dot--preview { background: rgba(var(--pa-paper-rgb), 0.35); }
+.pa-onboarding__skip { padding: 4px 0; border: 0; background: transparent; color: rgba(var(--pa-paper-rgb), 0.35); cursor: pointer; font: 10px/1 "Geist Mono", monospace; }
+.pa-onboarding__skip:hover { color: var(--pa-paper); }
+
+@media (max-width: 780px) {
+  .pa-onboarding { align-items: flex-start; padding: 18px; }
+  .pa-onboarding__body { grid-template-columns: 1fr; }
+  .pa-onboarding__hero { padding: 34px 24px; border-right: 0; }
+  .pa-onboarding__aside { border-top: 1px solid rgba(var(--pa-paper-rgb), 0.12); }
+  .pa-onboarding__footer { align-items: flex-start; flex-direction: column; }
+  .pa-onboarding__checks { gap: 8px; }
+}

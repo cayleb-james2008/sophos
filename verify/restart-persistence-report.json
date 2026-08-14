@@ -1,0 +1,55 @@
+{
+  "startedAt": "2026-08-11T18:03:00.447Z",
+  "results": [
+    {
+      "name": "auth.json has persisted ollama-cloud key",
+      "ok": true,
+      "detail": "key length=57"
+    },
+    {
+      "name": "settings.json has defaultProvider",
+      "ok": true,
+      "detail": "provider=ollama-cloud"
+    },
+    {
+      "name": "settings.json has defaultModel",
+      "ok": true,
+      "detail": "model=deepseek-v4-flash:0731-cloud"
+    },
+    {
+      "name": "daemon spawned and listening (TCP)",
+      "ok": true,
+      "detail": "port=48618"
+    },
+    {
+      "name": "bridge connected to daemon",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "setModel (no login needed)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "newSession",
+      "ok": true,
+      "detail": "sessionId=b3ee1547ee4e"
+    },
+    {
+      "name": "prompt ack",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "LLM responded using persisted API key (no login)",
+      "ok": true,
+      "detail": "assistant response received"
+    }
+  ],
+  "summary": {
+    "pass": 9,
+    "fail": 0,
+    "overall": "PASS"
+  }
+}

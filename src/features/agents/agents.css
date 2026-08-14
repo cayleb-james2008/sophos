@@ -1,0 +1,545 @@
+/* Agents feature — Sophos agent fleet.
+   Self-contained: every selector is namespaced "ag-" so the global
+   inbox.css / sessions.css (loaded app-wide at startup) never collide. */
+
+.ag-main {
+  height: 100%;
+  min-height: 0;
+  padding: 28px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--pa-paper);
+  background: var(--pa-ink);
+}
+
+.ag-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 24px;
+}
+.ag-heading { min-width: 0; }
+.ag-header h1 { margin: 6px 0 3px; font-size: 24px; font-weight: 600; letter-spacing: -0.015em; font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif; }
+.ag-header p { margin: 0; font-size: 14px; color: rgba(var(--pa-paper-rgb), 0.6); }
+
+.ag-eyebrow {
+  font: 600 10px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+}
+
+/* Right side of the header: quiet telemetry (hairline-separated, no box) with
+   the runtime model folded in beneath it — one band, not three. */
+.ag-headband {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.ag-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  white-space: nowrap;
+}
+.ag-telemetry b { color: var(--pa-paper); font-weight: 600; }
+.ag-telemetry i { width: 1px; height: 14px; background: var(--pa-border); }
+.ag-model {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.05em;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+}
+.ag-model__label { text-transform: uppercase; }
+.ag-model__value { color: var(--pa-paper); font-weight: 600; }
+.ag-model__provider { color: rgba(var(--pa-paper-rgb), 0.45); }
+
+.ag-errorbanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border: 1px solid rgba(var(--pa-danger-rgb), 0.4);
+  background: rgba(var(--pa-danger-rgb), 0.12);
+  border-radius: 0;
+  color: var(--pa-danger);
+  font-size: 12px;
+}
+.ag-errorbanner__action {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(var(--pa-danger-rgb), 0.45);
+  color: var(--pa-danger);
+  border-radius: 0;
+  padding: 4px 10px;
+  cursor: pointer;
+  font: 600 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.1em;
+}
+
+.ag-console {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  overflow: hidden;
+  background: rgba(var(--pa-ink-rgb), 0.82);
+  box-shadow: none;
+}
+
+/* ---- Rail ---- */
+.ag-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--pa-border);
+  background: linear-gradient(180deg, rgba(var(--pa-secondary-rgb), 0.86), rgba(var(--pa-card-rgb), 0.93));
+}
+.ag-railhead {
+  padding: 16px 18px 12px;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--pa-border);
+  font: 600 10px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  color: var(--pa-green);
+}
+.ag-railbody { padding: 9px; overflow: auto; flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.ag-railfoot {
+  border-top: 1px solid var(--pa-border);
+  padding: 13px 16px;
+  display: flex;
+  gap: 15px;
+  font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  text-transform: uppercase;
+}
+.ag-railfoot span { display: flex; align-items: center; gap: 5px; }
+.ag-group { display: flex; flex-direction: column; gap: 3px; }
+.ag-grouphead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 4px 5px;
+  font: 600 9px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.ag-grouphead span:last-child {
+  min-width: 16px;
+  height: 16px;
+  border-radius: 0;
+  background: var(--pa-border);
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+}
+
+/* ---- Agent row ---- */
+.ag-agent {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  transition: 0.18s ease;
+}
+.ag-agent:hover { background: var(--pa-secondary); }
+.ag-agent--selected {
+  background: linear-gradient(90deg, rgba(var(--pa-green-rgb), 0.12), rgba(var(--pa-green-rgb), 0.04));
+  border-color: rgba(var(--pa-green-rgb), 0.4);
+  box-shadow: inset 2px 0 var(--pa-green);
+}
+.ag-agent__edge {
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0;
+  background: var(--pa-border);
+}
+.ag-agent--selected .ag-agent__edge {
+  background: var(--pa-green);
+  box-shadow: none;
+}
+.ag-agent__avatar {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 0;
+  background: linear-gradient(145deg, var(--pa-secondary), var(--pa-card));
+  border: 1px solid var(--pa-border-strong);
+  display: grid;
+  place-items: center;
+  position: relative;
+  font: 600 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: var(--pa-green);
+}
+.ag-agent__avatar .ag-status {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid var(--pa-ink);
+  box-sizing: content-box;
+}
+.ag-agent__meta { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 2px; }
+.ag-agent__meta b { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-agent__summary { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-agent__model { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: var(--pa-green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-kind {
+  font: 7px/1 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pa-green);
+  white-space: nowrap;
+}
+.ag-unread {
+  min-width: 19px;
+  height: 19px;
+  border-radius: 0;
+  background: var(--pa-green);
+  display: grid;
+  place-items: center;
+  font: 700 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: var(--pa-ink);
+}
+.ag-agent__actions { display: none; gap: 2px; }
+.ag-agent:hover .ag-agent__actions { display: flex; }
+.ag-act {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  border-radius: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: 0.12s ease;
+}
+.ag-act:hover { background: var(--pa-overlay); color: var(--pa-paper); }
+.ag-act--accent { color: var(--pa-green); }
+.ag-agent--skeleton {
+  height: 52px;
+  background: linear-gradient(90deg, var(--pa-secondary), var(--pa-overlay), var(--pa-secondary));
+  background-size: 200%;
+  animation: pa-shimmer 1.4s infinite;
+}
+.ag-emptyrail {
+  text-align: center;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  padding: 40px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 11px;
+}
+.ag-emptyrail b { color: rgba(var(--pa-paper-rgb), 0.6); }
+.ag-radar { font-size: 26px; color: var(--pa-green); }
+.ag-railerror {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--pa-danger-rgb), 0.4);
+  background: rgba(var(--pa-danger-rgb), 0.12);
+  border-radius: 0;
+  color: var(--pa-danger);
+  font-size: 12px;
+}
+.ag-railerror__retry {
+  margin-left: auto;
+  background: none;
+  border: 1px solid rgba(var(--pa-danger-rgb), 0.45);
+  color: var(--pa-danger);
+  border-radius: 0;
+  padding: 3px 9px;
+  cursor: pointer;
+  font: 600 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+}
+
+/* ---- Detail ---- */
+.ag-detail {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--pa-card);
+}
+.ag-detailwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ag-detail__loading { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+.ag-detail__standby { margin: auto; text-align: center; max-width: 340px; color: rgba(var(--pa-paper-rgb), 0.45); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ag-detail__standby .ag-glyph { font-size: 32px; }
+.ag-detail__standby b { color: rgba(var(--pa-paper-rgb), 0.6); font-size: 14px; }
+.ag-detail__standby p { font-size: 12px; line-height: 1.6; margin: 0; }
+
+.ag-detail__head {
+  height: 76px;
+  flex: none;
+  border-bottom: 1px solid var(--pa-border);
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  gap: 13px;
+}
+.ag-detail__avatar {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 0;
+  background: linear-gradient(145deg, var(--pa-secondary), var(--pa-card));
+  border: 1px solid var(--pa-border-strong);
+  display: grid;
+  place-items: center;
+  font: 600 12px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: var(--pa-green);
+  position: relative;
+}
+.ag-detail__avatar--large { width: 44px; height: 44px; }
+.ag-detail__headmeta { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ag-detail__headmeta b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-detail__headmeta span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; text-transform: uppercase; color: rgba(var(--pa-paper-rgb), 0.45); letter-spacing: 0.06em; }
+.ag-detail__headmeta small { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: var(--pa-green); }
+.ag-detail__id { margin-left: auto; font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.3); letter-spacing: 0.12em; white-space: nowrap; }
+
+.ag-detail__body {
+  flex: none;
+  max-height: 58%;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 0 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+/* Definition-list rows: label above value, hairline-divided, full rail width.
+   No nested card-in-card boxes — a quiet stack that reads editorial. Values
+   wrap at word boundaries (overflow-wrap: anywhere only splits an opaque id
+   when it alone exceeds the line; it never shreds human-readable text). */
+.ag-detail__row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 26px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--pa-border);
+  border-radius: 0;
+}
+.ag-detail__row:last-child { border-bottom: 0; }
+.ag-detail__rowhead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.ag-detail__rowicon { display: flex; align-items: center; color: rgba(var(--pa-paper-rgb), 0.45); flex: none; }
+.ag-detail__row label {
+  font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.ag-detail__rowvalue {
+  font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: var(--pa-paper);
+  overflow-wrap: anywhere;
+}
+.ag-detail__rowvalue--mono { letter-spacing: 0.02em; }
+
+.ag-detail__actions { flex: none; display: flex; gap: 9px; padding: 12px 22px; border-top: 1px solid var(--pa-border); }
+.ag-detail__receipt { flex: none; padding: 7px 22px; border-top: 1px solid var(--pa-border); color: rgba(var(--pa-paper-rgb), 0.68); font: 11px/1.4 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; }
+
+.ag-detail__thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* ---- Thread / messages ---- */
+.ag-thread { min-width: 0; min-height: 0; display: flex; flex-direction: column; flex: 1; }
+.ag-thread__head {
+  height: 72px;
+  flex: none;
+  border-bottom: 1px solid var(--pa-border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 12px;
+}
+.ag-thread__head > div:nth-child(2) { display: flex; flex-direction: column; gap: 5px; }
+.ag-thread__head b { font-size: 14px; }
+.ag-thread__head span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; text-transform: uppercase; color: rgba(var(--pa-paper-rgb), 0.45); letter-spacing: 0.06em; }
+.ag-thread__head span i { margin-right: 4px; }
+.ag-thread__id { margin-left: auto; font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.3); letter-spacing: 0.12em; }
+.ag-thread__messages { flex: 1; min-height: 0; overflow: auto; padding: 25px 26px; display: flex; flex-direction: column; gap: 19px; }
+.ag-message { max-width: 70%; align-self: flex-start; }
+.ag-message--out { align-self: flex-end; }
+.ag-message__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 4px 6px;
+  font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+}
+.ag-message__label b { color: var(--pa-green); }
+.ag-message__bubble { padding: 12px 14px; border-radius: 0; border: 1px solid var(--pa-border); font-size: 13px; line-height: 1.55; color: var(--pa-paper); background: var(--pa-card); }
+.ag-message--out .ag-message__bubble {
+  border-color: rgba(var(--pa-green-rgb), 0.4);
+  background: linear-gradient(135deg, var(--pa-secondary), var(--pa-card));
+  border-radius: 0;
+}
+.ag-message__readbtn {
+  margin-left: 8px;
+  background: none;
+  border: 0;
+  color: var(--pa-green);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 0;
+  font-size: 11px;
+}
+.ag-thread__markall { padding: 0 20px 4px; display: flex; justify-content: flex-end; }
+.ag-thread__empty,
+.ag-thread__welcome { margin: auto; text-align: center; max-width: 360px; color: rgba(var(--pa-paper-rgb), 0.45); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ag-thread__empty h2,
+.ag-thread__welcome h2 { font-size: 16px; color: var(--pa-paper); margin: 8px 0 6px; }
+.ag-thread__empty p,
+.ag-thread__welcome p { font-size: 12px; line-height: 1.6; margin: 0; }
+.ag-glyph { width: 47px; height: 47px; display: grid; place-items: center; border: 1px solid var(--pa-border-strong); background: var(--pa-secondary); border-radius: 0; color: var(--pa-green); font-size: 20px; box-shadow: none; }
+.ag-thread__welcome span { margin-top: 12px; font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; letter-spacing: 0.2em; color: rgba(var(--pa-paper-rgb), 0.3); }
+
+/* ---- Composer ---- */
+.ag-composer {
+  margin: 0 20px 19px;
+  padding: 11px 13px 10px;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 0;
+  box-shadow: none;
+}
+.ag-composer:focus-within { border-color: rgba(var(--pa-green-rgb), 0.4); box-shadow: 0 0 0 2px rgba(var(--pa-green-rgb), 0.12); }
+.ag-composer__label { display: flex; justify-content: space-between; color: rgba(var(--pa-paper-rgb), 0.45); font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; letter-spacing: 0.06em; margin-bottom: 6px; }
+.ag-composer__label b { color: var(--pa-green); }
+.ag-composer__area {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  min-height: 54px;
+  padding: 10px 0 5px;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: var(--pa-paper);
+  font: 13px/1.5 inherit;
+}
+.ag-composer__area::placeholder { color: rgba(var(--pa-paper-rgb), 0.3); }
+.ag-composer__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--pa-border); padding-top: 9px; flex-wrap: nowrap; }
+.ag-composer__foot > span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.45); letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ag-composer__foot .ag-sendbtn { flex: none; white-space: nowrap; }
+
+/* ---- Status dots ---- */
+.ag-status { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: rgba(var(--pa-paper-rgb), 0.3); }
+.ag-status--running { background: var(--pa-green); box-shadow: none; }
+.ag-status--idle { background: var(--pa-amber); }
+.ag-status--saved { background: var(--pa-green); box-shadow: none; }
+.ag-status--done { background: var(--pa-tool); box-shadow: none; }
+.ag-status--error { background: var(--pa-danger); box-shadow: none; }
+
+@media (max-width: 900px) {
+  .ag-main { padding: 20px; }
+  .ag-telemetry { display: none; }
+  .ag-console { grid-template-columns: 260px minmax(0, 1fr); }
+  .ag-detail__id { display: none; }
+}
+
+/* ---- Node-graph console (P9) ----
+   The Agents view is now a node graph of the fleet on the left with a
+   compact inspector column on the right. The inspector reuses the existing
+   AgentDetail (head/telemetry/actions/thread/composer) untouched. */
+.ag-console--graph {
+  grid-template-columns: minmax(0, 1fr) 384px;
+}
+.ag-graphwrap {
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  background: var(--pa-ink);
+}
+.ag-inspectorwrap {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--pa-border);
+  overflow: hidden;
+}
+.ag-inspectorwrap .ag-detail {
+  border-radius: 0;
+  border: none;
+  height: 100%;
+}
+.ag-graphblank {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--pa-ink-rgb), 0.35);
+  backdrop-filter: blur(2px);
+}
+/* No box-in-box: the graph canvas already provides the frame, so a second
+   bordered card around the empty-state copy reads as an unfinished fragment
+   floating in a hollow rectangle. Matches the Inbox treatment. */
+.ag-graphblank__card {
+  text-align: center;
+  max-width: 320px;
+  padding: 22px 26px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.ag-graphblank__card b {
+  display: block;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--pa-paper);
+  margin-bottom: 6px;
+}
+.ag-graphblank__retry {
+  margin-top: 12px;
+  background: none;
+  border: 1px solid var(--pa-border-strong);
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  border-radius: 0;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.ag-graphblank__retry:hover { color: var(--pa-paper); border-color: var(--pa-green); }
+.ag-sendbtn { white-space: nowrap; }

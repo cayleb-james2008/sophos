@@ -1,0 +1,42 @@
+{
+  "piece": "fork-export-share",
+  "description": "Three coupled chat-surface features: Fork-from-here on assistant messages, Export format picker + Tauri save dialog, honest Share. Built as one coherent surface.",
+  "timestamp": "2026-08-15T14:56:00Z",
+  "files_changed": [
+    "src/features/chat/MessageActions.tsx",
+    "src/features/chat/MessageRow.tsx",
+    "src/features/chat/MessageList.tsx",
+    "src/features/chat/ChatView.tsx",
+    "src/features/chat/useTranscript.ts",
+    "src/features/chat/useChat.ts",
+    "src/features/commands/commands.tsx",
+    "src/features/chat/chat.css",
+    "src/features/chat/__tests__/MessageActions.test.tsx",
+    "src/features/chat/__tests__/ChatView.test.tsx"
+  ],
+  "files_NOT_touched": [
+    "src/ipc/contract.ts",
+    "src/ipc/client.ts",
+    "src/App.tsx",
+    "src/features/commands/CommandPalette.tsx"
+  ],
+  "gates": {
+    "tsc": "0 errors (exit 0)",
+    "vitest": "Test Files 11 passed / Tests 120 passed (baseline 9 files / 105)",
+    "build": "vite build succeeded in 2.91s"
+  },
+  "verification": {
+    "fork_button_assistant_only": "MessageActions renders Fork on assistant when onFork+canFork; never user/system/tool (7 tests)",
+    "export_flow": "ChatView opens format picker -> save dialog -> exportToHtml/exportToJsonl(path); honest toast (4 tests)",
+    "share_honest": "runCommand('share') success -> 'Session shared'; failure -> real error; no 'Share not available yet' (2 tests)",
+    "fork_wiring": "ChatView onFork calls forkSession(message.id) + reload + toast (2 tests)",
+    "palette_decoupled": "export/share commands dispatch sophos:request-export / sophos:request-share; ChatView subscribes via useEffect; buildPaletteCommands signature unchanged"
+  },
+  "reflection": [
+    "Fork glyph mirrors sessions ForkIcon path at 12px/strokeWidth 1.8/currentColor to match Copy/Edit/Retry",
+    "Export/share IPC + toast ownership kept in ChatView via custom window events, avoiding App.tsx / buildPaletteCommands signature churn",
+    "Added reload() to useTranscript/useChat so a fork actually navigates to the new session's transcript",
+    "save dialog guarded by isTauri (browser preview exports to default path); tests mock @tauri-apps/plugin-dialog + ipc/client with isTauri true",
+    "Fork button reuses .message-action-btn CSS; only added .export-picker styles"
+  ]
+}

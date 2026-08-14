@@ -1,0 +1,391 @@
+/* Shared node-graph chrome — Sophos terminal-minimal styling for the four
+   graph views. Built on React Flow (@xyflow/react) primitives, restyled to the
+   stark near-black token system. */
+
+.pa-graph {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.pa-graph__panel {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: transparent;
+}
+
+/* ---- Nodes: smooth layout springs ----
+   Nodes are auto-positioned by dagre; a transform transition turns every
+   re-layout into a clean settle instead of a jump. */
+.react-flow__node:not(.dragging) {
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease;
+  will-change: transform;
+  cursor: default;
+}
+.react-flow__node.selectable {
+  cursor: pointer;
+}
+
+/* ---- Handles: hairline ports ---- */
+.react-flow__handle {
+  width: 7px;
+  height: 7px;
+  border-radius: 0;
+  background: var(--pa-secondary);
+  border: 1px solid var(--pa-border-strong);
+}
+.react-flow__handle.connectionindicator {
+  border-color: var(--pa-green);
+}
+
+/* ---- Edges: quiet hairlines by default, flowing dash when active ---- */
+.react-flow__edge-path {
+  stroke: var(--pa-border);
+  stroke-width: 1.25;
+}
+.react-flow__edge-path.pg-animated {
+  stroke-dasharray: 5 7;
+  animation: pa-dash 0.9s linear infinite;
+}
+
+/* ---- Background: precision dot grid ---- */
+.pa-graph .react-flow__background {
+  background-color: var(--pa-ink);
+}
+.pa-graph .react-flow__background-pattern {
+  color: var(--pa-border);
+}
+/* The graph canvas follows the app theme. React Flow's `dark` class (from
+   colorMode="dark") sets its own near-black container background; override it
+   so the canvas tracks the active palette (light in light mode). */
+.pa-graph .react-flow.dark {
+  background-color: var(--pa-ink);
+}
+
+/* ---- Controls (zoom / fit) ---- */
+.react-flow__controls {
+  box-shadow: none;
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: var(--pa-card);
+  border-bottom: 1px solid var(--pa-border);
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  width: 26px;
+  height: 26px;
+}
+.react-flow__controls-button:hover {
+  background: var(--pa-secondary);
+  color: var(--pa-paper);
+}
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+/* ---- Minimap ---- */
+.react-flow__minimap {
+  background: var(--pa-ink);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+}
+
+/* ---- Selection / attribution ---- */
+.react-flow__node.selected .pg-node {
+  border-color: rgba(var(--pa-green-rgb), 0.55);
+  box-shadow: 0 0 0 1px rgba(var(--pa-green-rgb), 0.2);
+}
+.react-flow__attribution {
+  display: none;
+}
+
+/* ---- Shared node card ---- */
+.pg-node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 14px 12px 16px;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  transition: border-color 0.18s cubic-bezier(0.3, 0, 0.2, 1), box-shadow 0.18s ease;
+  height: 100%;
+}
+.pg-node:hover {
+  border-color: var(--pa-border-strong);
+}
+/* Status rail — the thin colored edge down the left */
+.pg-node__edge {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 0;
+}
+.pg-node__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pg-node__kind {
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pg-node__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pg-node__title {
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--pa-paper);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pg-node__sub {
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 11.5px;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pg-node__mono {
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 10.5px;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Node footer actions */
+.pg-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.pg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 0;
+  border: 1px solid var(--pa-border-strong);
+  background: transparent;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s cubic-bezier(0.3, 0, 0.2, 1);
+  white-space: nowrap;
+}
+.pg-btn:hover {
+  color: var(--pa-paper);
+  border-color: var(--pa-border-strong);
+  background: var(--pa-secondary);
+}
+.pg-btn--accent {
+  color: var(--pa-green);
+  border-color: rgba(var(--pa-green-rgb), 0.4);
+  background: rgba(var(--pa-green-rgb), 0.1);
+}
+.pg-btn--accent:hover {
+  background: rgba(var(--pa-green-rgb), 0.2);
+  color: var(--pa-green-hover);
+}
+.pg-btn--danger {
+  color: var(--pa-danger);
+  border-color: rgba(var(--pa-danger-rgb), 0.4);
+}
+.pg-btn--danger:hover {
+  background: rgba(var(--pa-danger-rgb), 0.12);
+  color: var(--pa-danger);
+}
+
+/* Compact context readout on session nodes (S5) — a small bar + `CTX n%`,
+   consistent with the SystemBar's context meter. Reads as part of the card's
+   rhythm, not a bolted-on circular widget. */
+.pg-ctx {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.pg-ctx__bar {
+  position: relative;
+  width: 34px;
+  height: 4px;
+  background: var(--pa-secondary);
+  border-radius: 0;
+  overflow: hidden;
+}
+.pg-ctx__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--pa-green);
+}
+.pg-ctx__fill--danger {
+  background: var(--pa-danger);
+}
+.pg-ctx__pct {
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 9px;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* Unread / attention pill */
+.pg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 0;
+  background: rgba(var(--pa-green-rgb), 0.12);
+  border: 1px solid rgba(var(--pa-green-rgb), 0.45);
+  color: var(--pa-green-hover);
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.pg-pill--err {
+  background: rgba(var(--pa-danger-rgb), 0.12);
+  border-color: rgba(var(--pa-danger-rgb), 0.45);
+  color: var(--pa-danger);
+}
+.pg-pill--ok {
+  background: rgba(var(--pa-green-rgb), 0.1);
+  border-color: rgba(var(--pa-green-rgb), 0.4);
+  color: var(--pa-green);
+}
+
+/* Inline status legend */
+.pg-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 6px 12px;
+  background: rgba(var(--pa-ink-rgb), 0.78);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  backdrop-filter: blur(6px);
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 10.5px;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  pointer-events: none;
+}
+.pg-legend b {
+  color: var(--pa-paper);
+  font-weight: 500;
+}
+.pg-legend__swatch {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: -0.5px;
+}
+
+/* Empty / degraded overlay inside the graph canvas */
+.pg-blank {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--pa-ink-rgb), 0.4);
+  backdrop-filter: blur(2px);
+}
+.pg-blank__card {
+  max-width: 360px;
+  text-align: center;
+  padding: 26px 30px;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+.pg-blank__glyph {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--pa-secondary);
+  border: 1px solid var(--pa-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  font-size: 18px;
+}
+.pg-blank__title {
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--pa-paper);
+  margin-bottom: 6px;
+}
+.pg-blank__body {
+  font-size: 12.5px;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node {
+    transition: none;
+  }
+  .react-flow__edge-path.pg-animated {
+    animation: none !important;
+  }
+  /* Safety net: hide any remaining heartbeat dots under reduced motion. */
+  .react-flow__edges circle {
+    display: none;
+  }
+}
+.pa-graph__controls { z-index: 5; }
+.pa-graph__minimap { z-index: 5; width: 140px; height: 90px; }
+
+/* ---- Inline-style purge: legend + pill modifiers ---- */
+.pg-legend__swatch--accent { background: var(--pa-green); }
+.pg-legend__swatch--ok { background: var(--pa-green); }
+.pg-legend__swatch--err { background: var(--pa-danger); }
+.pg-legend__preview { color: rgba(var(--pa-paper-rgb), 0.45); }
+.pg-pill--muted { background: var(--pa-overlay); border-color: var(--pa-border); color: rgba(var(--pa-paper-rgb), 0.45); }

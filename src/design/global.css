@@ -1,0 +1,376 @@
+/* Sophos — global styles for the stark terminal-minimal command center.
+ *
+ * The whole palette lives in CSS custom properties so the theme can switch at
+ * the DOM level. `:root` carries the DARK defaults (the current palette — the
+ * visual-regression harness asserts these exact values), and
+ * `:root[data-theme="light"]` overrides them with the inverted light palette.
+ * The theme application layer (src/design/theme.ts + the anti-flash script in
+ * index.html) decides which `data-theme` value lands on <html>.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- Surfaces ---- */
+  --pa-ink: #0e0e0e;            /* app background */
+  --pa-paper: #f4f4f4;          /* primary text */
+  --pa-card: #151515;           /* card surface */
+  --pa-secondary: #202020;     /* secondary surface */
+  --pa-overlay: #111;          /* popover / raised */
+  --pa-muted: #1b1b1b;         /* muted surface */
+  --pa-accent-surface: #2c2c2c; /* accent surface / strong border */
+
+  /* ---- RGB channels (for rgba(var(--pa-X-rgb), A) alpha variants) ---- */
+  --pa-ink-rgb: 14, 14, 14;
+  --pa-paper-rgb: 244, 244, 244;
+  --pa-card-rgb: 21, 21, 21;
+  --pa-secondary-rgb: 32, 32, 32;
+  --pa-overlay-rgb: 17, 17, 17;
+  --pa-border-rgb: 42, 42, 42;
+  --pa-green-rgb: 133, 237, 117;
+  --pa-amber-rgb: 243, 188, 86;
+  --pa-danger-rgb: 239, 68, 68;
+  --pa-info-rgb: 139, 124, 246;
+  --pa-tool-rgb: 56, 189, 248;
+
+  /* ---- Borders (hairline) ---- */
+  --pa-line: rgba(244, 244, 244, 0.12); /* subtle divider */
+  --pa-line-strong: rgba(244, 244, 244, 0.2); /* stronger divider */
+  --pa-border: #2a2a2a;        /* hairline border */
+  --pa-border-strong: #2c2c2c; /* hover / strong border */
+
+  /* ---- Text hierarchy (opacity on paper) ---- */
+  --pa-paper-strong: rgba(244, 244, 244, 0.9);
+  --pa-paper-muted: rgba(244, 244, 244, 0.6);
+  --pa-paper-dim: rgba(244, 244, 244, 0.45);
+  --pa-paper-faint: rgba(244, 244, 244, 0.3);
+
+  /* ---- Glass ---- */
+  --pa-glass: rgba(14, 14, 14, 0.78);
+
+  /* ---- Accent — terminal green (the ONE place of color) ---- */
+  --pa-green: #85ed75;
+  --pa-green-hover: #9fff8a;
+  --pa-green-soft: rgba(133, 237, 117, 0.12);
+  --pa-green-border: rgba(133, 237, 117, 0.4);
+  --pa-amber: #f3bc56;
+  --pa-amber-soft: rgba(243, 188, 86, 0.12);
+
+  /* ---- Semantic (functional status) ---- */
+  --pa-danger: #ef4444;
+  --pa-danger-soft: rgba(239, 68, 68, 0.1);
+  --pa-info: #8b7cf6;
+  --pa-info-soft: rgba(139, 124, 246, 0.12);
+  --pa-tool: #38bdf8;
+
+  /* ---- Scrollbar (hairline, sharp) ---- */
+  --pa-scroll-thumb: #2a2a2a;
+  --pa-scroll-thumb-hover: #2c2c2c;
+
+  /* ---- Focus ring (keyboard only, terminal green) ---- */
+  --pa-focus-ring: rgba(133, 237, 117, 0.85);
+
+  /* ---- Body glow (radial wash behind the app) ---- */
+  --pa-glow: rgba(133, 237, 117, 0.05);
+
+  /* ---- Geometry / motion ---- */
+  --pa-radius: 0px;
+  --pa-blur: 12px;
+}
+
+/* Light theme — inverts the dark palette. Derived from the same Prime
+   Intellect design DNA: near-white surfaces, hairline black borders, a slightly
+   darker green accent for contrast on light backgrounds. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --pa-ink: #f4f4f4;
+  --pa-paper: #0e0e0e;
+  --pa-card: #ffffff;
+  --pa-secondary: #e8e8e8;
+  --pa-overlay: #ffffff;
+  --pa-muted: #f0f0f0;
+  --pa-accent-surface: #dcdcdc;
+
+  --pa-ink-rgb: 244, 244, 244;
+  --pa-paper-rgb: 14, 14, 14;
+  --pa-card-rgb: 255, 255, 255;
+  --pa-secondary-rgb: 232, 232, 232;
+  --pa-overlay-rgb: 255, 255, 255;
+  --pa-border-rgb: 0, 0, 0;
+  --pa-green-rgb: 63, 176, 80;
+  --pa-amber-rgb: 198, 149, 39;
+  --pa-danger-rgb: 211, 51, 51;
+  --pa-info-rgb: 109, 92, 224;
+  --pa-tool-rgb: 14, 165, 233;
+
+  --pa-line: rgba(0, 0, 0, 0.12);
+  --pa-line-strong: rgba(0, 0, 0, 0.2);
+  --pa-border: rgba(0, 0, 0, 0.12);
+  --pa-border-strong: rgba(0, 0, 0, 0.2);
+
+  --pa-paper-strong: rgba(14, 14, 14, 0.9);
+  --pa-paper-muted: rgba(14, 14, 14, 0.6);
+  --pa-paper-dim: rgba(14, 14, 14, 0.45);
+  --pa-paper-faint: rgba(14, 14, 14, 0.3);
+
+  --pa-glass: rgba(244, 244, 244, 0.78);
+
+  --pa-green: #3fb050;
+  --pa-green-hover: #2f9a42;
+  --pa-green-soft: rgba(63, 176, 80, 0.12);
+  --pa-green-border: rgba(63, 176, 80, 0.4);
+  --pa-amber: #c69527;
+  --pa-amber-soft: rgba(198, 149, 39, 0.12);
+
+  --pa-danger: #d33;
+  --pa-danger-soft: rgba(211, 51, 51, 0.1);
+  --pa-info: #6d5ce0;
+  --pa-info-soft: rgba(109, 92, 224, 0.12);
+  --pa-tool: #0ea5e9;
+
+  --pa-scroll-thumb: #c9c9c9;
+  --pa-scroll-thumb-hover: #bdbdbd;
+
+  --pa-focus-ring: rgba(63, 176, 80, 0.85);
+  --pa-glow: rgba(63, 176, 80, 0.06);
+
+  --pa-radius: 0px;
+  --pa-blur: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background:
+    radial-gradient(circle at 80% -10%, var(--pa-glow), transparent 28rem),
+    var(--pa-ink);
+  color: var(--pa-paper);
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* ---- Typography: Geist (display/body) and Geist Mono (data) are loaded via
+   the @fontsource packages imported in main.tsx, which declare the proper
+   @font-face rules with woff2 sources. No local @font-face override here — a
+   src: local() for a family that is not installed system-wide errors and
+   shadows the web font. ---- */
+
+/* ---- Scrollbars (hairline, sharp) ---- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--pa-scroll-thumb);
+  border-radius: 0;
+  border: 2px solid var(--pa-ink);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pa-scroll-thumb-hover);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- Focus ring (keyboard only, terminal green) ---- */
+:focus-visible {
+  outline: none;
+}
+.pa-focus-ring:focus-visible {
+  box-shadow: 0 0 0 1px var(--pa-ink), 0 0 0 2px var(--pa-focus-ring);
+}
+
+/* ---- Motion keyframes ---- */
+@keyframes pa-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pa-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+/* Live status pulse — a crisp instrument "heartbeat" */
+@keyframes pa-beat {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  45% {
+    opacity: 0.55;
+    transform: scale(0.78);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes pa-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  80%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes pa-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pa-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pa-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pa-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pa-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+/* Loading skeleton pulse — a gentle opacity fade for placeholder blocks */
+@keyframes pa-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes pa-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pa-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* PI-inspired live-data motion. These are short, one-shot cues for changes;
+   active-state loops stay reserved for streaming/running indicators. */
+@keyframes pa-title-wash {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -30% 0;
+  }
+}
+
+@keyframes pa-reward-row-update {
+  from {
+    background-position: 160% 0;
+    box-shadow: inset 0 0 0 1px rgba(133, 237, 117, 0.34);
+  }
+  to {
+    background-position: -30% 0;
+    box-shadow: inset 0 0 0 1px rgba(133, 237, 117, 0);
+  }
+}
+
+@keyframes pa-state-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  45% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+@keyframes pa-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

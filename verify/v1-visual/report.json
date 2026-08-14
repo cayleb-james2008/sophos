@@ -1,0 +1,260 @@
+{
+  "views": {
+    "chat": {
+      "radius": [],
+      "banned_color": [],
+      "banned_font": [],
+      "glow": [],
+      "accentCount": 17,
+      "borderColors": {
+        "rgba(244, 244, 244, 0.2)": 2,
+        "rgba(244, 244, 244, 0.12)": 5,
+        "rgba(133, 237, 117, 0.18)": 1,
+        "rgba(0, 0, 0, 0)": 8,
+        "rgb(42, 42, 42)": 29,
+        "rgba(244, 244, 244, 0.18)": 1,
+        "rgba(133, 237, 117, 0.45)": 1,
+        "rgb(255, 255, 255)": 1,
+        "rgba(244, 244, 244, 0.1)": 3,
+        "rgba(244, 244, 244, 0.16)": 3,
+        "rgb(44, 44, 44)": 8,
+        "rgb(239, 68, 68)": 1
+      },
+      "fonts": {
+        "Times New Roman": 29,
+        "Geist": 254,
+        "Geist Mono": 71,
+        "Arial": 38
+      },
+      "bodyBg": "rgb(14, 14, 14)",
+      "bodyFg": "rgb(244, 244, 244)",
+      "bodyFont": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+    },
+    "sessions": {
+      "radius": [],
+      "banned_color": [],
+      "banned_font": [],
+      "glow": [],
+      "accentCount": 19,
+      "borderColors": {
+        "rgba(244, 244, 244, 0.2)": 2,
+        "rgba(244, 244, 244, 0.12)": 3,
+        "rgba(0, 0, 0, 0)": 10,
+        "rgba(133, 237, 117, 0.18)": 1,
+        "rgb(42, 42, 42)": 28,
+        "rgba(133, 237, 117, 0.4)": 5,
+        "rgb(255, 255, 255)": 4,
+        "rgba(244, 244, 244, 0.14)": 1,
+        "rgb(44, 44, 44)": 20,
+        "rgb(14, 14, 14)": 2,
+        "rgb(239, 68, 68)": 1
+      },
+      "fonts": {
+        "Times New Roman": 29,
+        "Geist": 381,
+        "Geist Mono": 96,
+        "Arial": 45
+      },
+      "bodyBg": "rgb(14, 14, 14)",
+      "bodyFg": "rgb(244, 244, 244)",
+      "bodyFont": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+    },
+    "agents": {
+      "radius": [],
+      "banned_color": [],
+      "banned_font": [],
+      "glow": [],
+      "accentCount": 22,
+      "borderColors": {
+        "rgba(244, 244, 244, 0.2)": 2,
+        "rgba(244, 244, 244, 0.12)": 3,
+        "rgba(0, 0, 0, 0)": 7,
+        "rgba(133, 237, 117, 0.18)": 1,
+        "rgb(42, 42, 42)": 22,
+        "rgb(44, 44, 44)": 18,
+        "rgb(255, 255, 255)": 2,
+        "rgb(239, 68, 68)": 1
+      },
+      "fonts": {
+        "Times New Roman": 29,
+        "Geist": 328,
+        "Geist Mono": 84,
+        "Arial": 40,
+        "monospace": 1
+      },
+      "bodyBg": "rgb(14, 14, 14)",
+      "bodyFg": "rgb(244, 244, 244)",
+      "bodyFont": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+    },
+    "inbox": {
+      "radius": [],
+      "banned_color": [],
+      "banned_font": [],
+      "glow": [],
+      "accentCount": 10,
+      "borderColors": {
+        "rgba(244, 244, 244, 0.2)": 2,
+        "rgba(244, 244, 244, 0.12)": 3,
+        "rgba(0, 0, 0, 0)": 6,
+        "rgba(133, 237, 117, 0.18)": 1,
+        "rgb(42, 42, 42)": 12,
+        "rgb(239, 68, 68)": 1,
+        "rgb(44, 44, 44)": 6
+      },
+      "fonts": {
+        "Times New Roman": 29,
+        "Geist": 162,
+        "Geist Mono": 45,
+        "Arial": 22
+      },
+      "bodyBg": "rgb(14, 14, 14)",
+      "bodyFg": "rgb(244, 244, 244)",
+      "bodyFont": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+    },
+    "settings:General": {
+      "radius": [],
+      "banned_color": [],
+      "banned_font": [],
+      "glow": [],
+      "accentCount": 8,
+      "borderColors": {
+        "rgba(244, 244, 244, 0.2)": 2,
+        "rgba(244, 244, 244, 0.12)": 3,
+        "rgba(0, 0, 0, 0)": 8,
+        "rgba(133, 237, 117, 0.18)": 1,
+        "rgb(42, 42, 42)": 17,
+        "rgba(244, 244, 244, 0.14)": 1,
+        "rgb(44, 44, 44)": 7,
+        "rgb(255, 255, 255)": 1,
+        "rgb(239, 68, 68)": 1
+      },
+      "fonts": {
+        "Times New Roman": 29,
+        "Geist": 210,
+        "Geist Mono": 42,
+        "Arial": 22
+      },
+      "bodyBg": "rgb(14, 14, 14)",
+      "bodyFg": "rgb(244, 244, 244)",
+      "bodyFont": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+    },
+    "settings:Providers": {
+      "radius": [],
+      "banned_color": [],
+      "banned_font": [],
+      "glow": [],
+      "accentCount": 13,
+      "borderColors": {
+        "rgba(244, 244, 244, 0.2)": 2,
+        "rgba(244, 244, 244, 0.12)": 3,
+        "rgba(0, 0, 0, 0)": 18,
+        "rgba(133, 237, 117, 0.18)": 1,
+        "rgb(42, 42, 42)": 26,
+        "rgba(244, 244, 244, 0.14)": 1,
+        "rgb(44, 44, 44)": 12,
+        "rgba(133, 237, 117, 0.4)": 7,
+        "rgb(239, 68, 68)": 1
+      },
+      "fonts": {
+        "Times New Roman": 29,
+        "Geist": 350,
+        "Geist Mono": 72,
+        "Arial": 22
+      },
+      "bodyBg": "rgb(14, 14, 14)",
+      "bodyFg": "rgb(244, 244, 244)",
+      "bodyFont": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+    },
+    "settings:Skills": {
+      "radius": [],
+      "banned_color": [],
+      "banned_font": [],
+      "glow": [],
+      "accentCount": 8,
+      "borderColors": {
+        "rgba(244, 244, 244, 0.2)": 2,
+        "rgba(244, 244, 244, 0.12)": 3,
+        "rgba(0, 0, 0, 0)": 9,
+        "rgba(133, 237, 117, 0.18)": 1,
+        "rgb(42, 42, 42)": 24,
+        "rgba(244, 244, 244, 0.14)": 1,
+        "rgb(44, 44, 44)": 10,
+        "rgb(255, 255, 255)": 3,
+        "rgb(239, 68, 68)": 1
+      },
+      "fonts": {
+        "Times New Roman": 29,
+        "Geist": 260,
+        "Geist Mono": 54,
+        "Arial": 25
+      },
+      "bodyBg": "rgb(14, 14, 14)",
+      "bodyFg": "rgb(244, 244, 244)",
+      "bodyFont": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+    },
+    "settings:Advanced": {
+      "radius": [],
+      "banned_color": [],
+      "banned_font": [],
+      "glow": [],
+      "accentCount": 19,
+      "borderColors": {
+        "rgba(244, 244, 244, 0.2)": 2,
+        "rgba(244, 244, 244, 0.12)": 3,
+        "rgba(0, 0, 0, 0)": 20,
+        "rgba(133, 237, 117, 0.18)": 1,
+        "rgb(42, 42, 42)": 28,
+        "rgba(244, 244, 244, 0.14)": 1,
+        "rgb(44, 44, 44)": 15,
+        "rgba(133, 237, 117, 0.4)": 1,
+        "rgb(133, 237, 117)": 1,
+        "rgb(239, 68, 68)": 1
+      },
+      "fonts": {
+        "Times New Roman": 29,
+        "Geist": 339,
+        "Geist Mono": 50,
+        "Arial": 22
+      },
+      "bodyBg": "rgb(14, 14, 14)",
+      "bodyFg": "rgb(244, 244, 244)",
+      "bodyFont": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+    },
+    "settings:Long-running": {
+      "radius": [],
+      "banned_color": [],
+      "banned_font": [],
+      "glow": [],
+      "accentCount": 9,
+      "borderColors": {
+        "rgba(244, 244, 244, 0.2)": 2,
+        "rgba(244, 244, 244, 0.12)": 3,
+        "rgba(0, 0, 0, 0)": 8,
+        "rgba(133, 237, 117, 0.18)": 1,
+        "rgb(42, 42, 42)": 14,
+        "rgba(244, 244, 244, 0.14)": 1,
+        "rgb(44, 44, 44)": 7,
+        "rgb(255, 255, 255)": 1,
+        "rgb(239, 68, 68)": 1
+      },
+      "fonts": {
+        "Times New Roman": 29,
+        "Geist": 200,
+        "Geist Mono": 43,
+        "Arial": 22
+      },
+      "bodyBg": "rgb(14, 14, 14)",
+      "bodyFg": "rgb(244, 244, 244)",
+      "bodyFont": "Geist, \"Geist Fallback\", ui-sans-serif, system-ui, sans-serif"
+    }
+  },
+  "blockers": [],
+  "warnings": [],
+  "dna": {
+    "bg": "rgb(14, 14, 14)",
+    "fg": "rgb(244, 244, 244)",
+    "border": "rgb(42, 42, 42)",
+    "accent": "rgb(133, 237, 117)"
+  },
+  "consoleErrors": []
+}

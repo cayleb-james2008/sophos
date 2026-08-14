@@ -1,0 +1,103 @@
+{
+  "suite": "p5-worker-verify",
+  "mode": "browser-demo (MockIpcClient)",
+  "results": [
+    {
+      "name": "filter-baseline-all-sessions",
+      "ok": true,
+      "detail": "Refactor auth module visible: 2"
+    },
+    {
+      "name": "filter-narrows",
+      "ok": true,
+      "detail": "auth=2, config=0"
+    },
+    {
+      "name": "filter-clear-restores",
+      "ok": true,
+      "detail": "config back after clear: 1"
+    },
+    {
+      "name": "filter-status-active",
+      "ok": true,
+      "detail": "active=2, saved=0"
+    },
+    {
+      "name": "filter-no-match-empty-state",
+      "ok": true,
+      "detail": "no-match empty state: 1"
+    },
+    {
+      "name": "perf-load-500-render",
+      "ok": true,
+      "detail": "render 500 msgs in 132ms"
+    },
+    {
+      "name": "perf-fixture-does-not-complete-onboarding",
+      "ok": true,
+      "detail": "preview onboarding remains visible after fixture load: 1"
+    },
+    {
+      "name": "perf-windowed-mount-count",
+      "ok": true,
+      "detail": "mounted rows: 8 (windowed, not 500)"
+    },
+    {
+      "name": "perf-scroll-to-bottom-renders-last",
+      "ok": true,
+      "detail": "last assistant message (497) rendered after scrolling to bottom"
+    },
+    {
+      "name": "perf-scroll-container",
+      "ok": true,
+      "detail": "scroll container overflowY=auto: true"
+    },
+    {
+      "name": "perf-scroll-up",
+      "ok": true,
+      "detail": "scrollTop after scroll-up: 0"
+    },
+    {
+      "name": "perf-scroll-bottom-restick",
+      "ok": true,
+      "detail": "distance to bottom after re-stick: 0"
+    },
+    {
+      "name": "empty-state-renders",
+      "ok": true,
+      "detail": "EmptyChatHint 'Start a conversation'=1, '$ sophos'=1"
+    },
+    {
+      "name": "perf-stream-stick",
+      "ok": true,
+      "detail": "distance to bottom while streaming: 0"
+    },
+    {
+      "name": "focus-scrolls-to-message",
+      "ok": true,
+      "detail": "scrolled to focused message (scrollTop=13031)"
+    },
+    {
+      "name": "focus-no-rearm-stream",
+      "ok": true,
+      "detail": "distance to bottom after focus + stream: 0 (auto-stick holds, not snapped to msg 100)"
+    },
+    {
+      "name": "focus-no-rearm-scroll",
+      "ok": true,
+      "detail": "scrollTop after manual scroll-up post-focus: 0 (stays, not snapped back)"
+    },
+    {
+      "name": "no-console-errors",
+      "ok": true,
+      "detail": "clean"
+    }
+  ],
+  "consoleErrors": [],
+  "summary": {
+    "total": 18,
+    "passed": 18,
+    "failed": 0,
+    "overall": "PASS"
+  }
+}

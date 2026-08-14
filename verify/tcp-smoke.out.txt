@@ -1,0 +1,13 @@
+[smoke] REF=C:/Users/Cayleb/Desktop/workspace/prime-agent-ref/packages/coding-agent
+[smoke] spawning supervisor: node C:\Users\Cayleb\Desktop\workspace\prime-agent-ref\packages\coding-agent\dist\bundle\cli.js --mode daemon --daemon-socket tcp://127.0.0.1:48124
+Prime Agent daemon supervisor 9e430ff6-eae2-4283-8e47-b95463d944eb listening on tcp://127.0.0.1:48124
+[smoke] PASS: supervisor is listening on tcp://127.0.0.1:48124
+[smoke] PASS: DaemonClient connected over TCP
+[smoke] PASS: received daemon_hello (protocolVersion=?)
+[smoke] create response: success=true
+[smoke] PASS: session created over TCP (worker spawned + supervisor<->worker TCP ok): b37cae69418b
+[smoke] PASS: list returned 1 session(s) over TCP
+[smoke] prompt response: success=true
+[smoke] PASS: prompt command routed to the worker over TCP
+[smoke] session killed
+[smoke] RESULT: TCP-LOOPBACK TRANSPORT OK

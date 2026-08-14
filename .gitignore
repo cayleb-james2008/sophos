@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+resources/node_modules/
+
+# Build output
+dist/
+src-tauri/target/
+
+# Bundled runtime (staged by scripts/bundle.mjs, never committed)
+resources/node/
+resources/daemon/dist/
+resources/daemon/package.json
+resources/bridge/dist/
+!resources/icon.png
+
+# Misc
+*.log
+.e2e/
+.nyc_output/
+.coverage/
+.vscode/
+.idea/
+.DS_Store

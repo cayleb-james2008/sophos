@@ -1,0 +1,36 @@
+{
+  "reference": {
+    "vars": {
+      "--background": "#0e0e0e",
+      "--foreground": "#f4f4f4",
+      "--border": "#2a2a2a",
+      "--card": "#151515",
+      "--radius": "0px",
+      "--chart-1": "#85ed75"
+    },
+    "bodyBg": "rgba(0, 0, 0, 0)",
+    "bodyFg": "rgb(255, 255, 255)",
+    "bodyFont": "ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\"",
+    "topBorder": "rgb(32, 32, 32)"
+  },
+  "rows": [
+    [
+      "--background",
+      "rgb(14, 14, 14)",
+      "rgb(14, 14, 14)"
+    ],
+    [
+      "--foreground",
+      "rgb(244, 244, 244)",
+      "rgb(244, 244, 244)"
+    ],
+    [
+      "--border",
+      "rgb(42, 42, 42)",
+      "rgb(42, 42, 42)"
+    ]
+  ],
+  "mismatches": [],
+  "radius_ok": true,
+  "accent_elements": 181
+}

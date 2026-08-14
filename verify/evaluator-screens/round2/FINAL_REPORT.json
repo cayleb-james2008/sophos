@@ -1,0 +1,181 @@
+{
+  "round": 2,
+  "piece": "Theme System (light/dark/system)",
+  "evaluator": "traycer agent 799dc367 (autobuild evaluator)",
+  "date": "2026-08-13T19:30Z",
+  "gates": {
+    "npx tsc --noEmit": {"exit": 0, "verdict": "PASS"},
+    "npx vitest run": {"passed": 86, "total": 86, "verdict": "PASS"},
+    "console_errors": {"count": 0, "verdict": "PASS"}
+  },
+  "bar_check_results": {
+    "1_light_theme_across_entire_app": {
+      "verdict": "PARTIAL",
+      "evidence": {
+        "body_bg": "rgb(244, 244, 244) ✓",
+        "body_text": "rgb(14, 14, 14) ✓",
+        "sidebar_bg": "rgba(244, 244, 244, 0.78) ✓ (light)",
+        "topbar_bg": "rgba(244, 244, 244, 0.78) ✓ (light)",
+        "card_bg": "rgb(255, 255, 255) ✓ (white)",
+        "border": "rgba(0, 0, 0, 0.12) ✓ (hairline)",
+        "green_accent": "rgb(63, 176, 80) ✓",
+        "light_text_elements_in_light_mode": 1,
+        "light_text_sample": "Stop button on red danger bg — intentional, not a defect",
+        "dark_text_count_in_light_mode": 447,
+        "shell_surfaces_count": "all switches to light",
+        "composer": "rgb(255, 255, 255) ✓ (white card)",
+        "graph_canvas_bg": "var(--pa-ink) which is #f4f4f4 in light ✓",
+        "graph_nodes": "white cards with dark text ✓"
+      },
+      "defects_visible_in_light_mode": [
+        {
+          "name": "inbox__graphblank empty-state scrim",
+          "selector": ".inbox__graphblank",
+          "file": "src/features/inbox/inbox.css:435",
+          "computed_bg": "rgba(14, 14, 14, 0.35)",
+          "issue": "Hardcoded dark scrim renders as gray patch on light canvas when inbox has no traffic. Clearly visible in light-inbox-zoom.png — large gray rectangle in the middle of the inbox.",
+          "severity": "high"
+        },
+        {
+          "name": "system-bar__readout tint",
+          "selector": ".system-bar__readout",
+          "file": "src/shell/shell.css:149",
+          "computed_bg": "rgba(0, 0, 0, 0.16)",
+          "issue": "Hardcoded black tint renders as darker gray strip inside the light topbar (ENGINE/MODEL/CONTEXT readout). Clearly visible in light-topbar.png — the central strip is grayer than the surrounding system bar.",
+          "severity": "medium"
+        },
+        {
+          "name": "onboarding__aside tint",
+          "selector": ".pa-onboarding__aside",
+          "file": "src/features/settings/onboarding.css:143",
+          "computed_bg": "rgba(0, 0, 0, 0.12)",
+          "issue": "Hardcoded black tint on the right-side archetype panel in the onboarding wizard. Subtle but visible — right side of the wizard card is darker than the left.",
+          "severity": "low"
+        },
+        {
+          "name": "graph/agents/sessions empty-state scrims (conditional)",
+          "files": [
+            "src/features/agents/agents.css:509",
+            "src/features/graph/graph.css:332",
+            "src/features/sessions/sessions.css:895"
+          ],
+          "computed_bg": "rgba(14, 14, 14, 0.35 / 0.4)",
+          "issue": "Hardcoded dark scrims for graph empty states. Would render as gray patches if those graphs are empty. Verified by computed style — not triggered in current tests because sample data is present.",
+          "severity": "medium"
+        },
+        {
+          "name": "sessions__inspector-backdrop (conditional)",
+          "selector": ".sessions__inspector-backdrop",
+          "file": "src/features/sessions/sessions.css:1472",
+          "computed_bg": "rgba(14, 14, 14, 0.45)",
+          "issue": "Hardcoded dark backdrop for sessions detail inspector. Would darken canvas when inspector is opened.",
+          "severity": "low"
+        },
+        {
+          "name": "system-bar__scrim (conditional)",
+          "selector": ".system-bar__scrim",
+          "file": "src/shell/shell.css:225",
+          "computed_bg": "rgba(14, 14, 14, 0.34)",
+          "issue": "Hardcoded dark scrim over rest of UI when details dropdown is open. Would create dark area in light mode.",
+          "severity": "low"
+        }
+      ]
+    },
+    "2_dark_theme_no_visual_regression": {
+      "verdict": "PASS",
+      "evidence": {
+        "body_bg_dark": "rgb(14, 14, 14) ✓",
+        "body_text_dark": "rgb(244, 244, 244) ✓",
+        "green_accent_dark": "rgb(133, 237, 117) ✓",
+        "sidebar_dark": "rgba(14, 14, 14, 0.78) ✓",
+        "topbar_dark": "rgba(14, 14, 14, 0.78) ✓",
+        "graph_canvas_dark": "var(--pa-ink) = #0e0e0e ✓",
+        "graph_nodes_dark": "#151515 cards with white text ✓",
+        "previous_round_v1_visual_match": "PASS (verified by prior round)"
+      }
+    },
+    "3_system_theme_follows_os_preference": {
+      "verdict": "PASS",
+      "evidence": {
+        "os_light_resolves_to": "light ✓",
+        "os_dark_resolves_to": "dark ✓",
+        "matchMedia_listener": "implemented in useTheme.ts and theme.ts",
+        "anti_flash_script": "handles 'system' inline at boot"
+      }
+    },
+    "4_no_flash_of_wrong_theme_on_launch": {
+      "verdict": "PASS",
+      "evidence": {
+        "anti_flash_script_in_index_html": true,
+        "executes_before_react": true,
+        "verified_first_data_theme_after_navigate": "light (with persisted theme=light, even with OS=dark)"
+      }
+    },
+    "5_theme_persists_across_restarts": {
+      "verdict": "PASS",
+      "evidence": {
+        "new_page_reload_data_theme": "light ✓",
+        "localStorage_key": "prime-agent.settings.v1"
+      }
+    },
+    "6_general_panel_select_applies_immediately": {
+      "verdict": "PASS",
+      "evidence": {
+        "select_found": true,
+        "options": ["dark", "light", "system"],
+        "change_to_dark_immediately_applies_data_theme": "dark ✓",
+        "code_path": "GeneralPanel.tsx onChange calls applyTheme(theme) directly"
+      }
+    },
+    "7_tsc_vitest_no_console_errors": {
+      "verdict": "PASS",
+      "evidence": {
+        "tsc_exit": 0,
+        "vitest": "86/86",
+        "console_errors_during_visual_test": 0
+      }
+    }
+  },
+  "css_variable_adoption": {
+    "files_with_var_pa_star": 14,
+    "files_with_hardcoded_hex_in_feature_css": 1,
+    "remaining_hardcoded_hex_literals_total": 31,
+    "remaining_hardcoded_hex_breakdown": {
+      "global_css_variable_definitions": 30,
+      "onboarding_css_primary_button": 1,
+      "feature_css_hardcoded_scrims": 9,
+      "feature_css_hardcoded_shadows": 5
+    },
+    "round1_to_round2_change": {
+      "round1": {"feature_css_hardcoded_hex": 576, "files_with_var_pa": 0},
+      "round2": {"feature_css_hardcoded_hex": 9, "files_with_var_pa": 14}
+    },
+    "comment_on_change": "Major progress on the surface adoption — all 14 feature CSS files now use var(--pa-*) extensively. However, a small set of dark-scrim/overlay literals (rgba(14,14,14,X) and rgba(0,0,0,X) on background or background-image) were missed. These create visible defects in light mode."
+  },
+  "verdict": {
+    "contract": "PARTIAL PASS",
+    "bar": "PARTIAL PASS — round 1's primary failure (light theme broken for shell/composer/views) is FIXED, but a small set of dark-scrim overlays remain and create visible defects in light mode (most visibly on Inbox empty state and SystemBar readout strip)."
+  },
+  "screenshots": [
+    "verify/evaluator-screens/round2/dark-chat.png",
+    "verify/evaluator-screens/round2/light-chat.png (first-run wizard)",
+    "verify/evaluator-screens/round2/light-chat-dismissed.png (post-onboarding Chat)",
+    "verify/evaluator-screens/round2/light-chat-with-text.png (Chat with composer + typed text)",
+    "verify/evaluator-screens/round2/light-sessions.png (Sessions view, graph populated)",
+    "verify/evaluator-screens/round2/light-agents.png (Agents view, graph populated)",
+    "verify/evaluator-screens/round2/light-inbox.png (Inbox — GRAY SCRIM DEFECT visible)",
+    "verify/evaluator-screens/round2/light-inbox-zoom.png (close-up of inbox defect)",
+    "verify/evaluator-screens/round2/light-settings.png (Settings — GeneralPanel)",
+    "verify/evaluator-screens/round2/light-palette.png (Command palette — modal backdrop OK)",
+    "verify/evaluator-screens/round2/light-topbar.png (close-up of topbar readout strip defect)",
+    "verify/evaluator-screens/round2/light-onboarding.png (First-run wizard)"
+  ],
+  "round_1_to_round_2_summary": {
+    "round1_d1_light_broken": "FIXED — body, sidebar, topbar, composer, cards, graph canvas all switch to light.",
+    "round1_d2_white_text_on_light": "FIXED — only 1 element with light text in light mode (Stop button, intentional).",
+    "round1_d3_no_var_adoption": "FIXED — all 14 feature CSS files now use var(--pa-*); 576 hex → 9 dark-scrim literals.",
+    "round1_d4_light_bg_inside_dark_shell": "FIXED — shell is now light in light mode.",
+    "new_defect_d5_dark_scrims_in_light_mode": "PARTIAL — hardcoded rgba(14,14,14,X) and rgba(0,0,0,X) literals on background (not shadows, not modal backdrops) create dark patches on light surfaces. 6 affected selectors across 5 files."
+  },
+  "verdict_message": "Light theme works for ~95% of the surface. The remaining 5% is scrim/overlay backgrounds that the conversion script treated as 'dark backdrop' and left alone. Most visible defect is the Inbox empty-state scrim (a large gray rectangle sits where the empty-state copy should be on a light canvas). Second-most visible is the SystemBar readout strip (the ENGINE/MODEL/CONTEXT strip is grayer than the surrounding topbar). Round-1 critical failure (entire shell staying dark in light mode) is genuinely fixed — but the bar's 'NO dark backgrounds in light mode' clause is not fully met."
+}

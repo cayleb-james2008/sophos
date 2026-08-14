@@ -1,0 +1,100 @@
+{
+  "startedAt": "2026-08-11T17:56:11.602Z",
+  "installDir": "C:\\Users\\Cayleb\\AppData\\Local\\Sophos",
+  "daemonPort": 48550,
+  "results": [
+    {
+      "name": "installed node.exe exists",
+      "ok": true,
+      "detail": "C:\\Users\\Cayleb\\AppData\\Local\\Sophos\\node\\node.exe"
+    },
+    {
+      "name": "installed daemon/cli.js exists",
+      "ok": true,
+      "detail": "C:\\Users\\Cayleb\\AppData\\Local\\Sophos\\daemon\\dist\\cli.js"
+    },
+    {
+      "name": "installed bridge/index.js exists",
+      "ok": true,
+      "detail": "C:\\Users\\Cayleb\\AppData\\Local\\Sophos\\bridge\\dist\\bridge\\src\\index.js"
+    },
+    {
+      "name": "installed preload exists",
+      "ok": true,
+      "detail": "C:\\Users\\Cayleb\\AppData\\Local\\Sophos\\scripts\\no-window-preload.cjs"
+    },
+    {
+      "name": "ollama-cloud API key available",
+      "ok": true,
+      "detail": "key length=57"
+    },
+    {
+      "name": "daemon spawned and listening on TCP",
+      "ok": true,
+      "detail": "port=48550"
+    },
+    {
+      "name": "bridge connected to daemon",
+      "ok": true,
+      "detail": "events=3"
+    },
+    {
+      "name": "login (ollama-cloud)",
+      "ok": true,
+      "detail": "{\"provider\":\"ollama-cloud\",\"stored\":true}"
+    },
+    {
+      "name": "API key persisted to auth.json",
+      "ok": true,
+      "detail": "key length=undefined"
+    },
+    {
+      "name": "setModel (deepseek-v4-flash)",
+      "ok": true,
+      "detail": "{\"provider\":\"ollama-cloud\",\"model\":\"deepseek-v4-flash:0731-cloud\"}"
+    },
+    {
+      "name": "newSession",
+      "ok": true,
+      "detail": "sessionId=083d02538f78"
+    },
+    {
+      "name": "prompt ack",
+      "ok": true,
+      "detail": "null"
+    },
+    {
+      "name": "received tool call event",
+      "ok": true,
+      "detail": "kinds: heartbeats_changed, agent_start, turn_start, message_start, message_end, message_update, tool_execution_start, tool_execution_update"
+    },
+    {
+      "name": "received assistant response",
+      "ok": true,
+      "detail": "kinds: heartbeats_changed, agent_start, turn_start, message_start, message_end, message_update, tool_execution_start, tool_execution_update"
+    },
+    {
+      "name": "event flow includes tool execution",
+      "ok": true,
+      "detail": "kinds=heartbeats_changed,agent_start,turn_start,message_start,message_end,message_update,tool_execution_start,tool_execution_update"
+    },
+    {
+      "name": "no console windows during IPC test",
+      "ok": true,
+      "detail": "none"
+    }
+  ],
+  "eventTypes": [],
+  "topLevelTypeCounts": {
+    "connection_status": 2,
+    "snapshot": 2,
+    "session_event": 23,
+    "extension_ui_request": 3
+  },
+  "totalEvents": 30,
+  "summary": {
+    "pass": 16,
+    "fail": 0,
+    "overall": "PASS"
+  }
+}
