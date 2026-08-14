@@ -8,7 +8,7 @@ import { useIpc } from "../../ipc/client";
 import type { SlashCommand } from "../../ipc/contract";
 import { SendIcon, StopIcon } from "./chatIcons";
 import { SlashAutocomplete, filterSlashCommands } from "./SlashAutocomplete";
-import { setComposerText, subscribeComposerText } from "./composerTextRef";
+import { setComposerText, useComposerText } from "./composerTextRef";
 
 type Props = {
   busy: boolean;
@@ -27,7 +27,13 @@ type Props = {
 };
 
 export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSend, onAbort, onSteer, onQueueFollowUp, onClearFollowUps, onPopFollowUp, onSideQuestion, onShell, onSetName }: Props) {
-  const [value, setValue] = useState("");
+  // The composer's text is owned by the shared composerTextRef store, so the
+  // ⌘K palette can read it (save) and write it (insert) from any view. Driving
+  // the controlled textarea from useComposerText() means the value initializes
+  // from the current snapshot on mount — a template inserted while the composer
+  // was unmounted (user on another view) lands here — and every write below
+  // publishes through setComposerText so save always sees the live text.
+  const value = useComposerText();
   const taRef = useRef<HTMLTextAreaElement>(null);
   const canSend = value.trim().length > 0 && !busy && setupReady;
 
@@ -60,22 +66,9 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const v = e.target.value;
-    setValue(v);
     setComposerText(v);
     updateSlashState(v, e.target.selectionStart);
   };
-
-  // Keep the composer in sync with external writes (e.g. the ⌘K palette
-  // inserting a saved template body). When setComposerText fires from outside
-  // this component, update the local value state so the controlled textarea
-  // reflects the new text.
-  useEffect(() => {
-    return subscribeComposerText((next) => {
-      setValue(next);
-      if (taRef.current) taRef.current.value = next;
-    });
-  }, []);
-
 
   // Auto-grow the textarea.
   useEffect(() => {
@@ -91,14 +84,14 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
     el.style.height = "auto";
     el.focus();
   };
-  const clearInput = () => { setValue(""); focusInput(); };
+  const clearInput = () => { setComposerText(""); focusInput(); };
 
   // Load edit-and-resend draft; keyed by starter seq so re-picking refills.
   useEffect(() => {
-    if (editDraft) { setValue(editDraft.text); focusInput(); }
+    if (editDraft) { setComposerText(editDraft.text); focusInput(); }
   }, [editDraft]);
   useEffect(() => {
-    if (starterDraft) { setValue(starterDraft.text); focusInput(); }
+    if (starterDraft) { setComposerText(starterDraft.text); focusInput(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [starterDraft?.seq]);
 
@@ -139,7 +132,7 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
         const matches = filterSlashCommands(slashCommands, slashQuery);
         const selected = matches[slashSelectedIdx];
         if (selected) {
-          setValue(`/${selected.name} `);
+          setComposerText(`/${selected.name} `);
           setSlashOpen(false);
           focusInput();
         }
@@ -154,7 +147,7 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
     // Escape clears text (idle) or queued follow-ups (busy).
     if (e.key === "Escape") {
       if (busy) onClearFollowUps();
-      else setValue("");
+      else setComposerText("");
       e.preventDefault();
       return;
     }
@@ -162,7 +155,7 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
     if (e.key === "ArrowUp" && e.altKey) {
       e.preventDefault();
       const popped = onPopFollowUp();
-      if (popped !== undefined) setValue(popped);
+      if (popped !== undefined) setComposerText(popped);
       focusInput();
       return;
     }
@@ -170,7 +163,7 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
     if (e.key === "Enter" && e.altKey) {
       e.preventDefault();
       const t = value.trim();
-      if (t) { onQueueFollowUp(t); setValue(""); focusInput(); }
+      if (t) { onQueueFollowUp(t); setComposerText(""); focusInput(); }
       return;
     }
     // Enter sends (idle) or steers (busy); Shift+Enter is a newline.
@@ -196,7 +189,7 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
         <SlashAutocomplete
           commands={slashCommands}
           query={slashQuery}
-          onSelect={(cmd) => { setValue(`/${cmd.name} `); setSlashOpen(false); focusInput(); }}
+          onSelect={(cmd) => { setComposerText(`/${cmd.name} `); setSlashOpen(false); focusInput(); }}
           onDismiss={() => setSlashOpen(false)}
           selectedIndex={slashSelectedIdx}
           onSelectedIndexChange={setSlashSelectedIdx}
