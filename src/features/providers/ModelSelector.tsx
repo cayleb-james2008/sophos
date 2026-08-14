@@ -5,11 +5,11 @@
 // <select> so we control the look, motion, and keyboard behavior.
 
 import { useEffect, useRef, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, Spinner, Select, Button } from "../../design";
 import { useConnectionState } from "../../ipc/client";
 import { useModels, DEFAULT_PROVIDER, DEFAULT_MODEL, type ModelSelection, type ThinkingLevel } from "./useModels";
 import { ProviderGlyph } from "./providerGlyphs";
+import "./providers.css";
 
 function currentSelection(stateModel: { provider: string; model: string; thinking?: string } | undefined): ModelSelection {
   if (stateModel && stateModel.provider && stateModel.model) {
@@ -72,7 +72,7 @@ export function ModelSelector() {
     .filter((g) => g.models.length > 0);
 
   return (
-    <div ref={rootRef} style={{ position: "relative" }}>
+    <div ref={rootRef} className="ms-root">
       {/* Trigger */}
       <Button
         variant="outline"
@@ -80,41 +80,16 @@ export function ModelSelector() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.sm,
-          background: open ? tokens.color.bgOverlay : tokens.color.bgRaised,
-          border: `1px solid ${open ? tokens.color.accentBorder : tokens.color.border}`,
-          borderRadius: tokens.radius.md,
-          padding: "5px 10px",
-          cursor: "pointer",
-          color: tokens.color.text,
-          fontFamily: tokens.font.sans,
-          transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
-          boxShadow: open ? tokens.shadow.glow : undefined,
-        }}
+        className={`ms-trigger${open ? " ms-trigger--open" : ""}`}
       >
-        <span
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 22,
-            height: 22,
-            borderRadius: tokens.radius.sm,
-            background: tokens.color.accentSoft,
-            color: tokens.color.accentHover,
-            flexShrink: 0,
-          }}
-        >
+        <span className="ms-icon">
           <ProviderGlyph provider={current.provider} size={13} />
         </span>
-        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", lineHeight: 1.15 }}>
-          <Text variant="micro" tone="dim" mono style={{ fontSize: 9 }}>
+        <span className="ms-triggermain">
+          <Text variant="micro" tone="dim" mono className="ms-provider">
             {current.provider}
           </Text>
-          <Text variant="label" weight="medium" mono style={{ fontSize: 11.5 }}>
+          <Text variant="label" weight="medium" mono className="ms-model">
             {currentModel?.name ?? current.model}
           </Text>
         </span>
@@ -126,11 +101,11 @@ export function ModelSelector() {
             height="12"
             viewBox="0 0 24 24"
             fill="none"
-            stroke={tokens.color.textDim}
+            stroke="rgba(244, 244, 244, 0.45)"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            style={{ transform: open ? "rotate(180deg)" : undefined, transition: `transform ${tokens.motion.fast} ${tokens.motion.ease}` }}
+            style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform 100ms cubic-bezier(0.3, 0, 0.2, 1)" }}
           >
             <polyline points="6 9 12 15 18 9" />
           </svg>
@@ -142,70 +117,39 @@ export function ModelSelector() {
         <div
           role="listbox"
           aria-label="Model selector"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            right: 0,
-            width: 320,
-            maxHeight: 420,
-            overflowY: "auto",
-            background: tokens.color.bgRaised,
-            border: `1px solid ${tokens.color.borderStrong}`,
-            borderRadius: tokens.radius.lg,
-            boxShadow: tokens.shadow.lg,
-            zIndex: 60,
-            padding: tokens.space.xs,
-            animation: "pa-scale-in 140ms cubic-bezier(0.16,1,0.3,1)",
-          }}
+          className="ms-panel"
         >
-          <div style={{ padding: `${tokens.space.sm} ${tokens.space.md}`, borderBottom: `1px solid ${tokens.color.border}` }}>
+          <div className="ms-panelhead">
             <Text variant="micro" tone="dim" mono uppercase>
               Model
             </Text>
           </div>
 
           {loading ? (
-            <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, padding: tokens.space.lg }}>
+            <div className="ms-state">
               <Spinner size={14} />
               <Text variant="label" tone="muted">
                 Loading catalog...
               </Text>
             </div>
           ) : error ? (
-            <div style={{ padding: tokens.space.lg }}>
+            <div className="ms-pad">
               <Text variant="label" tone="danger">
                 {error}
               </Text>
             </div>
           ) : grouped.length === 0 ? (
-            <div style={{ padding: tokens.space.lg }}>
+            <div className="ms-pad">
               <Text variant="label" tone="muted">
                 No models available.
               </Text>
             </div>
           ) : (
             grouped.map((group) => (
-              <div key={group.provider.id} style={{ marginBottom: tokens.space.xs }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: tokens.space.sm,
-                    padding: `${tokens.space.sm} ${tokens.space.md} ${tokens.space.xs}`,
-                  }}
-                >
+              <div key={group.provider.id} className="ms-group">
+                <div className="ms-grouphead">
                   <span
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 18,
-                      height: 18,
-                      borderRadius: tokens.radius.sm,
-                      background: group.provider.connected ? tokens.color.accentSoft : tokens.color.bgOverlay,
-                      color: group.provider.connected ? tokens.color.accentHover : tokens.color.textDim,
-                      flexShrink: 0,
-                    }}
+                    className={`ms-groupicon${group.provider.connected ? " ms-groupicon--connected" : ""}`}
                   >
                     <ProviderGlyph provider={group.provider.id} size={11} />
                   </span>
@@ -223,31 +167,9 @@ export function ModelSelector() {
                       role="option"
                       aria-selected={isCurrent}
                       onClick={() => handleSelect(m.provider, m.id)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: tokens.space.sm,
-                        width: "100%",
-                        padding: "7px 12px",
-                        borderRadius: tokens.radius.md,
-                        background: isCurrent ? tokens.color.accentSoft : "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: isCurrent ? tokens.color.text : tokens.color.textMuted,
-                        fontFamily: tokens.font.sans,
-                        fontSize: tokens.font.size.sm,
-                        textAlign: "left",
-                        transition: `background ${tokens.motion.fast} ${tokens.motion.ease}`,
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isCurrent) e.currentTarget.style.background = tokens.color.bgOverlay;
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isCurrent) e.currentTarget.style.background = "transparent";
-                      }}
+                      className={`ms-option${isCurrent ? " ms-option--current" : ""}`}
                     >
-                      <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                      <span className="ms-optionmain">
                         <Text variant="label" weight={isCurrent ? "semibold" : "medium"} tone={isCurrent ? "default" : "muted"}>
                           {m.name ?? m.id}
                         </Text>
@@ -259,7 +181,7 @@ export function ModelSelector() {
                         ) : null}
                       </span>
                       {isCurrent ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={tokens.color.accentHover} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9fff8a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       ) : null}
@@ -271,21 +193,9 @@ export function ModelSelector() {
           )}
 
           {supportsThinking && (
-            <div style={{ borderTop: `1px solid ${tokens.color.border}`, padding: tokens.space.sm, margin: `0 ${tokens.space.sm} ${tokens.space.sm}` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, marginBottom: tokens.space.xs }}>
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 18,
-                    height: 18,
-                    borderRadius: tokens.radius.sm,
-                    background: tokens.color.accentSoft,
-                    color: tokens.color.accentHover,
-                    flexShrink: 0,
-                  }}
-                >
+            <div className="ms-thinking">
+              <div className="ms-thinkinghead">
+                <span className="ms-thinkingicon">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 18h6" />
                     <path d="M12 12v6" />
@@ -300,7 +210,7 @@ export function ModelSelector() {
                 options={thinkingLevels.map((l) => ({ value: l.value, label: l.label }))}
                 value={thinking}
                 onChange={(e) => handleThinkingChange(e.target.value as ThinkingLevel)}
-                style={{ width: "100%" }}
+                className="ms-select"
               />
             </div>
           )}

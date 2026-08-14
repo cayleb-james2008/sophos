@@ -158,10 +158,10 @@ export function EngineGraph({ daemonAlive, sidecarAlive, workers, preview = fals
       maxZoom={2}
     >
       <div className="pg-legend">
-        <span><i className="pg-legend__swatch" style={{ background: tokens.color.accent }} />IPC link</span>
-        <span><i className="pg-legend__swatch" style={{ background: tokens.color.ok }} />worker running</span>
-        <span><i className="pg-legend__swatch" style={{ background: tokens.color.err }} />offline</span>
-        {preview ? <span style={{ color: tokens.color.textDim }}>browser preview</span> : null}
+        <span><i className="pg-legend__swatch pg-legend__swatch--accent" />IPC link</span>
+        <span><i className="pg-legend__swatch pg-legend__swatch--ok" />worker running</span>
+        <span><i className="pg-legend__swatch pg-legend__swatch--err" />offline</span>
+        {preview ? <span className="pg-legend__preview">browser preview</span> : null}
       </div>
     </GraphFlow>
   );

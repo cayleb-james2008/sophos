@@ -4,38 +4,8 @@
 // Renders to React elements (no dangerouslySetInnerHTML) so it is XSS-safe.
 
 import React from "react";
-import { tokens } from "../../design/tokens";
 
 type CSS = React.CSSProperties;
-
-const codeStyle: CSS = {
-  fontFamily: tokens.font.mono,
-  fontSize: "0.9em",
-  background: tokens.color.bgOverlay,
-  border: `1px solid ${tokens.color.border}`,
-  borderRadius: tokens.radius.sm,
-  padding: "1px 5px",
-  color: tokens.color.accentHover,
-};
-
-const preStyle: CSS = {
-  fontFamily: tokens.font.mono,
-  fontSize: tokens.font.size.sm,
-  lineHeight: 1.6,
-  background: tokens.color.bg,
-  border: `1px solid ${tokens.color.border}`,
-  borderRadius: tokens.radius.md,
-  padding: tokens.space.md,
-  overflowX: "auto",
-  color: tokens.color.text,
-  whiteSpace: "pre",
-};
-
-const linkStyle: CSS = {
-  color: tokens.color.accentHover,
-  textDecoration: "none",
-  borderBottom: `1px solid ${tokens.color.accentBorder}`,
-};
 
 // ---------------------------------------------------------------------------
 // Inline rendering
@@ -51,18 +21,18 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
     if (!part) continue;
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
       out.push(
-        <strong key={`${keyBase}-b${k++}`} style={{ fontWeight: tokens.font.weight.semibold, color: tokens.color.text }}>
+        <strong key={`${keyBase}-b${k++}`} className="md-strong">
           {part.slice(2, -2)}
         </strong>,
       );
     } else if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
       out.push(
-        <em key={`${keyBase}-i${k++}`} style={{ fontStyle: "italic", color: tokens.color.textMuted }}>
+        <em key={`${keyBase}-i${k++}`} className="md-em">
           {part.slice(1, -1)}
         </em>,
       );
     } else if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
-      out.push(<code key={`${keyBase}-c${k++}`} style={codeStyle}>{part.slice(1, -1)}</code>);
+      out.push(<code key={`${keyBase}-c${k++}`} className="md-code">{part.slice(1, -1)}</code>);
     } else if (part.startsWith("[") && part.includes("](")) {
       const close = part.indexOf("](");
       const end = part.indexOf(")", close);
@@ -70,7 +40,7 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
         const label = part.slice(1, close);
         const href = part.slice(close + 2, end);
         out.push(
-          <a key={`${keyBase}-a${k++}`} href={href} target="_blank" rel="noopener noreferrer" style={linkStyle}>
+          <a key={`${keyBase}-a${k++}`} href={href} target="_blank" rel="noopener noreferrer" className="md-link">
             {label}
           </a>,
         );
@@ -195,31 +165,31 @@ function parseBlocks(content: string): Block[] {
 export function Markdown({ content, style }: { content: string; style?: CSS }) {
   const blocks = parseBlocks(content);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm, ...style }}>
+    <div className="md-root" style={style}>
       {blocks.map((block, bi) => {
         const key = `blk-${bi}`;
         switch (block.type) {
           case "h1":
             return (
-              <div key={key} style={{ fontSize: tokens.font.size.lg, fontWeight: tokens.font.weight.semibold, color: tokens.color.text, lineHeight: 1.3 }}>
+              <div key={key} className="md-h1">
                 {renderInline(block.lines[0] ?? "", key)}
               </div>
             );
           case "h2":
             return (
-              <div key={key} style={{ fontSize: tokens.font.size.md, fontWeight: tokens.font.weight.semibold, color: tokens.color.text, lineHeight: 1.3 }}>
+              <div key={key} className="md-h2">
                 {renderInline(block.lines[0] ?? "", key)}
               </div>
             );
           case "h3":
             return (
-              <div key={key} style={{ fontSize: tokens.font.size.sm, fontWeight: tokens.font.weight.semibold, color: tokens.color.textMuted, lineHeight: 1.3 }}>
+              <div key={key} className="md-h3">
                 {renderInline(block.lines[0] ?? "", key)}
               </div>
             );
           case "p":
             return (
-              <div key={key} style={{ lineHeight: tokens.font.leading.relaxed, color: tokens.color.text }}>
+              <div key={key} className="md-p">
                 {block.lines.map((l, li) => (
                   <React.Fragment key={`${key}-${li}`}>
                     {li > 0 ? <br /> : null}
@@ -230,9 +200,9 @@ export function Markdown({ content, style }: { content: string; style?: CSS }) {
             );
           case "ul":
             return (
-              <ul key={key} style={{ margin: 0, paddingLeft: tokens.space.xl, display: "flex", flexDirection: "column", gap: tokens.space.xs }}>
+              <ul key={key} className="md-ul">
                 {block.lines.map((item, li) => (
-                  <li key={`${key}-${li}`} style={{ lineHeight: tokens.font.leading.relaxed, color: tokens.color.text }}>
+                  <li key={`${key}-${li}`} className="md-li">
                     {renderInline(item, `${key}-${li}`)}
                   </li>
                 ))}
@@ -240,9 +210,9 @@ export function Markdown({ content, style }: { content: string; style?: CSS }) {
             );
           case "ol":
             return (
-              <ol key={key} style={{ margin: 0, paddingLeft: tokens.space.xl, display: "flex", flexDirection: "column", gap: tokens.space.xs }}>
+              <ol key={key} className="md-ol">
                 {block.lines.map((item, li) => (
-                  <li key={`${key}-${li}`} style={{ lineHeight: tokens.font.leading.relaxed, color: tokens.color.text }}>
+                  <li key={`${key}-${li}`} className="md-li">
                     {renderInline(item, `${key}-${li}`)}
                   </li>
                 ))}
@@ -250,31 +220,20 @@ export function Markdown({ content, style }: { content: string; style?: CSS }) {
             );
           case "code":
             return (
-              <pre key={key} style={preStyle}>
+              <pre key={key} className="md-pre">
                 {block.lines.join("\n")}
               </pre>
             );
           case "quote":
             return (
-              <div
-                key={key}
-                style={{
-                  borderLeft: `2px solid ${tokens.color.accentBorder}`,
-                  paddingLeft: tokens.space.md,
-                  color: tokens.color.textMuted,
-                  fontStyle: "italic",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: tokens.space.xs,
-                }}
-              >
+              <div key={key} className="md-quote">
                 {block.lines.map((l, li) => (
                   <div key={`${key}-${li}`}>{renderInline(l, `${key}-${li}`)}</div>
                 ))}
               </div>
             );
           case "hr":
-            return <div key={key} style={{ height: 1, background: tokens.color.border, margin: `${tokens.space.xs} 0` }} />;
+            return <div key={key} className="md-hr" />;
         }
       })}
     </div>

@@ -10,12 +10,12 @@
 // state is kept.
 
 import { useEffect, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
 import { useIpc, useConnectionState } from "../../ipc/client";
 import { PlusIcon, XIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
 import { estimateNextDue } from "./nextDue";
+import "./longrunning.css";
 
 export interface Heartbeat {
   id: string;
@@ -29,14 +29,6 @@ export interface HeartbeatsPanelProps {
   /** Seed heartbeats from daemon state when available. */
   initial?: Heartbeat[];
 }
-
-const section: React.CSSProperties = {
-  borderTop: `1px solid ${tokens.color.line}`,
-  paddingTop: tokens.space.lg,
-  display: "flex",
-  flexDirection: "column",
-  gap: tokens.space.md,
-};
 
 export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
   const ipc = useIpc();
@@ -94,9 +86,9 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
   const activeCount = heartbeats.filter((h) => h.status === "active").length;
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       {/* State answer: is a heartbeat set? */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="lr-hb-head">
         <Text variant="label" weight="semibold">
           Heartbeats
         </Text>
@@ -106,7 +98,7 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
       </div>
 
       {/* State + action: set a heartbeat up front. */}
-      <div style={section}>
+      <div className="lr-hb-section">
         <Text variant="label" weight="semibold" tone={activeCount > 0 ? "success" : "default"}>
           {activeCount > 0
             ? `${activeCount} active heartbeat${activeCount > 1 ? "s" : ""} set — add or remove below.`
@@ -119,9 +111,9 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
 
         {error ? <ActionErrorBanner message={error} /> : null}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-          <div style={{ display: "flex", gap: tokens.space.sm, alignItems: "flex-end" }}>
-            <div style={{ flex: 1 }}>
+        <div className="lr-hb-fieldset">
+          <div className="lr-hb-row">
+            <div className="lr-hb-main">
               <Input
                 label="Interval"
                 placeholder='e.g. "every 5 minutes" or "every 10m"'
@@ -145,22 +137,12 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
       </div>
 
       {/* List — plain ruled rows. */}
-      <div style={section}>
+      <div className="lr-hb-section">
         <Text variant="micro" tone="dim" uppercase>
           Active heartbeats
         </Text>
         {heartbeats.length === 0 ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: tokens.space.sm,
-              padding: tokens.space.lg,
-              borderRadius: tokens.radius.md,
-              background: tokens.color.bgElevated,
-              border: `1px dashed ${tokens.color.borderStrong}`,
-            }}
-          >
+          <div className="lr-hb-empty">
             <Text variant="label" tone="muted">
               No heartbeats set
             </Text>
@@ -171,31 +153,21 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
             </Text>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.md }}>
+          <div className="lr-hb-list">
             {heartbeats.map((h) => (
               <div
                 key={h.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: tokens.space.md,
-                }}
+                className="lr-hb-item"
               >
                 <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    background: h.status === "active" ? tokens.color.success : tokens.color.warning,
-                  }}
+                  className={`lr-hb-dot${h.status === "active" ? " lr-hb-dot--active" : ""}`}
                 />
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                <div className="lr-hb-itemmain">
                   <Text variant="label" weight="medium" mono>
                     {h.interval}
                   </Text>
                   {h.prompt ? (
-                    <Text variant="micro" tone="dim" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <Text variant="micro" tone="dim" className="lr-hb-itemprompt">
                       {h.prompt}
                     </Text>
                   ) : null}

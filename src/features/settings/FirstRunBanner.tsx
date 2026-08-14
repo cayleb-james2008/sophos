@@ -21,6 +21,12 @@ function writeFlag(key: string): void {
   catch { /* best-effort persistence */ }
 }
 
+/** Clear the onboarding dismiss flag so the wizard can be re-launched from Settings. */
+export function clearOnboardingDismissed(): void {
+  try { window.localStorage.removeItem(DISMISS_KEY); }
+  catch { /* best-effort persistence */ }
+}
+
 export type SetupCheckState = "checking" | "ready" | "waiting" | "preview";
 export interface SetupCheck { label: string; state: SetupCheckState; detail: string; }
 export interface OnboardingStatus {

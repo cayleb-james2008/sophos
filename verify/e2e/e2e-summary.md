@@ -1,6 +1,6 @@
 # Sophos Browser E2E — Summary
 
-Date: 2026-08-12T20:33:53.642Z · Mode: browser-demo (MockIpcClient) · App: owned ephemeral Vite server
+Date: 2026-08-13T22:41:05.013Z · Mode: browser-demo (MockIpcClient) · App: owned ephemeral Vite server
 
 ## Result: PASS (37/37 passed)
 
@@ -60,45 +60,45 @@ Date: 2026-08-12T20:33:53.642Z · Mode: browser-demo (MockIpcClient) · App: own
 
 - JSON report: `verify/e2e/e2e-report.json`
 - Screenshots: `verify/e2e/screenshots/`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-chat-view-renders-chat.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-sessions-view-renders-graph-inspector-sessions.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-sessions-detail-inspector-opens-on-node-select-sessions-detail.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-sessions-tree-view-switch-sessions-tree.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-agents-view-renders-fleet-graph-rlm-children-agents.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-inbox-view-renders-empty-relay-state-inbox.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-settings-general-panel-renders-form-settings-general.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-settings-providers-panel-renders-catalog-settings-providers.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-settings-skills-panel-renders-settings-skills.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-settings-advanced-runtime-telemetry-renders-settings-advanced.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-settings-long-running-panels-render-goals-autonomous-heartbeats-schedules-refinement--settings-longrunning.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Views-engine-terminal-opens-via-systembar-toggle-engine.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-file-edit-tool-call-renders-a-unified-diff-not-raw-json--flow-diff.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-send-a-message-user-msg-streaming-assistant-completes-flow-send-busy.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-send-a-message-user-msg-streaming-assistant-completes-flow-send-done.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-steering-enter-while-busy-shows-steered-indicator-flow-steer.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-follow-up-queue-alt-enter-drains-one-at-a-time-flow-followup-queued.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-follow-up-queue-alt-enter-drains-one-at-a-time-flow-followup-drained.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-abort-mid-stream-stop-button-clears-busy-flow-abort.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-side-question-btw-opens-inline-panel-and-completes-flow-sidequestion.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-command-palette-k-opens-lists-commands-closes-flow-palette.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-model-selector-switches-model-flow-model.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-provider-login-flow-connect-modal-submit-connected--flow-login-modal.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-provider-login-flow-connect-modal-submit-connected--flow-login-connected.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-managed-provider-exposes-a-copyable-oauth-link-api-key-alternative-flow-oauth-copy-link.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-managed-provider-exposes-a-copyable-oauth-link-api-key-alternative-flow-oauth-copied.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-provider-logout-does-not-error-flow-provider-logout.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-export-session-shows-toast-flow-export.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-session-resume-fork-actions-from-detail-flow-session-actions.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Flows-new-session-modal-opens-from-chat-header-flow-new-session.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-empty-whitespace-input-disables-send-edge-empty-input.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-escape-clears-composer-text-when-idle-edge-escape-clear.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge--file-reference-hint-popover-appears-edge-file-hint.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-shell-command-cmd-shows-shell-notice-edge-shell.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-busy-state-shows-streaming-indicator-stop-control-edge-busy.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-engine-disconnected-demo-banner-present-in-browser-mode-edge-demo-banner.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-agents-view-renders-rlm-children-fleet-non-empty--edge-agents-fleet.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-inbox-view-empty-state-no-relay-traffic--edge-inbox-empty.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-state.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-recovered.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-empty-transcript-state-in-session-detail-edge-empty-transcript.png`
-  - `C:/Users/Cayleb/Desktop/workspace/prime-agent-windows/verify/e2e/screenshots/Edge-no-console-page-errors-across-all-views-edge-error-sweep.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-chat-view-renders-chat.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-sessions-view-renders-graph-inspector-sessions.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-sessions-detail-inspector-opens-on-node-select-sessions-detail.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-sessions-tree-view-switch-sessions-tree.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-agents-view-renders-fleet-graph-rlm-children-agents.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-inbox-view-renders-empty-relay-state-inbox.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-settings-general-panel-renders-form-settings-general.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-settings-providers-panel-renders-catalog-settings-providers.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-settings-skills-panel-renders-settings-skills.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-settings-advanced-runtime-telemetry-renders-settings-advanced.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-settings-long-running-panels-render-goals-autonomous-heartbeats-schedules-refinement--settings-longrunning.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Views-engine-terminal-opens-via-systembar-toggle-engine.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-file-edit-tool-call-renders-a-unified-diff-not-raw-json--flow-diff.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-send-a-message-user-msg-streaming-assistant-completes-flow-send-busy.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-send-a-message-user-msg-streaming-assistant-completes-flow-send-done.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-steering-enter-while-busy-shows-steered-indicator-flow-steer.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-follow-up-queue-alt-enter-drains-one-at-a-time-flow-followup-queued.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-follow-up-queue-alt-enter-drains-one-at-a-time-flow-followup-drained.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-abort-mid-stream-stop-button-clears-busy-flow-abort.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-side-question-btw-opens-inline-panel-and-completes-flow-sidequestion.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-command-palette-k-opens-lists-commands-closes-flow-palette.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-model-selector-switches-model-flow-model.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-provider-login-flow-connect-modal-submit-connected--flow-login-modal.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-provider-login-flow-connect-modal-submit-connected--flow-login-connected.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-managed-provider-exposes-a-copyable-oauth-link-api-key-alternative-flow-oauth-copy-link.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-managed-provider-exposes-a-copyable-oauth-link-api-key-alternative-flow-oauth-copied.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-provider-logout-does-not-error-flow-provider-logout.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-export-session-shows-toast-flow-export.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-session-resume-fork-actions-from-detail-flow-session-actions.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Flows-new-session-modal-opens-from-chat-header-flow-new-session.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-empty-whitespace-input-disables-send-edge-empty-input.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-escape-clears-composer-text-when-idle-edge-escape-clear.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge--file-reference-hint-popover-appears-edge-file-hint.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-shell-command-cmd-shows-shell-notice-edge-shell.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-busy-state-shows-streaming-indicator-stop-control-edge-busy.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-engine-disconnected-demo-banner-present-in-browser-mode-edge-demo-banner.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-agents-view-renders-rlm-children-fleet-non-empty--edge-agents-fleet.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-inbox-view-empty-state-no-relay-traffic--edge-inbox-empty.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-state.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-error-handling-ipc-rejection-shows-error-ui-retry-recovers-edge-error-recovered.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-empty-transcript-state-in-session-detail-edge-empty-transcript.png`
+  - `C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-sessions/verify/e2e/screenshots/Edge-no-console-page-errors-across-all-views-edge-error-sweep.png`

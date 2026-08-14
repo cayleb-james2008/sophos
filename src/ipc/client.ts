@@ -15,11 +15,13 @@ import type {
   AgentMessageReceipt,
   ConnectionState,
   AgentSessionState,
+  ExtensionInfo,
   HarnessState,
   KernelState,
   ContextTreeNode,
   IpcEvent,
   LocalProviderConfig,
+  McpTestResult,
   ModelInfo,
   ModelRuntimeConfig,
   NavigateTreeResult,
@@ -31,6 +33,7 @@ import type {
   SessionInfo,
   SessionTree,
   Settings,
+  SlashCommand,
   TranscriptMessage,
 } from "./contract";
 
@@ -91,6 +94,11 @@ export interface IpcClient {
   getAgentState(id: string): Promise<AgentSessionState>;
   createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill>;
   installSkill(path: string): Promise<RuntimeSkill[]>;
+  installExtension(path: string): Promise<void>;
+  removeExtension(path: string): Promise<void>;
+  getExtensions(): Promise<ExtensionInfo[]>;
+  testMcpServer(name: string, command: string, args?: string[]): Promise<McpTestResult>;
+  getSlashCommands(): Promise<SlashCommand[]>;
 
   // Events
   onEvent(cb: (event: IpcEvent) => void): () => void;
@@ -354,6 +362,21 @@ export class TauriIpcClient implements IpcClient {
   installSkill(path: string): Promise<RuntimeSkill[]> {
     return this.send("installSkill", { path }) as Promise<RuntimeSkill[]>;
   }
+  installExtension(path: string): Promise<void> {
+    return this.send("installExtension", { path }) as Promise<void>;
+  }
+  removeExtension(path: string): Promise<void> {
+    return this.send("removeExtension", { path }) as Promise<void>;
+  }
+  getExtensions(): Promise<ExtensionInfo[]> {
+    return this.send("getExtensions", {}) as Promise<ExtensionInfo[]>;
+  }
+  testMcpServer(name: string, command: string, args?: string[]): Promise<McpTestResult> {
+    return this.send("testMcpServer", { name, command, args }) as Promise<McpTestResult>;
+  }
+  getSlashCommands(): Promise<SlashCommand[]> {
+    return this.send("getSlashCommands", {}) as Promise<SlashCommand[]>;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -472,6 +495,65 @@ export class MockIpcClient implements IpcClient {
   };
   private simulated = false;
   private timers: number[] = [];
+
+  /** Demo skills surfaced by the browser-preview runtime so the Skills panel
+   * has something to render and the enable/disable + "Just installed" flows are
+   * demonstrable without a live daemon. */
+  private mockSkills: RuntimeSkill[] = [
+    { name: "release-audit", description: "Audit a release artifact", source: "project" },
+    { name: "code-review", description: "Review code for quality", source: "global" },
+    { name: "websearch", description: "Search the web for current information", source: "built-in" },
+  ];
+  private mockExtensions: Array<{ name: string; path: string; enabled: boolean }> = [
+    { name: "github-integration", path: "~/.pi/agent/extensions/github-integration", enabled: true },
+    { name: "linear-sync", path: "~/.pi/agent/extensions/linear-sync", enabled: true },
+  ];
+
+  /** Rich per-extension detail (registered tools + slash commands) surfaced by
+   * getExtensions() so the Extensions panel can render them in the browser
+   * preview without a live daemon. Kept consistent with mockExtensions so the
+   * configured list, the live daemon paths, and the rich detail all line up. */
+  private mockExtensionDetails: ExtensionInfo[] = [
+    { name: "github-integration", path: "~/.pi/agent/extensions/github-integration", enabled: true, tools: [{ name: "create_issue", description: "Create a GitHub issue" }, { name: "list_prs", description: "List open pull requests" }], slashCommands: [{ name: "issue", description: "Create or view GitHub issues" }] },
+    { name: "linear-sync", path: "~/.pi/agent/extensions/linear-sync", enabled: true, tools: [{ name: "create_task", description: "Create a Linear task" }], slashCommands: [{ name: "linear", description: "Manage Linear tasks" }] },
+  ];
+
+  /** Builtin slash commands surfaced by getSlashCommands() so the composer's
+   * inline autocomplete is demonstrable in the browser preview without a live
+   * daemon. Derived from the prime-agent reference's builtin command set. */
+  private mockSlashCommands: SlashCommand[] = [
+    { name: "refine", description: "Refine the session's goal and plan", source: "builtin" },
+    { name: "compact", description: "Compact the session context", source: "builtin" },
+    { name: "retry", description: "Retry the last failed operation", source: "builtin" },
+    { name: "goal", description: "Set or update the session goal", source: "builtin" },
+    { name: "autonomous", description: "Toggle autonomous execution mode", source: "builtin" },
+    { name: "heartbeat", description: "Set or view a persistent heartbeat", source: "builtin" },
+    { name: "schedule", description: "View or schedule recurring tasks", source: "builtin" },
+    { name: "skills", description: "List and manage available skills", source: "builtin" },
+    { name: "effort", description: "Select reasoning/thinking level", source: "builtin" },
+    { name: "fast", description: "Toggle Fast mode", source: "builtin" },
+    { name: "export", description: "Export session to HTML or JSONL", source: "builtin" },
+    { name: "share", description: "Share session as a GitHub gist", source: "builtin" },
+    { name: "copy", description: "Copy last agent message to clipboard", source: "builtin" },
+    { name: "btw", description: "Ask an inline side question", source: "builtin" },
+    { name: "side", description: "Ask an inline side question (alias of /btw)", source: "builtin" },
+    { name: "name", description: "Set or show the session display name", source: "builtin" },
+    { name: "tree", description: "Navigate session tree (switch branches)", source: "builtin" },
+    { name: "clone", description: "Duplicate the current session", source: "builtin" },
+    { name: "fork", description: "Create a new fork from a previous message", source: "builtin" },
+    { name: "context", description: "Show token, cost, and context usage", source: "builtin" },
+    { name: "usage", description: "Show token and cost breakdown", source: "builtin" },
+    { name: "hotkeys", description: "Show all keyboard shortcuts", source: "builtin" },
+    { name: "changelog", description: "Show changelog entries", source: "builtin" },
+    { name: "mcp", description: "Open MCP connections or manage MCP integrations", source: "builtin" },
+    { name: "model", description: "Select model (opens selector UI)", source: "builtin" },
+    { name: "new", description: "Start a new session", source: "builtin" },
+    { name: "settings", description: "Open settings menu", source: "builtin" },
+    { name: "login", description: "Configure provider authentication", source: "builtin" },
+    { name: "logout", description: "Remove provider authentication", source: "builtin" },
+    { name: "reload", description: "Reload keybindings, extensions, skills, and prompts", source: "builtin" },
+    { name: "help", description: "Show command help", source: "builtin" },
+  ];
 
   // The active session is the one surfaced by the UI. Keeping a single object
   // on the mock makes enrichment (context / goals / rlm / transcript) coherent
@@ -698,7 +780,7 @@ export class MockIpcClient implements IpcClient {
     }
   }
   async getSettings(): Promise<Settings> {
-    return { ...this.mockSettings, modelConfig: { ...(this.mockSettings.modelConfig ?? {}) } };
+    return { ...this.mockSettings, modelConfig: { ...(this.mockSettings.modelConfig ?? {}) }, extensions: this.mockExtensions } as unknown as Settings;
   }
   async setSettings(settings: Settings): Promise<void> {
     const next = { ...this.mockSettings, ...settings };
@@ -871,10 +953,13 @@ export class MockIpcClient implements IpcClient {
   async getRuntimeInfo(): Promise<RuntimeInfo> {
     return {
       kernel: { status: "browser-preview", persistent: false, toolAvailable: false },
-      skills: [],
+      skills: this.mockSkills,
       skillDiagnostics: [],
-      extensions: [],
+      extensions: this.mockExtensionDetails.map((e) => e.path),
     };
+  }
+  async getExtensions(): Promise<ExtensionInfo[]> {
+    return this.mockExtensionDetails;
   }
   async getKernelState(): Promise<KernelState> {
     return {
@@ -899,10 +984,29 @@ export class MockIpcClient implements IpcClient {
     return { id, status: "browser-preview", transcript: [] };
   }
   async createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill> {
-    return { name: input.name, description: input.description, source: "browser-preview" };
+    const skill: RuntimeSkill = { name: input.name, description: input.description, source: "browser-preview" };
+    this.mockSkills = [...this.mockSkills, skill];
+    return skill;
   }
   async installSkill(_path: string): Promise<RuntimeSkill[]> {
-    return [];
+    return this.mockSkills;
+  }
+  async installExtension(path: string): Promise<void> {
+    const name = path.split(/[/\\]/).pop() ?? path;
+    this.mockExtensions = [...this.mockExtensions, { name, path, enabled: true }];
+  }
+  async removeExtension(path: string): Promise<void> {
+    this.mockExtensions = this.mockExtensions.filter((e) => e.path !== path);
+  }
+  async testMcpServer(name: string, command: string, _args?: string[]): Promise<McpTestResult> {
+    const valid = command && command.trim().length > 0;
+    if (!valid) {
+      return { serverName: name, connected: false, error: "Command not found" };
+    }
+    return { serverName: name, connected: true, latencyMs: 42, tools: ["search", "fetch"] };
+  }
+  async getSlashCommands(): Promise<SlashCommand[]> {
+    return this.mockSlashCommands;
   }
 }
 

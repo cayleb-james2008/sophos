@@ -6,7 +6,6 @@
 // diff" and "Copy path" affordances (same CopyButton pattern as MessageRow).
 
 import { useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, Button } from "../../design";
 import type { DiffLine } from "./diff";
 
@@ -47,21 +46,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       onClick={copy}
       onMouseEnter={() => setVisible(true)}
       onMouseLeave={() => setVisible(false)}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 24,
-        height: 24,
-        borderRadius: tokens.radius.sm,
-        background: copied ? tokens.color.accentSoft : tokens.color.bgOverlay,
-        border: `1px solid ${copied ? tokens.color.accentBorder : tokens.color.border}`,
-        color: copied ? tokens.color.accentHover : tokens.color.textDim,
-        cursor: "pointer",
-        opacity: visible || copied ? 1 : 0,
-        transform: visible || copied ? "translateY(0)" : "translateY(-2px)",
-        transition: `opacity ${tokens.motion.fast} ${tokens.motion.ease}, transform ${tokens.motion.fast} ${tokens.motion.ease}, background ${tokens.motion.fast} ${tokens.motion.ease}`,
-      }}
+      className={`diff-copy ${visible || copied ? "is-visible" : ""} ${copied ? "is-copied" : ""}`}
     >
       {copied ? (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -90,47 +75,13 @@ export function DiffView({
   const removeCount = lines.filter((l) => l.type === "remove").length;
 
   return (
-    <div
-      data-diff="true"
-      style={{
-        border: `1px solid ${tokens.color.border}`,
-        background: tokens.color.bg,
-        overflow: "hidden",
-      }}
-    >
+    <div data-diff="true" className="diff">
       {/* Header — file path + add/remove counts + copy affordances */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.sm,
-          padding: "6px 10px",
-          borderBottom: `1px solid ${tokens.color.border}`,
-          background: tokens.color.bgElevated,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: tokens.font.mono,
-            fontSize: tokens.font.size.xs,
-            color: tokens.color.accent,
-            userSelect: "none",
-          }}
-        >
+      <div className="diff-header">
+        <span className="diff-file-badge">
           Δ
         </span>
-        <Text
-          variant="micro"
-          tone="muted"
-          mono
-          style={{
-            flex: 1,
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
+        <Text variant="micro" tone="muted" mono className="diff-file-name">
           {filePath || "(unknown path)"}
         </Text>
         <Text variant="micro" tone="success" mono>
@@ -144,57 +95,22 @@ export function DiffView({
       </div>
 
       {/* Lines — green added, red removed, dim context */}
-      <div
-        style={{
-          maxHeight: 260,
-          overflowY: "auto",
-          fontFamily: tokens.font.mono,
-          fontSize: tokens.font.size.xs,
-          lineHeight: 1.6,
-        }}
-      >
+      <div className="diff-body">
         {lines.map((l, i) => {
           const isAdd = l.type === "add";
           const isRemove = l.type === "remove";
-          const bg = isAdd
-            ? tokens.color.accentSoft
-            : isRemove
-              ? tokens.color.dangerSoft
-              : "transparent";
-          const color = isAdd
-            ? tokens.color.accentHover
-            : isRemove
-              ? tokens.color.danger
-              : tokens.color.textDim;
           const sign = isAdd ? "+" : isRemove ? "-" : " ";
           return (
             <div
               key={i}
               data-diff-add={isAdd ? "true" : undefined}
               data-diff-remove={isRemove ? "true" : undefined}
-              style={{ display: "flex", background: bg }}
+              className={`diff-line${isAdd ? " diff-line--add" : isRemove ? " diff-line--remove" : ""}`}
             >
-              <span
-                style={{
-                  width: 22,
-                  flexShrink: 0,
-                  textAlign: "right",
-                  paddingRight: 6,
-                  color: tokens.color.textDim,
-                  userSelect: "none",
-                  opacity: 0.5,
-                }}
-              >
+              <span className="diff-line-sign">
                 {sign}
               </span>
-              <span
-                style={{
-                  color,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  flex: 1,
-                }}
-              >
+              <span className={`diff-line-text${isAdd ? " diff-line-text--add" : isRemove ? " diff-line-text--remove" : ""}`}>
                 {l.text || " "}
               </span>
             </div>

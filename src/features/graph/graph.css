@@ -374,3 +374,12 @@
     display: none;
   }
 }
+.pa-graph__controls { z-index: 5; }
+.pa-graph__minimap { z-index: 5; width: 140px; height: 90px; }
+
+/* ---- Inline-style purge: legend + pill modifiers ---- */
+.pg-legend__swatch--accent { background: #85ed75; }
+.pg-legend__swatch--ok { background: #85ed75; }
+.pg-legend__swatch--err { background: #ef4444; }
+.pg-legend__preview { color: rgba(244, 244, 244, 0.45); }
+.pg-pill--muted { background: #111; border-color: #2a2a2a; color: rgba(244, 244, 244, 0.45); }

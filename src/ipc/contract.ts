@@ -57,7 +57,12 @@ export type IpcCommand =
   | { method: "getHarnessState"; params: {} }
   | { method: "getAgentState"; params: { id: string } }
   | { method: "createSkill"; params: { name: string; description: string; content: string; pythonImport?: string } }
-  | { method: "installSkill"; params: { path: string } };
+  | { method: "installSkill"; params: { path: string } }
+  | { method: "installExtension"; params: { path: string } }
+  | { method: "removeExtension"; params: { path: string } }
+  | { method: "getExtensions"; params: {} }
+  | { method: "testMcpServer"; params: { name: string; command: string; args?: string[] } }
+  | { method: "getSlashCommands"; params: {} };
 
 export interface PromptOptions {
   thinking?: string;
@@ -492,4 +497,48 @@ export interface Settings {
    * so no new IPC methods are needed.
    */
   localProviders?: LocalProviderConfig[];
+  /**
+   * Names of discovered skills the user has disabled. A disabled skill is still
+   * discovered by the daemon but is dimmed in the Skills panel and excluded from
+   * the session's invocable set. Pure settings — the daemon reads it from
+   * settings.json, so no new IPC methods are needed.
+   */
+  disabledSkills?: string[];
+}
+
+/** A tool registered by an extension (surfaced in the Extensions panel). */
+export interface ExtensionTool {
+  name: string;
+  description?: string;
+}
+
+/** A slash command registered by an extension (surfaced in the Extensions panel). */
+export interface ExtensionSlashCommand {
+  name: string;
+  description?: string;
+}
+
+/** Rich detail for a configured extension: its registered tools and slash commands. */
+export interface ExtensionInfo {
+  name: string;
+  path: string;
+  enabled: boolean;
+  tools: ExtensionTool[];
+  slashCommands: ExtensionSlashCommand[];
+}
+
+/** Result of a connection test for an MCP server (testMcpServer). */
+export interface McpTestResult {
+  serverName: string;
+  connected: boolean;
+  latencyMs?: number;
+  error?: string;
+  tools?: string[];
+}
+
+/** A slash command discovered by the daemon or registered by an extension. */
+export interface SlashCommand {
+  name: string;
+  description: string;
+  source?: "builtin" | "extension" | "skill";
 }

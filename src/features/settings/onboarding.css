@@ -197,3 +197,147 @@
   .pa-onboarding__footer { align-items: flex-start; flex-direction: column; }
   .pa-onboarding__checks { gap: 8px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Onboarding wizard — guided step sequence (Welcome → Provider → Model →
+   First prompt). Reuses the frame/topline/footer above; these styles add the
+   progress rail and step bodies.
+--------------------------------------------------------------------------- */
+
+.pa-onboarding__steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 22px;
+  border-bottom: 1px solid rgba(244,244,244,0.12);
+  background: rgba(255,255,255,0.02);
+}
+.pa-onboarding__step {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 18px 13px 0;
+  color: rgba(244,244,244,0.4);
+  font: 10px/1 "Geist Mono", monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: default;
+}
+.pa-onboarding__step + .pa-onboarding__step { padding-left: 18px; }
+.pa-onboarding__step + .pa-onboarding__step::before {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 12px;
+  content: "";
+  background: rgba(244,244,244,0.12);
+  transform: translateY(-50%);
+}
+.pa-onboarding__step-index {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(244,244,244,0.18);
+  color: rgba(244,244,244,0.45);
+  font: 9px/1 "Geist Mono", monospace;
+}
+.pa-onboarding__step--active { color: #f4f4f4; }
+.pa-onboarding__step--active .pa-onboarding__step-index {
+  border-color: rgba(133,237,117,0.55);
+  color: #85ed75;
+}
+.pa-onboarding__step--done { color: rgba(133,237,117,0.75); }
+.pa-onboarding__step--done .pa-onboarding__step-index {
+  border-color: rgba(133,237,117,0.4);
+  color: #85ed75;
+}
+
+.pa-onboarding__wizard-body {
+  padding: clamp(28px, 5vw, 58px);
+}
+.pa-onboarding__wizard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.pa-onboarding__wizard .pa-onboarding__title { font-size: clamp(30px, 4.5vw, 52px); }
+
+/* Provider status row */
+.pa-onboarding__provider-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 520px;
+  margin-top: 24px;
+  padding: 14px 16px;
+  border: 1px solid rgba(244,244,244,0.14);
+  background: rgba(255,255,255,0.03);
+}
+.pa-onboarding__provider-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+.pa-onboarding__provider-title { color: #f4f4f4; font: 500 13px/1.2 "Geist", sans-serif; }
+.pa-onboarding__provider-detail { color: rgba(244,244,244,0.5); font: 11px/1.45 "Geist", sans-serif; }
+
+/* Current model summary */
+.pa-onboarding__model-current {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 520px;
+  margin-top: 24px;
+  padding: 14px 16px;
+  border: 1px solid rgba(133,237,117,0.3);
+  background: rgba(133,237,117,0.05);
+}
+.pa-onboarding__model-current-name { color: #f4f4f4; font: 500 14px/1.2 "Geist", sans-serif; }
+.pa-onboarding__model-current-meta { color: rgba(244,244,244,0.5); font: 10px/1 "Geist Mono", monospace; }
+
+/* Model picker list */
+.pa-onboarding__model-list {
+  display: flex;
+  width: 100%;
+  max-width: 520px;
+  margin-top: 24px;
+  flex-direction: column;
+  gap: 14px;
+}
+.pa-onboarding__model-group { display: flex; flex-direction: column; gap: 6px; }
+.pa-onboarding__model-group-label {
+  color: rgba(244,244,244,0.45);
+  font: 10px/1 "Geist Mono", monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.pa-onboarding__model-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(244,244,244,0.12);
+  background: rgba(255,255,255,0.02);
+  color: rgba(244,244,244,0.72);
+  cursor: pointer;
+  font: 500 12.5px/1 "Geist", sans-serif;
+  text-align: left;
+  transition: border-color 100ms ease, background 100ms ease;
+}
+.pa-onboarding__model-option:hover { border-color: rgba(133,237,117,0.4); background: rgba(133,237,117,0.05); }
+.pa-onboarding__model-option[aria-selected="true"] {
+  border-color: rgba(133,237,117,0.5);
+  background: rgba(133,237,117,0.08);
+  color: #f4f4f4;
+}
+.pa-onboarding__model-option-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pa-onboarding__model-option-meta { flex-shrink: 0; color: rgba(244,244,244,0.45); font: 10px/1 "Geist Mono", monospace; }

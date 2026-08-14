@@ -6,7 +6,6 @@
 // clear preview state with no fake logs.
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, Button, StatusDot, Badge } from "../../design";
 import type { StatusDotState } from "../../design";
 import { useConnectionState } from "../../ipc/client";
@@ -77,12 +76,6 @@ function isInTauri(): boolean {
 // ---------------------------------------------------------------------------
 // Helper: color log lines by process/stream
 // ---------------------------------------------------------------------------
-
-function logColor(proc: string, stream: string): string {
-  if (stream === "stderr") return tokens.color.warning;
-  if (proc === "daemon") return tokens.color.info;
-  return tokens.color.textMuted;
-}
 
 function logPrefix(proc: string, stream: string): string {
   const p = proc === "daemon" ? "DAEMON" : "ENGINE";
@@ -184,29 +177,10 @@ export function EnginePanel({ open }: { open: boolean }) {
     : "Engine Partial";
 
   return (
-    <div
-      style={{
-        display: open ? "flex" : "none",
-        flexDirection: "column",
-        height: "100%",
-        background: tokens.color.bg,
-        borderTop: `1px solid ${tokens.color.border}`,
-      }}
-    >
+    <div className={`engine-panel${open ? "" : " engine-panel--hidden"}`}>
       {/* Panel header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: `0 ${tokens.space.lg}`,
-          height: 36,
-          flexShrink: 0,
-          background: tokens.color.bgElevated,
-          borderBottom: `1px solid ${tokens.color.border}`,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.md }}>
+      <div className="engine-panel__head">
+        <div className="engine-panel__headleft">
           <StatusDot state={dotState} size={7} />
           <Text variant="micro" tone="dim" mono uppercase>
             Engine Terminal
@@ -221,7 +195,7 @@ export function EnginePanel({ open }: { open: boolean }) {
             </>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+        <div className="engine-panel__headright">
           <Button variant="outline" size="sm" onClick={handleRestart} loading={restarting} disabled={!inTauri}>
             Restart
           </Button>
@@ -235,15 +209,7 @@ export function EnginePanel({ open }: { open: boolean }) {
       </div>
 
       {/* Live process graph */}
-      <div
-        style={{
-          flexShrink: 0,
-          height: 168,
-          borderBottom: `1px solid ${tokens.color.border}`,
-          background: tokens.color.bg,
-          minHeight: 0,
-        }}
-      >
+      <div className="engine-panel__graph">
         <EngineGraph
           daemonAlive={status?.daemon_alive}
           sidecarAlive={status?.sidecar_alive}
@@ -256,21 +222,12 @@ export function EnginePanel({ open }: { open: boolean }) {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        style={{
-          flex: 1,
-          overflow: "auto",
-          padding: `${tokens.space.sm} ${tokens.space.lg}`,
-          fontFamily: tokens.font.mono,
-          fontSize: tokens.font.size.xs,
-          lineHeight: 1.55,
-          background: tokens.color.bg,
-          minHeight: 0,
-        }}
+        className="engine-panel__body"
       >
         {!inTauri ? (
           <BrowserPreviewState />
         ) : logs.length === 0 ? (
-          <div style={{ padding: `${tokens.space.xl} 0`, textAlign: "center" }}>
+          <div className="engine-panel__empty">
             <Text variant="micro" tone="dim" mono>
               No engine output yet. Waiting for daemon + sidecar to start...
             </Text>
@@ -279,21 +236,15 @@ export function EnginePanel({ open }: { open: boolean }) {
           logs.map((entry, i) => (
             <div
               key={i}
-              style={{
-                display: "flex",
-                gap: tokens.space.sm,
-                padding: "1px 0",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-              }}
+              className="engine-panel__line"
             >
-              <span style={{ color: tokens.color.textDim, flexShrink: 0, fontSize: tokens.font.size.xs, opacity: 0.5 }}>
+              <span className="engine-panel__ts">
                 {entry.ts.slice(11, 19)}
               </span>
-              <span style={{ color: logColor(entry.proc, entry.stream), flexShrink: 0, fontWeight: 600 }}>
+              <span className={`engine-panel__prefix${entry.stream === "stderr" ? " engine-panel__prefix--err" : entry.proc === "daemon" ? " engine-panel__prefix--daemon" : ""}`}>
                 {logPrefix(entry.proc, entry.stream)}
               </span>
-              <span style={{ color: tokens.color.text }}>{entry.line}</span>
+              <span className="engine-panel__text">{entry.line}</span>
             </div>
           ))
         )}
@@ -308,30 +259,8 @@ export function EnginePanel({ open }: { open: boolean }) {
 
 function BrowserPreviewState() {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: tokens.space.md,
-        padding: `${tokens.space["3xl"]} ${tokens.space.xl}`,
-        textAlign: "center",
-      }}
-    >
-      <div
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: tokens.radius.full,
-          background: tokens.color.bgRaised,
-          border: `1px solid ${tokens.color.border}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: tokens.color.textDim,
-        }}
-      >
+    <div className="engine-panel__preview">
+      <div className="engine-panel__previewicon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
           <polyline points="4 17 10 11 4 5" />
           <line x1="12" y1="19" x2="20" y2="19" />
@@ -340,7 +269,7 @@ function BrowserPreviewState() {
       <Text variant="label" tone="muted" weight="medium">
         Engine not connected (browser preview)
       </Text>
-      <Text variant="micro" tone="dim" mono style={{ maxWidth: 400 }}>
+      <Text variant="micro" tone="dim" mono className="engine-panel__previewdesc">
         Run the app with `npm run tauri dev` to see live daemon + sidecar process
         output streaming here. Restart and Stop controls are disabled in the
         browser preview.

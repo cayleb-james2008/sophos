@@ -201,7 +201,10 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   suffix?: React.ReactNode;
 }
 
-export function Input({ label, hint, error, prefix, suffix, style, className, id, ...rest }: InputProps) {
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
+  { label, hint, error, prefix, suffix, style, className, id, ...rest },
+  ref,
+) {
   const inputId = id ?? (label ? `pa-input-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, width: "100%" }}>
@@ -225,6 +228,7 @@ export function Input({ label, hint, error, prefix, suffix, style, className, id
         {prefix}
         <input
           id={inputId}
+          ref={ref}
           className={`pa-focus-ring ${className ?? ""}`}
           style={{
             flex: 1,
@@ -253,7 +257,7 @@ export function Input({ label, hint, error, prefix, suffix, style, className, id
       ) : null}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // TextArea
@@ -264,7 +268,10 @@ export interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextArea
   error?: string;
 }
 
-export function TextArea({ label, error, style, className, id, ...rest }: TextAreaProps) {
+export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(
+  { label, error, style, className, id, ...rest },
+  ref,
+) {
   const inputId = id ?? (label ? `pa-ta-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, width: "100%" }}>
@@ -275,6 +282,7 @@ export function TextArea({ label, error, style, className, id, ...rest }: TextAr
       ) : null}
       <textarea
         id={inputId}
+        ref={ref}
         className={`pa-focus-ring ${className ?? ""}`}
         style={{
           background: tokens.color.bgElevated,
@@ -300,7 +308,7 @@ export function TextArea({ label, error, style, className, id, ...rest }: TextAr
       ) : null}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Select
@@ -312,7 +320,10 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
   placeholder?: string;
 }
 
-export function Select({ label, options, placeholder, style, className, id, ...rest }: SelectProps) {
+export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function Select(
+  { label, options, placeholder, style, className, id, ...rest },
+  ref,
+) {
   const selectId = id ?? (label ? `pa-select-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, width: "100%" }}>
@@ -324,6 +335,7 @@ export function Select({ label, options, placeholder, style, className, id, ...r
       <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
         <select
           id={selectId}
+          ref={ref}
           className={`pa-focus-ring ${className ?? ""}`}
           style={{
             appearance: "none",
@@ -367,7 +379,7 @@ export function Select({ label, options, placeholder, style, className, id, ...r
       </div>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Kbd

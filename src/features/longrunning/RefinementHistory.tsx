@@ -17,7 +17,6 @@
 // and auto-apply stays OFF by default (driven by useRefinementGate).
 
 import { useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { RefinementResult } from "../../ipc/contract";
@@ -25,6 +24,7 @@ import { RefreshIcon, XIcon, CheckIcon, ChevronRightIcon } from "../sessions/ico
 import { useActionError, ActionErrorBanner } from "./useActionError";
 import { useRefinementGate, buildRefinementDiff } from "./useRefinementGate";
 import { DiffView } from "./DiffView";
+import "./longrunning.css";
 
 export interface RefinementEntry {
   id: string;
@@ -38,14 +38,6 @@ export interface RefinementHistoryProps {
   /** Seed past refinements from daemon state when available. */
   initial?: RefinementEntry[];
 }
-
-const section: React.CSSProperties = {
-  borderTop: `1px solid ${tokens.color.line}`,
-  paddingTop: tokens.space.lg,
-  display: "flex",
-  flexDirection: "column",
-  gap: tokens.space.md,
-};
 
 export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
   const ipc = useIpc();
@@ -95,9 +87,9 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
   const refinements = gate.history.length > 0 ? gate.history : initial;
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
       {/* State: how many passes, is one awaiting review? */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="lr-headrow">
         <Text variant="label" weight="semibold">
           Refinement history
         </Text>
@@ -106,7 +98,7 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
         </Badge>
       </div>
 
-      <div style={section}>
+      <div className="lr-section">
         <Text variant="label" weight="semibold" tone={pending ? "accent" : "default"}>
           {pending
             ? "One proposed change awaits your review — apply or discard it below."
@@ -118,18 +110,8 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
         </Text>
 
         {/* Trust note — D37/D38: the human holds the pen. */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: tokens.space.sm,
-            padding: `${tokens.space.sm} ${tokens.space.md}`,
-            borderRadius: tokens.radius.md,
-            background: tokens.color.warning + "14",
-            border: `1px solid ${tokens.color.warning}40`,
-          }}
-        >
-          <span style={{ color: tokens.color.warning, fontSize: 12, lineHeight: 1, flexShrink: 0, marginTop: 2 }}>!</span>
+        <div className="lr-ref-note">
+          <span className="lr-ref-note-glyph">!</span>
           <Text variant="micro" tone="muted">
             Refinement edits the agent's own instructions and runs with your OS permissions — it is not a
             sandbox. Review every proposed change before applying.
@@ -141,27 +123,9 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
 
       {/* Pending proposal — the human gate, kept prominent. */}
       {pending ? (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: tokens.space.md,
-            padding: tokens.space.lg,
-            borderRadius: tokens.radius.md,
-            background: tokens.color.accentSoft,
-            border: `1px solid ${tokens.color.accentBorder}`,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: tokens.color.accentHover,
-                flexShrink: 0,
-              }}
-            />
+        <div className="lr-ref-pending">
+          <div className="lr-row">
+            <span className="lr-ref-dot" />
             <Text variant="label" weight="semibold" tone="accent">
               Proposed refinement — awaiting your review
             </Text>
@@ -182,33 +146,16 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
           ) : null}
 
           {(pending.result.appliedEdits ?? []).length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+            <div className="lr-ref-edits">
               <Text variant="micro" tone="dim" uppercase>
                 Proposed edits
               </Text>
               {(pending.result.appliedEdits ?? []).map((e, i) => (
-                <div
-                  key={e.id ?? i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: tokens.space.sm,
-                    padding: tokens.space.sm,
-                    borderRadius: tokens.radius.md,
-                    background: tokens.color.bgElevated,
-                    border: `1px solid ${tokens.color.border}`,
-                  }}
-                >
+                <div key={e.id ?? i} className="lr-ref-edit">
                   <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      background: e.applied ? tokens.color.success : tokens.color.warning,
-                    }}
+                    className={`lr-ref-edit-dot${e.applied ? " lr-ref-edit-dot--applied" : ""}`}
                   />
-                  <Text variant="micro" mono style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <Text variant="micro" mono className="lr-ref-edittitle">
                     {e.title ?? e.action ?? e.kind ?? "edit"}
                   </Text>
                   <Badge tone={e.applied ? "success" : "warning"} dot>
@@ -219,7 +166,7 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
             </div>
           ) : null}
 
-          <div style={{ display: "flex", gap: tokens.space.sm }}>
+          <div className="lr-actions">
             <Button variant="primary" size="md" icon={<CheckIcon size={13} />} onClick={() => gate.apply()}>
               Apply
             </Button>
@@ -231,17 +178,8 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
       ) : null}
 
       {/* Auto-apply opt-in (OFF by default) — plain ruled row. */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: tokens.space.md,
-          borderTop: `1px solid ${tokens.color.line}`,
-          paddingTop: tokens.space.lg,
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div className="lr-ref-auto">
+        <div className="lr-ref-automain">
           <Text variant="label" weight="medium">
             Auto-apply refinements
           </Text>
@@ -255,36 +193,14 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
           aria-checked={gate.autoApply}
           onClick={() => gate.setAutoApply(!gate.autoApply)}
           variant={gate.autoApply ? "accent-soft" : "ghost"}
-          style={{
-            width: 40,
-            height: 22,
-            borderRadius: 0,
-            border: `1px solid ${tokens.color.border}`,
-            background: gate.autoApply ? tokens.color.accent : tokens.color.bgRaised,
-            position: "relative",
-            cursor: "pointer",
-            padding: 0,
-            flexShrink: 0,
-            transition: "background 120ms ease",
-          }}
+          className={`lr-ref-toggle ${gate.autoApply ? "lr-ref-toggle--on" : "lr-ref-toggle--off"}`}
         >
-          <span
-            style={{
-              position: "absolute",
-              top: 2,
-              left: gate.autoApply ? 20 : 2,
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              background: tokens.color.text,
-              transition: "left 120ms ease",
-            }}
-          />
+          <span className={`lr-ref-toggleknob${gate.autoApply ? " lr-ref-toggleknob--on" : ""}`} />
         </Button>
       </div>
 
       {/* Run a refinement — the primary action. */}
-      <div style={section}>
+      <div className="lr-section">
         <Text variant="micro" tone="dim" uppercase>
           Run a refinement
         </Text>
@@ -303,22 +219,12 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
       </div>
 
       {/* History — plain ruled rows. */}
-      <div style={section}>
+      <div className="lr-section">
         <Text variant="micro" tone="dim" uppercase>
           History
         </Text>
         {refinements.length === 0 ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: tokens.space.sm,
-              padding: tokens.space.lg,
-              borderRadius: tokens.radius.md,
-              background: tokens.color.bgElevated,
-              border: `1px dashed ${tokens.color.borderStrong}`,
-            }}
-          >
+          <div className="lr-hb-empty">
             <Text variant="label" tone="muted">
               No refinements yet
             </Text>
@@ -329,36 +235,20 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
             </Text>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.md }}>
+          <div className="lr-hb-list">
             {refinements.map((r) => {
               const rolledBack = r.status === "rolled-back";
               const discarded = r.status === "discarded";
               const hasEdits = (r.result?.appliedEdits ?? []).length > 0;
               const diffOpen = openDiffs.has(r.id);
               return (
-                <div key={r.id} style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: tokens.space.md,
-                    }}
-                  >
+                <div key={r.id} className="lr-ref-hitem">
+                  <div className="lr-ref-hrow">
                     <span
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        flexShrink: 0,
-                        background: rolledBack
-                          ? tokens.color.warning
-                          : discarded
-                            ? tokens.color.textDim
-                            : tokens.color.accentHover,
-                      }}
+                      className={`lr-ref-hdot${rolledBack ? " lr-ref-hdot--rolled" : discarded ? "" : " lr-ref-hdot--applied"}`}
                     />
-                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-                      <Text variant="label" weight="medium" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div className="lr-hb-itemmain">
+                      <Text variant="label" weight="medium" className="lr-harness-refsum">
                         {r.description ?? "Refinement"}
                       </Text>
                       {r.timestamp ? (
@@ -372,33 +262,19 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
                         variant="ghost"
                         type="button"
                         onClick={() => toggleDiff(r.id)}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 4,
-                          background: "transparent",
-                          border: "none",
-                          color: tokens.color.textDim,
-                          fontFamily: tokens.font.sans,
-                          fontSize: tokens.font.size.xs,
-                          cursor: "pointer",
-                          padding: "2px 4px",
-                        }}
+                        className="lr-ref-diffbtn"
                       >
                         <ChevronRightIcon
                           size={11}
                           style={{
                             transform: diffOpen ? "rotate(90deg)" : "none",
-                            transition: `transform ${tokens.motion.fast} ${tokens.motion.ease}`,
+                            transition: "transform 100ms cubic-bezier(0.3, 0, 0.2, 1)",
                           }}
                         />
                         {diffOpen ? "Hide diff" : "Show diff"}
                       </Button>
                     ) : null}
-                    <Badge
-                      tone={rolledBack ? "warning" : discarded ? "neutral" : "success"}
-                      dot
-                    >
+                    <Badge tone={rolledBack ? "warning" : discarded ? "neutral" : "success"} dot>
                       {rolledBack ? "Rolled back" : discarded ? "Discarded" : "Applied"}
                     </Badge>
                     {!rolledBack && !discarded ? (
@@ -412,13 +288,13 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
                         <XIcon size={13} />
                       </IconButton>
                     ) : (
-                      <span style={{ color: tokens.color.textDim, display: "inline-flex" }}>
+                      <span className="lr-ref-check">
                         <CheckIcon size={13} />
                       </span>
                     )}
                   </div>
                   {hasEdits && diffOpen && r.result ? (
-                    <div style={{ paddingLeft: tokens.space.lg }}>
+                    <div className="lr-ref-diffpad">
                       <DiffView lines={buildRefinementDiff(r.result)} />
                     </div>
                   ) : null}

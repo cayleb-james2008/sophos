@@ -1,0 +1,103 @@
+/* ModelSelector — custom model dropdown. */
+
+.ms-root { position: relative; }
+.ms-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #202020;
+  border: 1px solid #2a2a2a;
+  border-radius: 0;
+  padding: 5px 10px;
+  cursor: pointer;
+  color: #f4f4f4;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  transition: all 100ms cubic-bezier(0.3, 0, 0.2, 1);
+  box-shadow: none;
+}
+.ms-trigger--open {
+  background: #111;
+  border-color: rgba(133, 237, 117, 0.4);
+  box-shadow: 0 0 0 1px rgba(133, 237, 117, 0.28);
+}
+.ms-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 0;
+  background: rgba(133, 237, 117, 0.12);
+  color: #9fff8a;
+  flex-shrink: 0;
+}
+.ms-triggermain { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
+.ms-provider { font-size: 9px; }
+.ms-model { font-size: 11.5px; }
+.ms-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #202020;
+  border: 1px solid #2c2c2c;
+  border-radius: 0;
+  box-shadow: none;
+  z-index: 60;
+  padding: 4px;
+  animation: pa-scale-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ms-panelhead { padding: 8px 12px; border-bottom: 1px solid #2a2a2a; }
+.ms-state { display: flex; align-items: center; gap: 8px; padding: 16px; }
+.ms-pad { padding: 16px; }
+.ms-group { margin-bottom: 4px; }
+.ms-grouphead { display: flex; align-items: center; gap: 8px; padding: 8px 12px 4px; }
+.ms-groupicon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 0;
+  background: #111;
+  color: rgba(244, 244, 244, 0.45);
+  flex-shrink: 0;
+}
+.ms-groupicon--connected { background: rgba(133, 237, 117, 0.12); color: #9fff8a; }
+.ms-option {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px;
+  width: 100% !important;
+  padding: 7px 12px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  color: rgba(244, 244, 244, 0.6) !important;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 12.5px !important;
+  text-align: left !important;
+  transition: background 100ms cubic-bezier(0.3, 0, 0.2, 1) !important;
+}
+.ms-option--current { background: rgba(133, 237, 117, 0.12) !important; color: #f4f4f4 !important; }
+.ms-option:hover { background: #111 !important; }
+.ms-option--current:hover { background: rgba(133, 237, 117, 0.12) !important; }
+.ms-optionmain { display: flex; flex-direction: column; gap: 1px; }
+.ms-thinking { border-top: 1px solid #2a2a2a; padding: 8px; margin: 0 8px 8px; }
+.ms-thinkinghead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.ms-thinkingicon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 0;
+  background: rgba(133, 237, 117, 0.12);
+  color: #9fff8a;
+  flex-shrink: 0;
+}
+.ms-select { width: 100% !important; }

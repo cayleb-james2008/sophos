@@ -201,7 +201,7 @@ export function GraphFlow({
           colorMode="dark"
         >
           <Background gap={22} size={1.1} color={tokens.color.border} bgColor={tokens.color.bg} />
-          <Controls position="bottom-right" showInteractive={false} style={{ zIndex: 5 }}>
+          <Controls position="bottom-right" showInteractive={false} className="pa-graph__controls">
             <ControlButton title="Zoom in" aria-label="Zoom in">
               <PlusGlyph />
             </ControlButton>
@@ -215,7 +215,7 @@ export function GraphFlow({
           {/* Minimap lives top-right so it never stacks on the zoom controls
               (bottom-right) — the D5 overlap fix. */}
           {showMiniMap ? (
-            <MiniMap position="top-right" pannable zoomable nodeStrokeWidth={2} nodeColor={nodeColor} maskColor="rgba(14,14,14,0.6)" style={{ zIndex: 5, width: 140, height: 90 }} />
+            <MiniMap position="top-right" pannable zoomable nodeStrokeWidth={2} nodeColor={nodeColor} maskColor="rgba(14,14,14,0.6)" className="pa-graph__minimap" />
           ) : null}
           {children}
         </ReactFlow>

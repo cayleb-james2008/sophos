@@ -728,6 +728,32 @@ export class RpcServer {
         }));
       }
 
+      case "installExtension": {
+        const p = requireParams<{ path: string }>(params, ["path"]);
+        const conn = this.requireConn();
+        const path = resolve(p.path);
+        const name = path.split(/[/\\]/).pop() ?? path;
+        const settings = this.holder.getSettingsStore().get() as Settings & { extensions?: Array<{ name: string; path: string; enabled: boolean }> };
+        // Dedupe by path — installing the same path twice should not create a duplicate entry (matches installSkill's `new Set` pattern).
+        const existing = new Map((settings.extensions ?? []).map((e) => [e.path, e] as const));
+        existing.set(path, { name, path, enabled: true });
+        const extensions = [...existing.values()];
+        this.holder.getSettingsStore().update({ extensions } as Partial<Settings>);
+        await conn.reload();
+        return undefined;
+      }
+
+      case "removeExtension": {
+        const p = requireParams<{ path: string }>(params, ["path"]);
+        const conn = this.requireConn();
+        const path = resolve(p.path);
+        const settings = this.holder.getSettingsStore().get() as Settings & { extensions?: Array<{ name: string; path: string; enabled: boolean }> };
+        const extensions = (settings.extensions ?? []).filter((e) => e.path !== path);
+        this.holder.getSettingsStore().update({ extensions } as Partial<Settings>);
+        await conn.reload();
+        return undefined;
+      }
+
       default:
         throw rpcError(JSON_RPC_ERROR.methodNotFound, `unknown method: ${method}`);
     }

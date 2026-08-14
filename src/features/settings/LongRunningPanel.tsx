@@ -9,7 +9,6 @@
 // agents" label is dropped — the tab already says it.
 
 import { useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Tabs } from "../../design";
 import { AutonomousPanel } from "../longrunning/AutonomousPanel";
 import { HeartbeatsPanel } from "../longrunning/HeartbeatsPanel";
@@ -21,7 +20,7 @@ import { HarnessStatePanel } from "../longrunning/HarnessStatePanel";
 export function LongRunningPanel() {
   const [tab, setTab] = useState("autonomous");
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.lg }}>
+    <div className="gp-form">
       <Tabs
         variant="underline"
         items={[

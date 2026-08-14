@@ -1,37 +1,14 @@
 {
-  "piece": "Sessions graph drag-to-arrange + responsive detail inspector (gauntlet-sessions)",
-  "status": "BUILT — awaiting critic verdict",
-  "date": "2026-08-12",
-  "breadcrumbs": [
-    {
-      "t": "setup",
-      "note": "worktree clean checkpoint; npm install root (esbuild postinstall skipped by allow-scripts but vite build still green). tsc --noEmit + npm run build both pass."
-    },
-    {
-      "t": "partA-drag",
-      "note": "SessionsGraph: dagre layout recomputed in useMemo on every sessions/enrichment/activeSessionId change and useEffect setNodes(layout.positioned) overwrote user-dragged positions. Fix: userPositioned ref (Set<string>) tracks node ids the user dragged (position changes in onNodesChange). Merge effect only adopts dagre position for nodes NOT in the set; dragged nodes keep position but still receive fresh data/status. Reset layout button clears the set and reapplies dagre."
-    },
-    {
-      "t": "partB-responsive",
-      "note": "SessionsView: added inspectorOpen state; console gets --inspector-open class; floating Inspect toggle (aria-expanded/aria-controls) in graphwrap; backdrop + close (x) on detailwrap. CSS: below 900px .sessions__console--graph becomes 1 column, detailwrap becomes absolute slide-in overlay (translateX, clipped by console overflow:hidden so no horizontal overflow), toggle/close/backdrop only surface below 900px. Above 900px untouched (grid column)."
-    },
-    {
-      "t": "verify",
-      "note": "verify/sessions-responsive.py drives live vite dev (localhost:1420, MockIpcClient). 22 checks ALL PASS: 1440 side-by-side + toggle hidden + no overflow; drag persists after Refresh (enrichment reload); Reset layout reapplies dagre; 900/768 hidden-by-default, toggle surfaces overlay, backdrop + close work, no horizontal overflow open or closed; zero console errors. Screenshots -> verify/visual/sessions-responsive/*.png"
-    },
-    {
-      "t": "test-threshold-fix",
-      "note": "Initial test asserted hidden inspector x>=899; actual hidden x=879 (console right edge 880, clipped). Behavior correct; fixed test to compare against console right edge."
-    }
+  "piece": "Onboarding Wizard",
+  "generator": "5402881a-fac7-4df5-ab73-ae62f102698c",
+  "sprint": 1,
+  "timeline": [
+    { "t": "start", "note": "Read role docs, loop protocol, and all context files (FirstRunBanner, GeneralPanel, onboarding.css, ChatView, AppState, design core/tokens, ipc client/contract, useModels, ModelSelector, SettingsView, App.tsx)." },
+    { "t": "design", "note": "Chose new OnboardingWizard.tsx over in-place refactor; kept FirstRunBanner.tsx as re-export home for useOnboardingStatus + FirstRunBanner alias + new clearOnboardingDismissed helper. Avoided circular import by keeping useOnboardingStatus in FirstRunBanner and importing its type into the wizard." },
+    { "t": "build", "note": "Created OnboardingWizard.tsx with 4 steps (welcome/provider/model/firstPrompt), progress rail, Skip at every step + footer Esc-to-dismiss, reuses setup prop from useOnboardingStatus, uses useConnectionState + useModels for model step. Wired ChatView to OnboardingWizard. Added 'Run onboarding again' button in GeneralPanel (clears dismiss flag + setView('chat')). Added wizard CSS to onboarding.css." },
+    { "t": "fix", "note": "tsc TS6133: removed unused useIpc import and unused liveReady prop in ProviderStep. tsc clean after." },
+    { "t": "verify", "note": "tsc --noEmit exit 0. vitest run 6 files / 86 tests pass. npm run build succeeds. Dev server on :1420 serves HTTP 200; OnboardingWizard/GeneralPanel/ChatView/FirstRunBanner modules transform with no vite errors." }
   ],
-  "files_changed": [
-    "src/features/sessions/SessionsGraph.tsx",
-    "src/features/sessions/SessionsView.tsx",
-    "src/features/sessions/sessions.css",
-    "verify/sessions-responsive.py",
-    "verify/visual/sessions-responsive/*.png"
-  ],
-  "unverified": [
-    "real daemon (Tauri) path — verified against MockIpcClient in browser; drag/position logic is representation-only and daemon-independent"
-  ]
+  "gates": { "tsc": "pass", "vitest": "pass (86/86)", "build": "pass", "dev_server": "pass (HTTP 200, no transform errors)" },
+  "preserved": ["useOnboardingStatus export", "FirstRunBanner alias export", "onSetupProviders/onStartChat callback pattern", "IPC contract types unchanged", "no new npm deps"]
 }

@@ -8,6 +8,7 @@ import { useAppState } from "../../state/AppState";
 import { GeneralPanel } from "./GeneralPanel";
 import { ProvidersPanel } from "./ProvidersPanel";
 import { SkillsPanel } from "./SkillsPanel";
+import { ExtensionsPanel } from "./ExtensionsPanel";
 import { AdvancedPanel } from "./AdvancedPanel";
 import { LongRunningPanel } from "./LongRunningPanel";
 import { FleetStrip } from "./FleetStrip";
@@ -21,7 +22,7 @@ export function SettingsView() {
       <header className="settings__header">
         <div className="settings__eyebrow">CONTROL ROOM</div>
         <h1>Settings</h1>
-        <p>Providers, models, preferences, skills, and runtime telemetry.</p>
+        <p>Providers, models, preferences, skills, extensions, and runtime telemetry.</p>
       </header>
 
       <FleetStrip />
@@ -32,6 +33,7 @@ export function SettingsView() {
           { id: "general", label: "General" },
           { id: "providers", label: "Providers" },
           { id: "skills", label: "Skills" },
+          { id: "extensions", label: "Extensions" },
           { id: "advanced", label: "Advanced" },
           { id: "longrunning", label: "Long-running" },
         ]}
@@ -43,6 +45,7 @@ export function SettingsView() {
         {tab === "general" ? <GeneralPanel /> : null}
         {tab === "providers" ? <ProvidersPanel /> : null}
         {tab === "skills" ? <SkillsPanel /> : null}
+        {tab === "extensions" ? <ExtensionsPanel /> : null}
         {tab === "advanced" ? <AdvancedPanel /> : null}
         {tab === "longrunning" ? <LongRunningPanel /> : null}
       </div>

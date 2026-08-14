@@ -176,3 +176,56 @@
 }
 .palette__hint { display: inline-flex; align-items: center; gap: 6px; }
 .palette__count { margin-left: auto; font: 10px 'Geist Mono', ui-monospace, monospace; color: rgba(244, 244, 244, 0.45); }
+
+/* ---- Inline-style purge: palette form / search fields ---- */
+.palette__match { color: #9fff8a; background: rgba(133, 237, 117, 0.12); }
+.palette__form { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+.palette__formlabel {
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(244, 244, 244, 0.6);
+}
+.palette__field {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 0;
+  background: #151515;
+  border: 1px solid #2c2c2c;
+  color: #f4f4f4;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  outline: none;
+}
+.palette__error { color: #ef4444; font-size: 12px; }
+.palette__actions { display: flex; gap: 8px; }
+.palette__savebtn {
+  padding: 6px 14px !important;
+  border-radius: 0 !important;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 12.5px !important;
+}
+.palette__savebtn--on {
+  background: #85ed75 !important;
+  border: 1px solid #85ed75 !important;
+  color: #0e0e0e !important;
+  cursor: pointer !important;
+}
+.palette__savebtn--off {
+  background: #111 !important;
+  border: 1px solid #85ed75 !important;
+  color: rgba(244, 244, 244, 0.45) !important;
+  cursor: not-allowed !important;
+}
+.palette__cancelbtn {
+  padding: 6px 14px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 1px solid #2c2c2c !important;
+  color: rgba(244, 244, 244, 0.6) !important;
+  cursor: pointer !important;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 12.5px !important;
+}
+.palette__glyphicon { font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; font-size: 13px; }

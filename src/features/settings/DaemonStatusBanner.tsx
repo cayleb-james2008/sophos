@@ -12,7 +12,6 @@
 // reconnecting), so normal operation stays untouched.
 
 import { useCallback, useEffect, useState } from "react";
-import { tokens } from "../../design/tokens";
 import { Text, Button, Card, StatusDot } from "../../design";
 import { useConnectionState, useIpc } from "../../ipc/client";
 import type { ConnectionStatus, Settings } from "../../ipc/contract";
@@ -73,17 +72,7 @@ export function DaemonStatusBanner({ onRestartRequest }: { onRestartRequest?: ()
   const tcpAlreadyOn = daemonTcp === true;
 
   return (
-    <div
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        padding: tokens.space.md,
-        display: "flex",
-        justifyContent: "center",
-        pointerEvents: "none",
-      }}
-    >
+    <div className="dsb">
       <Card
         variant="raised"
         padding="md"
@@ -93,11 +82,11 @@ export function DaemonStatusBanner({ onRestartRequest }: { onRestartRequest?: ()
           width: "100%",
           display: "flex",
           flexDirection: "column",
-          gap: tokens.space.sm,
-          border: `1px solid ${tokens.color.border}`,
+          gap: 8,
+          border: "1px solid #2a2a2a",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm }}>
+        <div className="dsb-head">
           <StatusDot state={status.kind} />
           <Text variant="label" tone="danger">
             Agent engine offline
@@ -114,7 +103,7 @@ export function DaemonStatusBanner({ onRestartRequest }: { onRestartRequest?: ()
             transport.
           </Text>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: tokens.space.sm, flexWrap: "wrap" }}>
+          <div className="dsb-actions">
             <Button
               variant="primary"
               size="sm"

@@ -28,61 +28,34 @@ export function ThinkingBlock({
   const hasContent = thinking.trim().length > 0;
 
   return (
-    <div
-      style={{
-        border: `1px solid ${tokens.color.border}`,
-        borderLeft: `3px solid ${tokens.color.info}`,
-        borderRadius: tokens.radius.md,
-        background: tokens.color.bgElevated,
-        overflow: "hidden",
-        transition: `border-color ${tokens.motion.fast} ${tokens.motion.ease}`,
-      }}
-    >
+    <div className="thinking">
       <Button
         variant="ghost"
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.sm,
-          width: "100%",
-          padding: "7px 12px",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          color: tokens.color.textMuted,
-          fontFamily: tokens.font.sans,
-          fontSize: tokens.font.size.xs,
-          textAlign: "left",
-        }}
+        className="thinking-toggle"
       >
         <ThinkingIcon color={tokens.color.info} />
         <Text variant="micro" tone="muted" mono uppercase>
           Thinking
         </Text>
         {streaming ? (
-          <span style={{ display: "inline-flex", gap: 3, marginLeft: 2 }}>
+          <span className="thinking-dots">
             {[0, 1, 2].map((i) => (
               <span
                 key={i}
-                style={{
-                  width: 3,
-                  height: 3,
-                  borderRadius: "50%",
-                  background: tokens.color.accentHover,
-                  animation: `pa-blink 1.2s ease-in-out ${i * 0.2}s infinite`,
-                }}
+                className="thinking-dot"
+                style={{ animationDelay: `${i * 0.2}s` }}
               />
             ))}
           </span>
         ) : (
-          <Text variant="micro" tone="dim" style={{ marginLeft: 2 }}>
+          <Text variant="micro" tone="dim" className="thinking-meta">
             {hasContent ? `${thinking.split(/\s+/).length} tokens` : "empty"}
           </Text>
         )}
-        <span style={{ marginLeft: "auto", display: "inline-flex", color: tokens.color.textDim }}>
+        <span className="thinking-chevron">
           <svg
             width="12"
             height="12"
@@ -92,7 +65,7 @@ export function ThinkingBlock({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            style={{ transform: open ? "rotate(180deg)" : undefined, transition: `transform ${tokens.motion.base} ${tokens.motion.ease}` }}
+            className={`thinking-chevron-ico${open ? " is-open" : ""}`}
           >
             <polyline points="6 9 12 15 18 9" />
           </svg>
@@ -100,25 +73,8 @@ export function ThinkingBlock({
       </Button>
 
       {open ? (
-        <div
-          style={{
-            padding: `${tokens.space.xs} ${tokens.space.md} ${tokens.space.md}`,
-            borderTop: `1px solid ${tokens.color.border}`,
-            animation: "pa-slide-down 160ms cubic-bezier(0.16,1,0.3,1)",
-          }}
-        >
-          <div
-            style={{
-              borderLeft: `2px solid ${tokens.color.info}`,
-              paddingLeft: tokens.space.md,
-              color: tokens.color.textDim,
-              fontFamily: tokens.font.sans,
-              fontSize: tokens.font.size.sm,
-              fontStyle: "italic",
-              lineHeight: tokens.font.leading.relaxed,
-              whiteSpace: "pre-wrap",
-            }}
-          >
+        <div className="thinking-body">
+          <div className="thinking-text">
             {hasContent ? thinking : "Reasoning in progress…"}
           </div>
         </div>
