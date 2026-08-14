@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src=".github/social-preview.png" width="100%" alt="Sophos — Open intelligence workspace" />
+
 <img src="resources/icon.png" width="120" height="120" alt="Sophos" />
 
 # Sophos
@@ -233,6 +235,19 @@ A stale supervisor registry from a crashed daemon lives under
 restart.
 
 ---
+
+## Contributing
+
+Contributions are welcome! Whether it's a bug report, feature idea, or a
+pull request — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full guide
+on building from source, running tests, code style, and the PR process.
+
+Quick checklist for a good PR:
+
+1. Fork & branch (`feat/your-feature` or `fix/your-bugfix`).
+2. `npx tsc --noEmit` and `npm test` must pass locally.
+3. Keep changes scoped and follow the existing design system tokens.
+4. Open a PR against `master` using the [PR template](.github/pull_request_template.md).
 
 ## License
 

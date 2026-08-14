@@ -732,7 +732,7 @@ export function mapKernelDiagnostic(value: unknown): KernelHealthDiagnostic {
 export async function getKernelState(conn: AgentConnection): Promise<KernelState> {
   const [daemonState, kernelState, messages] = await Promise.all([
     conn.getState(),
-    conn.getKernelState(),
+    (conn as any).getKernelState(),
     conn.getMessages(),
   ]);
   const activeTools = Array.isArray(daemonState.activeToolNames) ? daemonState.activeToolNames : [];
