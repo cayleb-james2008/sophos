@@ -33,7 +33,7 @@ export function Sidebar({
                 className={`pa-focus-ring sidebar__item${isActive ? " sidebar__item--active" : ""}`}
               >
                 {isActive ? <span className="sidebar__active-mark" aria-hidden="true" /> : null}
-                <Icon size={16} color={isActive ? "#85ed75" : "rgba(244,244,244,0.45)"} />
+                <Icon size={16} color={isActive ? "var(--pa-green)" : "rgba(var(--pa-paper-rgb), 0.45)"} />
                 <span>{item.label}</span>
                 {item.id === "inbox" ? <InboxBadge /> : null}
               </button>

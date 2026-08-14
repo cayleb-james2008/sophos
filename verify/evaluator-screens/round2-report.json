@@ -1,0 +1,298 @@
+{
+  "round": 2,
+  "piece": "Theme System",
+  "bar_checks": {
+    "dark_baseline": {
+      "data_theme": "dark",
+      "body_bg": "rgb(14, 14, 14)",
+      "body_text": "rgb(244, 244, 244)",
+      "matches_dark_bg": true,
+      "matches_dark_text": true
+    },
+    "light_theme_per_view": {
+      "chat": {
+        "body": {
+          "bg": "rgb(244, 244, 244)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "sidebar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "sidebar_fallback": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "topbar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgb(14, 14, 14) rgba(0, 0, 0, 0.12)"
+        },
+        "main": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "main_fallback": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "stats": {
+          "lightTextCount": 1,
+          "darkTextCount": 358,
+          "darkBgCount": 29,
+          "lightBgCount": 53,
+          "total": 359
+        }
+      },
+      "sessions": {
+        "body": {
+          "bg": "rgb(244, 244, 244)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "sidebar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "sidebar_fallback": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "topbar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgb(14, 14, 14) rgba(0, 0, 0, 0.12)"
+        },
+        "main": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "main_fallback": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "stats": {
+          "lightTextCount": 1,
+          "darkTextCount": 513,
+          "darkBgCount": 44,
+          "lightBgCount": 68,
+          "total": 514
+        }
+      },
+      "agents": {
+        "body": {
+          "bg": "rgb(244, 244, 244)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "sidebar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "sidebar_fallback": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "topbar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgb(14, 14, 14) rgba(0, 0, 0, 0.12)"
+        },
+        "main": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "main_fallback": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "stats": {
+          "lightTextCount": 1,
+          "darkTextCount": 447,
+          "darkBgCount": 31,
+          "lightBgCount": 58,
+          "total": 448
+        }
+      },
+      "inbox": {
+        "body": {
+          "bg": "rgb(244, 244, 244)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "sidebar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "sidebar_fallback": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "topbar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgb(14, 14, 14) rgba(0, 0, 0, 0.12)"
+        },
+        "main": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "main_fallback": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "stats": {
+          "lightTextCount": 1,
+          "darkTextCount": 225,
+          "darkBgCount": 22,
+          "lightBgCount": 34,
+          "total": 226
+        }
+      },
+      "settings": {
+        "body": {
+          "bg": "rgb(244, 244, 244)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "sidebar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "sidebar_fallback": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgba(0, 0, 0, 0.12) rgb(14, 14, 14) rgb(14, 14, 14)"
+        },
+        "topbar": {
+          "bg": "rgba(244, 244, 244, 0.78)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14) rgb(14, 14, 14) rgba(0, 0, 0, 0.12)"
+        },
+        "main": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "main_fallback": {
+          "bg": "rgba(0, 0, 0, 0)",
+          "color": "rgb(14, 14, 14)",
+          "border": "rgb(14, 14, 14)"
+        },
+        "stats": {
+          "lightTextCount": 1,
+          "darkTextCount": 270,
+          "darkBgCount": 18,
+          "lightBgCount": 39,
+          "total": 271
+        }
+      }
+    },
+    "light_text_in_light_mode": {
+      "count": 1,
+      "samples": [
+        {
+          "tag": "BUTTON",
+          "cls": "pa-focus-ring ",
+          "color": "rgb(255, 255, 255)",
+          "bg": "rgb(221, 51, 51)",
+          "text": "Stop"
+        }
+      ]
+    },
+    "dark_bg_in_light_mode": {
+      "count": 0,
+      "samples": []
+    },
+    "light_body": {
+      "bg": "rgb(244, 244, 244)",
+      "text": "rgb(14, 14, 14)",
+      "matches_light_bg": true,
+      "matches_light_text": true
+    },
+    "green_accent_visible": {
+      "count": 2,
+      "samples": [
+        {
+          "tag": "SPAN",
+          "cls": "system-bar__dot system-bar__dot--connected",
+          "color": "rgb(63, 176, 80)"
+        },
+        {
+          "tag": "DIV",
+          "cls": "settings__eyebrow",
+          "color": "rgb(63, 176, 80)"
+        }
+      ]
+    },
+    "system_theme": {
+      "os_light_resolves_to": "light",
+      "os_dark_resolves_to": "dark",
+      "passes": true
+    },
+    "anti_flash": {
+      "firstDataTheme_after_navigate": {
+        "firstDataTheme": "light",
+        "readyState": "complete",
+        "timeout": true
+      },
+      "expected": "light (because persisted)",
+      "passes": true
+    },
+    "general_panel_immediate_apply": {
+      "select_found": {
+        "found": true,
+        "value_before": "light",
+        "options": [
+          {
+            "value": "dark",
+            "text": "Dark (command center)"
+          },
+          {
+            "value": "light",
+            "text": "Light"
+          },
+          {
+            "value": "system",
+            "text": "System"
+          }
+        ]
+      },
+      "after_change_data_theme": "dark",
+      "passes": true
+    },
+    "persistence": {
+      "after_reload_data_theme": "light",
+      "expected": "light",
+      "passes": true
+    }
+  },
+  "defects": [],
+  "console_errors": [],
+  "screenshots": [
+    "round2/dark-chat.png",
+    "round2/light-chat.png",
+    "round2/light-sessions.png",
+    "round2/light-agents.png",
+    "round2/light-inbox.png",
+    "round2/light-settings.png"
+  ]
+}

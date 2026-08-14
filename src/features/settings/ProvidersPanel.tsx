@@ -396,7 +396,7 @@ function Chevron({ open }: { open: boolean }) {
       height="11"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="rgba(244, 244, 244, 0.45)"
+      stroke="rgba(var(--pa-paper-rgb), 0.45)"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"

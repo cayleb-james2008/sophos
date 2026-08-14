@@ -68,3 +68,7 @@ prime-agent-ref
 # Large binaries — downloaded by scripts/bundle.mjs, not tracked
 resources/node/node-v24.18.0-win-x64/node.exe
 resources/node/node.zip
+
+# Gauntlet runtime state (transient, per-piece breadcrumbs)
+evaluator-state.json
+generator-state.json

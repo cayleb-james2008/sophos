@@ -1,0 +1,48 @@
+{
+  "checks": [
+    {
+      "name": "system-bar__readout (light mode)",
+      "selector": ".system-bar__readout",
+      "computed": {
+        "bg": "rgba(0, 0, 0, 0.16)",
+        "bgImage": "linear-gradient(100deg, rgba(0, 0, 0, 0) 0%, rgba(63, 176, 80, 0.12) 48%, rgba(0, 0, 0, 0) 66%)"
+      },
+      "expected_light_bg": "should be light (no rgba(0,0,0))"
+    },
+    {
+      "name": "inbox__graphblank empty-state scrim (light mode)",
+      "selector": ".inbox__graphblank",
+      "computed": {
+        "bg": "rgba(14, 14, 14, 0.35)",
+        "bgImage": "none"
+      },
+      "expected_light_bg": "should not be rgba(14,14,14,X) \u2014 should invert or use --pa-ink with alpha"
+    },
+    {
+      "name": "palette__backdrop (light mode)",
+      "selector": ".palette__backdrop",
+      "computed": {
+        "bg": "rgba(14, 14, 14, 0.72)"
+      },
+      "expected_light_bg": "scrim can stay dark for backdrop, BUT should still darken the visible canvas"
+    },
+    {
+      "name": "agents__graphblank (light mode)",
+      "selector": ".ag-graphblank",
+      "computed": null,
+      "expected_light_bg": "should not be rgba(14,14,14,0.35) \u2014 should match theme"
+    },
+    {
+      "name": "sessions__graphblank (light mode)",
+      "selector": ".sessions__graphblank / .pg-blank",
+      "computed": null,
+      "expected_light_bg": "should not be rgba(14,14,14,0.35)"
+    },
+    {
+      "name": "onboarding__aside (light mode, if present)",
+      "selector": ".pa-onboarding__aside",
+      "computed": null,
+      "expected_light_bg": "should not be rgba(0,0,0,0.12)"
+    }
+  ]
+}

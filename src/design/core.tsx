@@ -462,10 +462,10 @@ export function Badge({
   const tones: Record<BadgeTone, CSS> = {
     neutral: { background: tokens.color.bgOverlay, color: tokens.color.textMuted },
     accent: { background: tokens.color.accentSoft, color: tokens.color.accentHover },
-    success: { background: "rgba(133,237,117,0.12)", color: tokens.color.success },
-    warning: { background: "rgba(243,188,86,0.12)", color: tokens.color.warning },
-    danger: { background: "rgba(239,68,68,0.12)", color: tokens.color.danger },
-    info: { background: "rgba(139,124,246,0.12)", color: tokens.color.info },
+    success: { background: "rgba(var(--pa-green-rgb), 0.12)", color: tokens.color.success },
+    warning: { background: "rgba(var(--pa-amber-rgb), 0.12)", color: tokens.color.warning },
+    danger: { background: "rgba(var(--pa-danger-rgb), 0.12)", color: tokens.color.danger },
+    info: { background: "rgba(var(--pa-info-rgb), 0.12)", color: tokens.color.info },
   };
   const dotColors: Record<BadgeTone, string> = {
     neutral: tokens.color.textDim,

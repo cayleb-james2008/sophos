@@ -109,8 +109,8 @@ export function BoltIcon(p: IconProps) {
  *  off-white with a terminal-green accent. Distinct from the old bolt mark. */
 export function SigmaGlyph({
   size = 16,
-  color = "#f4f4f4",
-  accent = "#85ed75",
+  color = "var(--pa-paper)",
+  accent = "var(--pa-green)",
 }: {
   size?: number;
   color?: string;
