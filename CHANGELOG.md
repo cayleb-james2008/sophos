@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-15 (Beta)
+
+### Added
+- **`/cd` command** — change the active session's working directory mid-session via a native directory picker (typed `/cd` in the composer, opens OS folder dialog, calls `runCommand("cd")`)
+- **Persistent subagent model policy** — new SubagentPolicyPanel in Settings → Subagents tab: set default provider, model, and thinking level for RLM subagents, persisted across sessions via `setSettings`
+- **Per-child composition knobs** — AgentComposer now has a collapsible composition panel with thinking level select (defaults from subagent policy) and skill multi-select (from daemon catalog minus disabled skills)
+- **Keyboard shortcuts overlay** — press `?` or `Cmd/Ctrl+/` to see all registered shortcuts in a styled modal with Kbd chips; closes on Escape/backdrop click
+- **ShortcutsOverlay component** — new design-system modal listing all `Hotkey` entries from the `useHotkeys` registry, grouped by category
+
+### Changed
+- **Inline styles eliminated** — all 58 `style={{}}` blocks in feature/view/shell/design components replaced with CSS classes or CSS custom properties; only dynamic CSS custom property refs remain (e.g. `--pa-skeleton-w`, `--ctx`, `--pad`)
+- **Design system refactor** — Card, Modal, Tooltip, ScrollArea, Tabs, ErrorBoundary, Text, Button, Input, Select, Kbd, Spinner, Badge, StatusDot, Skeleton all className-driven via new CSS files (`primitives.css`, `overlay.css`, `motion.css`, `shortcuts-overlay.css`)
+- **ViewScaffold** — gained optional `loading`/`error`/`onRetry`/`errorLabel` props with ErrorBoundary wrapper
+- **EmptyState** — polished, reusable empty state component with icon, title, description, and optional action button
+- **Error states** — chat error state upgraded to card with Retry button (disabled when no assistant turn to retry)
+- **Loading states** — chat loading text replaced with pulsing skeleton
+- **Sessions/Inbox/Graph/Goals/LongRunning** — all inline styles replaced with CSS custom properties (`--node-w`, `--node-color`, `--bar-w`, `--fill-w`, `--depth`, `--ring-size`, `--chevron-rot`) and CSS classes (`.card-stack-lg`, `.goals-panel`)
+
+### Removed
+- **Share button** — removed from chat header and command palette (was non-functional "not available yet"); Export and Copy buttons retained
+
+### Fixed
+- **Settings interface** — added `subagentDefaultProvider`, `subagentDefaultModel`, `subagentDefaultThinking` fields (additive, non-breaking)
+
+### Tests
+- 106 tests pass (9 files), up from 86 baseline — added 20 new tests for /cd command (8), subagent policy (6), ShortcutsOverlay (6)
+
 ## [0.4.0] — 2026-08-16 (Beta)
 
 ### Added

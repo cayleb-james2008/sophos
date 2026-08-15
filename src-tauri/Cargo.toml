@@ -1,6 +1,6 @@
 [package]
 name = "prime-agent-windows"
-version = "0.4.0"
+version = "0.5.0"
 description = "Windows native Prime Agent — Tauri (Rust) shell + Node bridge + React frontend"
 authors = ["Prime Agent"]
 edition = "2021"

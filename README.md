@@ -16,7 +16,7 @@ near-black surfaces.
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Download](https://img.shields.io/badge/Download-Sophos_0.4.0_Beta-85ed75?logo=gitlab)](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
+[![Download](https://img.shields.io/badge/Download-Sophos_0.5.0_Beta-85ed75?logo=gitlab)](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
 
 **Credits:** This is a Windows port of [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent). All credit for the agent runtime, daemon, and bridge belongs to the Prime Intellect team.
 
@@ -49,7 +49,7 @@ near-black surfaces.
 
 | Step | What |
 |---|---|
-| **1. Download** | Grab `Sophos_0.1.0_x64-setup.exe` from the [Releases](https://gitlab.com/caylebalvarez-james/sophos/-/releases) page. |
+| **1. Download** | Grab `Sophos_0.5.0_x64-setup.exe` from the [Releases](https://gitlab.com/caylebalvarez-james/sophos/-/releases) page. |
 | **2. Install** | Run the `.exe`. Sophos installs to `~\AppData\Local\Sophos`. No admin required. |
 | **3. Launch** | Open **Sophos**. The bundled Node runtime + daemon + bridge start automatically. |
 | **4. Add a provider** | Go to **Settings → Providers** and add an LLM provider (API key or local model). |
@@ -140,7 +140,7 @@ node scripts/bundle.mjs
 
 # 2. Build the native installer:
 npm run tauri build
-# → src-tauri/target/release/bundle/nsis/Sophos_0.1.0_x64-setup.exe
+# → src-tauri/target/release/bundle/nsis/Sophos_0.5.0_x64-setup.exe
 #   (native binary at src-tauri/target/release/prime-agent-windows.exe)
 ```
 
@@ -215,7 +215,7 @@ native binary, frontend, and bundle are all built; only the final `.exe`
 wrapper fails.
 
 > **Verified 2026-08-08:** the build succeeded end-to-end from this worktree
-> (`src-tauri/target/release/bundle/nsis/Sophos_0.1.0_x64-setup.exe`, ~93 MB).
+> (`src-tauri/target/release/bundle/nsis/Sophos_0.5.0_x64-setup.exe`, ~93 MB).
 > The blocker only triggers when the staged path pushes the deepest
 > `@mistralai` file past 260 chars — the current `prime-agent-windows`
 > worktree path keeps it at ~221 chars. If you ever hit it, shorten the
