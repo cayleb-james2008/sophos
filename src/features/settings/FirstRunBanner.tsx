@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../../design";
-import { useIpc, isTauri } from "../../ipc/client";
+import { useIpc, isTauri, isDemoMode, isDemoShell } from "../../ipc/client";
 import type { ModelInfo, ProviderInfo, RuntimeInfo } from "../../ipc/contract";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../providers/useModels";
 import "./onboarding.css";
@@ -21,10 +21,13 @@ function writeFlag(key: string): void {
   catch { /* best-effort persistence */ }
 }
 
-/** Clear the onboarding dismiss flag so the wizard can be re-launched from Settings. */
+/** Clear the onboarding completion flags so the wizard can be re-launched from Settings.
+ * Removes BOTH the dismiss flag and the "first message exists" flag — the latter also
+ * hides the wizard (completed = hasFirstMessage || readFlag(FIRST_MESSAGE_KEY)), so
+ * without clearing it "Run onboarding again" silently did nothing after a first chat. */
 export function clearOnboardingDismissed(): void {
-  try { window.localStorage.removeItem(DISMISS_KEY); }
-  catch { /* best-effort persistence */ }
+  try { window.localStorage.removeItem(DISMISS_KEY); } catch { /* best-effort persistence */ }
+  try { window.localStorage.removeItem(FIRST_MESSAGE_KEY); } catch { /* best-effort persistence */ }
 }
 
 export type SetupCheckState = "checking" | "ready" | "waiting" | "preview";
@@ -63,18 +66,22 @@ function friendlyCheckLabel(label: string): string { return FRIENDLY_CHECK_LABEL
 /** Shared health state used by the experience and the composer gate. */
 export function useOnboardingStatus(): OnboardingStatus {
   const ipc = useIpc();
+  // Demo mode (--demo / browser preview) is treated as fully ready: the mock
+  // IPC is connected and the UI must be usable without a live provider, so the
+  // composer is enabled and onboarding is skipped.
+  const demo = isDemoMode();
   const [checks, setChecks] = useState<SetupCheck[]>(() =>
     isTauri
       ? ["Node runtime", "Daemon", "Bridge", "Kernel", "Free model"].map((label) => ({ label, state: "checking", detail: "Checking…" }))
       : ["Node runtime", "Daemon", "Bridge", "Kernel", "Free model"].map((label) => ({ label, state: "preview", detail: "Browser preview" })),
   );
-  const [hasProvider, setHasProvider] = useState(!isTauri);
-  const [hasFreeProvider, setHasFreeProvider] = useState(!isTauri);
+  const [hasProvider, setHasProvider] = useState(!isTauri || demo);
+  const [hasFreeProvider, setHasFreeProvider] = useState(!isTauri || demo);
   const refreshGeneration = useRef(0);
 
   const refresh = useCallback(() => {
     const generation = ++refreshGeneration.current;
-    if (!isTauri) {
+    if (!isTauri || demo) {
       setChecks(["Node runtime", "Daemon", "Bridge", "Kernel", "Free model"].map((label) => ({ label, state: "preview", detail: "Browser preview" })));
       setHasProvider(true);
       setHasFreeProvider(true);
@@ -114,7 +121,7 @@ export function useOnboardingStatus(): OnboardingStatus {
     };
   }, [refresh]);
 
-  const ready = !isTauri || checks.every((check) => check.state === "ready");
+  const ready = !isTauri || demo || checks.every((check) => check.state === "ready");
   return { checks, ready, hasProvider, hasFreeProvider, refresh };
 }
 
@@ -156,7 +163,7 @@ function CheckRail({ checks }: { checks: SetupCheck[] }) {
 
 export function FirstRunExperience({ onSetupProviders, onStartChat, hasFirstMessage = false, setup }: FirstRunBannerProps): JSX.Element | null {
   const [dismissed, setDismissed] = useState(() => readFlag(DISMISS_KEY));
-  const completed = hasFirstMessage || readFlag(FIRST_MESSAGE_KEY);
+  const completed = hasFirstMessage || readFlag(FIRST_MESSAGE_KEY) || isDemoShell();
   const health = setup;
 
   const dismiss = () => {

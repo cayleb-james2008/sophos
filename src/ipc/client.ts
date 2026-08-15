@@ -697,7 +697,7 @@ export class MockIpcClient implements IpcClient {
 
     // Thinking.
     push(() => e({ kind: "thinking_delta", thinking: "Reading your message…" }), 350);
-    push(() => e({ kind: "thinking_delta", thinking: " `" + shown + "`" }), 900);
+    push(() => e({ kind: "thinking_delta", thinking: " `" + shown + "`" }), 1600);
     // A running demo tool call, then its result.
     push(
       () =>
@@ -706,7 +706,7 @@ export class MockIpcClient implements IpcClient {
           name: "demo_echo",
           input: JSON.stringify({ text: text.trim() }),
         }),
-      1350,
+      2600,
     );
     push(
       () =>
@@ -715,7 +715,7 @@ export class MockIpcClient implements IpcClient {
           name: "demo_echo",
           output: `Demo: echoed user input (${shown.length} chars) — no live tool available.`,
         }),
-      1750,
+      3600,
     );
     // Stream the answer in chunks.
     const chunks = [
@@ -724,13 +724,13 @@ export class MockIpcClient implements IpcClient {
       "\n\nIn the connected app I'd help you work through it step by step.",
     ];
     chunks.forEach((chunk, i) => {
-      push(() => e({ kind: "text", text: chunk }), 2200 + i * 650);
+      push(() => e({ kind: "text", text: chunk }), 4400 + i * 1100);
     });
     // Mark the turn complete → queue idle so busy clears + follow-ups flush.
     push(() => {
       this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "idle" } } });
       this.clearChatTurn();
-    }, 2200 + chunks.length * 650 + 300);
+    }, 4400 + chunks.length * 1100 + 500);
   }
   async setModel(provider: string, model: string, _thinking?: string, runtime?: ModelRuntimeConfig): Promise<void> {
     if (runtime) {

@@ -16,6 +16,8 @@ vi.mock("../../../ipc/client", async () => ({
   get isTauri() {
     return tauriFlag.value;
   },
+  isDemoShell: () => false,
+  isDemoMode: () => !tauriFlag.value,
 }));
 
 function makeSetup(overrides: Partial<OnboardingStatus> = {}): OnboardingStatus {

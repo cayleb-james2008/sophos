@@ -32,6 +32,8 @@ vi.mock("../../../ipc/client", async () => ({
   get isTauri() {
     return tauriFlag.value;
   },
+  isDemoShell: () => false,
+  isDemoMode: () => !tauriFlag.value,
 }));
 
 vi.mock("../../providers/useModels", async () => ({
