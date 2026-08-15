@@ -186,6 +186,13 @@ pub fn run() {
                 eprintln!("[job] failed to create job object; orphans possible on hard kill");
                 Job::null()
             }));
+            // Demo mode: launched with `--demo` (cua-driver e2e) or
+            // SOPHOS_DEMO_MODE=1. The app skips the daemon + sidecar and the
+            // frontend uses the MockIpcClient, so the full UI is demonstrable
+            // and testable without a live provider. This is a real feature —
+            // it makes the desktop app testable via computer-use.
+            let demo_mode = std::env::var("SOPHOS_DEMO_MODE").is_ok()
+                || std::env::args().any(|a| a == "--demo");
             // Resolve bundled runtime paths (packaged) or dev walk-up.
             let resource_dir = app.path().resource_dir().ok();
             let (node_path, daemon_path, bridge_path) =
@@ -216,9 +223,13 @@ pub fn run() {
             );
             sidecar.set_log_sink(log_sink.clone());
 
-            daemon.start(&node_path, &daemon_path, daemon_tcp);
-            sidecar.start();
-            spawn_health_monitor(handle, daemon.clone(), sidecar.clone(), daemon_tcp);
+            if demo_mode {
+                eprintln!("[sophos] DEMO MODE — daemon/sidecar skipped, using mock IPC");
+            } else {
+                daemon.start(&node_path, &daemon_path, daemon_tcp);
+                sidecar.start();
+                spawn_health_monitor(handle, daemon.clone(), sidecar.clone(), daemon_tcp);
+            }
 
             app.manage(AppState {
                 sidecar,
@@ -226,6 +237,15 @@ pub fn run() {
                 log_sink,
                 _job: job,
             });
+
+            // In demo mode, tell the frontend to use the MockIpcClient. This
+            // runs before the webview loads the frontend, so the flag is set
+            // before getIpcClient() is first called.
+            if demo_mode {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.eval("window.__SOPHOS_DEMO__ = true;");
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

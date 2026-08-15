@@ -561,6 +561,29 @@ export class MockIpcClient implements IpcClient {
   // session carries context, matching the real daemon's scope.
   private activeSessionId = "session-0";
 
+  /**
+   * Mutable session list. Starts with the three demo sessions; newSession /
+   * forkSession / cloneSession append to it so the demo mode round-trips
+   * session creation through the UI (the graph re-renders with the new node).
+   */
+  private mockSessions: SessionInfo[] = [
+    { id: "session-0", title: "Refactor auth module", status: "active", cwd: "C:\\work\\api-service", createdAt: new Date(Date.now() - 3600000).toISOString(), updatedAt: new Date().toISOString() },
+    { id: "session-1", title: "Migrate to new config schema", status: "saved", cwd: "C:\\work\\infra", createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString() },
+    { id: "session-2", title: "Sophos — Windows", status: "idle", cwd: "C:\\work\\sophos", createdAt: new Date(Date.now() - 172800000).toISOString() },
+  ];
+
+  /** Append a freshly created session to the demo list and make it active. */
+  private createMockSession(title: string, cwd?: string): string {
+    const id = `session-${Date.now()}`;
+    this.mockSessions = [
+      ...this.mockSessions,
+      { id, title, status: "active", cwd: cwd ?? "", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    ];
+    this.activeSessionId = id;
+    this.state = { ...this.state, activeSessionId: id };
+    return id;
+  }
+
   onEvent(cb: (event: IpcEvent) => void): () => void {
     this.listeners.push(cb);
     this.startSimulation();
@@ -624,9 +647,7 @@ export class MockIpcClient implements IpcClient {
     this.emit({ type: "snapshot", state: this.state });
   }
   async newSession(_cwd?: string, goal?: string): Promise<void> {
-    const id = `session-${Date.now()}`;
-    this.activeSessionId = id;
-    this.state = { ...this.state, activeSessionId: id };
+    this.createMockSession("New session", _cwd);
     if (goal) {
       this.state = {
         ...this.state,
@@ -646,17 +667,11 @@ export class MockIpcClient implements IpcClient {
     this.emit({ type: "snapshot", state: this.state });
   }
   async forkSession(_pathOrId: string): Promise<void> {
-    const id = `session-${Date.now()}`;
-    this.activeSessionId = id;
-    this.state = { ...this.state, activeSessionId: id };
+    this.createMockSession("Forked session");
     this.emit({ type: "snapshot", state: this.state });
   }
   async listSessions(): Promise<SessionInfo[]> {
-    return [
-      { id: "session-0", title: "Refactor auth module", status: "active", cwd: "C:\\work\\api-service", createdAt: new Date(Date.now() - 3600000).toISOString(), updatedAt: new Date().toISOString() },
-      { id: "session-1", title: "Migrate to new config schema", status: "saved", cwd: "C:\\work\\infra", createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString() },
-      { id: "session-2", title: "Sophos — Windows", status: "idle", cwd: "C:\\work\\sophos", createdAt: new Date(Date.now() - 172800000).toISOString() },
-    ];
+    return this.mockSessions;
   }
   async listAgents(): Promise<AgentInfo[]> {
     return [];
@@ -889,9 +904,7 @@ export class MockIpcClient implements IpcClient {
     };
   }
   async cloneSession(): Promise<{ activeSessionId?: string }> {
-    const id = `session-${Date.now()}`;
-    this.activeSessionId = id;
-    this.state = { ...this.state, activeSessionId: id };
+    const id = this.createMockSession("Cloned session");
     this.emit({ type: "snapshot", state: this.state });
     return { activeSessionId: id };
   }
@@ -1020,14 +1033,23 @@ export function getIpcClient(): IpcClient {
   if (client) return client;
   // In Tauri, the global __TAURI_INTERNALS__ is present.
   const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-  client = inTauri ? new TauriIpcClient() : new MockIpcClient();
+  // Demo mode: the Rust shell injects `window.__SOPHOS_DEMO__ = true` when the
+  // app is launched with `--demo` (or SOPHOS_DEMO_MODE=1). In demo mode the
+  // app uses the MockIpcClient so the full UI is demonstrable and testable
+  // without a live daemon/provider — the same simulated sessions, agents, and
+  // messages the browser preview uses. The URL-hash check keeps the dev
+  // server (`http://localhost:1420/#demo`) able to opt in without the shell.
+  const demoMode =
+    (window as any).__SOPHOS_DEMO__ === true ||
+    (typeof window !== "undefined" && window.location.hash.includes("demo"));
+  client = inTauri && !demoMode ? new TauriIpcClient() : new MockIpcClient();
   // Expose on window in browser/demo mode so the e2e test harness can patch
   // the singleton directly (Vite HMR creates separate module instances per
   // `?t=` timestamp, so `import()` in page.evaluate resolves to a different
   // module than the app loaded — patching that prototype has no effect on the
   // already-instantiated singleton). In Tauri this is a no-op (the mock isn't
   // used). Harmless in production.
-  if (typeof window !== "undefined" && !inTauri) {
+  if (typeof window !== "undefined" && (!inTauri || demoMode)) {
     (window as any).__sophosIpc = client;
   }
   return client;

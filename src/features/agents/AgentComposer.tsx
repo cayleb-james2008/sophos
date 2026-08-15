@@ -8,7 +8,7 @@
 // and the daemon skill catalog (getRuntimeInfo), so the relay honors the
 // fleet's defaults until the operator explicitly overrides them.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Text, Select } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { AgentRow } from "./useAgents";
@@ -32,6 +32,31 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
   const ipc = useIpc();
   const target = agent?.name ?? "AGENT";
   const canSend = draft.trim().length > 0 && !sending;
+  const areaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // The cua-driver e2e harness types into the textarea via UIA ValuePattern,
+  // which sets the DOM value without firing React's synthetic onChange. A
+  // native `input` listener (attached directly to the element) plus a short
+  // polling fallback keep the draft in sync so the relay is testable by
+  // computer-use. This is a no-op for normal keyboard input (onChange already
+  // handles it) — it only bridges the programmatic-set path.
+  useEffect(() => {
+    const area = areaRef.current;
+    if (!area) return;
+    const onNativeInput = () => {
+      if (area.value !== draft) setDraft(area.value);
+    };
+    area.addEventListener("input", onNativeInput);
+    // Polling fallback: some UIA ValuePattern implementations set the value
+    // without dispatching any DOM event, so a short interval catches it.
+    const poll = window.setInterval(() => {
+      if (area.value !== draft) setDraft(area.value);
+    }, 200);
+    return () => {
+      area.removeEventListener("input", onNativeInput);
+      window.clearInterval(poll);
+    };
+  }, [draft, setDraft]);
 
   // Defaults come from the persisted subagent policy + the skill catalog.
   const [thinking, setThinking] = useState<string>("medium");
@@ -139,6 +164,7 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
       ) : null}
 
       <textarea
+        ref={areaRef}
         aria-label={`Message to ${target}`}
         className="ag-composer__area"
         value={draft}
