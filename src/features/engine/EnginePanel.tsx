@@ -73,6 +73,30 @@ function isInTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+// Detect the real Tauri app launched in demo mode (`--demo` / SOPHOS_DEMO_MODE=1):
+// the Rust shell injects `window.__SOPHOS_DEMO__ = true`. In that mode the app
+// skips the daemon + sidecar, so the Tauri engine invokes (`get_engine_logs`,
+// `get_engine_status`) have nothing to answer with. Rather than showing a dead,
+// empty terminal, demo mode presents a simulated live engine — status dots lit,
+// process graph live, and a clearly-labeled demo log stream — so the Engine
+// Terminal is fully demonstrable and testable without a live daemon.
+function isDemoShell(): boolean {
+  return typeof window !== "undefined" && (window as any).__SOPHOS_DEMO__ === true;
+}
+
+/** Simulated engine log stream shown in demo mode (clearly labeled as a demo). */
+const DEMO_ENGINE_STATUS: EngineStatus = { daemon_alive: true, sidecar_alive: true };
+
+const DEMO_ENGINE_LOGS: EngineLogEntry[] = [
+  { proc: "daemon", stream: "stdout", line: "Sophos agent daemon starting (demo mode — simulated engine)", ts: new Date(Date.now() - 120000).toISOString() },
+  { proc: "sidecar", stream: "stdout", line: "IPC bridge connecting to daemon...", ts: new Date(Date.now() - 118000).toISOString() },
+  { proc: "daemon", stream: "stdout", line: "daemon listening on tcp://127.0.0.1", ts: new Date(Date.now() - 115000).toISOString() },
+  { proc: "sidecar", stream: "stdout", line: "bridge connected · session-0 ready", ts: new Date(Date.now() - 112000).toISOString() },
+  { proc: "daemon", stream: "stdout", line: "kernel: persistent IPython ready", ts: new Date(Date.now() - 110000).toISOString() },
+  { proc: "daemon", stream: "stdout", line: "free model: DeepSeek V4 Flash 0731 ready", ts: new Date(Date.now() - 108000).toISOString() },
+  { proc: "daemon", stream: "stderr", line: "(demo) engine log output is simulated — no real daemon is running", ts: new Date(Date.now() - 105000).toISOString() },
+];
+
 // ---------------------------------------------------------------------------
 // Helper: color log lines by process/stream
 // ---------------------------------------------------------------------------
@@ -88,18 +112,23 @@ function logPrefix(proc: string, stream: string): string {
 // ---------------------------------------------------------------------------
 
 export function EnginePanel({ open }: { open: boolean }) {
-  const [logs, setLogs] = useState<EngineLogEntry[]>([]);
-  const [status, setStatus] = useState<EngineStatus | null>(null);
+  const inTauri = useMemo(() => isInTauri(), []);
+  const demo = useMemo(() => isDemoShell(), []);
+  // `live` gates the real Tauri engine invokes: only when running in the real
+  // (non-demo) Tauri shell. In demo mode the daemon is skipped, so the terminal
+  // renders a simulated live engine instead.
+  const live = inTauri && !demo;
+  const [logs, setLogs] = useState<EngineLogEntry[]>(() => (demo ? DEMO_ENGINE_LOGS : []));
+  const [status, setStatus] = useState<EngineStatus | null>(() => (demo ? DEMO_ENGINE_STATUS : null));
   const [autoScroll, setAutoScroll] = useState(true);
   const [restarting, setRestarting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inTauri = useMemo(() => isInTauri(), []);
   const conn = useConnectionState();
   const workers = conn.rlmChildren ?? [];
 
-  // Initial load + event subscription
+  // Initial load + event subscription (real Tauri engine only)
   useEffect(() => {
-    if (!inTauri) return;
+    if (!live) return;
 
     let unlisten: (() => void) | undefined;
 
@@ -126,17 +155,17 @@ export function EnginePanel({ open }: { open: boolean }) {
     return () => {
       unlisten?.();
     };
-  }, [inTauri]);
+  }, [live]);
 
-  // Poll engine status every 3s (lightweight)
+  // Poll engine status every 3s (lightweight) — real Tauri engine only.
   useEffect(() => {
-    if (!inTauri) return;
+    if (!live) return;
     const interval = setInterval(async () => {
       const s = await invokeEngineStatus();
       if (s) setStatus(s);
     }, 3000);
     return () => clearInterval(interval);
-  }, [inTauri]);
+  }, [live]);
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
@@ -160,7 +189,7 @@ export function EnginePanel({ open }: { open: boolean }) {
   }, []);
   const handleStop = useCallback(async () => { await invokeStop(); }, []);
 
-  const dotState: StatusDotState = !inTauri
+  const dotState: StatusDotState = !inTauri && !demo
     ? "idle"
     : status?.daemon_alive && status?.sidecar_alive
     ? "connected"
@@ -168,7 +197,7 @@ export function EnginePanel({ open }: { open: boolean }) {
     ? "disconnected"
     : "connecting";
 
-  const statusLabel = !inTauri
+  const statusLabel = !inTauri && !demo
     ? "Browser Preview"
     : status?.daemon_alive && status?.sidecar_alive
     ? "Engine Running"
@@ -224,7 +253,7 @@ export function EnginePanel({ open }: { open: boolean }) {
         onScroll={handleScroll}
         className="engine-panel__body"
       >
-        {!inTauri ? (
+        {!inTauri && !demo ? (
           <BrowserPreviewState />
         ) : logs.length === 0 ? (
           <div className="engine-panel__empty">
