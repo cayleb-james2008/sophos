@@ -1,0 +1,22 @@
+# .gitlab-ci.yml
+# Sophos update-feed branch — GitLab Pages deployment for the auto-updater manifest.
+#
+# GitLab Pages serves static files from the `public/` directory produced by a
+# `pages` job. This job copies the canonical update manifest into `public/` so
+# the auto-updater can fetch it at:
+#   https://caylebalvarez-james.gitlab.io/sophos/manifest.json
+#
+# The manifest's download URL points at the GitLab release asset
+# (Sophos_0.2.0_x64-setup.exe). The signature is unchanged — the signed
+# updater key is NOT rotated.
+
+pages:
+  stage: deploy
+  script:
+    - mkdir -p public
+    - cp update/manifest.json public/manifest.json
+  artifacts:
+    paths:
+      - public
+  only:
+    - update-feed
