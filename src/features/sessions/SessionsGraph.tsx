@@ -12,6 +12,7 @@ import { tokens } from "../../design/tokens";
 import { Button } from "../../design";
 import type { SessionInfo, ContextStats, Goal, RlmChild } from "../../ipc/contract";
 import { formatTokens } from "./format";
+import type { CSSProperties } from "react";
 import "./sessions.css";
 
 const WIDTH = 252;
@@ -87,7 +88,7 @@ function CtxReadout({ tokens: t, window: w }: { tokens?: number; window?: number
   return (
     <span className="pg-ctx" title={`Context ${formatTokens(t)} / ${formatTokens(w)} tokens`}>
       <span className="pg-ctx__bar">
-        <span className={`pg-ctx__fill${danger ? " pg-ctx__fill--danger" : ""}`} style={{ width: `${pct}%` }} />
+        <span className={`pg-ctx__fill${danger ? " pg-ctx__fill--danger" : ""}`} style={{ "--fill-w": `${pct}%` } as CSSProperties} />
       </span>
       <span className="pg-ctx__pct">CTX {pct}%</span>
     </span>

@@ -8,7 +8,7 @@
 // tree so the view is demonstrable; in the real app an empty tree renders a
 // graceful empty state.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button, Text, IconButton } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { SessionInfo, SessionTreeNode } from "../../ipc/contract";
@@ -241,7 +241,7 @@ function TreeRow({
       <Button
         variant="ghost"
         className={`session-tree__node session-tree__node--${cls}${selected ? " session-tree__node--selected" : ""}`}
-        style={{ paddingLeft: 12 + depth * 18 }}
+        style={{ "--depth": depth } as CSSProperties}
         onClick={() => onSelect(node)}
         title={node.label}
       >

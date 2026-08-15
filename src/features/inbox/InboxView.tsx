@@ -9,7 +9,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Text } from "../../design";
-import { tokens } from "../../design/tokens";
 import { useIpc, useIpcEvent } from "../../ipc/client";
 import type { AgentInfo, AgentMessage } from "../../ipc/contract";
 import { InboxGraph } from "./InboxGraph";
@@ -129,7 +128,7 @@ export function InboxView() {
               onClick={() => void selectAgent(agent.id)}
               title={agent.name ?? agent.id}
             >
-              <span className="inbox__chip__dot" style={{ background: agent.status === "running" ? tokens.color.ok : agent.status === "idle" ? tokens.color.warn : tokens.color.textDim }} />
+              <span className={`inbox__chip__dot${agent.status === "running" ? " inbox__chip__dot--running" : agent.status === "idle" ? " inbox__chip__dot--idle" : ""}`} />
               <span className="inbox__chip__name">{agent.name ?? agent.id}</span>
               {unread > 0 && <span className="inbox__chip__unread">{unread}</span>}
             </Button>

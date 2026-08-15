@@ -86,7 +86,7 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
   const activeCount = heartbeats.filter((h) => h.status === "active").length;
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack-lg">
       {/* State answer: is a heartbeat set? */}
       <div className="lr-hb-head">
         <Text variant="label" weight="semibold">

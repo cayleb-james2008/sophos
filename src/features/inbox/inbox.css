@@ -402,6 +402,8 @@
   border-radius: 50%;
   background: rgba(var(--pa-paper-rgb), 0.3);
 }
+.inbox__chip__dot--running { background: var(--pa-green); }
+.inbox__chip__dot--idle { background: var(--pa-amber); }
 .inbox__chip__name { font-weight: 500; }
 .inbox__chip__unread {
   min-width: 16px;

@@ -41,7 +41,7 @@
 
 /* ---- Edges: quiet hairlines by default, flowing dash when active ---- */
 .react-flow__edge-path {
-  stroke: var(--pa-border);
+  stroke: var(--edge-color, var(--pa-border));
   stroke-width: 1.25;
 }
 .react-flow__edge-path.pg-animated {
@@ -116,6 +116,7 @@
   border-radius: 0;
   transition: border-color 0.18s cubic-bezier(0.3, 0, 0.2, 1), box-shadow 0.18s ease;
   height: 100%;
+  width: var(--node-w);
 }
 .pg-node:hover {
   border-color: var(--pa-border-strong);
@@ -128,6 +129,7 @@
   bottom: 8px;
   width: 2px;
   border-radius: 0;
+  background: var(--node-color);
 }
 .pg-node__head {
   display: flex;
@@ -150,6 +152,8 @@
   height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
+  background: var(--node-color);
+  box-shadow: 0 0 0 3px var(--node-wash);
 }
 .pg-node__title {
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
@@ -251,6 +255,7 @@
   top: 0;
   bottom: 0;
   background: var(--pa-green);
+  width: var(--fill-w);
 }
 .pg-ctx__fill--danger {
   background: var(--pa-danger);

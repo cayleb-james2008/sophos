@@ -112,7 +112,7 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
   };
 
   return (
-    <Card variant="raised" padding="none" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <Card variant="raised" padding="none" className="goals-panel">
       {/* Header — the active-goal state answer. */}
       <div className={`goals-head${open ? "" : " goals-head--closed"}`}>
         <div className="goals-headmain">

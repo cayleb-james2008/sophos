@@ -16,7 +16,7 @@
 // the pending proposal stays an explicit green human-gate box with Apply/Discard,
 // and auto-apply stays OFF by default (driven by useRefinementGate).
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Card, Text, Badge, Button, Input, IconButton } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { RefinementResult } from "../../ipc/contract";
@@ -87,7 +87,7 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
   const refinements = gate.history.length > 0 ? gate.history : initial;
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack-lg">
       {/* State: how many passes, is one awaiting review? */}
       <div className="lr-headrow">
         <Text variant="label" weight="semibold">
@@ -266,10 +266,7 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
                       >
                         <ChevronRightIcon
                           size={11}
-                          style={{
-                            transform: diffOpen ? "rotate(90deg)" : "none",
-                            transition: "transform 100ms cubic-bezier(0.3, 0, 0.2, 1)",
-                          }}
+                          style={{ "--chevron-rot": diffOpen ? "90deg" : "0deg" } as CSSProperties}
                         />
                         {diffOpen ? "Hide diff" : "Show diff"}
                       </Button>

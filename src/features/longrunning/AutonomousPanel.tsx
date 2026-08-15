@@ -102,7 +102,7 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
     : null;
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack-lg">
       {/* State answer up top: is this on? */}
       <div className="lr-headrow">
         <Text variant="label" weight="semibold">

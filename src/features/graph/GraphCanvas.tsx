@@ -67,11 +67,11 @@ export function NodeFrame({
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.3, ease: enterEase }}
     >
-      <div className={`pg-node ${selected ? "pg-node--sel" : ""}`} style={{ width, ...style }} onClick={onClick}>
-        <span className="pg-node__edge" style={{ background: color }} />
+      <div className={`pg-node ${selected ? "pg-node--sel" : ""}`} style={{ "--node-w": `${width}px`, ...style } as CSSProperties} onClick={onClick}>
+        <span className="pg-node__edge" style={{ "--node-color": color } as CSSProperties} />
         <div className="pg-node__head">
           <span className="pg-node__kind">{kind}</span>
-          {corner ?? <span className="pg-node__dot" style={{ background: color, boxShadow: `0 0 0 3px ${statusWash(status)}` }} />}
+          {corner ?? <span className="pg-node__dot" style={{ "--node-color": color, "--node-wash": statusWash(status) } as CSSProperties} />}
         </div>
         <div className="pg-node__title" title={title}>
           {title}
@@ -130,7 +130,7 @@ export function PulseEdge({
         id={id}
         path={path}
         className={d.animated ? "pg-animated" : undefined}
-        style={{ stroke: color, strokeWidth: 1.25, ...style }}
+        style={{ "--edge-color": color, ...style } as CSSProperties}
       />
       {d.pulse && !reduced ? (
         <circle r={2.6} fill={color}>

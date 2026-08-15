@@ -1,5 +1,19 @@
 /* Long-running panels — flat, ruled, shared visual language. */
 
+/* ---- Card stack (replaces inline display:flex / gap on the panel Cards) ---- */
+.card-stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ---- Chevron rotation on diff toggles (via CSS custom property) ---- */
+.lr-gate__diff-toggle svg,
+.lr-ref-diffbtn svg {
+  transition: transform 100ms cubic-bezier(0.3, 0, 0.2, 1);
+  transform: rotate(var(--chevron-rot, 0deg));
+}
+
 /* ---- DiffView ---- */
 .lr-diff {
   background: var(--pa-ink);

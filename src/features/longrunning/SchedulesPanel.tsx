@@ -72,7 +72,7 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
   const activeCount = schedules.filter((s) => s.active !== false).length;
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack-lg">
       {/* State answer: is anything scheduled? */}
       <div className="lr-headrow">
         <Text variant="label" weight="semibold">

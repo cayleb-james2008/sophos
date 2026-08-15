@@ -13,7 +13,7 @@
 // stays OFF by default. The diff is built from the event (buildRefinementDiff)
 // and never fabricates content the daemon did not report.
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Text, Button } from "../../design";
 import { CheckIcon, XIcon, ChevronRightIcon } from "../sessions/icons";
 import { useRefinementGate, describeRefinement } from "./useRefinementGate";
@@ -45,13 +45,11 @@ export function RefinementGateBanner() {
           <Button
             variant="ghost"
             size="sm"
+            className="lr-gate__diff-toggle"
             icon={
               <ChevronRightIcon
                 size={12}
-                style={{
-                  transform: showDiff ? "rotate(90deg)" : "none",
-                  transition: "transform 100ms cubic-bezier(0.3, 0, 0.2, 1)",
-                }}
+                style={{ "--chevron-rot": showDiff ? "90deg" : "0deg" } as CSSProperties}
               />
             }
             onClick={() => setShowDiff((s) => !s)}

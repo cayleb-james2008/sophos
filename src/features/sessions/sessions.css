@@ -519,6 +519,7 @@
   border-radius: 0;
   background: var(--pa-green);
   max-width: 22px;
+  width: var(--bar-w);
 }
 .session__ctx--danger { color: var(--pa-danger); }
 .session__ctx--danger .session__ctx-dot { background: var(--pa-danger); }
@@ -1035,6 +1036,7 @@
   gap: 8px;
   padding: 6px 10px;
   padding-right: 8px;
+  padding-left: calc(12px + var(--depth, 0) * 18px) !important;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 0;
@@ -1222,6 +1224,8 @@
 .ctx-ring {
   position: relative;
   flex: none;
+  width: var(--ring-size);
+  height: var(--ring-size);
 }
 .ctx-ring svg { display: block; }
 .ctx-ring__track { fill: none; stroke: var(--pa-border); stroke-width: 7; }

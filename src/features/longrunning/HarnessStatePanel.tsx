@@ -44,7 +44,7 @@ export function HarnessStatePanel() {
   const entries = (state?.entries ?? []).filter((entry) => filter === "all" || entry.kind === filter);
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack-lg">
       <div className="lr-headrow">
         <div>
           <Text variant="label" weight="semibold">Continual harness state</Text>

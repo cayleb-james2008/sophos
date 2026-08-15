@@ -4,6 +4,7 @@
 // Hover-revealed action buttons: Switch, Resume, Fork.
 
 import type { SessionInfo, ContextStats, Goal, RlmChild } from "../../ipc/contract";
+import type { CSSProperties } from "react";
 import { initials, durationLabel, formatTokens } from "./format";
 import { IconButton } from "../../design";
 import { PlayIcon, ForkIcon, RefreshIcon, TargetIcon, LayersIcon } from "./icons";
@@ -84,7 +85,7 @@ export function SessionCard({
               <span className={`session__ctx ${contextPct > 80 ? "session__ctx--danger" : ""}`}>
                 <i
                   className="session__ctx-dot"
-                  style={{ width: `${Math.max(3, (contextPct / 100) * 22)}px` }}
+                  style={{ "--bar-w": `${Math.max(3, (contextPct / 100) * 22)}px` } as CSSProperties}
                 />
                 {formatTokens(context?.tokens)}
                 {context?.contextWindow ? `/${formatTokens(context.contextWindow)}` : ""}
