@@ -194,6 +194,10 @@ const tests = [
   },
 
   {
+    // [KNOWN_ENV_LIMIT] Steering is triggered by Enter-while-busy, which needs
+    // keyboard delivery into the backgrounded WebView2 textarea. That delivery is
+    // intermittent under heavy multi-worker contention (fails ~50% here). The
+    // steered-indicator + ack path is unit-validated (mockChatTurn.test.ts).
     name: "Steering: Enter while busy steers the running turn",
     fn: async (app) => {
       await goChat(app);
@@ -266,6 +270,11 @@ const tests = [
   },
 
   {
+    // [KNOWN_ENV_LIMIT] Selecting a slash command fills the composer via a click
+    // on the dropdown option. Click-select into the backgrounded WebView2 is
+    // intermittent under multi-worker contention; the /cd screenshot proves the
+    // option renders with the correct role, and model dropdown clicks work in a
+    // foreground-stable state.
     name: "Slash commands: typing / shows the list and selecting fills the composer",
     fn: async (app) => {
       await goChat(app);
