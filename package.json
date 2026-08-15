@@ -1,7 +1,7 @@
 {
   "name": "sophos",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Sophos — a Windows-native port of Prime Intellect's Prime Agent. Credits: PrimeIntellect-ai/prime-agent (upstream).",
   "scripts": {

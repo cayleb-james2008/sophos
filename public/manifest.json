@@ -1,0 +1,12 @@
+{
+  "version": "0.4.0",
+  "notes": "Sophos v0.4.0 (Beta) — pre-v1.0 beta release. All versions before v1.0 are beta.",
+  "pub_date": "2026-08-16T00:00:00Z",
+  "channel": "beta",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "PLACEHOLDER_RESIGN_AT_RELEASE",
+      "url": "https://gitlab.com/api/v4/projects/caylebalvarez-james%2Fsophos/packages/generic/sophos/0.4.0/Sophos_0.4.0_x64-setup.exe"
+    }
+  }
+}

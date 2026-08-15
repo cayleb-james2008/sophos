@@ -9,21 +9,26 @@
 // `.gitlab-ci.yml` pages job). This local server is for development/testing
 // only — the production endpoint in tauri.conf.json points at GitLab Pages.
 //
-// Usage: node scripts/serve-update-feed.mjs [--port 37822] [--version 0.2.0]
+// Usage: node scripts/serve-update-feed.mjs [--port 37822] [--version 0.4.0] [--channel beta]
 //
 // Serves:
-//   GET /manifest.json  → the update manifest (version, notes, platforms)
+//   GET /manifest.json  → the update manifest (version, notes, channel, platforms)
 //   GET /update          → the update binary (a dummy file for testing)
 //
 // The manifest format matches the Tauri v2 updater spec:
 //   {
-//     "version": "0.2.0",
-//     "notes": "Test update",
-//     "pub_date": "2026-08-12T00:00:00Z",
+//     "version": "0.4.0",
+//     "notes": "Sophos v0.4.0 (Beta) — ...",
+//     "pub_date": "2026-08-16T00:00:00Z",
+//     "channel": "beta",
 //     "platforms": {
 //       "windows-x86_64": { "url": "http://127.0.0.1:37822/update", "signature": "..." }
 //     }
 //   }
+//
+// The `channel` field is a custom key (ignored by the Tauri v2 updater, which
+// only reads version/notes/pub_date/platforms) but visible to humans inspecting
+// the endpoint so the release channel is labeled.
 
 import { createServer } from "node:http";
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
@@ -37,7 +42,15 @@ const args = process.argv.slice(2);
 const portIdx = args.indexOf("--port");
 const port = portIdx !== -1 ? parseInt(args[portIdx + 1], 10) : 37822;
 const versionIdx = args.indexOf("--version");
-const version = versionIdx !== -1 ? args[versionIdx + 1] : "0.2.0";
+const version = versionIdx !== -1 ? args[versionIdx + 1] : "0.4.0";
+const channelIdx = args.indexOf("--channel");
+const channel = channelIdx !== -1 ? args[channelIdx + 1] : "beta";
+
+// Human-readable channel label for the notes text (e.g. "beta" → "Beta").
+function channelLabel(ch) {
+  if (!ch) return "";
+  return ch.charAt(0).toUpperCase() + ch.slice(1);
+}
 
 // Read the signature from a file if it exists, otherwise use a placeholder.
 const sigPath = join(__dirname, "update.sig");
@@ -59,8 +72,9 @@ const server = createServer((req, res) => {
 
     const manifest = {
       version,
-      notes: `Sophos ${version} — test update for auto-updater verification`,
+      notes: `Sophos ${version} (${channelLabel(channel)}) — test update for auto-updater verification`,
       pub_date: new Date().toISOString(),
+      channel,
       platforms: {
         "windows-x86_64": {
           url: `http://127.0.0.1:${port}/update`,
@@ -97,6 +111,7 @@ server.listen(port, "127.0.0.1", () => {
   console.log(`  Manifest:  http://127.0.0.1:${port}/manifest.json`);
   console.log(`  Update:    http://127.0.0.1:${port}/update`);
   console.log(`  Version:   ${version}`);
+  console.log(`  Channel:   ${channel}`);
   console.log(`  Signature: ${existsSync(sigPath) ? "loaded from update.sig" : "NOT SET — run build-signed-update.mjs first"}`);
   console.log(`\nPress Ctrl+C to stop.`);
 });
