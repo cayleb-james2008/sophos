@@ -72,3 +72,6 @@ resources/node/node.zip
 # Gauntlet runtime state (transient, per-piece breadcrumbs)
 evaluator-state.json
 generator-state.json
+
+# Smoke test screenshots
+verify/screenshots/
