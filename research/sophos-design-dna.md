@@ -63,7 +63,7 @@ Stark near-black. Sharp corners. Hairline `#2a2a2a` borders. Off-white `#f4f4f4`
 
 The app is being rebranded from "Prime Agent" to **Sophos** (Greek: wisdom/intellect).
 
-- Repo: `github.com/cayleb-james2008/sophos` (NEW repo; old `prime-agent-windows` scrapped)
+- Repo: `gitlab.com/caylebalvarez-james/sophos` (NEW repo; old `prime-agent-windows` scrapped)
 - Package name: `sophos`
 - Tauri productName: `Sophos`
 - Identifier: `com.sophos.app` (or `com.cayleb.sophos`)

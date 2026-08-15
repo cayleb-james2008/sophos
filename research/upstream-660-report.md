@@ -136,4 +136,4 @@ without manual filesystem surgery, which seems worth noting alongside #660.
 | Prime Agent | v0.7.0 |
 | Node | 24.18.0 |
 | Python (venv) | 3.11.15 (uv-managed) |
-| Context | Reproduced via [Sophos](https://github.com/cayleb-james2008/sophos), a Windows-native desktop port of Prime Agent |
+| Context | Reproduced via [Sophos](https://gitlab.com/caylebalvarez-james/sophos), a Windows-native desktop port of Prime Agent |

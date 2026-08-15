@@ -16,6 +16,7 @@ near-black surfaces.
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Download](https://img.shields.io/badge/Download-Sophos_0.2.0-85ed75?logo=gitlab)](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
 
 **Credits:** This is a Windows port of [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent). All credit for the agent runtime, daemon, and bridge belongs to the Prime Intellect team.
 
@@ -46,7 +47,7 @@ near-black surfaces.
 
 | Step | What |
 |---|---|
-| **1. Download** | Grab `Sophos_0.1.0_x64-setup.exe` from the [Releases](../../releases) page. |
+| **1. Download** | Grab `Sophos_0.1.0_x64-setup.exe` from the [Releases](https://gitlab.com/caylebalvarez-james/sophos/-/releases) page. |
 | **2. Install** | Run the `.exe`. Sophos installs to `~\AppData\Local\Sophos`. No admin required. |
 | **3. Launch** | Open **Sophos**. The bundled Node runtime + daemon + bridge start automatically. |
 | **4. Add a provider** | Go to **Settings → Providers** and add an LLM provider (API key or local model). |
@@ -240,6 +241,6 @@ MIT — same license as the upstream [PrimeIntellect-ai/prime-agent](https://git
 
 <div align="center">
 
-*Brought to you by [Cayleb](https://github.com/cayleb-james2008). Built on the open superintelligence stack.*
+*Brought to you by [Cayleb](https://gitlab.com/caylebalvarez-james). Built on the open superintelligence stack.*
 
 </div>

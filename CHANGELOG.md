@@ -83,4 +83,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Credits
 - Based on [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) — all credit for the agent runtime, daemon, and bridge belongs to the Prime Intellect team.
-- Built by [Cayleb](https://github.com/cayleb-james2008).
+- Built by [Cayleb](https://gitlab.com/caylebalvarez-james).
