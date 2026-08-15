@@ -113,7 +113,7 @@ export function AdvancedPanel() {
 
 function TrustModelCard() {
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <Card variant="raised" padding="lg" className="card-stack--compact">
       <div className="sp-headrow">
         <span className="sp-icon">
           <ShieldIcon size={16} />
@@ -141,7 +141,7 @@ function KernelCard({ runtime }: { runtime?: RuntimeInfo }) {
   const configured = kernel?.status === "configured";
   const browserPreview = kernel?.status === "browser-preview";
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <Card variant="raised" padding="lg" className="card-stack--compact">
       <div className="sp-head">
         <div className="sp-headrow">
           <CpuIcon size={16} />

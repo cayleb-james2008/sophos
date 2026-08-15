@@ -80,7 +80,7 @@ export function DaemonTransportCard() {
   );
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <Card variant="raised" padding="lg" className="card-stack--compact">
       <div className="sp-head">
         <div className="sp-headrow--sm">
           <PlugIcon size={16} />
@@ -106,7 +106,7 @@ export function DaemonTransportCard() {
 
 export function DaemonDiagnosticsCard({ status, onRefresh }: { status: { connected: boolean; tcpEnabled?: boolean; socketPath?: string }; onRefresh: () => void }) {
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack">
       <div className="sp-head">
         <div className="sp-headrow">
           <span className={`sp-icon${status.connected ? " sp-icon--ok" : " sp-icon--err"}`}>

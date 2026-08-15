@@ -76,15 +76,7 @@ export function DaemonStatusBanner({ onRestartRequest }: { onRestartRequest?: ()
       <Card
         variant="raised"
         padding="md"
-        style={{
-          pointerEvents: "auto",
-          maxWidth: 720,
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          border: "1px solid var(--pa-border)",
-        }}
+        className="dsb-card"
       >
         <div className="dsb-head">
           <StatusDot state={status.kind} />

@@ -19,7 +19,7 @@ function childBadge(status: RlmChild["status"]): { label: string; tone: BadgeTon
 
 export function RlmChildrenPanel({ children, onRefresh }: { children: RlmChild[]; onRefresh: () => void }) {
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack">
       <div className="sp-head">
         <div className="sp-headrow">
           <span className="sp-icon sp-icon--dim">

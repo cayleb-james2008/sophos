@@ -12,7 +12,7 @@ export function ContextPanel({ context, onCompact }: { context: ContextStats; on
   const pct = ctxWindow > 0 ? Math.min(100, (tokensUsed / ctxWindow) * 100) : 0;
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack">
       <div className="sp-head">
         <div className="sp-headleft">
           <span className="sp-icon">

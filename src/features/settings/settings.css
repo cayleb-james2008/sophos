@@ -81,6 +81,22 @@
 }
 
 /* ---- Inline-style purge: settings panels ---- */
+/* Card stack — replaces the repeated flex-column Card inline layout. gap: 22px
+   matches tokens.space.xl (the historical gap: 22); the `--compact` variant
+   matches tokens.space.md (the gap: 12 cards). */
+.card-stack { display: flex; flex-direction: column; gap: 22px; }
+.card-stack--compact { display: flex; flex-direction: column; gap: 12px; }
+
+/* Daemon status banner card — pointer-events re-enabled over the inert wrapper. */
+.dsb-card {
+  pointer-events: auto;
+  max-width: 720px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--pa-border);
+}
 .gp-form { display: flex; flex-direction: column; gap: 22px; }
 .gp-head { display: flex; align-items: center; justify-content: space-between; }
 .gp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
@@ -114,6 +130,18 @@
 .ap-eyebrow { letter-spacing: 0.12em; }
 .ap-loading { display: flex; justify-content: center; padding: 40px; }
 .ap-cwd { word-break: break-all; }
+
+/* ---- subagent model policy ---- */
+.sub-skeleton { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; }
+.sub-error { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--pa-border); background: var(--pa-card); }
+.sub-error__actions { display: flex; justify-content: flex-end; }
+.sub-empty { padding: 12px; border: 1px dashed var(--pa-border); background: var(--pa-card); }
+.sub-field { display: flex; flex-direction: column; gap: 5px; }
+.sub-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 620px) {
+  .sub-grid { grid-template-columns: 1fr 1fr; }
+  .sub-grid--wide { grid-column: 1 / -1; }
+}
 
 /* ---- list rows / status dots ---- */
 .sp-icon--dim { background: var(--pa-overlay); color: rgba(var(--pa-paper-rgb), 0.45); }

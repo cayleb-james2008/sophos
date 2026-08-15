@@ -8,6 +8,7 @@ import { useAppState } from "../../state/AppState";
 import { GeneralPanel } from "./GeneralPanel";
 import { ProvidersPanel } from "./ProvidersPanel";
 import { SkillsPanel } from "./SkillsPanel";
+import { SubagentPolicyPanel } from "./SubagentPolicyPanel";
 import { ExtensionsPanel } from "./ExtensionsPanel";
 import { AdvancedPanel } from "./AdvancedPanel";
 import { LongRunningPanel } from "./LongRunningPanel";
@@ -33,6 +34,7 @@ export function SettingsView() {
         items={[
           { id: "general", label: "General" },
           { id: "providers", label: "Providers" },
+          { id: "subagents", label: "Subagents" },
           { id: "skills", label: "Skills" },
           { id: "extensions", label: "Extensions" },
           { id: "advanced", label: "Advanced" },
@@ -46,6 +48,7 @@ export function SettingsView() {
       <div className="settings__body">
         {tab === "general" ? <GeneralPanel /> : null}
         {tab === "providers" ? <ProvidersPanel /> : null}
+        {tab === "subagents" ? <SubagentPolicyPanel /> : null}
         {tab === "skills" ? <SkillsPanel /> : null}
         {tab === "extensions" ? <ExtensionsPanel /> : null}
         {tab === "advanced" ? <AdvancedPanel /> : null}

@@ -458,6 +458,67 @@
 .ag-composer__foot > span { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.45); letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ag-composer__foot .ag-sendbtn { flex: none; white-space: nowrap; }
 
+/* ---- Per-child composition knobs ---- */
+.ag-compbtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--pa-border);
+  padding: 5px 0 8px;
+  cursor: pointer;
+  color: rgba(var(--pa-paper-rgb), 0.55);
+  font: 600 9px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: left;
+  border-radius: 0;
+}
+.ag-compbtn:hover { color: var(--pa-paper); }
+.ag-compbtn__caret { display: inline-block; transition: transform 120ms cubic-bezier(0.3, 0, 0.2, 1); color: var(--pa-green); }
+.ag-compbtn__caret--open { transform: rotate(90deg); }
+.ag-compbtn__hint {
+  margin-left: 4px;
+  color: var(--pa-green);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+.ag-comp {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 11px 0 12px;
+  border-bottom: 1px solid var(--pa-border);
+}
+.ag-comp__row { display: flex; flex-direction: column; gap: 5px; }
+.ag-comp__label {
+  font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+}
+.ag-comp__skills { display: flex; flex-direction: column; gap: 6px; }
+.ag-comp__skillgrid { display: flex; flex-direction: column; gap: 4px; }
+.ag-skill {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  background: var(--pa-overlay);
+  cursor: pointer;
+  transition: border-color 120ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.ag-skill:hover { border-color: rgba(var(--pa-green-rgb), 0.4); }
+.ag-skill--on { border-color: rgba(var(--pa-green-rgb), 0.5); background: rgba(var(--pa-green-rgb), 0.08); }
+.ag-skill__checkbox { accent-color: var(--pa-green); margin: 0; }
+.ag-skill__name { font: 600 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: var(--pa-paper); white-space: nowrap; }
+.ag-skill__desc { font-size: 10px; color: rgba(var(--pa-paper-rgb), 0.5); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ---- Status dots ---- */
 .ag-status { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: rgba(var(--pa-paper-rgb), 0.3); }
 .ag-status--running { background: var(--pa-green); box-shadow: none; }

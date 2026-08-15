@@ -17,6 +17,8 @@ export interface CardProps {
   padding?: "none" | "sm" | "md" | "lg";
   children?: React.ReactNode;
   style?: CSS;
+  /** Extra layout/theme class(es) applied alongside the base card styles. */
+  className?: string;
   onClick?: () => void;
 }
 
@@ -41,9 +43,10 @@ const cardPaddings: Record<string, CSS> = {
   lg: { padding: tokens.space.xl },
 };
 
-export function Card({ variant = "default", padding = "md", children, style, onClick }: CardProps) {
+export function Card({ variant = "default", padding = "md", children, style, className, onClick }: CardProps) {
   return (
     <div
+      className={className}
       onClick={onClick}
       style={{
         borderRadius: tokens.radius.lg,

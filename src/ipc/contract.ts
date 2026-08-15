@@ -504,6 +504,12 @@ export interface Settings {
    * settings.json, so no new IPC methods are needed.
    */
   disabledSkills?: string[];
+  /** Default provider for RLM subagents — persists across sessions. */
+  subagentDefaultProvider?: string;
+  /** Default model for RLM subagents — persists across sessions. */
+  subagentDefaultModel?: string;
+  /** Default thinking level for subagents (none/low/medium/high). */
+  subagentDefaultThinking?: string;
 }
 
 /** A tool registered by an extension (surfaced in the Extensions panel). */

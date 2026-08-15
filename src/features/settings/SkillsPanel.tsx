@@ -147,7 +147,7 @@ export function SkillsPanel() {
         </div>
       ) : (
         <>
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <Card variant="raised" padding="lg" className="card-stack">
             {/* Header row: the icon tile is neutral, not accent-washed — green
                 is a status signal, and a section icon carries no status. The
                 Reload control is vertically centred against the 34px tile so
@@ -174,7 +174,7 @@ export function SkillsPanel() {
             </Text>
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-head">
               <div className="sp-headrow">
                 <Text variant="label" weight="semibold">Discovered skills</Text>
@@ -221,7 +221,7 @@ export function SkillsPanel() {
             ))}
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-headrow">
               <Text variant="label" weight="semibold">Create or install a skill</Text>
               <Badge tone="info">live daemon</Badge>
@@ -253,7 +253,7 @@ export function SkillsPanel() {
             </div>
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-headrow">
               <span className="sp-icon sp-icon--dim">
                 <SparkIcon size={16} />

@@ -132,7 +132,7 @@ export function ExtensionsPanel() {
         </div>
       ) : (
         <>
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <Card variant="raised" padding="lg" className="card-stack">
             <div className="ep-head">
               <div className="sp-headrow">
                 <span className="sp-icon">
@@ -155,7 +155,7 @@ export function ExtensionsPanel() {
             </Text>
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-headrow">
               <Text variant="label" weight="semibold">Live extensions</Text>
               <Text variant="micro" tone="dim" mono>{runtime?.extensions.length ?? 0}</Text>
@@ -174,7 +174,7 @@ export function ExtensionsPanel() {
             )}
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-headrow">
               <Text variant="label" weight="semibold">Configured extensions</Text>
               <Text variant="micro" tone="dim" mono>{configured.length}</Text>
@@ -262,7 +262,7 @@ export function ExtensionsPanel() {
             )}
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-headrow">
               <Text variant="label" weight="semibold">Install an extension</Text>
             </div>
@@ -277,7 +277,7 @@ export function ExtensionsPanel() {
             </div>
           </Card>
 
-          <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <Card variant="raised" padding="lg" className="card-stack">
             <div className="ep-disc">
               <Text variant="micro" tone="dim" mono className="ep-disclabel">
                 Discovery locations

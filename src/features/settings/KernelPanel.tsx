@@ -80,7 +80,7 @@ export function KernelPanel() {
   const statusTone = status === "running" ? "info" : status === "configured" ? "success" : status === "browser-preview" ? "neutral" : "warning";
 
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack">
       <div className="sp-head">
         <div className="sp-headrow--sm">
           <CpuIcon size={16} />

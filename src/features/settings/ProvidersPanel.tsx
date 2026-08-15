@@ -145,7 +145,7 @@ function ProviderCard({
 }) {
   const managed = provider.kind === "subscription";
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack">
       <div className="sp-head--start">
         <div className="sp-headrow">
           <span className={`pp-icon${provider.connected ? " pp-icon--connected" : ""}`}>
@@ -434,7 +434,7 @@ function LocalProviderCard({
   const name = config?.name ?? "Local";
   const sub = config ? config.baseUrl : "Not connected";
   return (
-    <Card variant="raised" padding="lg" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <Card variant="raised" padding="lg" className="card-stack">
       <div className="sp-head--start">
         <div className="sp-headrow">
           <span className={`pp-icon${connected ? " pp-icon--connected" : ""}`}>
