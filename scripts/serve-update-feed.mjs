@@ -3,6 +3,12 @@
 // A local HTTP server that serves a Tauri v2 updater manifest + update binary.
 // Used for testing the auto-updater flow without a real release server.
 //
+// NOTE: The canonical update feed is now hosted at GitLab Pages:
+//   https://caylebalvarez-james.gitlab.io/sophos/manifest.json
+// (served from the `public/` directory on the `update-feed` branch via the
+// `.gitlab-ci.yml` pages job). This local server is for development/testing
+// only — the production endpoint in tauri.conf.json points at GitLab Pages.
+//
 // Usage: node scripts/serve-update-feed.mjs [--port 37822] [--version 0.2.0]
 //
 // Serves:
