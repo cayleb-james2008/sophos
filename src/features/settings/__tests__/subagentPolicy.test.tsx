@@ -13,19 +13,22 @@ const mockClient = vi.hoisted(() => ({
   getRuntimeInfo: vi.fn(),
 }));
 
-const mockModels = vi.hoisted(() => ({
-  providers: [
+const mockModels = vi.hoisted(() => {
+  const providers = [
     { id: "ollama-cloud", name: "Ollama Cloud", kind: "api_key", connected: true, models: [] },
     { id: "openrouter", name: "OpenRouter", kind: "api_key", connected: true, models: [] },
-  ],
-  models: [
-    { id: "deepseek-v4-flash:0731-cloud", name: "DeepSeek V4 Flash 0731", provider: "ollama-cloud" },
-    { id: "gpt-4o", name: "GPT-4o", provider: "openrouter" },
-  ],
-  loading: false,
-  error: null,
-  reload: vi.fn(),
-}));
+  ];
+  return {
+    providers,
+    models: [
+      { id: "deepseek-v4-flash:0731-cloud", name: "DeepSeek V4 Flash 0731", provider: "ollama-cloud" },
+      { id: "gpt-4o", name: "GPT-4o", provider: "openrouter" },
+    ],
+    loading: false,
+    error: null,
+    reload: vi.fn(),
+  };
+});
 
 vi.mock("../../../ipc/client", async () => ({
   useIpc: () => mockClient,
@@ -37,6 +40,11 @@ vi.mock("../../providers/useModels", async () => ({
   useModels: () => mockModels,
 }));
 
+const DEFAULT_PROVIDERS = [
+  { id: "ollama-cloud", name: "Ollama Cloud", kind: "api_key", connected: true, models: [] },
+  { id: "openrouter", name: "OpenRouter", kind: "api_key", connected: true, models: [] },
+];
+
 const savedSettings = {
   subagentDefaultProvider: "ollama-cloud",
   subagentDefaultModel: "deepseek-v4-flash:0731-cloud",
@@ -45,6 +53,7 @@ const savedSettings = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockModels.providers.splice(0, mockModels.providers.length, ...DEFAULT_PROVIDERS);
   (mockClient.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({ ...savedSettings });
   (mockClient.setSettings as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 });
@@ -69,7 +78,7 @@ describe("SubagentPolicyPanel", () => {
     expect(modelOptions).not.toContain("gpt-4o");
   });
 
-  it("persists a new thinking level via setSettings", async () => {
+  it("persists a new thinking level via setSettings with the exact payload", async () => {
     render(<SubagentPolicyPanel />);
 
     await waitFor(() => expect(screen.getByLabelText("Thinking level")).toBeInTheDocument());
@@ -78,13 +87,11 @@ describe("SubagentPolicyPanel", () => {
     await userEvent.selectOptions(thinking, "high");
 
     await waitFor(() => {
-      expect(mockClient.setSettings).toHaveBeenCalledWith(
-        expect.objectContaining({
-          subagentDefaultProvider: "ollama-cloud",
-          subagentDefaultModel: "deepseek-v4-flash:0731-cloud",
-          subagentDefaultThinking: "high",
-        }),
-      );
+      expect(mockClient.setSettings).toHaveBeenCalledWith({
+        subagentDefaultProvider: "ollama-cloud",
+        subagentDefaultModel: "deepseek-v4-flash:0731-cloud",
+        subagentDefaultThinking: "high",
+      });
     });
   });
 
@@ -109,7 +116,7 @@ describe("SubagentPolicyPanel", () => {
   });
 
   it("shows a helpful empty state when no providers are configured", async () => {
-    mockModels.providers = [];
+    mockModels.providers.length = 0;
     (mockClient.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
     render(<SubagentPolicyPanel />);
@@ -117,5 +124,37 @@ describe("SubagentPolicyPanel", () => {
     await waitFor(() => {
       expect(screen.getByText(/No providers configured/i)).toBeInTheDocument();
     });
+  });
+
+  it("surfaces a load error with a retry that re-invokes load and clears the error", async () => {
+    (mockClient.getSettings as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("settings down"));
+
+    render(<SubagentPolicyPanel />);
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.getByText(/settings down/i)).toBeInTheDocument();
+
+    // Retry now succeeds: load re-runs, the error clears, and the form appears.
+    (mockClient.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({ ...savedSettings });
+    await userEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(mockClient.getSettings).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces the full error block + retry even when a saved policy exists", async () => {
+    // Settings load succeeds (a policy exists), then a save fails — the error
+    // must still surface as the full block + retry, not a trailing micro-text.
+    (mockClient.setSettings as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("save failed"));
+
+    render(<SubagentPolicyPanel />);
+
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText("Thinking level"), "high");
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.getByText(/save failed/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
   });
 });

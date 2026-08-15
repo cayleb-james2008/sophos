@@ -8,7 +8,7 @@
 // and the daemon skill catalog (getRuntimeInfo), so the relay honors the
 // fleet's defaults until the operator explicitly overrides them.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Text, Select } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { AgentRow } from "./useAgents";
@@ -37,39 +37,38 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
   const [thinking, setThinking] = useState<string>("medium");
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [skills, setSkills] = useState<Array<{ name: string; description?: string }>>([]);
+  const [skillsLoading, setSkillsLoading] = useState(true);
   const [showComposition, setShowComposition] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    ipc.getSettings().then((s) => {
-      if (mounted && s.subagentDefaultThinking) setThinking(s.subagentDefaultThinking);
-      const disabled = new Set(s.disabledSkills ?? []);
+    setSkillsLoading(true);
+    const applySkills = (list: Array<{ name: string; description?: string }>) => {
+      if (mounted) {
+        setSkills(list);
+        setSkillsLoading(false);
+      }
+    };
+    const fetchSkills = (disabled?: string[]) => {
       void ipc
         .getRuntimeInfo()
         .then((info) => {
-          if (mounted) {
-            const enabled = (info?.skills ?? []).filter((sk) => !disabled.has(sk.name));
-            setSkills(enabled.map((sk) => ({ name: sk.name, description: sk.description })));
-          }
+          const disabledSet = new Set(disabled ?? []);
+          applySkills((info?.skills ?? [])
+            .filter((sk) => !disabledSet.has(sk.name))
+            .map((sk) => ({ name: sk.name, description: sk.description })));
         })
-        .catch(() => {
-          if (mounted) setSkills([]);
-        });
+        .catch(() => applySkills([]));
+    };
+    ipc.getSettings().then((s) => {
+      if (mounted && s.subagentDefaultThinking) setThinking(s.subagentDefaultThinking);
+      fetchSkills(s.disabledSkills ?? []);
     }).catch(() => {
-      if (mounted) {
-        // Settings unavailable — fall back to the runtime skill catalog only.
-        void ipc
-          .getRuntimeInfo()
-          .then((info) => {
-            if (mounted) setSkills((info?.skills ?? []).map((sk) => ({ name: sk.name, description: sk.description })));
-          })
-          .catch(() => {});
-      }
+      // Settings unavailable — fall back to the runtime skill catalog only.
+      fetchSkills();
     });
     return () => { mounted = false; };
   }, [ipc]);
-
-  const skillsReady = useMemo(() => skills.length > 0, [skills]);
 
   const toggleSkill = (name: string) => {
     setSelectedSkills((cur) => (cur.includes(name) ? cur.filter((n) => n !== name) : [...cur, name]));
@@ -110,7 +109,9 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
 
           <div className="ag-comp__skills">
             <label className="ag-comp__label">Skills ({selectedSkills.length} selected)</label>
-            {skillsReady ? (
+            {skillsLoading ? (
+              <Text variant="micro" tone="dim">Loading skills…</Text>
+            ) : skills.length > 0 ? (
               <div className="ag-comp__skillgrid">
                 {skills.map((sk) => {
                   const on = selectedSkills.includes(sk.name);

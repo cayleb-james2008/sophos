@@ -94,7 +94,7 @@ export function SubagentPolicyPanel() {
           <Skeleton width="100%" height={34} />
           <Skeleton width="100%" height={34} />
         </div>
-      ) : error && !provider && !model ? (
+      ) : error ? (
         <div className="sub-error" role="alert">
           <Text variant="body" tone="danger">{error}</Text>
           <div className="sub-error__actions">
@@ -143,10 +143,6 @@ export function SubagentPolicyPanel() {
           </div>
         </div>
       )}
-
-      {error && provider && model ? (
-        <Text variant="micro" tone="danger">{error}</Text>
-      ) : null}
     </Card>
   );
 }
