@@ -28,10 +28,10 @@ For the full list of features and changes, see the
 
 ## Known Issues
 
-- The update binary for this release is **not yet re-signed** — the manifest
-  carries a `PLACEHOLDER_RESIGN_AT_RELEASE` signature that will be replaced
-  with a real signature at the actual release. Do not attempt to install the
-  update from this manifest until it is re-signed.
+- The v0.4.0 installer binary is **not yet built and signed** — the auto-updater
+  manifest points at the last signed stable build (v0.2.0) until the v0.4.0
+  installer is rebuilt and re-signed. New installs should use the v0.2.0
+  installer for now; the v0.4.0 binary will be published when it is ready.
 - As a pre-v1.0 beta, some features may be incomplete or subject to change.
 
 ## Installation
