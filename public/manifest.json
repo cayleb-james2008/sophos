@@ -1,12 +1,12 @@
 {
-  "version": "0.4.0",
-  "notes": "Sophos v0.4.0 (Beta) — pre-v1.0 beta release. All versions before v1.0 are beta. This update labels the release channel as beta across all surfaces.",
-  "pub_date": "2026-08-16T00:00:00Z",
+  "version": "0.5.0",
+  "notes": "Sophos v0.5.0 (Beta) — /cd command, subagent model policy, per-child composition knobs, keyboard shortcuts overlay, design system refactor (inline styles eliminated), 106 tests. All versions before v1.0 are beta.",
+  "pub_date": "2026-08-15T00:00:00Z",
   "channel": "beta",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcGZTOHpHV2ZKVkYvS0Z6anFYaGRvYjNpYlcyRDRsK2d5SWdnWVdCcmRhN3FGMDVtb3l1Y0NvcHFmNDhZTG1OaFlWMmhPaDJhMVYzQ21mQnZGczJLN1E0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2Nzc5MTMzCWZpbGU6U29waG9zXzAuNC4wX3g2NC1zZXR1cC5leGUKRnVVQm1obENUdFMwWlVJeDcrU2RVaXN1MlEyQi9EUDZWREcveXJJd2hsdWFGNlNFajJzQStUd2J1Y0NCcUw0TUpWMEExd25rWXdpM0YvUmFWSml0REE9PQo=",
-      "url": "https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.4.0/Sophos_0.4.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcGFrUGtKMTgrdm90VDZ1TzNlNmxvVFZBT1lnVXhrMWRldlhNdjBPZEdHdnhoT3IyM21HWUU1WURzdGQzSmRVdHd2bXd6TzRrR01vNTY2ZTZlNm5mWEFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2ODE1MjExCWZpbGU6U29waG9zXzAuNS4wX3g2NC1zZXR1cC5leGUKY2xxeUVRcGd1ZWgvQmV0R1hSTjlsQTVDQlpYQUZYZ2ZjT2RaT3pvK2p6Q3hUaHpZUHhhdW5rSnlFcTNSTHVIc0JxcDNXUVBLL1hlTW44ZEZ3K2ZFQWc9PQo=",
+      "url": "https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.5.0/Sophos_0.5.0_x64-setup.exe"
     }
   }
 }
