@@ -55,10 +55,12 @@ export async function afterAll() {
 }
 
 /** True when the failure is a torn-down app window (external interference —
- * e.g. another agent relaunching the shared release exe mid-suite). A fresh
- * relaunch + retry is the correct recovery; the test code itself is fine. */
+ * e.g. another agent relaunching the shared release exe mid-suite). Matches
+ * both the "window_id … exists" lookup miss and the "Invalid window handle"
+ * destroy race. A fresh relaunch + retry is the correct recovery. */
 function isStaleWindow(err) {
-  return /No window with window_id/i.test(err && err.message ? err.message : "");
+  const msg = err && err.message ? err.message : "";
+  return /No window with window_id|Invalid window handle|window_id .* exists/i.test(msg);
 }
 
 /** Relaunch the app without touching the daemon (keeps it running across a
@@ -81,16 +83,19 @@ async function relaunchApp() {
       await sleep(1200);
       return;
     } catch (err) {
-      if (isStaleWindow(err) && attempt < 4) continue;
+      if (isStaleWindow(err) && attempt < 6) {
+        await sleep(500);
+        continue;
+      }
       throw err;
     }
   }
 }
 
-/** Run a single test, retrying up to 3 times on a stale-window tear-down. */
+/** Run a single test, retrying up to 5 times on a stale-window tear-down. */
 export async function runTest(name, fn) {
   const start = Date.now();
-  const maxAttempts = 3;
+  const maxAttempts = 5;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       if (!app.pid) await beforeAll();
@@ -100,6 +105,7 @@ export async function runTest(name, fn) {
       return { name, pass: true, elapsed };
     } catch (err) {
       if (isStaleWindow(err) && attempt < maxAttempts) {
+        await sleep(500);
         console.log(`  ~ ${name}: stale window torn down externally; relaunching + retrying`);
         await relaunchApp();
         continue;
@@ -121,7 +127,7 @@ export async function runDemoSuite(name, tests) {
       await beforeAll();
       break;
     } catch (err) {
-      if (isStaleWindow(err) && attempt < 3) {
+      if (isStaleWindow(err) && attempt < 5) {
         console.log(`  ~ initial launch torn down externally; relaunching (attempt ${attempt})`);
         continue;
       }

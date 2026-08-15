@@ -65,6 +65,17 @@ async function clickInnerTab(appHandle, tabName, marker) {
   return freshState(appHandle);
 }
 
+/** Poll until an element matching `text` is absent from the window, or timeout. */
+async function waitForGone(appHandle, text, timeoutMs = 10000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const st = freshState(appHandle);
+    if (!findBy(st, { text })) return true;
+    await sleep(400);
+  }
+  return false;
+}
+
 /** Count occurrences of a substring in the window text content (per line). */
 function countText(state, needle) {
   const content = (state.elements || [])
@@ -162,7 +173,18 @@ const tests = [
   {
     name: "MCP servers card shows the add form and add/remove round-trips",
     fn: async (appHandle) => {
-      const state = await openSettingsTab(appHandle, "Advanced", "MCP servers");
+      let state = await openSettingsTab(appHandle, "Advanced", "MCP servers");
+      // Idempotent against demo-mode localStorage persistence: a prior run's
+      // added server can leak into this launch (the mock persists settings to
+      // localStorage across runs), so clear any leftover MCP servers first —
+      // otherwise the empty-state assertion below races a leaked entry.
+      for (let i = 0; i < 6; i++) {
+        const rm = findBy(state, { role: "Button", text: "Remove " });
+        if (!rm) break;
+        clickBy(appHandle.pid, freshState(appHandle), { role: "Button", text: "Remove " });
+        await sleep(900);
+        state = freshState(appHandle);
+      }
       // Empty-state + add form.
       assertText(state, "No MCP servers configured yet");
       // Input accessible names render uppercased via CSS (label text is
@@ -184,11 +206,13 @@ const tests = [
       assertText(afterAdd, "filesystem");
       assertText(afterAdd, "npx");
       takeScreenshot(appHandle.pid, "settings-mcp-added", appHandle.windowId);
-      // Remove it.
+      // Remove it — poll until it is actually gone from the UI (the
+      // setSettings → refresh round-trip can lag under load; don't race it).
       const removeBtn = await waitFor(afterAdd, { text: "Remove filesystem" }, 8000);
       assert(removeBtn, "MCP Remove button not found");
       clickBy(appHandle.pid, freshState(appHandle), { text: "Remove filesystem" });
-      await sleep(1200);
+      const removed = await waitForGone(appHandle, "filesystem", 10000);
+      assert(removed, "MCP server was not removed from the UI within the wait window");
       const afterRemove = freshState(appHandle);
       assert(!findBy(afterRemove, { text: "filesystem" }), "MCP server was not removed");
       takeScreenshot(appHandle.pid, "settings-mcp-removed", appHandle.windowId);
