@@ -1,7 +1,8 @@
 {
-  "version": "0.2.0",
-  "notes": "Sophos v0.2.0 - Testable Foundation + Harness Depth + Theme",
-  "pub_date": "2026-08-14T19:30:00Z",
+  "version": "0.4.0",
+  "notes": "Sophos v0.4.0 (Beta) — pre-v1.0 beta release. All versions before v1.0 are beta. This update labels the release channel as beta across all surfaces. Note: the download binary is the last signed stable build (v0.2.0) until the v0.4.0 installer is rebuilt and signed.",
+  "pub_date": "2026-08-16T00:00:00Z",
+  "channel": "beta",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcGJiVERWS08rSmNWTHNPUEhlZmFpZ0daL3ZtMk9iNGJOaFpuTitnUkUvSkNOdFVUSGhDSVg1cG9rdDU3T2hCa2VQbFJ1UDFwYjBnRWsxSkNMNFkwY0FvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2NzM4NDE5CWZpbGU6U29waG9zXzAuMi4wX3g2NC1zZXR1cC5leGUKM1o5STBXN2psYmxDT2Y0b3N0NW1SZGg0aXB1K21INEx4cXVXT1M4Q1BRaWFsWS92M0JMcmsrSE9IdTdnSjR2NFZ5aktWczBTUy9yR2VQWGx1K2xzQVE9PQo=",
