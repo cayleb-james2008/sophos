@@ -55,6 +55,43 @@
   border-bottom: 1px solid;
 }
 .chat-error { background: rgba(var(--pa-danger-rgb), 0.08); border-color: rgba(var(--pa-danger-rgb), 0.25); }
+.chat-error-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(var(--pa-danger-rgb), 0.45);
+  color: var(--pa-danger);
+  font: 700 13px/1 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+}
+.chat-error-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-error-retry {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid rgba(var(--pa-paper-rgb), 0.2);
+  background: transparent;
+  color: var(--pa-paper);
+  font: 500 12px/1 "Geist", sans-serif;
+  cursor: pointer;
+  transition: border-color 100ms ease, background 100ms ease;
+}
+.chat-error-retry:hover { border-color: rgba(var(--pa-green-rgb), 0.4); background: rgba(var(--pa-green-rgb), 0.08); }
+.chat-error-retry:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.chat-error-retry:disabled:hover { border-color: rgba(var(--pa-paper-rgb), 0.2); background: transparent; }
 .chat-demo { background: rgba(var(--pa-amber-rgb), 0.07); border-color: rgba(var(--pa-amber-rgb), 0.2); }
 .chat-demo-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--pa-amber); }
 .chat-developer-preview { margin-left: auto; color: rgba(var(--pa-paper-rgb), 0.6); }
@@ -62,6 +99,25 @@
 .chat-demo-button { margin-top: 6px; padding: 4px 10px; border: 1px solid rgba(var(--pa-paper-rgb), 0.18); background: transparent; color: rgba(var(--pa-paper-rgb), 0.6); cursor: pointer; font: 10px/1 "Geist Mono", monospace; }
 .chat-demo-button:hover { border-color: rgba(var(--pa-green-rgb), 0.4); color: var(--pa-paper); }
 .chat-loading { display: flex; flex: 1; align-items: center; justify-content: center; }
+
+/* Loading skeleton — a neutral placeholder that reads as "transcript in
+   flight" rather than a spinner you wait on. Matches the terminal-minimal
+   language: hairline bars, no rounding. */
+.chat-loading-skeleton {
+  width: min(560px, 80%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chat-loading-line {
+  height: 12px;
+  border-radius: 0;
+  background: linear-gradient(90deg, rgba(var(--pa-paper-rgb), 0.05), rgba(var(--pa-paper-rgb), 0.12), rgba(var(--pa-paper-rgb), 0.05));
+  background-size: 200% 100%;
+  animation: pa-title-wash 1.4s ease-in-out infinite;
+}
+.chat-loading-line--short { width: 38%; }
+.chat-loading-line--med { width: 68%; }
 .chat-toast { position: absolute; right: 24px; bottom: 96px; padding: 8px 14px; border: 1px solid rgba(var(--pa-paper-rgb), 0.2); background: rgba(var(--pa-overlay-rgb), 0.9); box-shadow: 0 16px 40px rgba(0,0,0,0.28); animation: pa-slide-up 140ms ease both; }
 .chat-icon { display: block; }
 
@@ -232,6 +288,21 @@
   border: 1px solid var(--pa-border-strong);
   border-radius: 0;
   box-shadow: none;
+}
+.composer-cd-notice {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 30;
+  max-width: 72%;
+  padding: 8px 14px;
+  border: 1px solid rgba(var(--pa-green-rgb), 0.4);
+  background: var(--pa-overlay);
+  color: var(--pa-green-hover);
+  font: 11px/1.5 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  animation: pa-slide-up 140ms ease both;
+  word-break: break-word;
 }
 .composer-input-textarea {
   flex: 1;
@@ -580,6 +651,7 @@
   line-height: 1;
   font-weight: 600;
   color: var(--pa-green-hover);
+  font-size: var(--glyph-size, 12px);
 }
 .msg-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .msg-head { display: flex; align-items: center; gap: 8px; }
@@ -626,6 +698,7 @@
   border-radius: 50%;
   background: var(--pa-green-hover);
   animation: pa-blink 1.2s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
 }
 .thinking-meta { margin-left: 2px; }
 .thinking-chevron { margin-left: auto; display: inline-flex; color: rgba(var(--pa-paper-rgb), 0.45); }
@@ -699,6 +772,11 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+.tool-call-output {
+  max-height: 200px;
+  overflow-y: auto;
+}
+.tool-call-output--error .hl-code { color: var(--pa-danger); }
 
 /* ---- highlight ---- */
 .hl-code {

@@ -1,13 +1,13 @@
 // ComposerInput — the prompt input box: editor state, TUI-parity key handling,
 // auto-growing textarea, file-ref hint popover, and the abort/send action.
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Text, Button } from "../../design";
 import { useIpc } from "../../ipc/client";
 import type { SlashCommand } from "../../ipc/contract";
 import { SendIcon, StopIcon } from "./chatIcons";
-import { SlashAutocomplete, filterSlashCommands } from "./SlashAutocomplete";
+import { SlashAutocomplete, filterSlashCommands, mergeClientSideCommands } from "./SlashAutocomplete";
 
 type Props = {
   busy: boolean;
@@ -38,9 +38,51 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
   const [slashQuery, setSlashQuery] = useState("");
   const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
 
+  // Transient working-directory confirmation (the /cd toast). Kept local to the
+  // composer so the /cd flow never needs a daemon round-trip to surface state.
+  const [cdNotice, setCdNotice] = useState<string | null>(null);
+  const cdNoticeTimer = useRef<number | null>(null);
+  const showCdNotice = (message: string) => {
+    setCdNotice(message);
+    if (cdNoticeTimer.current) window.clearTimeout(cdNoticeTimer.current);
+    cdNoticeTimer.current = window.setTimeout(() => setCdNotice(null), 2600);
+  };
+  useEffect(() => () => {
+    if (cdNoticeTimer.current) window.clearTimeout(cdNoticeTimer.current);
+  }, []);
+
   useEffect(() => {
     ipc.getSlashCommands().then(setSlashCommands).catch(() => {});
   }, [ipc]);
+
+  // Daemon-discovered commands plus the client-side set (/cd). Every filter and
+  // the autocomplete dropdown read this merged list so Enter-insertion,
+  // selection, and the composer's intercept all agree.
+  const allCommands = useMemo(() => mergeClientSideCommands(slashCommands), [slashCommands]);
+
+  // /cd — open a native directory picker, then tell the daemon to switch the
+  // working directory. Never sent as a prompt.
+  const handleCd = async () => {
+    let picked: string | null = null;
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const result = await open({ directory: true });
+      if (typeof result === "string" && result.trim().length > 0) picked = result;
+    } catch {
+      showCdNotice("Could not open directory picker");
+      clearInput();
+      return;
+    }
+    if (picked) {
+      try {
+        await ipc.runCommand("cd", [picked]);
+        showCdNotice(`Working directory changed to ${picked}`);
+      } catch (err) {
+        showCdNotice(`Could not change directory: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    clearInput();
+  };
 
   // Recompute the slash dropdown state from the current value + cursor. The
   // dropdown is open only when the value starts with '/', the cursor is on the
@@ -93,6 +135,11 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
   const submit = () => {
     const raw = value;
     const trimmed = raw.trim();
+    // /cd is a client-side command: open the directory picker, never send it.
+    if (trimmed === "/cd") {
+      void handleCd();
+      return;
+    }
     if (raw.startsWith("/btw ") || raw.startsWith("/side ")) {
       const kind: "btw" | "side" = raw.startsWith("/btw ") ? "btw" : "side";
       const q = (kind === "btw" ? raw.slice(5) : raw.slice(6)).trim();
@@ -123,9 +170,15 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
       }
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        const matches = filterSlashCommands(slashCommands, slashQuery);
+        const matches = filterSlashCommands(allCommands, slashQuery);
         const selected = matches[slashSelectedIdx];
         if (selected) {
+          // /cd is client-side — run the picker directly instead of filling the box.
+          if (selected.name === "cd") {
+            setSlashOpen(false);
+            void handleCd();
+            return;
+          }
           setValue(`/${selected.name} `);
           setSlashOpen(false);
           focusInput();
@@ -168,10 +221,14 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
   };
 
   const fileHintVisible = value.includes("@");
-  const slashMatches = slashOpen ? filterSlashCommands(slashCommands, slashQuery) : [];
+  const slashMatches = slashOpen ? filterSlashCommands(allCommands, slashQuery) : [];
 
   return (
     <div className="composer-input">
+      {cdNotice ? (
+        <div className="composer-cd-notice" role="status">{cdNotice}</div>
+      ) : null}
+
       {fileHintVisible ? (
         <div className="composer-input-filehint">
           <Text variant="micro" tone="accent" mono>@</Text>
@@ -181,9 +238,12 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
 
       {slashOpen && slashMatches.length > 0 ? (
         <SlashAutocomplete
-          commands={slashCommands}
+          commands={allCommands}
           query={slashQuery}
-          onSelect={(cmd) => { setValue(`/${cmd.name} `); setSlashOpen(false); focusInput(); }}
+          onSelect={(cmd) => {
+            if (cmd.name === "cd") { setSlashOpen(false); void handleCd(); return; }
+            setValue(`/${cmd.name} `); setSlashOpen(false); focusInput();
+          }}
           onDismiss={() => setSlashOpen(false)}
           selectedIndex={slashSelectedIdx}
           onSelectedIndexChange={setSlashSelectedIdx}

@@ -135,15 +135,12 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
             </Button>
           </div>
           {showOutput ? (
-            <HighlightedCode
-              code={call.output ?? ""}
-              lang={detectLang(call.output ?? "")}
-              style={{
-                maxHeight: 200,
-                overflowY: "auto",
-                color: call.status === "error" ? tokens.color.danger : undefined,
-              }}
-            />
+            <div className={`tool-call-output${call.status === "error" ? " tool-call-output--error" : ""}`}>
+              <HighlightedCode
+                code={call.output ?? ""}
+                lang={detectLang(call.output ?? "")}
+              />
+            </div>
           ) : null}
         </div>
       ) : null}

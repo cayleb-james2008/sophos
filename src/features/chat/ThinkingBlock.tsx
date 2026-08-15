@@ -3,6 +3,7 @@
 // text with a subtle left accent. Animated open/close.
 
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { tokens } from "../../design/tokens";
 import { Text, Button } from "../../design";
 
@@ -46,7 +47,7 @@ export function ThinkingBlock({
               <span
                 key={i}
                 className="thinking-dot"
-                style={{ animationDelay: `${i * 0.2}s` }}
+                style={{ "--delay": `${i * 0.2}s` } as CSSProperties}
               />
             ))}
           </span>

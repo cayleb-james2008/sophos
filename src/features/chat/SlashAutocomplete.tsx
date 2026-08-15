@@ -4,8 +4,24 @@
 // and supports arrow-key navigation + Enter insertion (handled by ComposerInput).
 
 import { useMemo } from "react";
-import { tokens } from "../../design/tokens";
 import type { SlashCommand } from "../../ipc/contract";
+
+/** Client-side slash commands handled entirely in the composer — no daemon
+ * round-trip. `/cd` opens a native directory picker and calls `runCommand("cd")`
+ * rather than sending a prompt. */
+export const CLIENT_SIDE_COMMANDS: SlashCommand[] = [
+  { name: "cd", description: "Change working directory", source: "builtin" },
+];
+
+/** Merge the client-side command set with the daemon-discovered commands.
+ * Daemon/extension commands win on a name collision; client-only commands are
+ * appended. Call this once and filter the result so autocomplete, Enter
+ * insertion, and the composer's intercept all see the same list. */
+export function mergeClientSideCommands(commands: SlashCommand[]): SlashCommand[] {
+  const known = new Set(commands.map((c) => c.name));
+  const clientOnly = CLIENT_SIDE_COMMANDS.filter((c) => !known.has(c.name));
+  return [...commands, ...clientOnly];
+}
 
 type Props = {
   commands: SlashCommand[];
@@ -73,7 +89,7 @@ export function SlashAutocomplete({ commands, query, onSelect, onDismiss: _onDis
             onClick={() => onSelect(cmd)}
             onMouseDown={(e) => e.preventDefault()}
           >
-            <span className="slash-autocomplete-name" style={{ fontFamily: tokens.font.mono }}>
+            <span className="slash-autocomplete-name">
               /{cmd.name}
             </span>
             <span className="slash-autocomplete-desc">{cmd.description}</span>

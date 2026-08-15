@@ -5,7 +5,7 @@
 //   * tool      — nested tool card
 // Streaming assistant messages get a blinking caret.
 
-import { tokens } from "../../design/tokens";
+import type { CSSProperties } from "react";
 import { Text } from "../../design";
 import type { TranscriptMessage } from "../../ipc/contract";
 import { Markdown } from "./markdown";
@@ -14,10 +14,12 @@ import { ToolCallCard } from "./ToolCallCard";
 import { MessageActions } from "./MessageActions";
 
 // SophosMark — the geometric "Σ" (sigma, sum of knowledge) wordmark in Geist
-// Mono, replacing the old Prime bolt glyph.
-function SophosMark({ size = 12, color }: { size?: number; color: string }) {
+// Mono, replacing the old Prime bolt glyph. Size/color come from chat.css
+// (`.msg-avatar-glyph`); the size is passed through a CSS custom property so no
+// presentation value is inlined.
+function SophosMark({ size = 12 }: { size?: number }) {
   return (
-    <span className="msg-avatar-glyph" style={{ fontSize: size, color }}>
+    <span className="msg-avatar-glyph" style={{ "--glyph-size": `${size}px` } as CSSProperties}>
       Σ
     </span>
   );
@@ -118,7 +120,7 @@ export function MessageRow({
           full-opacity glyph keeps the identity while returning green to its job
           as a signal for live/active state. */}
       <div className="msg-avatar">
-        <SophosMark color={tokens.color.accentHover} />
+        <SophosMark />
       </div>
 
       {/* Body */}

@@ -28,10 +28,6 @@ function ExportIcon({ size = 13, color }: { size?: number; color: string }) {
   return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>;
 }
 
-function ShareIcon({ size = 13, color }: { size?: number; color: string }) {
-  return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.6" y1="13.5" x2="15.4" y2="17.5" /><line x1="15.4" y1="6.5" x2="8.6" y2="10.5" /></svg>;
-}
-
 function CopyIcon({ size = 13, color }: { size?: number; color: string }) {
   return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>;
 }
@@ -71,7 +67,6 @@ export function ChatView() {
   const fillPrompt = (text: string) => setStarterDraft({ seq: ++starterSeq.current, text });
   const onStartChat = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message input"]')?.focus();
   const onExport = () => { void ipc.exportToHtml().catch(() => {}); showToast("Exporting session to HTML…"); };
-  const onShare = () => { void ipc.runCommand("share").catch(() => {}); showToast("Share not available yet"); };
   const onCopy = async () => {
     if (!lastAssistant) { showToast("No assistant message to copy"); return; }
     try { await navigator.clipboard.writeText(lastAssistant); showToast("Copied last assistant message"); }
@@ -84,9 +79,13 @@ export function ChatView() {
 
   const headerButtons = [
     { title: "Export session to HTML", onClick: onExport, icon: (color: string) => <ExportIcon color={color} /> },
-    { title: "Share as GitHub gist", onClick: onShare, icon: (color: string) => <ShareIcon color={color} /> },
     { title: "Copy last assistant message", onClick: () => void onCopy(), icon: (color: string) => <CopyIcon color={color} /> },
   ];
+
+  // Error-card retry re-issues the last assistant turn (which re-sends the
+  // preceding user prompt). No assistant message yet → nothing to retry.
+  const lastRetryable = [...messages].reverse().find((message) => message.role === "assistant");
+  const onErrorRetry = () => { if (lastRetryable) retry(lastRetryable); };
 
   return (
     <div className="chat-view">
@@ -114,7 +113,16 @@ export function ChatView() {
         </div>
       </header>
 
-      {error ? <div className="chat-error"><Text variant="label" tone="danger">{error}</Text></div> : null}
+      {error ? (
+        <div className="chat-error" role="alert">
+          <span className="chat-error-icon" aria-hidden="true">!</span>
+          <div className="chat-error-body">
+            <Text variant="label" tone="danger">Something went wrong</Text>
+            <Text variant="label" tone="muted">{error}</Text>
+          </div>
+          <Button variant="outline" type="button" onClick={onErrorRetry} disabled={!lastRetryable} className="chat-error-retry">Retry</Button>
+        </div>
+      ) : null}
 
       <OnboardingWizard onSetupProviders={handleSetupProviders} onStartChat={onStartChat} hasFirstMessage={hasFirstMessage} setup={onboarding} />
 
@@ -134,7 +142,15 @@ export function ChatView() {
       {loaded ? (
         <MessageList messages={messages} busy={busy} onRetry={retry} onEdit={(index, message) => requestEdit(index, message.content)} hasProvider={hasProvider} onFillPrompt={fillPrompt} />
       ) : (
-        <div className="chat-loading"><Text variant="label" tone="dim">Loading transcript…</Text></div>
+        <div className="chat-loading" aria-busy="true" aria-live="polite">
+          <div className="chat-loading-skeleton">
+            <div className="chat-loading-line chat-loading-line--short" />
+            <div className="chat-loading-line chat-loading-line--med" />
+            <div className="chat-loading-line" />
+            <div className="chat-loading-line chat-loading-line--med" />
+            <div className="chat-loading-line chat-loading-line--short" />
+          </div>
+        </div>
       )}
 
       <ContextBar stats={contextStats} />
