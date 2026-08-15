@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button, Text, Badge, StatusDot } from "../../design";
-import { useConnectionState, isTauri } from "../../ipc/client";
+import { useConnectionState, isTauri, isDemoShell } from "../../ipc/client";
 import { useModels, DEFAULT_PROVIDER, DEFAULT_MODEL } from "../providers/useModels";
 import type { OnboardingStatus } from "./FirstRunBanner";
 import "./onboarding.css";
@@ -40,7 +40,7 @@ export interface OnboardingWizardProps {
 export function OnboardingWizard({ onSetupProviders, onStartChat, hasFirstMessage = false, setup }: OnboardingWizardProps): JSX.Element | null {
   const [dismissed, setDismissed] = useState(() => readFlag(DISMISS_KEY));
   const [step, setStep] = useState<Step>("welcome");
-  const completed = hasFirstMessage || readFlag(FIRST_MESSAGE_KEY);
+  const completed = hasFirstMessage || readFlag(FIRST_MESSAGE_KEY) || isDemoShell();
   const health = setup;
   const preview = !isTauri;
 
