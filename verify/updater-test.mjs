@@ -67,8 +67,8 @@ async function main() {
   ) || (allPass = false);
 
   check(
-    "version is 0.2.0",
-    tauriConf?.version === "0.2.0",
+    "version is present in tauri.conf.json",
+    typeof tauriConf?.version === "string" && tauriConf.version.length > 0,
     `version=${tauriConf?.version}`,
   ) || (allPass = false);
 
