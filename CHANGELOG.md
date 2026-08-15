@@ -5,9 +5,12 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] — 2026-08-16 (Beta)
 
-## [0.2.0] — 2026-08-14
+### Added
+- **Beta release** — pre-v1.0 beta per the beta-labeling policy
+
+## [0.2.0] — 2026-08-14 (Beta)
 
 ### Added
 - **Test suite** — vitest + @testing-library/react + jsdom; 6 test files, 86 tests covering design-system primitives and critical hooks (useChat, useAgents, useRefinementGate, useModels)
@@ -43,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Transient gauntlet state files (`evaluator-state.json`, `generator-state.json`) removed from tracking and gitignored
 
-## [0.1.0] — 2026-08-12
+## [0.1.0] — 2026-08-12 (Beta)
 
 ### Added
 - **Windows-native desktop app** — Tauri v2 (Rust) shell that spawns and supervises the Prime Agent daemon

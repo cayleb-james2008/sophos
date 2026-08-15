@@ -16,11 +16,13 @@ near-black surfaces.
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Download](https://img.shields.io/badge/Download-Sophos_0.2.0-85ed75?logo=gitlab)](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
+[![Download](https://img.shields.io/badge/Download-Sophos_0.4.0_Beta-85ed75?logo=gitlab)](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
 
 **Credits:** This is a Windows port of [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent). All credit for the agent runtime, daemon, and bridge belongs to the Prime Intellect team.
 
 </div>
+
+> **⚠️ Beta Notice:** All Sophos versions before v1.0 are beta releases. Features may change, and there may be bugs. Use in production at your own risk.
 
 ---
 
