@@ -250,6 +250,10 @@ const tests = [
       const ref = await clickInnerTab(appHandle, "Refinement", "Refinement history");
       assertText(ref, "No pending changes");
 
+      // Harness state section (6th inner tab).
+      const hs = await clickInnerTab(appHandle, "Harness state", "Continual harness state");
+      assertText(hs, "Continual harness state");
+
       takeScreenshot(appHandle.pid, "settings-longrunning", appHandle.windowId);
     },
   },

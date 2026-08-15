@@ -54,26 +54,80 @@ export async function afterAll() {
   }
 }
 
-/** Run a single test. Returns { name, pass, elapsed, error? }. */
+/** True when the failure is a torn-down app window (external interference —
+ * e.g. another agent relaunching the shared release exe mid-suite). A fresh
+ * relaunch + retry is the correct recovery; the test code itself is fine. */
+function isStaleWindow(err) {
+  return /No window with window_id/i.test(err && err.message ? err.message : "");
+}
+
+/** Relaunch the app without touching the daemon (keeps it running across a
+ * retry). Retries internally on stale-window tear-downs during launch itself. */
+async function relaunchApp() {
+  for (let attempt = 1; ; attempt++) {
+    if (app.pid) {
+      try {
+        closeApp(app.pid);
+      } catch {
+        // window already gone
+      }
+      app.pid = null;
+      app.windowId = null;
+    }
+    try {
+      const launched = await launchDemoApp();
+      app.pid = launched.pid;
+      app.windowId = launched.windowId;
+      await sleep(1200);
+      return;
+    } catch (err) {
+      if (isStaleWindow(err) && attempt < 4) continue;
+      throw err;
+    }
+  }
+}
+
+/** Run a single test, retrying up to 3 times on a stale-window tear-down. */
 export async function runTest(name, fn) {
   const start = Date.now();
-  try {
-    if (!app.pid) await beforeAll();
-    await fn(app);
-    const elapsed = Date.now() - start;
-    console.log(`  \u2713 ${name} (${elapsed}ms)`);
-    return { name, pass: true, elapsed };
-  } catch (err) {
-    const elapsed = Date.now() - start;
-    console.error(`  \u2717 ${name} (${elapsed}ms): ${err.message}`);
-    return { name, pass: false, elapsed, error: err.message };
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      if (!app.pid) await beforeAll();
+      await fn(app);
+      const elapsed = Date.now() - start;
+      console.log(`  \u2713 ${name} (${elapsed}ms)`);
+      return { name, pass: true, elapsed };
+    } catch (err) {
+      if (isStaleWindow(err) && attempt < maxAttempts) {
+        console.log(`  ~ ${name}: stale window torn down externally; relaunching + retrying`);
+        await relaunchApp();
+        continue;
+      }
+      const elapsed = Date.now() - start;
+      console.error(`  \u2717 ${name} (${elapsed}ms): ${err.message}`);
+      return { name, pass: false, elapsed, error: err.message };
+    }
   }
 }
 
 /** Run a suite of tests in demo mode. Sets process.exitCode = 1 on failure. */
 export async function runDemoSuite(name, tests) {
   console.log(`\n=== ${name} ===`);
-  await beforeAll();
+  // Retry the initial launch if the window is torn down externally before it
+  // settles (e.g. another agent relaunching the shared release exe).
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await beforeAll();
+      break;
+    } catch (err) {
+      if (isStaleWindow(err) && attempt < 3) {
+        console.log(`  ~ initial launch torn down externally; relaunching (attempt ${attempt})`);
+        continue;
+      }
+      throw err;
+    }
+  }
   const results = [];
   for (const test of tests) {
     results.push(await runTest(test.name, test.fn));
