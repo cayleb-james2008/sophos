@@ -33,8 +33,23 @@ export function InboxView() {
   const refresh = useCallback(async () => {
     try {
       const [nextAgents, inbox] = await Promise.all([ipc.listAgents(), ipc.listInbox()]);
-      setAgents(nextAgents); setMessages(inbox);
-      setSelected((old) => old ?? nextAgents[0]?.id ?? (inbox[0] ? peerId(inbox[0]) : undefined));
+      // Relay peers: prefer the daemon-reported agent list, but fall back to
+      // the RLM children when the daemon reports none (demo mode / a wedged
+      // relay) so the Inbox still has peers to route messages between — the
+      // same agent set the Agents fleet surfaces. Guarded so a client without
+      // getRlmChildren (e.g. a partial test mock) still loads.
+      let peers = nextAgents;
+      if (!peers.length && typeof ipc.getRlmChildren === "function") {
+        const children = (await ipc.getRlmChildren()) ?? [];
+        peers = children.map((c) => ({
+          id: c.id,
+          name: c.name,
+          status: c.status === "done" || c.status === "error" ? "idle" : c.status,
+        }));
+      }
+      setAgents(peers);
+      setMessages(inbox);
+      setSelected((old) => old ?? peers[0]?.id ?? (inbox[0] ? peerId(inbox[0]) : undefined));
       setError(undefined);
       setLastSync(new Date());
     } catch (e) { setError(e instanceof Error ? e.message : "Inbox unavailable"); }
@@ -72,7 +87,12 @@ export function InboxView() {
     }
   }
 
-  async function markMsgRead(messageId: string) {
+  async function markMsgRead(rawId: string) {
+    // The graph calls back with the node id ("msg-<id>"), not the raw message
+    // id — strip the prefix so we match against the actual message in the
+    // thread, otherwise the lookup below misses and the message is never
+    // marked read.
+    const messageId = rawId.startsWith("msg-") ? rawId.slice(4) : rawId;
     const m = messages.find((x) => x.id === messageId);
     if (!m || m.fromAgentId === SELF || m.read) return;
     try { await ipc.markMessageRead(messageId); } catch { /* local mark */ }

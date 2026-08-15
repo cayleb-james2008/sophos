@@ -41,6 +41,27 @@ import type {
 export const isTauri =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+/**
+ * True when running inside the real Tauri demo shell: launched with `--demo`
+ * or `SOPHOS_DEMO_MODE=1`, which makes the Rust shell inject
+ * `window.__SOPHOS_DEMO__ = true`. In this mode the frontend uses the
+ * MockIpcClient and the UI must be fully usable (composer enabled, onboarding
+ * skipped) so the desktop app is demonstrable + testable without a live
+ * provider.
+ */
+export function isDemoShell(): boolean {
+  return typeof window !== "undefined" && (window as any).__SOPHOS_DEMO__ === true;
+}
+
+/**
+ * True when the app is in demo mode: the Tauri `--demo` shell (isDemoShell) or
+ * the browser preview (not Tauri), including the `#demo` dev-server opt-in. In
+ * demo mode the frontend uses the MockIpcClient.
+ */
+export function isDemoMode(): boolean {
+  return isDemoShell() || !isTauri || (typeof window !== "undefined" && window.location.hash.includes("demo"));
+}
+
 export interface IpcClient {
   // Commands
   prompt(text: string, options?: { thinking?: string; streamingBehavior?: "steer" | "followUp"; queueIfBusy?: boolean }): Promise<void>;
@@ -509,6 +530,17 @@ export class MockIpcClient implements IpcClient {
     { name: "linear-sync", path: "~/.pi/agent/extensions/linear-sync", enabled: true },
   ];
 
+  /** Demo relay messages surfaced by listInbox() so the Inbox renders an
+   * actual message flow (sender → preview → timestamp) with unread/read state
+   * in demo mode instead of an empty relay. markMessageRead round-trips here.
+   * The peers are the RLM children the fleet surfaces (api-reviewer,
+   * test-runner) so the Inbox switcher stays consistent with the Agents view. */
+  private mockInboxMessages: AgentMessage[] = [
+    { id: "in-api-1", fromAgentId: "rlm-1", fromAgentName: "api-reviewer", toAgentId: "self", toAgentName: "You", text: "Endpoint review approved", timestamp: new Date(Date.now() - 90 * 60000).toISOString(), read: false },
+    { id: "out-api-1", fromAgentId: "self", fromAgentName: "You", toAgentId: "rlm-1", toAgentName: "api-reviewer", text: "Please check the new schema", timestamp: new Date(Date.now() - 120 * 60000).toISOString(), read: true },
+    { id: "in-test-1", fromAgentId: "rlm-2", fromAgentName: "test-runner", toAgentId: "self", toAgentName: "You", text: "Suite green on 3 targets", timestamp: new Date(Date.now() - 45 * 60000).toISOString(), read: false },
+  ];
+
   /** Rich per-extension detail (registered tools + slash commands) surfaced by
    * getExtensions() so the Extensions panel can render them in the browser
    * preview without a live daemon. Kept consistent with mockExtensions so the
@@ -610,11 +642,96 @@ export class MockIpcClient implements IpcClient {
     );
   }
 
+  /** Timers for the in-flight simulated chat turn (streaming assistant reply).
+   * Tracked separately from the connection `timers` so abort()/a new prompt
+   * can stop the current simulated turn without touching connect state. */
+  private chatTurnTimers: number[] = [];
+
+  /** Clear any in-flight simulated chat turn timers. */
+  private clearChatTurn(): void {
+    this.chatTurnTimers.forEach((t) => window.clearTimeout(t));
+    this.chatTurnTimers = [];
+  }
+
   async prompt(text: string): Promise<void> {
     this.emit({ type: "session_event", event: { kind: "user_message", text } });
+    this.simulateChatTurn(text);
   }
-  async abort(): Promise<void> {}
-  async steer(): Promise<void> {}
+  async abort(): Promise<void> {
+    // Stop any in-flight simulated streaming turn (matches the real daemon).
+    this.clearChatTurn();
+  }
+  async steer(text: string): Promise<void> {
+    // A steer is delivered to the (simulated) running turn and gets its own
+    // acknowledgement so the steered indicator round-trips in demo mode.
+    this.emit({
+      type: "session_event",
+      event: {
+        kind: "text",
+        text: `\n\n[steered] noted — I'll address “${text.trim()}” after the current tool calls.`,
+      },
+    });
+  }
+
+  /**
+   * Simulate a full streaming assistant turn in response to the user's prompt.
+   * Emits thinking → tool call → answer deltas through the same session-event
+   * channel the real daemon uses (useTranscript.applySessionEvent), then a
+   * snapshot marking the queue idle so the composer's busy state clears. This
+   * makes the core Chat messaging + streaming features demonstrable/testable
+   * in demo mode via cua-driver.
+   */
+  private simulateChatTurn(text: string): void {
+    this.clearChatTurn();
+    const shown = (text.trim() || "(empty message)").slice(0, 140);
+    const push = (fn: () => void, ms: number) => {
+      this.chatTurnTimers.push(window.setTimeout(fn, ms));
+    };
+    const e = (event: Record<string, unknown>) =>
+      this.emit({ type: "session_event", event } as IpcEvent);
+
+    // Mark the turn as running so the composer's daemonIdle (busy-clearing)
+    // effect sees a queue-idle transition at the END of the turn. Without this
+    // the queue stays idle across turns and the transition never fires again.
+    this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "busy" } } });
+
+    // Thinking.
+    push(() => e({ kind: "thinking_delta", thinking: "Reading your message…" }), 350);
+    push(() => e({ kind: "thinking_delta", thinking: " `" + shown + "`" }), 900);
+    // A running demo tool call, then its result.
+    push(
+      () =>
+        e({
+          kind: "tool_call",
+          name: "demo_echo",
+          input: JSON.stringify({ text: text.trim() }),
+        }),
+      1350,
+    );
+    push(
+      () =>
+        e({
+          kind: "tool_result",
+          name: "demo_echo",
+          output: `Demo: echoed user input (${shown.length} chars) — no live tool available.`,
+        }),
+      1750,
+    );
+    // Stream the answer in chunks.
+    const chunks = [
+      `Got it — you said: “${shown}”.`,
+      "\n\nThis is a simulated demo response — no live engine is connected, so I can't run real tools or fetch live data.",
+      "\n\nIn the connected app I'd help you work through it step by step.",
+    ];
+    chunks.forEach((chunk, i) => {
+      push(() => e({ kind: "text", text: chunk }), 2200 + i * 650);
+    });
+    // Mark the turn complete → queue idle so busy clears + follow-ups flush.
+    push(() => {
+      this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "idle" } } });
+      this.clearChatTurn();
+    }, 2200 + chunks.length * 650 + 300);
+  }
   async setModel(provider: string, model: string, _thinking?: string, runtime?: ModelRuntimeConfig): Promise<void> {
     if (runtime) {
       this.applyModelRuntime(provider, model, runtime);
@@ -836,9 +953,14 @@ export class MockIpcClient implements IpcClient {
     };
   }
   async listInbox(): Promise<AgentMessage[]> {
-    return [];
+    return this.mockInboxMessages;
   }
-  async markMessageRead(): Promise<void> {}
+  async markMessageRead(messageId: string): Promise<void> {
+    const raw = messageId.startsWith("msg-") ? messageId.slice(4) : messageId;
+    this.mockInboxMessages = this.mockInboxMessages.map((m) =>
+      m.id === raw ? { ...m, read: true } : m,
+    );
+  }
   async compact(_prompt?: string): Promise<void> {}
   async retry(): Promise<void> {}
   async refine(): Promise<void> {
@@ -944,6 +1066,22 @@ export class MockIpcClient implements IpcClient {
   async startSideQuestion(text: string): Promise<{ id: string }> {
     const id = `side-${Date.now()}`;
     this.emit({ type: "session_event", event: { kind: "side_question_event", id, text, status: "running" } });
+    // Simulate the inline side-turn completing so the panel is fully
+    // demonstrable (running → complete with a reply) in demo mode.
+    this.chatTurnTimers.push(
+      window.setTimeout(() => {
+        this.emit({
+          type: "session_event",
+          event: {
+            kind: "side_question_event",
+            id,
+            text,
+            status: "complete",
+            answer: `Side reply (demo) — your question: “${text.trim()}”. In the connected app this opens an inline side conversation that doesn't touch the main session.`,
+          },
+        });
+      }, 1300),
+    );
     return { id };
   }
   async exportToHtml(outputPath?: string): Promise<{ outputPath: string }> {
@@ -1039,9 +1177,7 @@ export function getIpcClient(): IpcClient {
   // without a live daemon/provider — the same simulated sessions, agents, and
   // messages the browser preview uses. The URL-hash check keeps the dev
   // server (`http://localhost:1420/#demo`) able to opt in without the shell.
-  const demoMode =
-    (window as any).__SOPHOS_DEMO__ === true ||
-    (typeof window !== "undefined" && window.location.hash.includes("demo"));
+  const demoMode = isDemoMode();
   client = inTauri && !demoMode ? new TauriIpcClient() : new MockIpcClient();
   // Expose on window in browser/demo mode so the e2e test harness can patch
   // the singleton directly (Vite HMR creates separate module instances per
