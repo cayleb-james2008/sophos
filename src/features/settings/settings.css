@@ -217,6 +217,27 @@
 .pp-dividerline { flex: 1; height: 1px; background: var(--pa-border); }
 .pp-apikey { display: flex; flex-direction: column; gap: 8px; }
 
+/* ---- about panel ---- */
+.about-panel { display: flex; flex-direction: column; gap: 14px; }
+.about-panel__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.about-panel__version-row { display: flex; align-items: center; gap: 8px; }
+.about-panel__version {
+  font: 600 13px/1.2 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  color: var(--pa-paper);
+}
+.about-panel__links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+}
+.about-panel__links a {
+  color: var(--pa-green-hover);
+  text-decoration: none;
+}
+.about-panel__links a:hover { text-decoration: underline; }
+
 /* ---- skills ---- */
 .sp-row--disabled { opacity: 0.5; }
 .sk-desc { font-size: 12.5px; }

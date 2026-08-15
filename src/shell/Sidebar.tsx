@@ -58,7 +58,7 @@ export function Sidebar({
           </span>
           <div className="sidebar__brand-copy">
             <span className="sidebar__wordmark">SOPHOS</span>
-            <span className="sidebar__version">v0.1.0 · 2026-08-06</span>
+            <span className="sidebar__version">v0.4.0-beta</span>
           </div>
         </div>
       </div>
