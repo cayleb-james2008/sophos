@@ -1,0 +1,207 @@
+/* Overlay components — Card, Modal, Tooltip, ScrollArea, Tabs, ErrorBoundary.
+   Visual layout for the design-system surfaces. Dynamic values (e.g. modal
+   width, tooltip side) are passed via CSS custom properties or class
+   switches — never as inline style objects at runtime. */
+
+.pa-card {
+  border-radius: 0;
+  box-shadow: none;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pa-card--default {
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
+}
+.pa-card--raised {
+  background: var(--pa-secondary);
+  border: 1px solid var(--pa-border-strong);
+}
+.pa-card--interactive {
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
+  cursor: pointer;
+}
+.pa-card--interactive:hover {
+  border-color: var(--pa-green-border);
+  transform: translateY(-1px);
+}
+.pa-card--accent {
+  background: linear-gradient(180deg, var(--pa-secondary), var(--pa-card));
+  border: 1px solid var(--pa-green-border);
+}
+.pa-card--p-none { padding: 0; }
+.pa-card--p-sm { padding: 12px; }
+.pa-card--p-md { padding: 16px; }
+.pa-card--p-lg { padding: 22px; }
+
+/* ---- ScrollArea ---- */
+.pa-scroll-area {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+}
+
+/* ---- Tabs ---- */
+.pa-tabs {
+  display: flex;
+  align-items: center;
+}
+.pa-tabs--pill { gap: 4px; }
+.pa-tabs--underline { gap: 16px; border-bottom: 1px solid var(--pa-border); }
+.pa-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--pa-paper-muted);
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 0;
+  transition: color 100ms cubic-bezier(0.3, 0, 0.2, 1), background 100ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.pa-tab:disabled { cursor: not-allowed; opacity: 0.4; }
+.pa-tab--active { color: var(--pa-paper); }
+.pa-tab--pill { padding: 6px 14px; }
+.pa-tab--underline { padding: 8px 2px; }
+.pa-tab--pill.pa-tab--active { background: var(--pa-green-soft); }
+.pa-tab__underline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 0;
+  background: var(--pa-green);
+}
+
+/* ---- Tooltip ---- */
+.pa-tooltip-host {
+  position: relative;
+  display: inline-flex;
+}
+.pa-tooltip {
+  position: absolute;
+  z-index: 100;
+  white-space: nowrap;
+  background: var(--pa-overlay);
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 0;
+  padding: 5px 9px;
+  color: var(--pa-paper);
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  box-shadow: none;
+  animation: pa-scale-in 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pa-tooltip--top    { bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
+.pa-tooltip--bottom { top: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
+.pa-tooltip--left   { right: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
+.pa-tooltip--right  { left: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
+
+/* ---- Modal ---- */
+.pa-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+}
+.pa-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 5, 8, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: pa-fade-in 160ms ease;
+}
+.pa-modal__panel {
+  position: relative;
+  width: var(--pa-modal-width, 480px);
+  max-width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--pa-secondary);
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 0;
+  box-shadow: none;
+  animation: pa-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pa-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--pa-border);
+}
+.pa-modal__body {
+  padding: 22px;
+  overflow-y: auto;
+}
+.pa-modal__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--pa-border);
+}
+.pa-modal__close {
+  background: transparent;
+  border: none;
+  color: var(--pa-paper-dim);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 0;
+}
+.pa-modal__close:hover,
+.pa-modal__close:focus-visible { color: var(--pa-paper); }
+
+/* ---- ErrorBoundary ---- */
+.pa-error-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 100%;
+  padding: 22px;
+  background: var(--pa-ink);
+  color: var(--pa-paper);
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  text-align: center;
+}
+.pa-error-boundary__card {
+  max-width: 480px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+}
+.pa-error-boundary__label {
+  letter-spacing: 0.12em;
+}
+.pa-error-boundary__trace {
+  padding: 8px;
+  background: var(--pa-danger-soft);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  overflow-x: auto;
+  word-break: break-word;
+  text-align: left;
+  color: var(--pa-danger);
+}
+.pa-error-boundary__reload { align-self: center; }

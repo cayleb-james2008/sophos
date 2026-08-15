@@ -11,3 +11,4 @@ export type { Theme } from "./theme";
 export * from "./core";
 export * from "./overlay";
 export * from "./motion";
+export { ShortcutsOverlay, type ShortcutsGroup, type ShortcutsOverlayProps } from "./ShortcutsOverlay";

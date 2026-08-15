@@ -1,0 +1,282 @@
+/* Design primitives — CSS for design system components. The components in
+   core.tsx (Text, Button, Input, TextArea, Select, Kbd, Spinner, Badge,
+   StatusDot, IconButton, Skeleton) use these classes for their layout, color,
+   and variant styles. Tokens (--pa-* vars + tokens.font/space/radius) are the
+   only values used — class switches instead of inline style composition. */
+
+/* ---- Text ---- */
+.pa-text--display {
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 31px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+.pa-text--title    { font-size: 24px; font-weight: 600; line-height: 1.15; letter-spacing: -0.015em; }
+.pa-text--subtitle { font-size: 16px; font-weight: 500; line-height: 1.5; }
+.pa-text--body     { font-size: 14px; font-weight: 400; line-height: 1.65; }
+.pa-text--label    { font-size: 12.5px; font-weight: 500; line-height: 1.5; }
+.pa-text--micro    { font-size: 11px; font-weight: 500; line-height: 1.5; letter-spacing: 0.08em; }
+
+.pa-text--default  { color: var(--pa-paper); }
+.pa-text--muted    { color: var(--pa-paper-muted); }
+.pa-text--dim      { color: var(--pa-paper-dim); }
+.pa-text--accent   { color: var(--pa-green-hover); }
+.pa-text--success  { color: var(--pa-green); }
+.pa-text--warning  { color: var(--pa-amber); }
+.pa-text--danger   { color: var(--pa-danger); }
+.pa-text--info     { color: var(--pa-info); }
+
+
+/* ---- Button ---- */
+.pa-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
+  border-radius: 0;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 100ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.pa-button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.pa-button--primary {
+  background: #fff;
+  color: #0e0e0e;
+  border-color: #fff;
+}
+.pa-button--primary:hover:not(:disabled) { background: #f4f4f4; }
+
+.pa-button--accent-soft {
+  background: var(--pa-green-soft);
+  color: var(--pa-green-hover);
+  border-color: var(--pa-green-border);
+}
+.pa-button--accent-soft:hover:not(:disabled) { background: var(--pa-green-border); }
+
+.pa-button--ghost {
+  background: transparent;
+  color: var(--pa-paper-muted);
+  border-color: transparent;
+}
+.pa-button--ghost:hover:not(:disabled) { color: var(--pa-paper); }
+
+.pa-button--outline {
+  background: transparent;
+  color: var(--pa-paper);
+  border-color: var(--pa-border);
+}
+.pa-button--outline:hover:not(:disabled) { border-color: var(--pa-green-border); }
+
+.pa-button--danger {
+  background: var(--pa-danger);
+  color: #fff;
+  border-color: var(--pa-danger);
+}
+
+.pa-button--sm { padding: 3px 10px; font-size: 12.5px; gap: 6px; }
+.pa-button--md { padding: 6px 14px; font-size: 12.5px; gap: 8px; }
+.pa-button--lg { padding: 9px 18px; font-size: 14px; gap: 10px; }
+
+.pa-button--full { width: 100%; }
+
+/* ---- Input ---- */
+.pa-input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+.pa-input-shell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  padding: 0 12px;
+  transition: border-color 100ms cubic-bezier(0.3, 0, 0.2, 1), box-shadow 100ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.pa-input-shell--error { border-color: var(--pa-danger); }
+.pa-input-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--pa-paper);
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  padding: 8px 0;
+  min-width: 0;
+}
+
+/* ---- TextArea ---- */
+.pa-ta-field { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.pa-ta-textarea {
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  color: var(--pa-paper);
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 72px;
+  outline: none;
+  transition: border-color 100ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.pa-ta-textarea--error { border-color: var(--pa-danger); }
+
+/* ---- Select ---- */
+.pa-select-field { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.pa-select-shell { position: relative; display: flex; align-items: center; }
+.pa-select-native {
+  appearance: none;
+  width: 100%;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border);
+  border-radius: 0;
+  color: var(--pa-paper);
+  font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font-size: 12.5px;
+  padding: 8px 30px 8px 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 100ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.pa-select-caret {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+  color: var(--pa-paper-dim);
+  font-size: 9px;
+}
+
+/* ---- Kbd ---- */
+.pa-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: var(--pa-secondary);
+  border: 1px solid var(--pa-border);
+  border-bottom-width: 2px;
+  border-radius: 0;
+  color: var(--pa-paper-muted);
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ---- Spinner ---- */
+.pa-spinner {
+  display: inline-block;
+  width: var(--pa-spinner-size, 16px);
+  height: var(--pa-spinner-size, 16px);
+  border: 2px solid var(--pa-border);
+  border-top-color: var(--pa-green);
+  border-radius: 50%;
+  animation: pa-spin 0.8s linear infinite;
+}
+
+/* ---- Badge ---- */
+.pa-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pa-badge--neutral { background: var(--pa-overlay); color: var(--pa-paper-muted); }
+.pa-badge--accent { background: var(--pa-green-soft); color: var(--pa-green-hover); }
+.pa-badge--success { background: rgba(var(--pa-green-rgb), 0.12); color: var(--pa-green); }
+.pa-badge--warning { background: rgba(var(--pa-amber-rgb), 0.12); color: var(--pa-amber); }
+.pa-badge--danger  { background: rgba(var(--pa-danger-rgb), 0.12); color: var(--pa-danger); }
+.pa-badge--info    { background: rgba(var(--pa-info-rgb), 0.12); color: var(--pa-info); }
+.pa-badge__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.pa-badge__dot--neutral { background: var(--pa-paper-dim); }
+.pa-badge__dot--accent { background: var(--pa-green-hover); }
+.pa-badge__dot--success { background: var(--pa-green); }
+.pa-badge__dot--warning { background: var(--pa-amber); }
+.pa-badge__dot--danger { background: var(--pa-danger); }
+.pa-badge__dot--info { background: var(--pa-info); }
+
+/* ---- StatusDot ---- */
+.pa-status-dot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pa-status-dot__core {
+  border-radius: 50%;
+  width: var(--pa-status-dot-size, 8px);
+  height: var(--pa-status-dot-size, 8px);
+}
+.pa-status-dot__core--glow {
+  box-shadow: 0 0 0 3px var(--pa-glow);
+}
+.pa-status-dot__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: pa-beat 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.pa-status-dot--connecting .pa-status-dot__core,
+.pa-status-dot--connecting .pa-status-dot__pulse { background: var(--pa-amber); }
+.pa-status-dot--connected .pa-status-dot__core,
+.pa-status-dot--connected .pa-status-dot__pulse { background: var(--pa-green); }
+.pa-status-dot--disconnected .pa-status-dot__core,
+.pa-status-dot--disconnected .pa-status-dot__pulse { background: var(--pa-danger); }
+.pa-status-dot--reconnecting .pa-status-dot__core,
+.pa-status-dot--reconnecting .pa-status-dot__pulse { background: var(--pa-info); }
+.pa-status-dot--idle .pa-status-dot__core { background: var(--pa-paper-dim); }
+.pa-status-dot--connected .pa-status-dot__core,
+.pa-status-dot--connecting .pa-status-dot__core,
+.pa-status-dot--reconnecting .pa-status-dot__core {
+  animation: pa-pulse 1.2s ease-in-out infinite;
+}
+
+/* ---- IconButton ---- */
+.pa-icon-button {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 100ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+.pa-icon-button:disabled { cursor: not-allowed; opacity: 0.4; }
+.pa-icon-button:hover:not(:disabled) { background: var(--pa-overlay); }
+.pa-icon-button--default { color: var(--pa-paper-muted); }
+.pa-icon-button--accent { color: var(--pa-green-hover); }
+.pa-icon-button--danger { color: var(--pa-danger); }
+.pa-icon-button--sm { padding: 5px; }
+.pa-icon-button--md { padding: 7px; }
+
+/* ---- Skeleton ---- */
+.pa-skeleton {
+  display: inline-block;
+  background: var(--pa-secondary);
+  border-radius: var(--pa-skeleton-r, 0);
+  animation: pa-skeleton-pulse 1.4s ease-in-out infinite;
+  width: var(--pa-skeleton-w, 100%);
+  height: var(--pa-skeleton-h, 16px);
+}

@@ -1,0 +1,14 @@
+/* Motion layer — animation hooks. Each hook reads its timing from CSS custom
+   properties (--pa-motion-duration, --pa-motion-delay) so callers don't have
+   to compose inline animation strings at runtime. */
+
+.pa-fade {
+  animation: pa-fade-in var(--pa-motion-duration, 180ms) var(--pa-ease, cubic-bezier(0.3, 0, 0.2, 1)) var(--pa-motion-delay, 0ms) both;
+}
+.pa-slide-up {
+  animation: pa-slide-up var(--pa-motion-duration, 180ms) var(--pa-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) var(--pa-motion-delay, 0ms) both;
+}
+.pa-view-transition {
+  height: 100%;
+  animation: pa-fade-in var(--pa-motion-duration, 180ms) var(--pa-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}

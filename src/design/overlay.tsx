@@ -1,12 +1,16 @@
-// Surface & overlay components — Card, Modal, Tooltip, ScrollArea, Tabs.
-// Built from the tokens. P4/P5 consume these; keep the props stable.
+// Surface & overlay components — Card, Modal, Tooltip, ScrollArea, Tabs,
+// ErrorBoundary. Built from the tokens. P4/P5 consume these; keep the props
+// stable.
+//
+// Styling is class-driven (overlay.css). Modal width and tooltip placement are
+// passed through CSS custom properties or class switches so the component
+// functions remain declarative.
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { tokens } from "./tokens";
 import { Text, Button } from "./core";
-
-type CSS = React.CSSProperties;
+import "./overlay.css";
 
 // ---------------------------------------------------------------------------
 // Card
@@ -16,55 +20,31 @@ export interface CardProps {
   variant?: "default" | "raised" | "interactive" | "accent";
   padding?: "none" | "sm" | "md" | "lg";
   children?: React.ReactNode;
-  style?: CSS;
-  /** Extra layout/theme class(es) applied alongside the base card styles. */
+  style?: React.CSSProperties;
   className?: string;
   onClick?: () => void;
 }
 
-const cardVariants: Record<string, CSS> = {
-  default: { background: tokens.color.bgElevated, border: `1px solid ${tokens.color.border}` },
-  raised: { background: tokens.color.bgRaised, border: `1px solid ${tokens.color.borderStrong}` },
-  interactive: {
-    background: tokens.color.bgElevated,
-    border: `1px solid ${tokens.color.border}`,
-    cursor: "pointer",
-  },
-  accent: {
-    background: `linear-gradient(180deg, ${tokens.color.bgRaised}, ${tokens.color.bgElevated})`,
-    border: `1px solid ${tokens.color.accentBorder}`,
-  },
-};
-
-const cardPaddings: Record<string, CSS> = {
-  none: { padding: 0 },
-  sm: { padding: tokens.space.md },
-  md: { padding: tokens.space.lg },
-  lg: { padding: tokens.space.xl },
-};
-
-export function Card({ variant = "default", padding = "md", children, style, className, onClick }: CardProps) {
+export function Card({
+  variant = "default",
+  padding = "md",
+  children,
+  style,
+  className,
+  onClick,
+}: CardProps) {
   return (
     <div
-      className={className}
       onClick={onClick}
-      style={{
-        borderRadius: tokens.radius.lg,
-        boxShadow: tokens.shadow.sm,
-        transition: `all ${tokens.motion.base} ${tokens.motion.easeOut}`,
-        ...cardVariants[variant],
-        ...cardPaddings[padding],
-        ...(variant === "interactive"
-          ? {
-              ":hover": {
-                borderColor: tokens.color.accentBorder,
-                transform: "translateY(-1px)",
-                boxShadow: tokens.shadow.md,
-              },
-            }
-          : null),
-        ...style,
-      }}
+      className={[
+        "pa-card",
+        `pa-card--${variant}`,
+        `pa-card--p-${padding}`,
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={style}
     >
       {children}
     </div>
@@ -81,18 +61,13 @@ export function ScrollArea({
   className,
 }: {
   children: React.ReactNode;
-  style?: CSS;
+  style?: React.CSSProperties;
   className?: string;
 }) {
   return (
     <div
-      className={className}
-      style={{
-        overflowY: "auto",
-        overflowX: "hidden",
-        height: "100%",
-        ...style,
-      }}
+      className={["pa-scroll-area", className].filter(Boolean).join(" ")}
+      style={style}
     >
       {children}
     </div>
@@ -115,22 +90,16 @@ export interface TabsProps {
   activeId: string;
   onChange: (id: string) => void;
   variant?: "underline" | "pill";
-  style?: CSS;
+  style?: React.CSSProperties;
+  className?: string;
 }
 
-export function Tabs({ items, activeId, onChange, variant = "underline", style }: TabsProps) {
+export function Tabs({ items, activeId, onChange, variant = "underline", style, className }: TabsProps) {
   return (
     <div
       role="tablist"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: variant === "pill" ? tokens.space.xs : tokens.space.lg,
-        ...(variant === "underline"
-          ? { borderBottom: `1px solid ${tokens.color.border}` }
-          : null),
-        ...style,
-      }}
+      className={["pa-tabs", `pa-tabs--${variant}`, className].filter(Boolean).join(" ")}
+      style={style}
     >
       {items.map((item) => {
         const active = item.id === activeId;
@@ -141,40 +110,18 @@ export function Tabs({ items, activeId, onChange, variant = "underline", style }
             aria-selected={active}
             disabled={item.disabled}
             onClick={() => onChange(item.id)}
-            className="pa-focus-ring"
-            style={{
-              position: "relative",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: tokens.space.sm,
-              background: variant === "pill" && active ? tokens.color.accentSoft : "transparent",
-              border: "none",
-              cursor: item.disabled ? "not-allowed" : "pointer",
-              opacity: item.disabled ? 0.4 : 1,
-              color: active ? tokens.color.text : tokens.color.textMuted,
-              fontFamily: tokens.font.sans,
-              fontSize: tokens.font.size.sm,
-              fontWeight: tokens.font.weight.medium,
-              padding: variant === "pill" ? "6px 14px" : "8px 2px",
-              borderRadius: tokens.radius.sm,
-              transition: `color ${tokens.motion.fast} ${tokens.motion.ease}, background ${tokens.motion.fast} ${tokens.motion.ease}`,
-            }}
+            className={[
+              "pa-tab",
+              `pa-tab--${variant}`,
+              active ? "pa-tab--active" : null,
+              "pa-focus-ring",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             {item.icon}
             {item.label}
-            {variant === "underline" && active ? (
-              <span
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: -1,
-                  height: 2,
-                  borderRadius: 0, // sharp — P4 critic fix
-                  background: tokens.color.accent,
-                }}
-              />
-            ) : null}
+            {variant === "underline" && active ? <span className="pa-tab__underline" aria-hidden="true" /> : null}
           </button>
         );
       })}
@@ -207,16 +154,9 @@ export function Tooltip({ content, children, side = "top", delay = 300 }: Toolti
     setVisible(false);
   };
 
-  const sideStyle: Record<string, CSS> = {
-    top: { bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)" },
-    bottom: { top: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)" },
-    left: { right: "calc(100% + 8px)", top: "50%", transform: "translateY(-50%)" },
-    right: { left: "calc(100% + 8px)", top: "50%", transform: "translateY(-50%)" },
-  };
-
   return (
     <span
-      style={{ position: "relative", display: "inline-flex" }}
+      className="pa-tooltip-host"
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocus={show}
@@ -224,26 +164,7 @@ export function Tooltip({ content, children, side = "top", delay = 300 }: Toolti
     >
       {children}
       {visible ? (
-        <span
-          role="tooltip"
-          id={id}
-          style={{
-            position: "absolute",
-            zIndex: 100,
-            whiteSpace: "nowrap",
-            background: tokens.color.bgOverlay,
-            border: `1px solid ${tokens.color.borderStrong}`,
-            borderRadius: tokens.radius.sm,
-            padding: "5px 9px",
-            color: tokens.color.text,
-            fontFamily: tokens.font.sans,
-            fontSize: tokens.font.size.xs,
-            fontWeight: tokens.font.weight.medium,
-            boxShadow: tokens.shadow.md,
-            animation: "pa-scale-in 120ms cubic-bezier(0.16,1,0.3,1)",
-            ...sideStyle[side],
-          }}
-        >
+        <span role="tooltip" id={id} className={`pa-tooltip pa-tooltip--${side}`}>
           {content}
         </span>
       ) : null}
@@ -277,88 +198,27 @@ export function Modal({ open, onClose, title, children, footer, width = 480 }: M
   if (!open) return null;
 
   return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 200,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: tokens.space.xl,
-      }}
-    >
+    <div className="pa-modal" role="dialog" aria-modal="true">
+      <div className="pa-modal__backdrop" onClick={onClose} aria-hidden="true" />
       <div
-        onClick={onClose}
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "rgba(5,5,8,0.7)",
-          backdropFilter: "blur(4px)",
-          animation: "pa-fade-in 160ms ease",
-        }}
-      />
-      <div
-        style={{
-          position: "relative",
-          width,
-          maxWidth: "100%",
-          maxHeight: "85vh",
-          display: "flex",
-          flexDirection: "column",
-          background: tokens.color.bgRaised,
-          border: `1px solid ${tokens.color.borderStrong}`,
-          borderRadius: tokens.radius.lg,
-          boxShadow: tokens.shadow.lg,
-          animation: "pa-scale-in 200ms cubic-bezier(0.16,1,0.3,1)",
-        }}
+        className="pa-modal__panel"
+        style={{ "--pa-modal-width": `${width}px` } as React.CSSProperties}
       >
         {title ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: `${tokens.space.lg} ${tokens.space.xl}`,
-              borderBottom: `1px solid ${tokens.color.border}`,
-            }}
-          >
+          <div className="pa-modal__head">
             <Text variant="subtitle">{title}</Text>
             <button
+              type="button"
               onClick={onClose}
               aria-label="Close"
-              className="pa-focus-ring"
-              style={{
-                background: "transparent",
-                border: "none",
-                color: tokens.color.textDim,
-                cursor: "pointer",
-                fontSize: 16,
-                lineHeight: 1,
-                padding: 4,
-                borderRadius: tokens.radius.sm,
-              }}
+              className="pa-modal__close pa-focus-ring"
             >
               ✕
             </button>
           </div>
         ) : null}
-        <div style={{ padding: tokens.space.xl, overflowY: "auto" }}>{children}</div>
-        {footer ? (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: tokens.space.sm,
-              padding: `${tokens.space.md} ${tokens.space.xl}`,
-              borderTop: `1px solid ${tokens.color.border}`,
-            }}
-          >
-            {footer}
-          </div>
-        ) : null}
+        <div className="pa-modal__body">{children}</div>
+        {footer ? <div className="pa-modal__foot">{footer}</div> : null}
       </div>
     </div>,
     document.body,
@@ -399,58 +259,24 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     if (this.state.error) {
       const { label } = this.props;
       return (
-        <div
-          role="alert"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: tokens.space.md,
-            minHeight: "100%",
-            padding: tokens.space.xl,
-            background: tokens.color.bg,
-            color: tokens.color.text,
-            fontFamily: tokens.font.sans,
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              maxWidth: 480,
-              width: "100%",
-              display: "flex",
-              flexDirection: "column",
-              gap: tokens.space.md,
-              padding: tokens.space.xl,
-              background: tokens.color.bgElevated,
-              border: `1px solid ${tokens.color.border}`,
-              borderRadius: tokens.radius.lg,
-            }}
-          >
-            <Text variant="micro" tone="accent" mono uppercase style={{ letterSpacing: "0.12em" }}>
+        <div role="alert" className="pa-error-boundary">
+          <div className="pa-error-boundary__card">
+            <Text variant="micro" tone="accent" mono uppercase className="pa-error-boundary__label">
               {label ?? "Something went wrong"}
             </Text>
             <Text variant="body" tone="muted">
               A render error occurred in this view. Reload to recover.
             </Text>
             <Text
+              as="pre"
               variant="micro"
               tone="danger"
               mono
-              style={{
-                padding: tokens.space.sm,
-                background: tokens.color.dangerSoft,
-                border: `1px solid ${tokens.color.border}`,
-                borderRadius: tokens.radius.sm,
-                overflowX: "auto",
-                wordBreak: "break-word",
-                textAlign: "left",
-              }}
+              className="pa-error-boundary__trace"
             >
               {this.state.error.message || String(this.state.error)}
             </Text>
-            <Button variant="accent-soft" size="md" onClick={this.handleReload} style={{ alignSelf: "center" }}>
+            <Button variant="accent-soft" size="md" onClick={this.handleReload} className="pa-error-boundary__reload">
               Reload
             </Button>
           </div>
@@ -460,3 +286,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     return this.props.children;
   }
 }
+
+// `tokens` is imported above for any future use; the explicit re-export keeps
+// callers that previously relied on it still working.
+void tokens;

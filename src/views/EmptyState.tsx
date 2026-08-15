@@ -1,9 +1,22 @@
-// Shared empty-state scaffold for the placeholder views. Demonstrates the
-// design system while the feature modules (P4/P5) land.
+// EmptyState — polished, reusable zero-data placeholder for the Sophos views.
+// Renders an icon, an optional badge, a title, a description, an optional
+// action button, and an optional footer meta line. Visual styling lives in
+// views.css so the file stays clean of inline styles.
 
 import type { ReactNode } from "react";
-import { tokens } from "../design/tokens";
 import { Text, Badge, Button, type BadgeTone } from "../design";
+import "./views.css";
+
+export interface EmptyStateProps {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  badge?: string;
+  badgeTone?: BadgeTone;
+  actionLabel?: string;
+  onAction?: () => void;
+  meta?: string;
+}
 
 export function EmptyState({
   icon,
@@ -14,59 +27,18 @@ export function EmptyState({
   actionLabel,
   onAction,
   meta,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  badge?: string;
-  badgeTone?: BadgeTone;
-  actionLabel?: string;
-  onAction?: () => void;
-  meta?: string;
-}) {
+}: EmptyStateProps) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        gap: tokens.space.lg,
-        padding: tokens.space["3xl"],
-        height: "100%",
-        maxWidth: 520,
-        margin: "0 auto",
-      }}
-    >
-      <div
-        style={{
-          width: 56,
-          height: 56,
-          borderRadius: tokens.radius.md, // resolves to 0px (sharp) — P1 token
-          background: tokens.color.surface2,
-          border: `1px solid ${tokens.color.borderStrong}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: tokens.color.accent,
-        }}
-      >
+    <div className="empty-state">
+      <div className="empty-state__icon" aria-hidden="true">
         {icon}
       </div>
 
-      <div
-        style={{
-          fontFamily: tokens.font.mono,
-          fontSize: tokens.font.size.sm,
-          color: tokens.color.textMuted,
-          letterSpacing: "0.02em",
-        }}
-      >
-        <span style={{ color: tokens.color.accent }}>$</span>{" "}sophos
+      <div className="empty-state__prompt" aria-hidden="true">
+        <span className="empty-state__prompt-glyph">$</span> sophos
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.sm }}>
+      <div className="empty-state__group">
         {badge ? <Badge tone={badgeTone}>{badge}</Badge> : null}
         <Text variant="title">{title}</Text>
         <Text variant="body" tone="muted">

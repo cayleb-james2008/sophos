@@ -1,0 +1,113 @@
+/* ShortcutsOverlay — modal that lists keyboard shortcuts in a clean, dense
+   table. Terminal-minimal: hairline borders, monospace kbd column, dim labels,
+   no decorative gradient. Loaded via the design barrel. */
+
+.shortcuts-overlay {
+  position: relative;
+  width: 540px;
+  max-width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--pa-card);
+  border: 1px solid var(--pa-border-strong);
+  border-radius: 0;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  animation: pa-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.shortcuts-overlay__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--pa-border);
+}
+.shortcuts-overlay__title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.shortcuts-overlay__eyebrow {
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--pa-green);
+  text-transform: uppercase;
+}
+.shortcuts-overlay__heading {
+  color: var(--pa-paper);
+  font: 600 18px/1 "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+.shortcuts-overlay__close {
+  background: transparent;
+  border: none;
+  color: var(--pa-paper-dim);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 6px;
+  border-radius: 0;
+  transition: color 120ms ease;
+}
+.shortcuts-overlay__close:hover,
+.shortcuts-overlay__close:focus-visible { color: var(--pa-paper); }
+.shortcuts-overlay__body {
+  padding: 8px 0;
+  overflow-y: auto;
+}
+.shortcuts-overlay__group {
+  padding: 14px 22px 16px;
+  border-bottom: 1px solid var(--pa-border);
+}
+.shortcuts-overlay__group:last-child { border-bottom: 0; }
+.shortcuts-overlay__grouphead {
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--pa-paper-muted);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.shortcuts-overlay__rows {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  row-gap: 10px;
+  column-gap: 18px;
+}
+.shortcuts-overlay__row {
+  display: contents;
+}
+.shortcuts-overlay__label {
+  color: var(--pa-paper);
+  font: 500 13px/1.4 "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.shortcuts-overlay__keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: end;
+}
+.shortcuts-overlay__plus {
+  color: var(--pa-paper-dim);
+  margin-inline: 2px;
+  font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  font-size: 11px;
+}
+.shortcuts-overlay__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--pa-border);
+  color: var(--pa-paper-dim);
+}
+.shortcuts-overlay__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

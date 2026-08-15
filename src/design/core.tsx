@@ -1,12 +1,13 @@
 // Core design primitives — the atomic building blocks of the Sophos command
 // center. Built from the tokens. P4/P5 consume these; keep the props stable.
+//
+// Style composition is class-driven via primitives.css — variant names map to
+// BEM-style classes (`pa-button`, `pa-button--primary`, etc.) — so the
+// styled-dom pipeline never needs to parse JS objects at runtime.
 
 import React from "react";
 import { tokens } from "./tokens";
-
-type CSS = React.CSSProperties;
-
-const mono = { fontFamily: tokens.font.mono };
+import "./primitives.css";
 
 // ---------------------------------------------------------------------------
 // Text
@@ -32,28 +33,31 @@ export interface TextProps {
   uppercase?: boolean;
   htmlFor?: string;
   children?: React.ReactNode;
-  style?: CSS;
   className?: string;
+  /** Optional escape hatch for layout-specific tweaks (letter-spacing, etc.)
+   *  that aren't worth a dedicated class. Reserved for things like eyebrow
+   *  microcopy where one design token is moved by a few units. */
+  style?: React.CSSProperties;
 }
 
-const textVariants: Record<TextVariant, CSS> = {
-  display: { fontFamily: tokens.font.display, fontSize: tokens.font.size["3xl"], fontWeight: tokens.font.weight.medium, lineHeight: tokens.font.leading.tight, letterSpacing: "-0.015em" },
-  title: { fontSize: tokens.font.size["2xl"], fontWeight: tokens.font.weight.semibold, lineHeight: tokens.font.leading.tight, letterSpacing: "-0.015em" },
-  subtitle: { fontSize: tokens.font.size.lg, fontWeight: tokens.font.weight.medium, lineHeight: tokens.font.leading.normal },
-  body: { fontSize: tokens.font.size.md, fontWeight: tokens.font.weight.regular, lineHeight: tokens.font.leading.relaxed },
-  label: { fontSize: tokens.font.size.sm, fontWeight: tokens.font.weight.medium, lineHeight: tokens.font.leading.normal },
-  micro: { fontSize: tokens.font.size.xs, fontWeight: tokens.font.weight.medium, lineHeight: tokens.font.leading.normal, letterSpacing: "0.08em" },
+const variantClass: Record<TextVariant, string> = {
+  display: "pa-text--display",
+  title: "pa-text--title",
+  subtitle: "pa-text--subtitle",
+  body: "pa-text--body",
+  label: "pa-text--label",
+  micro: "pa-text--micro",
 };
 
-const textTones: Record<TextTone, CSS> = {
-  default: { color: tokens.color.text },
-  muted: { color: tokens.color.textMuted },
-  dim: { color: tokens.color.textDim },
-  accent: { color: tokens.color.accentHover },
-  success: { color: tokens.color.success },
-  warning: { color: tokens.color.warning },
-  danger: { color: tokens.color.danger },
-  info: { color: tokens.color.info },
+const toneClass: Record<TextTone, string> = {
+  default: "pa-text--default",
+  muted: "pa-text--muted",
+  dim: "pa-text--dim",
+  accent: "pa-text--accent",
+  success: "pa-text--success",
+  warning: "pa-text--warning",
+  danger: "pa-text--danger",
+  info: "pa-text--info",
 };
 
 export function Text({
@@ -65,21 +69,22 @@ export function Text({
   uppercase = false,
   htmlFor,
   children,
-  style,
   className,
+  style,
 }: TextProps) {
+  // Text renders static typography + tone via classes. Weight / mono /
+  // uppercase are still applied inline because they're only a handful of
+  // trivial CSS declarations on the host element, NOT cross-component styling.
+  const composed: React.CSSProperties = { ...(style ?? {}) };
+  if (weight) composed.fontWeight = tokens.font.weight[weight];
+  if (isMono) composed.fontFamily = tokens.font.mono;
+  if (uppercase) composed.textTransform = "uppercase";
+
   return (
     <Tag
-      className={className}
+      className={[variantClass[variant], toneClass[tone], className].filter(Boolean).join(" ")}
       htmlFor={htmlFor}
-      style={{
-        ...textVariants[variant],
-        ...textTones[tone],
-        ...(weight ? { fontWeight: tokens.font.weight[weight] } : null),
-        ...(isMono ? mono : null),
-        ...(uppercase ? { textTransform: "uppercase" } : null),
-        ...style,
-      }}
+      style={Object.keys(composed).length ? composed : undefined}
     >
       {children}
     </Tag>
@@ -98,41 +103,6 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   icon?: React.ReactNode;
 }
 
-const buttonVariants: Record<string, CSS> = {
-  // Primary = solid white bg + black text (inverted), per the Sophos aesthetic.
-  primary: {
-    background: "#fff",
-    color: "#0e0e0e",
-    border: "1px solid #fff",
-  },
-  "accent-soft": {
-    background: tokens.color.accentSoft,
-    color: tokens.color.accentHover,
-    border: `1px solid ${tokens.color.accentBorder}`,
-  },
-  ghost: {
-    background: "transparent",
-    color: tokens.color.textMuted,
-    border: "1px solid transparent",
-  },
-  outline: {
-    background: "transparent",
-    color: tokens.color.text,
-    border: `1px solid ${tokens.color.border}`,
-  },
-  danger: {
-    background: tokens.color.danger,
-    color: "#fff",
-    border: `1px solid ${tokens.color.danger}`,
-  },
-};
-
-const buttonSizes: Record<string, CSS> = {
-  sm: { padding: "3px 10px", fontSize: tokens.font.size.sm, gap: "6px" },
-  md: { padding: "6px 14px", fontSize: tokens.font.size.sm, gap: "8px" },
-  lg: { padding: "9px 18px", fontSize: tokens.font.size.md, gap: "10px" },
-};
-
 export function Button({
   variant = "primary",
   size = "md",
@@ -140,49 +110,22 @@ export function Button({
   fullWidth = false,
   icon,
   children,
-  style,
   disabled,
   className,
   ...rest
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const cls = [
+    "pa-button",
+    `pa-button--${variant}`,
+    `pa-button--${size}`,
+    fullWidth ? "pa-button--full" : null,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <button
-      className={`pa-focus-ring ${className ?? ""}`}
-      disabled={isDisabled}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: tokens.font.sans,
-        fontWeight: tokens.font.weight.medium,
-        borderRadius: tokens.radius.md,
-        letterSpacing: "0.01em",
-        cursor: isDisabled ? "not-allowed" : "pointer",
-        opacity: isDisabled ? 0.5 : 1,
-        transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
-        ...buttonVariants[variant],
-        ...buttonSizes[size],
-        ...(fullWidth ? { width: "100%" } : null),
-        ...style,
-      }}
-      onMouseEnter={(e) => {
-        if (isDisabled) return;
-        const el = e.currentTarget;
-        if (variant === "primary") el.style.background = "#f4f4f4";
-        if (variant === "accent-soft") el.style.background = tokens.color.accentBorder;
-        if (variant === "outline") el.style.borderColor = tokens.color.accentBorder;
-        if (variant === "ghost") el.style.color = tokens.color.text;
-      }}
-      onMouseLeave={(e) => {
-        const el = e.currentTarget;
-        if (variant === "primary") el.style.background = "#fff";
-        if (variant === "accent-soft") el.style.background = tokens.color.accentSoft;
-        if (variant === "outline") el.style.borderColor = tokens.color.border;
-        if (variant === "ghost") el.style.color = tokens.color.textMuted;
-      }}
-      {...rest}
-    >
+    <button {...rest} disabled={isDisabled} className={cls + " pa-focus-ring"}>
       {loading ? <Spinner size={size === "sm" ? 12 : 14} /> : icon}
       {children}
     </button>
@@ -207,41 +150,18 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
 ) {
   const inputId = id ?? (label ? `pa-input-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, width: "100%" }}>
+    <div className="pa-input-field">
       {label ? (
         <Text as="label" htmlFor={inputId} variant="micro" tone="muted" uppercase>
           {label}
         </Text>
       ) : null}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: tokens.space.sm,
-          background: tokens.color.bgElevated,
-          border: `1px solid ${error ? tokens.color.danger : tokens.color.border}`,
-          borderRadius: tokens.radius.md,
-          padding: "0 12px",
-          transition: `border-color ${tokens.motion.fast} ${tokens.motion.ease}, box-shadow ${tokens.motion.fast} ${tokens.motion.ease}`,
-        }}
-      >
+      <div className={["pa-input-shell", error ? "pa-input-shell--error" : null].filter(Boolean).join(" ")}>
         {prefix}
         <input
           id={inputId}
           ref={ref}
-          className={`pa-focus-ring ${className ?? ""}`}
-          style={{
-            flex: 1,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            color: tokens.color.text,
-            fontFamily: tokens.font.sans,
-            fontSize: tokens.font.size.md,
-            padding: "8px 0",
-            minWidth: 0,
-            ...style,
-          }}
+          className={["pa-input-input pa-focus-ring", className].filter(Boolean).join(" ")}
           {...rest}
         />
         {suffix}
@@ -274,7 +194,7 @@ export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(fun
 ) {
   const inputId = id ?? (label ? `pa-ta-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, width: "100%" }}>
+    <div className="pa-ta-field">
       {label ? (
         <Text as="label" htmlFor={inputId} variant="micro" tone="muted" uppercase>
           {label}
@@ -283,22 +203,7 @@ export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(fun
       <textarea
         id={inputId}
         ref={ref}
-        className={`pa-focus-ring ${className ?? ""}`}
-        style={{
-          background: tokens.color.bgElevated,
-          border: `1px solid ${error ? tokens.color.danger : tokens.color.border}`,
-          borderRadius: tokens.radius.md,
-          color: tokens.color.text,
-          fontFamily: tokens.font.sans,
-          fontSize: tokens.font.size.md,
-          lineHeight: tokens.font.leading.normal,
-          padding: "10px 12px",
-          resize: "vertical",
-          minHeight: 72,
-          outline: "none",
-          transition: `border-color ${tokens.motion.fast} ${tokens.motion.ease}`,
-          ...style,
-        }}
+        className={["pa-ta-textarea pa-focus-ring", error ? "pa-ta-textarea--error" : null, className].filter(Boolean).join(" ")}
         {...rest}
       />
       {error ? (
@@ -326,32 +231,17 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function 
 ) {
   const selectId = id ?? (label ? `pa-select-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: tokens.space.xs, width: "100%" }}>
+    <div className="pa-select-field">
       {label ? (
         <Text as="label" htmlFor={selectId} variant="micro" tone="muted" uppercase>
           {label}
         </Text>
       ) : null}
-      <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+      <div className="pa-select-shell">
         <select
           id={selectId}
           ref={ref}
-          className={`pa-focus-ring ${className ?? ""}`}
-          style={{
-            appearance: "none",
-            width: "100%",
-            background: tokens.color.bgElevated,
-            border: `1px solid ${tokens.color.border}`,
-            borderRadius: tokens.radius.md,
-            color: tokens.color.text,
-            fontFamily: tokens.font.sans,
-            fontSize: tokens.font.size.sm,
-            padding: "8px 30px 8px 12px",
-            cursor: "pointer",
-            outline: "none",
-            transition: `border-color ${tokens.motion.fast} ${tokens.motion.ease}`,
-            ...style,
-          }}
+          className={["pa-select-native pa-focus-ring", className].filter(Boolean).join(" ")}
           {...rest}
         >
           {placeholder ? (
@@ -365,17 +255,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function 
             </option>
           ))}
         </select>
-        <span
-          style={{
-            position: "absolute",
-            right: 10,
-            pointerEvents: "none",
-            color: tokens.color.textDim,
-            fontSize: 9,
-          }}
-        >
-          ▾
-        </span>
+        <span className="pa-select-caret">▾</span>
       </div>
     </div>
   );
@@ -385,27 +265,9 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function 
 // Kbd
 // ---------------------------------------------------------------------------
 
-export function Kbd({ children, style }: { children: React.ReactNode; style?: CSS }) {
+export function Kbd({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <kbd
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 20,
-        height: 20,
-        padding: "0 6px",
-        background: tokens.color.bgRaised,
-        border: `1px solid ${tokens.color.border}`,
-        borderBottomWidth: 2,
-        borderRadius: tokens.radius.sm,
-        color: tokens.color.textMuted,
-        fontFamily: tokens.font.mono,
-        fontSize: tokens.font.size.xs,
-        lineHeight: 1,
-        ...style,
-      }}
-    >
+    <kbd className={["pa-kbd", className].filter(Boolean).join(" ")}>
       {children}
     </kbd>
   );
@@ -415,21 +277,13 @@ export function Kbd({ children, style }: { children: React.ReactNode; style?: CS
 // Spinner
 // ---------------------------------------------------------------------------
 
-export function Spinner({ size = 16, style }: { size?: number; style?: CSS }) {
+export function Spinner({ size = 16, className }: { size?: number; className?: string }) {
   return (
     <span
       role="status"
       aria-label="Loading"
-      style={{
-        display: "inline-block",
-        width: size,
-        height: size,
-        border: `2px solid ${tokens.color.border}`,
-        borderTopColor: tokens.color.accent,
-        borderRadius: "50%",
-        animation: "pa-spin 0.8s linear infinite",
-        ...style,
-      }}
+      className={["pa-spinner", className].filter(Boolean).join(" ")}
+      style={{ "--pa-spinner-size": `${size}px` } as React.CSSProperties}
     />
   );
 }
@@ -445,7 +299,7 @@ export function Badge({
   tone = "neutral",
   dot = false,
   dotTone,
-  style,
+  className,
 }: {
   children: React.ReactNode;
   tone?: BadgeTone;
@@ -457,50 +311,12 @@ export function Badge({
    * badge would say it twice.
    */
   dotTone?: BadgeTone;
-  style?: CSS;
+  className?: string;
 }) {
-  const tones: Record<BadgeTone, CSS> = {
-    neutral: { background: tokens.color.bgOverlay, color: tokens.color.textMuted },
-    accent: { background: tokens.color.accentSoft, color: tokens.color.accentHover },
-    success: { background: "rgba(var(--pa-green-rgb), 0.12)", color: tokens.color.success },
-    warning: { background: "rgba(var(--pa-amber-rgb), 0.12)", color: tokens.color.warning },
-    danger: { background: "rgba(var(--pa-danger-rgb), 0.12)", color: tokens.color.danger },
-    info: { background: "rgba(var(--pa-info-rgb), 0.12)", color: tokens.color.info },
-  };
-  const dotColors: Record<BadgeTone, string> = {
-    neutral: tokens.color.textDim,
-    accent: tokens.color.accentHover,
-    success: tokens.color.success,
-    warning: tokens.color.warning,
-    danger: tokens.color.danger,
-    info: tokens.color.info,
-  };
+  const dotClass = `pa-badge__dot--${dotTone ?? tone}`;
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: tokens.space.xs,
-        padding: "2px 8px",
-        borderRadius: tokens.radius.sm,
-        border: "1px solid transparent",
-        fontSize: tokens.font.size.xs,
-        fontWeight: tokens.font.weight.medium,
-        whiteSpace: "nowrap",
-        ...tones[tone],
-        ...style,
-      }}
-    >
-      {dot ? (
-        <span
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: "50%",
-            background: dotColors[dotTone ?? tone],
-          }}
-        />
-      ) : null}
+    <span className={["pa-badge", `pa-badge--${tone}`, className].filter(Boolean).join(" ")}>
+      {dot ? <span className={["pa-badge__dot", dotClass].filter(Boolean).join(" ")} /> : null}
       {children}
     </span>
   );
@@ -511,14 +327,6 @@ export function Badge({
 // ---------------------------------------------------------------------------
 
 export type StatusDotState = "connecting" | "connected" | "disconnected" | "reconnecting" | "idle";
-
-const statusColors: Record<StatusDotState, string> = {
-  connecting: tokens.color.warning,
-  connected: tokens.color.success,
-  disconnected: tokens.color.danger,
-  reconnecting: tokens.color.info,
-  idle: tokens.color.textDim,
-};
 
 const statusLabels: Record<StatusDotState, string> = {
   connecting: "Connecting",
@@ -533,51 +341,28 @@ export function StatusDot({
   label,
   pulse = true,
   size = 8,
-  style,
+  className,
 }: {
   state?: StatusDotState;
   label?: string;
   pulse?: boolean;
   size?: number;
-  style?: CSS;
+  className?: string;
 }) {
-  const color = statusColors[state];
   const isPulsing = pulse && (state === "connecting" || state === "reconnecting");
+  const a11yLabel = label ?? statusLabels[state];
+  const glow = state !== "idle";
   return (
     <span
       role="status"
-      aria-label={label ?? statusLabels[state]}
-      title={label ?? statusLabels[state]}
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: size,
-        height: size,
-        ...style,
-      }}
+      aria-label={a11yLabel}
+      title={a11yLabel}
+      className={["pa-status-dot", `pa-status-dot--${state}`, className].filter(Boolean).join(" ")}
+      style={{ "--pa-status-dot-size": `${size}px` } as React.CSSProperties}
     >
-      {isPulsing ? (
-        <span
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: "50%",
-            background: color,
-            animation: "pa-beat 1.4s cubic-bezier(0,0,0.2,1) infinite",
-          }}
-        />
-      ) : null}
+      {isPulsing ? <span className="pa-status-dot__pulse" /> : null}
       <span
-        style={{
-          width: size,
-          height: size,
-          borderRadius: "50%",
-          background: color,
-          boxShadow: `0 0 0 3px ${color}22`,
-          animation: isPulsing ? "pa-pulse 1.2s ease-in-out infinite" : undefined,
-        }}
+        className={["pa-status-dot__core", glow ? "pa-status-dot__core--glow" : ""].filter(Boolean).join(" ")}
       />
     </span>
   );
@@ -593,9 +378,8 @@ export interface IconButtonProps {
   title?: string;
   tone?: "default" | "accent" | "danger";
   size?: "sm" | "md";
-  style?: CSS;
-  disabled?: boolean;
   className?: string;
+  disabled?: boolean;
 }
 
 export function IconButton({
@@ -604,19 +388,9 @@ export function IconButton({
   title,
   tone = "default",
   size = "md",
-  style,
-  disabled = false,
   className,
+  disabled = false,
 }: IconButtonProps) {
-  const tones: Record<string, CSS> = {
-    default: { color: tokens.color.textMuted },
-    accent: { color: tokens.color.accentHover },
-    danger: { color: tokens.color.danger },
-  };
-  const sizes: Record<string, CSS> = {
-    sm: { padding: "5px" },
-    md: { padding: "7px" },
-  };
   return (
     <button
       type="button"
@@ -624,28 +398,9 @@ export function IconButton({
       aria-label={title}
       onClick={onClick}
       disabled={disabled}
-      className={`pa-focus-ring ${className ?? ""}`.trim()}
-      style={{
-        background: "transparent",
-        border: "none",
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.4 : 1,
-        borderRadius: tokens.radius.sm,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transition: `all ${tokens.motion.fast} ${tokens.motion.ease}`,
-        ...tones[tone],
-        ...sizes[size],
-        ...style,
-      }}
-      onMouseEnter={(e) => {
-        if (disabled) return;
-        e.currentTarget.style.background = tokens.color.bgOverlay;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
-      }}
+      className={["pa-icon-button", `pa-icon-button--${tone}`, `pa-icon-button--${size}`, "pa-focus-ring", className]
+        .filter(Boolean)
+        .join(" ")}
     >
       {children}
     </button>
@@ -660,28 +415,22 @@ export function Skeleton({
   width = "100%",
   height = 16,
   radius = tokens.radius.sm,
-  style,
   className,
 }: {
   width?: number | string;
   height?: number | string;
   radius?: number | string;
-  style?: CSS;
   className?: string;
 }) {
   return (
     <span
       aria-hidden
-      className={className}
+      className={["pa-skeleton", className].filter(Boolean).join(" ")}
       style={{
-        display: "inline-block",
-        width,
-        height,
-        borderRadius: radius,
-        background: tokens.color.bgRaised,
-        animation: "pa-skeleton-pulse 1.4s ease-in-out infinite",
-        ...style,
-      }}
+        "--pa-skeleton-w": typeof width === "number" ? `${width}px` : width,
+        "--pa-skeleton-h": typeof height === "number" ? `${height}px` : height,
+        "--pa-skeleton-r": typeof radius === "number" ? `${radius}px` : radius,
+      } as React.CSSProperties}
     />
   );
 }

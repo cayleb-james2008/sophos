@@ -207,7 +207,13 @@ describe("Skeleton", () => {
     const { container } = render(<Skeleton width={120} height={24} />);
     const el = container.querySelector("[aria-hidden]");
     expect(el).toBeInTheDocument();
-    expect(el).toHaveStyle({ width: "120px", height: "24px" });
+    // Skeleton forwards dimensions via CSS custom properties so consumers can
+    // reach them with `style={{ "--pa-skeleton-w": "120px" }}`. The element
+    // applies them through `.pa-skeleton { width: var(--pa-skeleton-w); }`.
+    expect(el).toHaveStyle({
+      "--pa-skeleton-w": "120px",
+      "--pa-skeleton-h": "24px",
+    } as Record<string, string>);
   });
 });
 

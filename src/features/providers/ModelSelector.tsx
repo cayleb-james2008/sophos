@@ -105,7 +105,7 @@ export function ModelSelector() {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform 100ms cubic-bezier(0.3, 0, 0.2, 1)" }}
+            className={open ? "ms-chevron ms-chevron--open" : "ms-chevron"}
           >
             <polyline points="6 9 12 15 18 9" />
           </svg>
