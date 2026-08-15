@@ -1,0 +1,61 @@
+# .gitlab-ci.yml
+# Sophos CI — migrated from .github/workflows/ci.yml
+#
+# The GitHub Actions workflow runs on `windows-latest` because
+# verify/e2e.mjs is Windows-specific: it drives named-pipe transports
+# (`\\.\pipe\...`), uses `taskkill /T` for process-tree teardown, and boots a
+# bundled `node-v24.18.0-win-x64` runtime. This pipeline reproduces the same
+# three checks on a GitLab SaaS Windows shared runner
+# (`saas-windows-medium-amd64`).
+#
+# Mapping from the GitHub Actions workflow:
+#   - npm ci            -> before_script (install deps from lock file)
+#   - npx tsc --noEmit  -> type-check-and-test job (blocks the pipeline)
+#   - npx vitest run    -> type-check-and-test job (blocks the pipeline)
+#   - node verify/e2e.mjs (continue-on-error: true)
+#                       -> e2e-best-effort job (allow_failure: true)
+#
+# GitHub Actions `continue-on-error` is per-step; GitLab CI `allow_failure` is
+# per-job. So the best-effort e2e is split into its own job so a failure there
+# does not red the pipeline, while tsc and vitest still block it.
+#
+# Node version: the original pins Node 22 via actions/setup-node@v4. GitLab
+# SaaS Windows shared runners provide Node from the runner image; this port
+# does not pin a version, so the effective Node is whatever the
+# saas-windows-medium-amd64 image ships. If a specific Node version is
+# required, install it in before_script (e.g. via a version manager).
+#
+# e2e.mjs boots the BUNDLED runtime (resources/node/<version>/node.exe +
+# resources/daemon/dist + resources/bridge/dist + shared node_modules), which
+# is gitignored and assembled only on the developer machine by
+# `node scripts/bundle.mjs` (it needs a local prime-agent-ref checkout and the
+# AppData node_modules ship — neither exists in a fresh CI checkout). Run
+# `node scripts/bundle.mjs && node verify/e2e.mjs` locally before merge; see
+# CONTRIBUTING.md.
+
+stages:
+  - test
+  - e2e
+
+# Type-check and unit tests. These MUST pass — a failure blocks the pipeline.
+type-check-and-test:
+  stage: test
+  tags:
+    - saas-windows-medium-amd64
+  before_script:
+    - npm ci
+  script:
+    - npx tsc --noEmit
+    - npx vitest run
+
+# Best-effort e2e — Windows-specific, bundled runtime not assembled in CI.
+# A failure here does NOT block the pipeline (allow_failure: true).
+e2e-best-effort:
+  stage: e2e
+  tags:
+    - saas-windows-medium-amd64
+  before_script:
+    - npm ci
+  script:
+    - node verify/e2e.mjs
+  allow_failure: true
