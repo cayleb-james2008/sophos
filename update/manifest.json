@@ -1,11 +1,12 @@
 {
-  "version": "0.2.0",
-  "notes": "Sophos v0.2.0 - Testable Foundation + Harness Depth + Theme",
-  "pub_date": "2026-08-14T19:30:00Z",
+  "version": "0.5.0",
+  "notes": "Sophos v0.5.0 (Beta) — /cd command, subagent model policy, per-child composition knobs, keyboard shortcuts overlay, design system refactor (inline styles eliminated), 106 tests. All versions before v1.0 are beta.",
+  "pub_date": "2026-08-15T00:00:00Z",
+  "channel": "beta",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcGJiVERWS08rSmNWTHNPUEhlZmFpZ0daL3ZtMk9iNGJOaFpuTitnUkUvSkNOdFVUSGhDSVg1cG9rdDU3T2hCa2VQbFJ1UDFwYjBnRWsxSkNMNFkwY0FvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2NzM4NDE5CWZpbGU6U29waG9zXzAuMi4wX3g2NC1zZXR1cC5leGUKM1o5STBXN2psYmxDT2Y0b3N0NW1SZGg0aXB1K21INEx4cXVXT1M4Q1BRaWFsWS92M0JMcmsrSE9IdTdnSjR2NFZ5aktWczBTUy9yR2VQWGx1K2xzQVE9PQo=",
-      "url": "https://gitlab.com/api/v4/projects/caylebalvarez-james%2Fsophos/packages/generic/sophos/0.2.0/Sophos_0.2.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcGFrUGtKMTgrdm90VDZ1TzNlNmxvVFZBT1lnVXhrMWRldlhNdjBPZEdHdnhoT3IyM21HWUU1WURzdGQzSmRVdHd2bXd6TzRrR01vNTY2ZTZlNm5mWEFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2ODE1MjExCWZpbGU6U29waG9zXzAuNS4wX3g2NC1zZXR1cC5leGUKY2xxeUVRcGd1ZWgvQmV0R1hSTjlsQTVDQlpYQUZYZ2ZjT2RaT3pvK2p6Q3hUaHpZUHhhdW5rSnlFcTNSTHVIc0JxcDNXUVBLL1hlTW44ZEZ3K2ZFQWc9PQo=",
+      "url": "https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.5.0/Sophos_0.5.0_x64-setup.exe"
     }
   }
 }
