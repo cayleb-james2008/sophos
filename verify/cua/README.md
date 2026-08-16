@@ -107,8 +107,81 @@ handles launch/teardown and reports pass/fail per test.
 - `node verify/cua/smoke.mjs` — exit 0, reports PASS.
 - `node verify/cua/sessions.test.mjs` — cua-driver e2e for ALL Sessions features.
 - `node verify/cua/agents.test.mjs` — cua-driver e2e for ALL Agents features.
-- `npx vitest run` — 982 unit tests pass (no regressions).
+- `node verify/cua/chat.test.mjs` — cua-driver e2e for ALL Chat features.
+- `node verify/cua/inbox.test.mjs` — cua-driver e2e for ALL Inbox features.
+- `node verify/cua/settings.test.mjs` — cua-driver e2e for ALL Settings features.
+- `node verify/cua/shell.test.mjs` — cua-driver e2e for ALL shell / global features.
+- `node verify/cua/run-all.mjs` — runs all 7 suites in sequence, exits 0 on all-pass / 1 on any fail.
+- `npm run test:cua` — same as above (npm script alias).
+- `npx vitest run` — 984 unit tests pass (no regressions).
 - `npx tsc --noEmit` — clean.
+
+## CI integration
+
+The cua-driver e2e suite runs on **every push and pull request** in both
+CI systems. A failure **blocks the merge** — the e2e job is not best-effort.
+
+### How it works in CI
+
+CI builds the app from source, installs the cua-driver, and runs the full
+suite in demo mode. The build chain is:
+
+1. **Install dependencies** — `npm ci` (Node) + Rust toolchain setup.
+2. **Build the frontend** — `npm run build` (TypeScript compile + Vite build → `dist/`).
+3. **Build the Tauri release exe** — `cargo build --release` in `src-tauri/`
+   compiles the Rust shell and embeds the frontend. This produces
+   `src-tauri/target/release/prime-agent-windows.exe` — the raw exe is all
+   the e2e tests need (the full installer bundle is not required).
+4. **Install cua-driver** — `irm https://cua.ai/driver/install.ps1 | iex`
+   downloads and installs the cua-driver binary.
+5. **Run the e2e suite** — `node verify/cua/run-all.mjs` runs all 7 test
+   suites sequentially. Exit 0 = all pass, exit 1 = any fail. No
+   `continue-on-error` / `allow_failure` — a failure reds the pipeline.
+
+### GitHub Actions (`.github/workflows/ci.yml`)
+
+The `cua-e2e` job runs on `windows-latest` alongside the existing `test` job
+(tsc + vitest + best-effort e2e.mjs). The `cua-e2e` job is blocking — no
+`continue-on-error`. Rust is installed via `dtolnay/rust-toolchain@stable`.
+WebView2 is pre-installed on GitHub-hosted Windows runners.
+
+### GitLab CI (`.gitlab-ci.yml`)
+
+The `cua-e2e` job runs on `saas-windows-medium-amd64` (GitLab SaaS Windows
+shared runner) in the `e2e` stage. The `cua-e2e` job is blocking — no
+`allow_failure`. Rust is installed via `rustup` in the job script (GitLab SaaS
+Windows runners do not ship Rust). The job caches `.cargo/registry/` and
+`src-tauri/target/` to speed up subsequent runs.
+
+### Running locally (same as CI)
+
+```bash
+# 1. Build the frontend
+npm run build
+
+# 2. Build the Tauri release exe
+cd src-tauri && cargo build --release && cd ..
+
+# 3. Install cua-driver (if not already installed)
+#    PowerShell:  irm https://cua.ai/driver/install.ps1 | iex
+
+# 4. Run the full e2e suite
+node verify/cua/run-all.mjs
+#    or:  npm run test:cua
+```
+
+### Troubleshooting
+
+| Problem | Cause | Fix |
+|---|---|---|
+| `cua-driver call ... failed to spawn` | cua-driver not installed or wrong path | Run `irm https://cua.ai/driver/install.ps1 \| iex`, or set `CUA_DRIVER_BIN` to the binary path. |
+| `daemon did not become ready` | cua-driver daemon failed to start | Check `cua-driver status` in a terminal. Kill stale daemons with `cua-driver stop`. |
+| `Timed out waiting for a window owned by pid` | App didn't launch or crashed on startup | Verify the exe exists at `src-tauri/target/release/prime-agent-windows.exe`. Run `npm run build` first, then `cargo build --release` in `src-tauri/`. Check that WebView2 is installed. |
+| `UIA tree is empty` / no elements | WebView2 accessibility not enabled | The harness clicks the web content to enable accessibility. If it still fails, ensure the app window is not minimized. |
+| Suite times out (5 min) | App hung or a test is stuck | Check the suite's screenshot in `verify/cua/screenshots/`. Re-run the individual suite file (e.g. `node verify/cua/smoke.mjs`) to isolate. |
+| `cargo build --release` fails in CI | Missing Rust toolchain or MSVC | GitHub Actions: ensure `dtolnay/rust-toolchain@stable` step ran. GitLab CI: ensure the rustup install step ran. MSVC Build Tools are pre-installed on both runner types. |
+| `No window with window_id` | App window was closed externally mid-test | The demo-runner retries up to 5 times on stale-window errors. If it persists, ensure no other process is killing the app. |
+| cua-driver not found after install | PATH not updated in the same shell | The install script adds to PATH. In CI, the binary is at `%LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe`. Set `CUA_DRIVER_BIN` explicitly if needed. |
 
 ## Demo mode
 

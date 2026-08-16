@@ -59,3 +59,51 @@ e2e-best-effort:
   script:
     - node verify/e2e.mjs
   allow_failure: true
+
+# cua-driver e2e — drives the REAL Sophos desktop app (Tauri v2 release
+# build) via the cua-driver CLI and UIA accessibility automation
+# (verify/cua/*). These tests run in DEMO MODE (--demo skips the daemon +
+# sidecar and injects window.__SOPHOS_DEMO__ = true so the frontend uses the
+# MockIpcClient with simulated Sessions/Agents data). Unlike e2e-best-effort
+# above (which needs a bundled runtime that doesn't exist in CI), the
+# cua-driver suite only needs the compiled exe + cua-driver binary, both
+# produced here from source.
+#
+# BLOCKING — no allow_failure: a failure must red the pipeline and stop the
+# merge, because it exercises real UI behavior that unit tests cannot.
+# Requires a Windows desktop session (UIA/window automation) and WebView2,
+# both available on saas-windows-medium-amd64 runners.
+cua-e2e:
+  stage: e2e
+  tags:
+    - saas-windows-medium-amd64
+  before_script:
+    - npm ci
+  script:
+    - |
+      # Install Rust toolchain (not pre-installed on GitLab SaaS Windows runners).
+      $env:RUSTUP_HOME = "$env:CI_PROJECT_DIR\.rustup"
+      $env:CARGO_HOME = "$env:CI_PROJECT_DIR\.cargo"
+      Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
+      .\rustup-init.exe -y --default-toolchain stable --no-modify-path
+      $env:PATH = "$env:CARGO_HOME\bin;$env:PATH"
+      # Build frontend (tsc + vite build -> dist/).
+      npm run build
+      # Build Tauri release exe — compiles the Rust shell and embeds the
+      # frontend from ../dist, producing src-tauri/target/release/prime-agent-windows.exe.
+      # We deliberately do NOT run `npx tauri build`, which would try to bundle
+      # installers and needs the gitignored resources/ directory.
+      Push-Location src-tauri
+      cargo build --release
+      Pop-Location
+      # Install cua-driver (binary at %LOCALAPPDATA%\Programs\Cua\cua-driver\bin\).
+      irm https://cua.ai/driver/install.ps1 | iex
+      # Run all cua-driver e2e test suites. Exits 0 on all-pass, 1 on any fail.
+      node verify/cua/run-all.mjs
+  # NO allow_failure — failures block the pipeline.
+  cache:
+    key: cua-e2e-cargo-$CI_COMMIT_REF_SLUG
+    paths:
+      - .cargo/registry/
+      - src-tauri/target/
+    policy: pull-push

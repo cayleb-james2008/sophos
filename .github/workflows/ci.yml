@@ -47,3 +47,66 @@ jobs:
       - name: End-to-end verification (best-effort)
         run: node verify/e2e.mjs
         continue-on-error: true
+
+  # cua-e2e — drives the REAL Sophos desktop app (Tauri v2 release build) via
+  # the cua-driver CLI and UIA accessibility automation (verify/cua/*). These
+  # tests run in DEMO MODE (the `--demo` flag skips the daemon + sidecar and
+  # injects window.__SOPHOS_DEMO__ = true, so the frontend uses the
+  # MockIpcClient with simulated Sessions/Agents data). Unlike the bundled
+  # verify/e2e.mjs step above (which needs a gitignored bundled runtime that
+  # doesn't exist in a fresh CI checkout), the cua-driver suite only needs the
+  # compiled exe + the cua-driver binary — both produced entirely here from
+  # source. So this job is BLOCKING: a failure must red the build and stop the
+  # merge, because it exercises real UI behavior that unit tests cannot.
+  #
+  # Requires a desktop session (UIA/window automation) and WebView2, both
+  # available on windows-latest runners, so we build and run on Windows.
+  cua-e2e:
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build frontend
+        # tsc && vite build — emits dist/ that the Tauri shell embeds.
+        run: npm run build
+
+      - name: Build Tauri release exe
+        # cargo build --release compiles the Rust shell and embeds the
+        # frontend from ../dist, producing
+        # src-tauri/target/release/prime-agent-windows.exe. We deliberately do
+        # NOT run `npx tauri build`, which would try to bundle installers and
+        # needs the gitignored resources/ directory. The raw exe is all the
+        # cua-driver e2e tests need.
+        working-directory: src-tauri
+        run: cargo build --release
+
+      - name: Install cua-driver
+        # The cua-driver binary is installed to
+        # %LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe and found
+        # by verify/cua/driver.mjs (overridable via CUA_DRIVER_BIN).
+        shell: pwsh
+        run: irm https://cua.ai/driver/install.ps1 | iex
+
+      - name: Run cua-driver e2e suite
+        # BLOCKING — deliberately no continue-on-error. Run-all drives the real
+        # app in demo mode through every cua-driver e2e suite; it exits 0 on
+        # all-pass and 1 on any failure.
+        run: node verify/cua/run-all.mjs
