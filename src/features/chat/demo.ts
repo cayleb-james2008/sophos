@@ -9,6 +9,10 @@
 // the UI.
 
 import type { TranscriptMessage, ToolCall } from "../../ipc/contract";
+import { publishCodeRunEvent } from "../code/codeRunBus";
+import { buildCodeModeTurn } from "../code/demoTurn";
+import type { AgentProfile } from "../profiles/profiles";
+import { customDemoFlavor, isCustomId } from "../studio/store";
 
 const now = Date.now();
 const iso = (secAgo: number) => new Date(now - secAgo * 1000).toISOString();
@@ -109,8 +113,47 @@ export interface SimCallbacks {
   onDone: () => void;
 }
 
+/**
+ * The Gauntlet profile's demo status block — appended to simulated answers so
+ * selecting the profile visibly changes how the agent reports (goal + bar
+ * first, honest evidence markers, plain-English status) while every anchor
+ * string the e2e suite relies on stays intact.
+ */
+export function gauntletStatusBlock(): string {
+  return [
+    "\n\nStatus — demo run (simulated response; evidence is a UI round-trip, not a live tool run)",
+    "\nVerified — the message loop round-tripped and this reply rendered in your conversation",
+    "\nUnverified — nothing was actually executed — no live engine is connected, so no real tool ran and no real data was fetched",
+    "\nNext action — connect an engine (or start a local model server), then re-run this prompt for a real result",
+  ].join("");
+}
+
+/** True when the active profile runs the Code-mode simulated turn (the built-in
+ * Code profile or any custom profile whose base mode is "code"). */
+export function isCodeProfile(profile: string | AgentProfile | undefined): boolean {
+  if (typeof profile === "string") return profile === "code";
+  return profile?.id === "code" || profile?.mode === "code";
+}
+
+/** The demo status block for the ACTIVE profile: built-in Gauntlet keeps its
+ * exact v0.7 block; custom profiles follow the live draft (name/tagline/working
+ * style chips) so the studio's hot reload is visible in simulated responses. */
+export function profileDemoBlock(profile: string | AgentProfile | undefined): string {
+  if (typeof profile === "string") {
+    return profile === "gauntlet" ? gauntletStatusBlock() : "";
+  }
+  if (!profile) return "";
+  if (profile.id === "gauntlet") return gauntletStatusBlock();
+  if (isCustomId(profile.id)) return customDemoFlavor(profile);
+  return "";
+}
+
 /** Start a simulated assistant turn that echoes the user's actual input. */
-export function simulateResponse(userText: string, cb: SimCallbacks): () => void {
+export function simulateResponse(userText: string, cb: SimCallbacks, profile?: string | AgentProfile): () => void {
+  // Code Mode: the simulated turn writes ONE program that calls several tools
+  // and decomposes it into tool-call cards (bus → Code Mode panel) + a
+  // deterministic answer. Everything is clearly labeled as simulated.
+  if (isCodeProfile(profile)) return simulateCodeTurn(userText, cb);
   const timers: number[] = [];
   const push = (fn: () => void, ms: number) => {
     timers.push(window.setTimeout(fn, ms));
@@ -129,6 +172,7 @@ export function simulateResponse(userText: string, cb: SimCallbacks): () => void
     `Got it — you said: “${shown}”.`,
     "\n\nThanks for your message. This is a demo preview without a live engine, so I can't run real tools or fetch live data here.",
     "\n\nBut I understood what you're asking. In the connected app I'd help you work through it step by step — tell me more and I'll keep building on your message.",
+    ...(profileDemoBlock(profile) ? [profileDemoBlock(profile)] : []),
   ];
   // A clearly-labeled, honest demo tool call that echoes the input — it
   // demonstrates the tool-call UI without pretending to access a real tool.
@@ -228,6 +272,135 @@ export function simulateResponse(userText: string, cb: SimCallbacks): () => void
     );
     cb.onDone();
   }, 500 + thinkingChunks.length * 700 + 1600 + 400 + answerChunks.length * 500 + 300);
+
+  return () => {
+    timers.forEach((t) => window.clearTimeout(t));
+  };
+}
+
+/**
+ * Code-mode simulated turn (browser preview). Builds the deterministic
+ * run_code program from the user's ACTUAL input, publishes the run + each
+ * tool call to the code-run bus (driving the Code Mode panel), attaches the
+ * same calls to the transcript (driving the chat tool-call cards), and streams
+ * an answer. Every output is labeled demo/simulated — no live tool claim.
+ */
+function simulateCodeTurn(userText: string, cb: SimCallbacks): () => void {
+  const timers: number[] = [];
+  const push = (fn: () => void, ms: number) => {
+    timers.push(window.setTimeout(fn, ms));
+  };
+
+  const shown = shortText(userText);
+  const assistantId = `sim-${Date.now()}`;
+  const { program, calls } = buildCodeModeTurn(userText);
+  const runId = `code-run-${Date.now()}`;
+  const sessionTag = "browser-preview";
+
+  const thinkingChunks = [
+    "Let me read your message carefully.",
+    `You wrote: “${shown}”.`,
+    "Code mode: I'll write ONE program that calls several tools, then run it.",
+  ];
+  const answerChunks = [
+    `Got it — you said: “${shown}”.`,
+    "\n\nThis is a demo preview without a live engine, so the run_code program and its tool calls are simulated — no real tool ran and no real data was fetched.",
+    `\n\nI ran one program with ${calls.length} tool calls (${calls.map((c) => c.name).join(", ")}) — each decomposed into its own tool-call card in the Code Mode panel and recorded in the Trajectory log.`,
+    "\n\nNext action — connect an engine (or start a local model server), then re-run this prompt for a real result.",
+  ];
+
+  // 1. Create the streaming assistant message with thinking.
+  cb.onUpdate((msgs) => [
+    ...msgs,
+    {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      thinking: "",
+      toolCalls: [],
+      status: "streaming",
+      timestamp: new Date().toISOString(),
+    },
+  ]);
+
+  // 2. Stream thinking.
+  thinkingChunks.forEach((chunk, i) => {
+    push(() => {
+      cb.onUpdate((msgs) =>
+        msgs.map((m) =>
+          m.id === assistantId
+            ? { ...m, thinking: `${m.thinking ?? ""}${i > 0 ? " " : ""}${chunk}` }
+            : m,
+        ),
+      );
+    }, 500 + i * 700);
+  });
+
+  // 3. Start the run: publish run_code, attach running tool calls.
+  push(() => {
+    publishCodeRunEvent({ type: "run_code", runId, sessionId: sessionTag, program, ts: new Date().toISOString() });
+    cb.onUpdate((msgs) =>
+      msgs.map((m) =>
+        m.id === assistantId
+          ? {
+              ...m,
+              toolCalls: calls.map((c) => ({
+                id: `${runId}-${c.name}`,
+                name: c.name,
+                input: JSON.stringify(c.input),
+                status: "running" as const,
+              })),
+            }
+          : m,
+      ),
+    );
+  }, 500 + thinkingChunks.length * 700);
+
+  // 4. Complete each call: publish tool_call/tool_result, update the card.
+  calls.forEach((c, i) => {
+    push(() => {
+      publishCodeRunEvent({ type: "tool_call", runId, sessionId: sessionTag, name: c.name, input: JSON.stringify(c.input), ts: new Date().toISOString() });
+    }, 500 + thinkingChunks.length * 700 + 400 + i * 700);
+    push(() => {
+      publishCodeRunEvent({ type: "tool_result", runId, sessionId: sessionTag, name: c.name, output: c.output, ts: new Date().toISOString() });
+      cb.onUpdate((msgs) =>
+        msgs.map((m) =>
+          m.id === assistantId
+            ? {
+                ...m,
+                toolCalls: (m.toolCalls ?? []).map((tc) =>
+                  tc.name === c.name ? { ...tc, output: c.output, status: "complete" as const } : tc,
+                ),
+              }
+            : m,
+        ),
+      );
+    }, 500 + thinkingChunks.length * 700 + 400 + i * 700 + 600);
+  });
+
+  // 5. Mark the run complete.
+  push(() => {
+    publishCodeRunEvent({ type: "run_complete", runId, sessionId: sessionTag, ts: new Date().toISOString() });
+  }, 500 + thinkingChunks.length * 700 + 400 + calls.length * 700 + 800);
+
+  // 6. Stream the answer.
+  let acc = "";
+  answerChunks.forEach((chunk, i) => {
+    push(() => {
+      acc += chunk;
+      cb.onUpdate((msgs) =>
+        msgs.map((m) => (m.id === assistantId ? { ...m, content: acc } : m)),
+      );
+    }, 500 + thinkingChunks.length * 700 + 400 + calls.length * 700 + 900 + i * 500);
+  });
+
+  // 7. Mark complete.
+  push(() => {
+    cb.onUpdate((msgs) =>
+      msgs.map((m) => (m.id === assistantId ? { ...m, status: "complete" } : m)),
+    );
+    cb.onDone();
+  }, 500 + thinkingChunks.length * 700 + 400 + calls.length * 700 + 900 + answerChunks.length * 500 + 300);
 
   return () => {
     timers.forEach((t) => window.clearTimeout(t));

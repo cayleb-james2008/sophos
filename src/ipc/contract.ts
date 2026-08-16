@@ -72,6 +72,18 @@ export interface PromptOptions {
   serviceTier?: string;
   transport?: string;
   goal?: string;
+  /**
+   * Active agent profile id (v0.7). Additive UI-layer hint: the frontend uses
+   * it to flavor demo responses and show the active working style; the bridge
+   * and daemon ignore unknown option fields, so nothing upstream changes.
+   */
+  profile?: string;
+  /**
+   * Live display flavor of the ACTIVE profile (v0.7.1 Profile Studio). Carried
+   * so demo-mode simulation follows the studio draft even before Save; the
+   * bridge strips unknown option fields, so it never reaches the daemon.
+   */
+  profileFlavor?: { name: string; tagline: string; workingStyle: string[]; mode?: string };
 }
 
 // ---------------------------------------------------------------------------

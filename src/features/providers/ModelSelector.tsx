@@ -4,11 +4,12 @@
 // providers/models that support thinking. Built from the design tokens; no native
 // <select> so we control the look, motion, and keyboard behavior.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, Spinner, Select, Button } from "../../design";
 import { useConnectionState } from "../../ipc/client";
 import { useModels, DEFAULT_PROVIDER, DEFAULT_MODEL, type ModelSelection, type ThinkingLevel } from "./useModels";
 import { ProviderGlyph } from "./providerGlyphs";
+import { scanLocalEndpoints, providerIdFor, type LocalEndpoint } from "./localDetection";
 import "./providers.css";
 
 function currentSelection(stateModel: { provider: string; model: string; thinking?: string } | undefined): ModelSelection {
@@ -23,7 +24,31 @@ export function ModelSelector() {
   const { providers, models, loading, error, setModel, thinking, setThinking, thinkingLevels } = useModels();
   const [open, setOpen] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [localEndpoints, setLocalEndpoints] = useState<LocalEndpoint[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const [lastScan, setLastScan] = useState<Date | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Automatic local-endpoint detection: scan when the dropdown opens (and on
+  // demand via the re-scan control). No manual URL typing — the scanner finds
+  // running Ollama / LM Studio / llama.cpp / OpenAI-compatible servers.
+  const rescan = useCallback(async () => {
+    setScanning(true);
+    try {
+      const found = await scanLocalEndpoints();
+      setLocalEndpoints(found);
+      setLastScan(new Date());
+    } catch {
+      setLocalEndpoints([]);
+    } finally {
+      setScanning(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    void rescan();
+  }, [open, rescan]);
 
   const current = currentSelection(state.model);
   const currentModel = models.find((m) => m.id === current.model && m.provider === current.provider);
@@ -62,6 +87,17 @@ export function ModelSelector() {
     if (current.provider && current.model && supportsThinking) {
       await setModel(current.provider, current.model, level);
     }
+  };
+
+  const handleLocalSelect = async (endpoint: LocalEndpoint, modelId: string) => {
+    if (current.provider === providerIdFor(endpoint) && current.model === modelId) {
+      setOpen(false);
+      return;
+    }
+    setApplying(true);
+    await setModel(providerIdFor(endpoint), modelId, undefined);
+    setApplying(false);
+    setOpen(false);
   };
 
   const grouped = providers
@@ -191,6 +227,92 @@ export function ModelSelector() {
               </div>
             ))
           )}
+
+          {/* Local servers — automatic detection with friendly labels + rescan */}
+          <div className="ms-local">
+            <div className="ms-localhead">
+              <span className="ms-localicon" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="14" rx="2" />
+                  <line x1="8" y1="22" x2="16" y2="22" />
+                  <line x1="12" y1="18" x2="12" y2="22" />
+                </svg>
+              </span>
+              <Text variant="micro" tone="dim" mono uppercase>
+                Local servers
+              </Text>
+              <span className="ms-localactions">
+                {scanning ? <Spinner size={11} /> : null}
+                <Button variant="ghost" size="sm" className="ms-rescan" onClick={() => void rescan()} disabled={scanning} title="Rescan for local model servers">
+                  Rescan
+                </Button>
+              </span>
+            </div>
+
+            {scanning ? (
+              <div className="ms-pad">
+                <Text variant="label" tone="muted">Scanning localhost for model servers…</Text>
+              </div>
+            ) : localEndpoints.length === 0 ? (
+              <div className="ms-pad">
+                <Text variant="label" tone="muted">
+                  No local servers found. Start Ollama, LM Studio, llama.cpp, or any OpenAI-compatible server, then rescan.
+                </Text>
+              </div>
+            ) : (
+              localEndpoints.map((endpoint) => (
+                <div key={endpoint.id} className="ms-localendpoint">
+                  <div className="ms-localendpoint-head">
+                    <span className="ms-localendpoint-name">{endpoint.name}</span>
+                    <span className="ms-localendpoint-port">:{endpoint.port}</span>
+                    <span className="ms-localendpoint-live" aria-label="connected" />
+                  </div>
+                  {endpoint.models.length === 0 ? (
+                    <div className="ms-pad">
+                      <Text variant="micro" tone="dim">Connected — no models reported.</Text>
+                    </div>
+                  ) : (
+                    endpoint.models.map((m) => {
+                      const isCurrent = current.provider === providerIdFor(endpoint) && current.model === m.id;
+                      return (
+                        <Button
+                          key={`${endpoint.id}:${m.id}`}
+                          variant={isCurrent ? "accent-soft" : "ghost"}
+                          type="button"
+                          role="option"
+                          aria-selected={isCurrent}
+                          onClick={() => handleLocalSelect(endpoint, m.id)}
+                          className={`ms-option${isCurrent ? " ms-option--current" : ""}`}
+                        >
+                          <span className="ms-optionmain">
+                            <Text variant="label" weight={isCurrent ? "semibold" : "medium"} tone={isCurrent ? "default" : "muted"}>
+                              {m.name}
+                            </Text>
+                            <Text variant="micro" tone="dim" mono>
+                              {m.id}
+                            </Text>
+                          </span>
+                          {isCurrent ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--pa-green-hover)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          ) : null}
+                        </Button>
+                      );
+                    })
+                  )}
+                </div>
+              ))
+            )}
+
+            {lastScan ? (
+              <div className="ms-lastscan">
+                <Text variant="micro" tone="dim" mono>
+                  last scan {lastScan.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </Text>
+              </div>
+            ) : null}
+          </div>
 
           {supportsThinking && (
             <div className="ms-thinking">

@@ -1,0 +1,148 @@
+/* Profile selector — header control + dropdown. Neutral surfaces, rounded. */
+
+.pr-root { position: relative; }
+
+.pr-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 6px 10px !important;
+  border: 1px solid rgba(var(--pa-paper-rgb), 0.14) !important;
+  border-radius: var(--pa-radius-md) !important;
+  background: rgba(var(--pa-paper-rgb), 0.035) !important;
+  color: rgba(var(--pa-paper-rgb), 0.72) !important;
+  cursor: pointer !important;
+  transition: border-color 100ms ease, background 100ms ease !important;
+}
+.pr-trigger:hover, .pr-trigger--open { border-color: rgba(var(--pa-green-rgb), 0.4) !important; background: rgba(var(--pa-green-rgb), 0.08) !important; }
+.pr-glyph { display: inline-flex; color: var(--pa-green); flex-shrink: 0; }
+.pr-triggermain { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
+.pr-label { letter-spacing: 0.1em; }
+.pr-name { color: var(--pa-paper); font-size: 12.5px !important; }
+.pr-mode-chip {
+  padding: 2px 7px;
+  border: 1px solid rgba(var(--pa-green-rgb), 0.3);
+  border-radius: var(--pa-radius-full);
+  background: rgba(var(--pa-green-rgb), 0.1);
+  color: var(--pa-green-hover);
+  font: 9px/1.3 "Geist Mono", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.pr-chevron { color: rgba(var(--pa-paper-rgb), 0.45); transition: transform 120ms ease; flex-shrink: 0; }
+.pr-chevron--open { transform: rotate(180deg); }
+
+.pr-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: min(360px, 92vw);
+  max-height: 78vh;
+  overflow-y: auto;
+  border: 1px solid var(--pa-border-strong);
+  border-radius: var(--pa-radius-lg);
+  background: var(--pa-overlay);
+  box-shadow: var(--pa-shadow-lg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: pa-slide-down 140ms ease both;
+}
+.pr-panelhead { padding: 12px 14px 8px; border-bottom: 1px solid var(--pa-border); }
+
+.pr-list { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; }
+.pr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--pa-border);
+  border-radius: var(--pa-radius-md);
+  background: transparent;
+  color: var(--pa-paper);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 100ms ease, background 100ms ease;
+}
+.pr-card:hover { border-color: var(--pa-border-strong); background: rgba(var(--pa-paper-rgb), 0.03); }
+.pr-card--current { border-color: rgba(var(--pa-green-rgb), 0.4); background: rgba(var(--pa-green-rgb), 0.07); }
+.pr-card-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.pr-card-name { font: 600 13px/1.3 "Geist", sans-serif; }
+.pr-card-tagline { color: var(--pa-green-hover); font: 11px/1.4 "Geist", sans-serif; }
+.pr-card-desc { color: rgba(var(--pa-paper-rgb), 0.58); font-size: 12px; line-height: 1.5; }
+.pr-card-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.pr-chip {
+  padding: 2px 7px;
+  border: 1px solid rgba(var(--pa-paper-rgb), 0.14);
+  border-radius: var(--pa-radius-full);
+  background: rgba(var(--pa-paper-rgb), 0.04);
+  color: rgba(var(--pa-paper-rgb), 0.55);
+  font: 10px/1.4 "Geist", sans-serif;
+}
+
+.pr-compose { padding: 10px 14px 14px; border-top: 1px solid var(--pa-border); }
+.pr-compose-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.pr-modes { display: flex; gap: 6px; flex-wrap: wrap; }
+.pr-mode { flex: 1; min-width: 0; }
+.pr-mode--active { border-color: rgba(var(--pa-green-rgb), 0.4) !important; }
+.pr-compose-summary { margin-top: 8px; padding: 8px 10px; border: 1px solid var(--pa-border); border-radius: var(--pa-radius-md); background: rgba(var(--pa-ink-rgb), 0.4); }
+
+/* --- Custom profiles section (v0.7.1 Profile Studio) --- */
+
+.pr-custom { display: flex; flex-direction: column; gap: 6px; padding: 2px 12px 10px; border-top: 1px solid var(--pa-border); }
+.pr-custom-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0 2px; }
+.pr-custom-empty { padding: 6px 2px; }
+.pr-custom-list { display: flex; flex-direction: column; gap: 6px; }
+.pr-card--custom { position: relative; padding: 0; overflow: hidden; }
+.pr-card--custom .pr-card-head { padding: 10px 12px 0; }
+.pr-custom-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.pr-custom-main:hover { background: rgba(var(--pa-green-rgb), 0.04); }
+.pr-card-compose {
+  color: rgba(var(--pa-paper-rgb), 0.4);
+  font: 9.5px/1.5 "Geist Mono", monospace;
+}
+.pr-custom-actions {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px 10px;
+  border-top: 1px dashed rgba(var(--pa-paper-rgb), 0.1);
+  padding-top: 8px;
+}
+.pr-custom-action {
+  padding: 3px 10px;
+  border: 1px solid var(--pa-border);
+  border-radius: var(--pa-radius-sm);
+  background: transparent;
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  font: 10.5px/1.4 "Geist Sans", sans-serif;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.pr-custom-action:hover { border-color: rgba(var(--pa-green-rgb), 0.4); color: var(--pa-green-hover); }
+.pr-custom-action--danger:hover { border-color: rgba(var(--pa-danger-rgb, 239, 83, 80), 0.5); color: var(--pa-danger, #ef5350); }
+
+.pr-studio-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-start;
+  width: 100%;
+  margin-top: 4px;
+  border: 1px dashed rgba(var(--pa-green-rgb), 0.3) !important;
+  color: var(--pa-green-hover) !important;
+}
+.pr-studio-glyph { font-size: 12px; line-height: 1; }

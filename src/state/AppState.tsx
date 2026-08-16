@@ -20,6 +20,12 @@ export interface AppStateValue {
   setSessionsFilter: (filter: string | undefined) => void;
   sessionsSelectedId: string | undefined;
   setSessionsSelectedId: (id: string | undefined) => void;
+  /** Trajectory panel (right drawer) open state — v0.7 conversation-first chrome. */
+  trajectoryOpen: boolean;
+  setTrajectoryOpen: (open: boolean) => void;
+  /** Code Mode panel (right drawer) open state — v0.7.1 run_code program view. */
+  codeOpen: boolean;
+  setCodeOpen: (open: boolean) => void;
 }
 
 const AppStateContext = createContext<AppStateValue | undefined>(undefined);
@@ -35,6 +41,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // "Find session…" command so it can land filtered.
   const [sessionsFilter, setSessionsFilter] = useState<string | undefined>();
   const [sessionsSelectedId, setSessionsSelectedId] = useState<string | undefined>();
+  const [trajectoryOpen, setTrajectoryOpen] = useState(false);
+  const [codeOpen, setCodeOpen] = useState(false);
 
   const value = useMemo<AppStateValue>(
     () => ({
@@ -48,8 +56,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       setSessionsFilter,
       sessionsSelectedId,
       setSessionsSelectedId,
+      trajectoryOpen,
+      setTrajectoryOpen,
+      codeOpen,
+      setCodeOpen,
     }),
-    [view, newSessionOpen, settingsTab, sessionsFilter, sessionsSelectedId],
+    [view, newSessionOpen, settingsTab, sessionsFilter, sessionsSelectedId, trajectoryOpen, codeOpen],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

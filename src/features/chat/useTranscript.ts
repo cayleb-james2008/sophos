@@ -5,11 +5,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { useIpc, useIpcEvent, isTauri } from "../../ipc/client";
 import type { SessionEvent, ToolCall, TranscriptMessage } from "../../ipc/contract";
+import type { AgentProfile } from "../profiles/profiles";
 // Demo helpers — DEV-only, tree-shaken in production (import.meta.env.DEV).
 import { demoSeedLarge, simulateResponse } from "./demo";
 import { setTranscriptMessages } from "./chatBridge";
 
 const nowIso = () => new Date().toISOString();
+
+/** The live display flavor of the active profile — rides on demo prompts so
+ * simulation follows the studio draft even before Save (additive; the bridge
+ * strips it before the daemon). */
+function profileFlavorOf(profile: AgentProfile): { name: string; tagline: string; workingStyle: string[]; mode: string } {
+  return { name: profile.name, tagline: profile.tagline, workingStyle: profile.workingStyle ?? [], mode: profile.mode };
+}
 const userMsg = (content: string): TranscriptMessage => ({ id: `u-${Date.now()}`, role: "user", content, timestamp: nowIso(), status: "complete" });
 
 /** Flatten the daemon message content into text / thinking / toolCalls. */
@@ -131,7 +139,7 @@ export function useTranscript({ setBusy, setError, busyRef }: TranscriptOptions)
     setEditDraft(draft);
   }, []);
 
-  const editAndResend = useCallback((index: number, newText: string) => {
+  const editAndResend = useCallback((index: number, newText: string, profile?: AgentProfile) => {
     const trimmed = newText.trim();
     if (!trimmed) return;
     demoFixture.current = false;
@@ -140,16 +148,16 @@ export function useTranscript({ setBusy, setError, busyRef }: TranscriptOptions)
     setBusy(true);
     setError(null);
     if (isTauri) {
-      void client.prompt(trimmed).catch((err) => { setError(err instanceof Error ? err.message : String(err)); setBusy(false); });
+      void (profile ? client.prompt(trimmed, { profile: profile.id, profileFlavor: profileFlavorOf(profile) }) : client.prompt(trimmed)).catch((err) => { setError(err instanceof Error ? err.message : String(err)); setBusy(false); });
       return;
     }
     if (import.meta.env.DEV) {
       simCleanup.current?.();
-      simCleanup.current = simulateResponse(trimmed, { onUpdate: (u) => setMessages(u), onDone: () => { setBusy(false); streamingId.current = null; } });
+      simCleanup.current = simulateResponse(trimmed, { onUpdate: (u) => setMessages(u), onDone: () => { setBusy(false); streamingId.current = null; } }, profile);
     }
   }, [client, setBusy, setError, busyRef]);
 
-  const retry = useCallback((message: TranscriptMessage) => {
+  const retry = useCallback((message: TranscriptMessage, profile?: AgentProfile) => {
     const idx = messages.findIndex((m) => m.id === message.id);
     if (idx < 0) return;
     let userText: string | null = null;
@@ -164,7 +172,7 @@ export function useTranscript({ setBusy, setError, busyRef }: TranscriptOptions)
     setBusy(true);
     if (import.meta.env.DEV) {
       simCleanup.current?.();
-      simCleanup.current = simulateResponse(userText, { onUpdate: (u) => setMessages(u), onDone: () => { setBusy(false); streamingId.current = null; } });
+      simCleanup.current = simulateResponse(userText, { onUpdate: (u) => setMessages(u), onDone: () => { setBusy(false); streamingId.current = null; } }, profile);
     }
   }, [messages, client, setBusy, setError]);
 
@@ -174,7 +182,7 @@ export function useTranscript({ setBusy, setError, busyRef }: TranscriptOptions)
   }, []);
 
   /** Execute a turn: append (or branch from) a user message and stream a response. */
-  const runTurn = useCallback(async (text: string, branchFrom?: number): Promise<void> => {
+  const runTurn = useCallback(async (text: string, branchFrom?: number, profile?: AgentProfile): Promise<void> => {
     const trimmed = text.trim();
     if (!trimmed) return;
     demoFixture.current = false;
@@ -183,12 +191,12 @@ export function useTranscript({ setBusy, setError, busyRef }: TranscriptOptions)
     setMessages((msgs) => (branchFrom != null ? [...msgs.slice(0, branchFrom), userMsg(trimmed)] : [...msgs, userMsg(trimmed)]));
     setBusy(true);
     if (isTauri) {
-      try { await client.prompt(trimmed); } catch (err) { setError(err instanceof Error ? err.message : String(err)); setBusy(false); }
+      try { await (profile ? client.prompt(trimmed, { profile: profile.id, profileFlavor: profileFlavorOf(profile) }) : client.prompt(trimmed)); } catch (err) { setError(err instanceof Error ? err.message : String(err)); setBusy(false); }
       return;
     }
     if (import.meta.env.DEV) {
       simCleanup.current?.();
-      simCleanup.current = simulateResponse(trimmed, { onUpdate: (u) => setMessages(u), onDone: () => { setBusy(false); streamingId.current = null; } });
+      simCleanup.current = simulateResponse(trimmed, { onUpdate: (u) => setMessages(u), onDone: () => { setBusy(false); streamingId.current = null; } }, profile);
     }
   }, [client, setBusy, setError, busyRef]);
 

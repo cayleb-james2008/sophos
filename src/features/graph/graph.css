@@ -31,7 +31,7 @@
 .react-flow__handle {
   width: 7px;
   height: 7px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: var(--pa-secondary);
   border: 1px solid var(--pa-border-strong);
 }
@@ -67,7 +67,7 @@
 .react-flow__controls {
   box-shadow: none;
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   overflow: hidden;
 }
 .react-flow__controls-button {
@@ -92,7 +92,7 @@
 .react-flow__minimap {
   background: var(--pa-ink);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 
 /* ---- Selection / attribution ---- */
@@ -113,7 +113,7 @@
   padding: 12px 14px 12px 16px;
   background: var(--pa-card);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   transition: border-color 0.18s cubic-bezier(0.3, 0, 0.2, 1), box-shadow 0.18s ease;
   height: 100%;
   width: var(--node-w);
@@ -128,7 +128,7 @@
   top: 8px;
   bottom: 8px;
   width: 2px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: var(--node-color);
 }
 .pg-node__head {
@@ -198,7 +198,7 @@
   align-items: center;
   gap: 5px;
   padding: 3px 9px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   border: 1px solid var(--pa-border-strong);
   background: transparent;
   color: rgba(var(--pa-paper-rgb), 0.6);
@@ -246,7 +246,7 @@
   width: 34px;
   height: 4px;
   background: var(--pa-secondary);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   overflow: hidden;
 }
 .pg-ctx__fill {
@@ -274,7 +274,7 @@
   align-items: center;
   gap: 4px;
   padding: 1px 7px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: rgba(var(--pa-green-rgb), 0.12);
   border: 1px solid rgba(var(--pa-green-rgb), 0.45);
   color: var(--pa-green-hover);
@@ -306,7 +306,7 @@
   padding: 6px 12px;
   background: rgba(var(--pa-ink-rgb), 0.78);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   backdrop-filter: blur(6px);
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   font-size: 10.5px;
@@ -343,7 +343,7 @@
   padding: 26px 30px;
   background: var(--pa-card);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   box-shadow: none;
 }
 .pg-blank__glyph {

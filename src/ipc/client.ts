@@ -9,6 +9,8 @@
 // `useIpcEvent` for subscribing to the live event stream.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { buildCodeModeTurn } from "../features/code/demoTurn";
+import { customDemoFlavor, isCustomId, parseCustomProfiles, type CustomProfile } from "../features/studio/store";
 import type {
   AgentInfo,
   AgentMessage,
@@ -64,7 +66,7 @@ export function isDemoMode(): boolean {
 
 export interface IpcClient {
   // Commands
-  prompt(text: string, options?: { thinking?: string; streamingBehavior?: "steer" | "followUp"; queueIfBusy?: boolean }): Promise<void>;
+  prompt(text: string, options?: { thinking?: string; streamingBehavior?: "steer" | "followUp"; queueIfBusy?: boolean; profile?: string; profileFlavor?: { name: string; tagline: string; workingStyle: string[]; mode?: string } }): Promise<void>;
   abort(): Promise<void>;
   steer(text: string): Promise<void>;
   setModel(provider: string, model: string, thinking?: string, runtime?: ModelRuntimeConfig): Promise<void>;
@@ -410,6 +412,13 @@ const LOCAL_MODEL_CONFIG_KEY = "prime-agent.modelConfig.v1";
 const LOCAL_PROVIDER_KEY = "prime-agent.localProviders.v1";
 const LOCAL_SETTINGS_KEY = "prime-agent.settings.v1";
 
+/** Demo MCP server shipped connected so the Code Mode SDK registry includes
+ * MCP tools (via testMcpServer) in demo mode. It's additive to settings and
+ * the Settings e2e suite's clear-loop removes it like any other server. */
+const DEMO_MCP_SERVERS = [
+  { name: "demo-fs", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem"], enabled: true },
+];
+
 function readLocalSettings(): Settings {
   try {
     const raw = typeof window !== "undefined" ? window.localStorage.getItem(LOCAL_SETTINGS_KEY) : null;
@@ -492,11 +501,14 @@ const LOCAL_DEFAULT_CONFIG: LocalProviderConfig = {
 
 export class MockIpcClient implements IpcClient {
   private listeners: Array<(e: IpcEvent) => void> = [];
-  private mockSettings: Settings = {
+  private mockSettings: Settings & { mcpServers?: Array<{ name: string; command: string; args?: string[]; enabled: boolean }> } = {
     ...INITIAL_LOCAL_SETTINGS,
     theme: INITIAL_LOCAL_SETTINGS.theme ?? "dark",
     modelConfig: { ...(INITIAL_LOCAL_SETTINGS.modelConfig ?? {}), ...readLocalModelConfig() },
     localProviders: readLocalProviders() ?? [LOCAL_DEFAULT_CONFIG],
+    // Persisted settings win; a fresh demo ships one connected MCP server so
+    // the Code Mode registry has MCP tools without a live daemon.
+    mcpServers: (INITIAL_LOCAL_SETTINGS as Settings & { mcpServers?: typeof DEMO_MCP_SERVERS }).mcpServers ?? DEMO_MCP_SERVERS,
   };
   private state: ConnectionState = {
     status: { kind: "connecting" },
@@ -653,9 +665,16 @@ export class MockIpcClient implements IpcClient {
     this.chatTurnTimers = [];
   }
 
-  async prompt(text: string): Promise<void> {
+  /** Resolve a custom profile from the mock's persisted settings (guarded). */
+  private customById(id: string | undefined): CustomProfile | undefined {
+    if (!id || !isCustomId(id)) return undefined;
+    const stored = (this.mockSettings as Settings & { customProfiles?: unknown }).customProfiles;
+    return parseCustomProfiles(stored).find((p) => p.id === id);
+  }
+
+  async prompt(text: string, options?: { profile?: string; profileFlavor?: { name: string; tagline: string; workingStyle: string[]; mode?: string } }): Promise<void> {
     this.emit({ type: "session_event", event: { kind: "user_message", text } });
-    this.simulateChatTurn(text);
+    this.simulateChatTurn(text, options?.profile, options?.profileFlavor);
   }
   async abort(): Promise<void> {
     // Stop any in-flight simulated streaming turn (matches the real daemon).
@@ -681,8 +700,21 @@ export class MockIpcClient implements IpcClient {
    * makes the core Chat messaging + streaming features demonstrable/testable
    * in demo mode via cua-driver.
    */
-  private simulateChatTurn(text: string): void {
+  private simulateChatTurn(
+    text: string,
+    profile?: string,
+    profileFlavor?: { name: string; tagline: string; workingStyle: string[]; mode?: string },
+  ): void {
     this.clearChatTurn();
+    // Code Mode: the simulated turn writes ONE program that calls several
+    // tools and emits run_code + tool_call/tool_result events, so the Code
+    // Mode panel decomposes it into tool-call cards and the Trajectory log
+    // records the program and each call — all clearly labeled simulated. A
+    // custom profile whose base mode is "code" runs the same turn.
+    if (profile === "code" || profileFlavor?.mode === "code" || this.customById(profile)?.mode === "code") {
+      this.simulateCodeTurn(text);
+      return;
+    }
     const shown = (text.trim() || "(empty message)").slice(0, 140);
     const push = (fn: () => void, ms: number) => {
       this.chatTurnTimers.push(window.setTimeout(fn, ms));
@@ -717,12 +749,24 @@ export class MockIpcClient implements IpcClient {
         }),
       3600,
     );
-    // Stream the answer in chunks.
+    // Stream the answer in chunks. When the active profile is Gauntlet, append
+    // its plain-English status block so the profile visibly changes how the
+    // agent reports (goal + bar, honest evidence markers) — the e2e anchor
+    // strings above stay intact either way. Custom profiles append their live
+    // draft flavor (follows the studio before Save via profileFlavor, or the
+    // persisted profile from settings).
+    const profileBlock =
+      profile === "gauntlet"
+        ? "\n\nStatus — demo run (simulated response; evidence is a UI round-trip, not a live tool run)\nVerified — the message loop round-tripped and this reply rendered in your conversation\nUnverified — nothing was actually executed — no live engine is connected, so no real tool ran and no real data was fetched\nNext action — connect an engine (or start a local model server), then re-run this prompt for a real result"
+        : isCustomId(profile ?? "")
+          ? customDemoFlavor(profileFlavor ?? this.customById(profile))
+          : "";
     const chunks = [
       `Got it — you said: “${shown}”.`,
       "\n\nThis is a simulated demo response — no live engine is connected, so I can't run real tools or fetch live data.",
       "\n\nIn the connected app I'd help you work through it step by step.",
-    ];
+      profileBlock,
+    ].filter(Boolean);
     chunks.forEach((chunk, i) => {
       push(() => e({ kind: "text", text: chunk }), 4400 + i * 1100);
     });
@@ -731,6 +775,54 @@ export class MockIpcClient implements IpcClient {
       this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "idle" } } });
       this.clearChatTurn();
     }, 4400 + chunks.length * 1100 + 500);
+  }
+
+  /**
+   * Code-mode simulated turn (Tauri demo shell). Builds the deterministic
+   * run_code program from the user's ACTUAL input and streams it through the
+   * same session_event channel the real daemon uses: run_code (the program),
+   * one tool_call/tool_result pair per call, run_complete, then the answer.
+   * Every output is labeled demo/simulated — no live tool claim.
+   */
+  private simulateCodeTurn(text: string): void {
+    this.clearChatTurn();
+    const shown = (text.trim() || "(empty message)").slice(0, 140);
+    const push = (fn: () => void, ms: number) => {
+      this.chatTurnTimers.push(window.setTimeout(fn, ms));
+    };
+    const e = (event: Record<string, unknown>) =>
+      this.emit({ type: "session_event", event } as IpcEvent);
+
+    this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "busy" } } });
+
+    const { program, calls } = buildCodeModeTurn(text);
+    const runId = `code-run-${Date.now()}`;
+
+    push(() => e({ kind: "thinking_delta", thinking: "Reading your message…" }), 350);
+    push(() => e({ kind: "thinking_delta", thinking: " Code mode: compiling ONE program that calls several tools." }), 1600);
+    push(() => e({ kind: "run_code", runId, program }), 2600);
+    calls.forEach((c, i) => {
+      push(() => e({ kind: "tool_call", runId, name: c.name, input: JSON.stringify(c.input) }), 3200 + i * 700);
+      push(() => e({ kind: "tool_result", runId, name: c.name, output: c.output }), 3200 + i * 700 + 600);
+    });
+    push(() => e({ kind: "run_complete", runId }), 3200 + calls.length * 700 + 800);
+
+    const chunks = [
+      `Got it — you said: “${shown}”.`,
+      "\n\nThis is a simulated demo response — no live engine is connected, so the run_code program and its tool calls are simulated; no real tool ran and no real data was fetched.",
+      `\n\nI ran one program with ${calls.length} tool calls (${calls.map((c) => c.name).join(", ")}) — each decomposed into its own tool-call card in the Code Mode panel and recorded in the Trajectory log.`,
+    ];
+    // The answer streams AFTER the run completes (run_complete lands at
+    // 3200 + calls*700 + 800), so the transcript order matches the browser
+    // preview path: program → tool calls → run complete → answer.
+    const answerStart = 3200 + calls.length * 700 + 900;
+    chunks.forEach((chunk, i) => {
+      push(() => e({ kind: "text", text: chunk }), answerStart + i * 1100);
+    });
+    push(() => {
+      this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "idle" } } });
+      this.clearChatTurn();
+    }, answerStart + chunks.length * 1100 + 500);
   }
   async setModel(provider: string, model: string, _thinking?: string, runtime?: ModelRuntimeConfig): Promise<void> {
     if (runtime) {

@@ -21,6 +21,12 @@ import { InboxView } from "./features/inbox/InboxView";
 import { CommandPalette } from "./features/commands/CommandPalette";
 import { NewSessionModal } from "./features/sessions/NewSessionModal";
 import { UnreadProvider } from "./ipc/unread";
+import { ProfileProvider } from "./features/profiles/profiles";
+import { TrajectoryProvider } from "./features/trajectory/trajectory";
+import { TrajectoryPanel } from "./features/trajectory/TrajectoryPanel";
+import { CodeRunProvider } from "./features/code/useCodeRuns";
+import { CodePanel } from "./features/code/CodePanel";
+import { StudioPanel } from "./features/studio/StudioPanel";
 import { AppStateProvider, useAppState } from "./state/AppState";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { useTheme } from "./hooks/useTheme";
@@ -96,6 +102,9 @@ function AppShell() {
           setView("sessions");
         }}
       />
+      <TrajectoryPanel />
+      <CodePanel />
+      <StudioPanel />
     </>
   );
 }
@@ -105,7 +114,13 @@ export default function App() {
   return (
     <UnreadProvider>
       <AppStateProvider>
-        <AppShell />
+        <ProfileProvider>
+          <TrajectoryProvider>
+            <CodeRunProvider>
+              <AppShell />
+            </CodeRunProvider>
+          </TrajectoryProvider>
+        </ProfileProvider>
       </AppStateProvider>
     </UnreadProvider>
   );

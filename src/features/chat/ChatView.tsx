@@ -7,6 +7,8 @@ import { Text, StatusDot, Button, IconButton } from "../../design";
 import { useConnectionState, useIpc, isTauri } from "../../ipc/client";
 import { useAppState } from "../../state/AppState";
 import { ModelSelector } from "../providers/ModelSelector";
+import { ProfileSelector } from "../profiles/ProfileSelector";
+import { useProfile } from "../profiles/profiles";
 import { useChat } from "./useChat";
 import { MessageList } from "./MessageList";
 import { Composer } from "./Composer";
@@ -32,9 +34,21 @@ function CopyIcon({ size = 13, color }: { size?: number; color: string }) {
   return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>;
 }
 
+function TrajectoryIcon({ size = 14, color }: { size?: number; color: string }) {
+  return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M6 8.5v3a4 4 0 0 0 4 4h5" /><path d="M8.5 6H15a3 3 0 0 1 3 3v6" /></svg>;
+}
+
+function CodeIcon({ size = 14, color }: { size?: number; color: string }) {
+  return <svg className="chat-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg>;
+}
+
 export function ChatView() {
-  const { setNewSessionOpen, setSettingsTab, setView } = useAppState();
+  const { setNewSessionOpen, setSettingsTab, setView, setTrajectoryOpen, setCodeOpen } = useAppState();
   const openNewSession = () => setNewSessionOpen(true);
+  const { profile, selection } = useProfile();
+  // Code Mode is active when the runtime mode or the profile itself is "code"
+  // — that's when the run_code view is reachable from the header.
+  const isCodeMode = selection.mode === "code" || profile.id === "code";
   const handleSetupProviders = () => {
     setSettingsTab("providers");
     setView("settings");
@@ -80,6 +94,7 @@ export function ChatView() {
   const headerButtons = [
     { title: "Export session to HTML", onClick: onExport, icon: (color: string) => <ExportIcon color={color} /> },
     { title: "Copy last assistant message", onClick: () => void onCopy(), icon: (color: string) => <CopyIcon color={color} /> },
+    { title: "Trajectory", onClick: () => setTrajectoryOpen(true), icon: (color: string) => <TrajectoryIcon color={color} /> },
   ];
 
   // Error-card retry re-issues the last assistant turn (which re-sends the
@@ -106,9 +121,15 @@ export function ChatView() {
             </IconButton>
           ))}
           <Button variant="outline" onClick={openNewSession} title="New session" className="chat-new-button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             New session
           </Button>
+          {isCodeMode ? (
+            <IconButton title="Code Mode — SDK + run_code programs" className="chat-action-button" onClick={() => setCodeOpen(true)} aria-label="Open Code Mode">
+              <CodeIcon color="currentColor" />
+            </IconButton>
+          ) : null}
+          <ProfileSelector />
           <ModelSelector />
         </div>
       </header>
@@ -159,6 +180,9 @@ export function ChatView() {
         setupReady={!isTauri || onboarding.ready}
         editDraft={editDraft}
         starterDraft={starterDraft}
+        profileName={profile.name}
+        profileTagline={profile.tagline}
+        codeMode={isCodeMode}
         onSend={send}
         onAbort={abort}
         onSteer={steer}

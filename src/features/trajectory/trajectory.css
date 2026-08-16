@@ -1,0 +1,189 @@
+/* Trajectory — the "every run is traceable" drawer. Soft neutral surfaces,
+   rounded corners, quiet timeline. */
+
+.traj { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.traj--open { pointer-events: auto; }
+
+.traj__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(var(--pa-ink-rgb), 0.4);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+.traj--open .traj__backdrop { opacity: 1; }
+
+.traj__drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  width: min(420px, 92vw);
+  flex-direction: column;
+  border-left: 1px solid var(--pa-border);
+  background: var(--pa-card);
+  box-shadow: var(--pa-shadow-lg);
+  transform: translateX(100%);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.traj--open .traj__drawer { transform: translateX(0); }
+
+.traj__header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--pa-border);
+}
+.traj__heading { display: flex; flex-direction: column; gap: 3px; }
+
+.traj__controls {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--pa-border);
+  background: rgba(var(--pa-ink-rgb), 0.35);
+}
+
+.traj__select-wrap { display: flex; flex-direction: column; gap: 4px; }
+.traj__select-label {
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  font: 10px/1 "Geist Mono", monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.traj__select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--pa-border-strong);
+  border-radius: var(--pa-radius-md);
+  background: var(--pa-overlay);
+  color: var(--pa-paper);
+  font: 400 12.5px/1.3 "Geist", sans-serif;
+}
+
+.traj__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--pa-border-strong);
+  border-radius: var(--pa-radius-md);
+  background: var(--pa-overlay);
+}
+.traj__search:focus-within { border-color: rgba(var(--pa-green-rgb), 0.45); }
+.traj__search-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--pa-paper);
+  font: 400 12.5px/1.3 "Geist", sans-serif;
+}
+.traj__search-input::placeholder { color: rgba(var(--pa-paper-rgb), 0.4); }
+.traj__search-clear { flex-shrink: 0; }
+
+.traj__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.traj__meta { display: flex; align-items: center; justify-content: space-between; }
+
+.traj__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+}
+.traj__empty { padding: 24px 8px; text-align: center; }
+
+.traj__entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--pa-border);
+  border-radius: var(--pa-radius-md);
+  background: var(--pa-muted);
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+.traj__entry--current { border-color: rgba(var(--pa-green-rgb), 0.3); }
+.traj__entry--replay {
+  border-color: rgba(var(--pa-green-rgb), 0.55);
+  background: rgba(var(--pa-green-rgb), 0.1);
+  box-shadow: 0 0 0 1px rgba(var(--pa-green-rgb), 0.25);
+}
+.traj__entry-row { display: flex; align-items: center; gap: 8px; }
+.traj__kind {
+  padding: 1px 6px;
+  border-radius: var(--pa-radius-sm);
+  font: 9px/1.4 "Geist Mono", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--pa-secondary);
+  color: rgba(var(--pa-paper-rgb), 0.6);
+}
+.traj__kind--prompt { background: rgba(var(--pa-info-rgb), 0.16); color: var(--pa-info); }
+.traj__kind--thinking { background: rgba(var(--pa-amber-rgb), 0.14); color: var(--pa-amber); }
+.traj__kind--tool { background: rgba(var(--pa-tool-rgb), 0.14); color: var(--pa-tool); }
+.traj__kind--message { background: rgba(var(--pa-green-rgb), 0.14); color: var(--pa-green-hover); }
+.traj__kind--agent { background: rgba(var(--pa-info-rgb), 0.14); color: var(--pa-info); }
+.traj__kind--refinement { background: rgba(var(--pa-amber-rgb), 0.14); color: var(--pa-amber); }
+.traj__kind--program { background: rgba(var(--pa-tool-rgb), 0.18); color: var(--pa-tool); }
+.traj__time { color: rgba(var(--pa-paper-rgb), 0.4); font: 10px/1 "Geist Mono", monospace; }
+.traj__seq { margin-left: auto; color: rgba(var(--pa-paper-rgb), 0.3); font: 9px/1 "Geist Mono", monospace; }
+.traj__summary {
+  color: rgba(var(--pa-paper-rgb), 0.78);
+  font-size: 12.5px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.traj__detail summary {
+  cursor: pointer;
+  color: rgba(var(--pa-paper-rgb), 0.4);
+  font: 10px/1.4 "Geist Mono", monospace;
+}
+.traj__pre {
+  margin: 6px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--pa-border);
+  border-radius: var(--pa-radius-sm);
+  background: var(--pa-ink);
+  color: rgba(var(--pa-paper-rgb), 0.6);
+  font: 10.5px/1.55 "Geist Mono", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.traj__replaybar {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--pa-border);
+}
+.traj__replay-track {
+  height: 4px;
+  border-radius: var(--pa-radius-full);
+  background: var(--pa-secondary);
+  overflow: hidden;
+}
+.traj__replay-fill {
+  height: 100%;
+  background: var(--pa-green);
+  transition: width 220ms ease;
+}

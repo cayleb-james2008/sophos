@@ -5,42 +5,42 @@
     "width": 1440,
     "height": 900
   },
-  "startedAt": "2026-08-12T20:47:23.942Z",
-  "finishedAt": "2026-08-12T20:47:32.408Z",
-  "baselinesDir": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines",
+  "startedAt": "2026-08-16T14:41:29.564Z",
+  "finishedAt": "2026-08-16T14:41:38.911Z",
+  "baselinesDir": "C:\\Users\\Cayleb\\Desktop\\workspace\\sophos\\verify\\visual\\baselines",
   "captured": [
     {
       "view": "chat",
       "label": "Chat",
-      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\chat.png",
+      "file": "C:\\Users\\Cayleb\\Desktop\\workspace\\sophos\\verify\\visual\\baselines\\chat.png",
       "width": 1440,
       "height": 900
     },
     {
       "view": "sessions",
       "label": "Sessions",
-      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\sessions.png",
+      "file": "C:\\Users\\Cayleb\\Desktop\\workspace\\sophos\\verify\\visual\\baselines\\sessions.png",
       "width": 1440,
       "height": 900
     },
     {
       "view": "agents",
       "label": "Agents",
-      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\agents.png",
+      "file": "C:\\Users\\Cayleb\\Desktop\\workspace\\sophos\\verify\\visual\\baselines\\agents.png",
       "width": 1440,
       "height": 900
     },
     {
       "view": "inbox",
       "label": "Inbox",
-      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\inbox.png",
+      "file": "C:\\Users\\Cayleb\\Desktop\\workspace\\sophos\\verify\\visual\\baselines\\inbox.png",
       "width": 1440,
       "height": 900
     },
     {
       "view": "settings",
       "label": "Settings",
-      "file": "C:\\Users\\Cayleb\\.traycer\\worktrees\\cayleb-james2008__sophos\\gauntlet-visual\\verify\\visual\\baselines\\settings.png",
+      "file": "C:\\Users\\Cayleb\\Desktop\\workspace\\sophos\\verify\\visual\\baselines\\settings.png",
       "width": 1440,
       "height": 900
     }

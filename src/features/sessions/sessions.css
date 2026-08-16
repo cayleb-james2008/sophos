@@ -76,7 +76,7 @@
   padding: 0 8px;
   background: rgba(var(--pa-card-rgb), 0.75);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   min-width: 220px;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
@@ -111,7 +111,7 @@
   font-size: 11px;
   line-height: 1;
   padding: 2px 4px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   flex: none;
   transition: color 0.12s ease;
 }
@@ -121,7 +121,7 @@
 .sessions__status-select {
   background: rgba(var(--pa-card-rgb), 0.75);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   color: rgba(var(--pa-paper-rgb), 0.6);
   font: 11px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   padding: 7px 8px;
@@ -144,7 +144,7 @@
   display: grid;
   grid-template-columns: 330px minmax(0, 1fr);
   border: 1px solid rgba(var(--pa-paper-rgb), 0.14);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   overflow: hidden;
   background: linear-gradient(135deg, rgba(var(--pa-card-rgb), 0.72), rgba(var(--pa-ink-rgb), 0.82));
   box-shadow: inset 0 1px rgba(var(--pa-paper-rgb), 0.025);
@@ -182,7 +182,7 @@
 .sessions__grouphead span:last-child {
   min-width: 16px;
   height: 16px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: var(--pa-border);
   display: grid;
   place-items: center;
@@ -199,7 +199,7 @@
   padding: 10px 10px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -223,7 +223,7 @@
   top: 8px;
   bottom: 8px;
   width: 3px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: var(--pa-border);
 }
 .session--active .session__edge {
@@ -236,7 +236,7 @@
   width: 34px;
   height: 34px;
   flex: none;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: linear-gradient(145deg, var(--pa-secondary), var(--pa-card));
   border: 1px solid var(--pa-border-strong);
   display: grid;
@@ -299,7 +299,7 @@
   border: 0;
   background: transparent;
   color: rgba(var(--pa-paper-rgb), 0.6);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -352,7 +352,7 @@
   width: 40px;
   height: 40px;
   flex: none;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: linear-gradient(145deg, var(--pa-secondary), var(--pa-card));
   border: 1px solid var(--pa-border-strong);
   display: grid;
@@ -400,7 +400,7 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .detail__row:last-child { border-bottom: 0; }
 .detail__row label { font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; letter-spacing: 0.12em; color: rgba(var(--pa-paper-rgb), 0.45); text-transform: uppercase; }
@@ -447,7 +447,7 @@
   padding: 13px 16px;
   background: rgba(var(--pa-amber-rgb), 0.08);
   border: 1px solid rgba(var(--pa-amber-rgb), 0.25);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .sessions__daemon-icon {
   font-size: 20px;
@@ -470,7 +470,7 @@
   padding: 10px 14px;
   background: rgba(var(--pa-amber-rgb), 0.08);
   border: 1px solid rgba(var(--pa-amber-rgb), 0.2);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .sessions__dismiss {
   background: transparent;
@@ -479,7 +479,7 @@
   cursor: pointer;
   font-size: 12px;
   padding: 2px 6px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .sessions__dismiss:hover { background: rgba(var(--pa-paper-rgb), 0.06); color: var(--pa-paper); }
 
@@ -493,7 +493,7 @@
   cursor: pointer;
   padding: 4px 8px;
   margin-top: 6px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   transition: 0.12s ease;
 }
 .sessions__linkbtn:hover { background: rgba(var(--pa-green-rgb), 0.12); color: var(--pa-green-hover); }
@@ -516,7 +516,7 @@
 .session__ctx-dot {
   display: inline-block;
   height: 3px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: var(--pa-green);
   max-width: 22px;
   width: var(--bar-w);
@@ -530,7 +530,7 @@
   font: 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   color: rgba(var(--pa-paper-rgb), 0.6);
   padding: 1px 4px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: rgba(var(--pa-paper-rgb), 0.04);
 }
 
@@ -563,7 +563,7 @@
   display: grid;
   place-items: center;
   padding: 0 5px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: var(--pa-border);
   font: 600 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   color: rgba(var(--pa-paper-rgb), 0.6);
@@ -571,7 +571,7 @@
 
 .detail__skeleton {
   height: 24px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: linear-gradient(90deg, rgba(var(--pa-border-rgb), 0.5) 0%, rgba(var(--pa-border-rgb), 0.15) 50%, rgba(var(--pa-border-rgb), 0.5) 100%);
   background-size: 200% 100%;
   animation: pa-shimmer 1.5s ease infinite;
@@ -585,7 +585,7 @@
   padding: 10px 12px;
   background: rgba(var(--pa-danger-rgb), 0.08);
   border: 1px solid rgba(var(--pa-danger-rgb), 0.22);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .detail__retry {
   background: transparent;
@@ -595,7 +595,7 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 4px 10px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   cursor: pointer;
   transition: 0.12s ease;
 }
@@ -615,13 +615,13 @@
 }
 .context-meter__bar {
   height: 6px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: var(--pa-border);
   overflow: hidden;
 }
 .context-meter__fill {
   height: 100%;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: var(--pa-green);
   transition: width 0.3s ease;
   box-shadow: none;
@@ -664,7 +664,7 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .goal:last-child { border-bottom: 0; }
 .goal__status { flex: none; }
@@ -707,14 +707,14 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .rlm-child:last-child { border-bottom: 0; }
 .rlm-child__avatar {
   width: 28px;
   height: 28px;
   flex: none;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: linear-gradient(145deg, var(--pa-secondary), var(--pa-card));
   border: 1px solid var(--pa-border-strong);
   display: grid;
@@ -766,7 +766,7 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .transcript__row:last-child { border-bottom: 0; }
 .transcript__role--user,
@@ -807,7 +807,7 @@
   padding: 6px 8px;
   background: rgba(var(--pa-paper-rgb), 0.06);
   border-left: 2px solid rgba(var(--pa-paper-rgb), 0.3);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .transcript__thinking-label {
   display: block;
@@ -837,7 +837,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 6px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: rgba(var(--pa-green-rgb), 0.08);
   border: 1px solid rgba(var(--pa-green-rgb), 0.2);
   font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
@@ -880,7 +880,7 @@
   overflow: hidden;
 }
 .sessions__detailwrap .sessions__detail {
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   border: none;
   height: 100%;
   flex: 1;
@@ -912,7 +912,7 @@
   padding: 6px 10px;
   background: rgba(var(--pa-card-rgb), 0.88);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   color: rgba(var(--pa-paper-rgb), 0.75);
   font: 500 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.06em;
@@ -931,7 +931,7 @@
   padding: 22px 26px;
   background: transparent;
   border: none;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   color: rgba(var(--pa-paper-rgb), 0.6);
   font-size: 12.5px;
   line-height: 1.6;
@@ -968,7 +968,7 @@
   padding: 3px;
   background: rgba(var(--pa-card-rgb), 0.75);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .sessions__modeswitch-btn {
   display: inline-flex;
@@ -979,7 +979,7 @@
   color: rgba(var(--pa-paper-rgb), 0.45);
   font: 500 11px "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   padding: 5px 13px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   cursor: pointer;
   transition: 0.12s ease;
 }
@@ -1039,7 +1039,7 @@
   padding-left: calc(12px + var(--depth, 0) * 18px) !important;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -1067,7 +1067,7 @@
   flex: none;
   width: 16px;
   height: 16px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   display: grid;
   place-items: center;
   font: 600 8px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
@@ -1093,7 +1093,7 @@
   text-transform: uppercase;
   color: var(--pa-green);
   padding: 2px 6px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   opacity: 0;
   transition: 0.12s ease;
 }
@@ -1140,7 +1140,7 @@
   padding: 9px 12px;
   background: rgba(var(--pa-danger-rgb), 0.12);
   border: 1px solid rgba(var(--pa-danger-rgb), 0.4);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .session-tree__error .sessions__linkbtn { margin-top: 0; }
 
@@ -1156,7 +1156,7 @@
   padding: 8px 12px 8px 14px;
   background: var(--pa-overlay);
   border: 1px solid rgba(var(--pa-green-rgb), 0.4);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   font-size: 11px;
   color: var(--pa-paper);
   box-shadow: none;
@@ -1183,7 +1183,7 @@
   padding: 12px 14px;
   background: var(--pa-card);
   border: 1px solid var(--pa-border-strong);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   animation: pa-scale-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .session-tree__preview-head {
@@ -1262,7 +1262,7 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .context-block__meta {
   flex: 1;
@@ -1288,7 +1288,7 @@
   color: inherit;
   cursor: pointer;
   max-width: 100%;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   text-align: left;
 }
 .detail__title-edit b {
@@ -1306,7 +1306,7 @@
   border: 1px solid var(--pa-green);
   color: var(--pa-paper);
   font: 600 15px "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   padding: 4px 8px;
   outline: none;
   box-shadow: 0 0 0 3px rgba(var(--pa-green-rgb), 0.15);
@@ -1324,7 +1324,7 @@
   padding: 9px 14px;
   background: var(--pa-overlay);
   border: 1px solid rgba(var(--pa-green-rgb), 0.4);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   font-size: 11.5px;
   color: var(--pa-paper);
   box-shadow: none;
@@ -1341,7 +1341,7 @@
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .compact-status__dot {
   width: 9px;
@@ -1374,7 +1374,7 @@
   text-transform: uppercase;
   cursor: pointer;
   padding: 1px 5px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   transition: 0.12s ease;
   vertical-align: middle;
 }
@@ -1386,7 +1386,7 @@
   padding: 6px 9px;
   background: rgba(var(--pa-green-rgb), 0.08);
   border: 1px solid rgba(var(--pa-green-rgb), 0.28);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   margin-bottom: 6px;
 }
 .transcript__forkconfirm span {
@@ -1401,7 +1401,7 @@
   font: 600 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   padding: 3px 8px;
   cursor: pointer;
   border: 1px solid transparent;
@@ -1455,7 +1455,7 @@
     padding: 6px 10px;
     background: rgba(var(--pa-card-rgb), 0.88);
     border: 1px solid var(--pa-border);
-    border-radius: 0;
+    border-radius: var(--pa-radius-md);
     color: rgba(var(--pa-paper-rgb), 0.75);
     font: 500 10px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
     letter-spacing: 0.06em;
@@ -1512,7 +1512,7 @@
     height: 28px;
     background: rgba(var(--pa-card-rgb), 0.88);
     border: 1px solid var(--pa-border);
-    border-radius: 0;
+    border-radius: var(--pa-radius-md);
     color: rgba(var(--pa-paper-rgb), 0.6);
     font-size: 13px;
     line-height: 1;

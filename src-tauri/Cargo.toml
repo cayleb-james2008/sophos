@@ -1,6 +1,6 @@
 [package]
 name = "prime-agent-windows"
-version = "0.6.0"
+version = "0.7.0"
 description = "Windows native Prime Agent — Tauri (Rust) shell + Node bridge + React frontend"
 authors = ["Prime Agent"]
 edition = "2021"
@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["custom-protocol"] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"

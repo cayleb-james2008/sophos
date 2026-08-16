@@ -1,4 +1,4 @@
-// run-all.mjs — CI entry point that runs all 7 cua-driver e2e test suites in
+// run-all.mjs — CI entry point that runs all 8 cua-driver e2e test suites in
 // sequence and aggregates their exit codes.
 //
 // Run:  node verify/cua/run-all.mjs    (or: npm run test:cua)
@@ -25,6 +25,7 @@ const SUITES = [
   { file: "inbox.test.mjs", label: "INBOX" },
   { file: "settings.test.mjs", label: "SETTINGS" },
   { file: "shell.test.mjs", label: "SHELL" },
+  { file: "studio.test.mjs", label: "STUDIO" },
 ];
 
 /** Hard per-suite timeout (ms). 5 minutes is generous for 30s–2min suites. */

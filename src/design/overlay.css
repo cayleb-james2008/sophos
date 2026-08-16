@@ -4,7 +4,7 @@
    switches — never as inline style objects at runtime. */
 
 .pa-card {
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   box-shadow: none;
   transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -60,7 +60,7 @@
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   font-size: 12.5px;
   font-weight: 500;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   transition: color 100ms cubic-bezier(0.3, 0, 0.2, 1), background 100ms cubic-bezier(0.3, 0, 0.2, 1);
 }
 .pa-tab:disabled { cursor: not-allowed; opacity: 0.4; }
@@ -74,7 +74,7 @@
   right: 0;
   bottom: -1px;
   height: 2px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   background: var(--pa-green);
 }
 
@@ -89,7 +89,7 @@
   white-space: nowrap;
   background: var(--pa-overlay);
   border: 1px solid var(--pa-border-strong);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   padding: 5px 9px;
   color: var(--pa-paper);
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
@@ -130,7 +130,7 @@
   flex-direction: column;
   background: var(--pa-secondary);
   border: 1px solid var(--pa-border-strong);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   box-shadow: none;
   animation: pa-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -160,7 +160,7 @@
   font-size: 16px;
   line-height: 1;
   padding: 4px;
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .pa-modal__close:hover,
 .pa-modal__close:focus-visible { color: var(--pa-paper); }
@@ -188,7 +188,7 @@
   padding: 22px;
   background: var(--pa-card);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
 }
 .pa-error-boundary__label {
   letter-spacing: 0.12em;
@@ -197,7 +197,7 @@
   padding: 8px;
   background: var(--pa-danger-soft);
   border: 1px solid var(--pa-border);
-  border-radius: 0;
+  border-radius: var(--pa-radius-md);
   font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   overflow-x: auto;
   word-break: break-word;

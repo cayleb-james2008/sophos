@@ -12,16 +12,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useIpc, useIpcEvent, useConnectionState, isTauri } from "../../ipc/client";
 import type { ContextStats } from "../../ipc/contract";
+import { useProfile } from "../profiles/profiles";
 import { useTranscript } from "./useTranscript";
 import { usePromptQueue } from "./usePromptQueue";
 import { useSideQuestions } from "./useSideQuestions";
 import type { FollowUp } from "./usePromptQueue";
+import type { TranscriptMessage } from "../../ipc/contract";
 import type { SideQuestion, SideQuestionStatus } from "./useSideQuestions";
 
 export type { FollowUp, SideQuestion, SideQuestionStatus };
 
 export function useChat() {
   const client = useIpc();
+  // Active agent profile (the EFFECTIVE profile — the studio draft while the
+  // studio is open). Its id rides on every prompt so the agent visibly works
+  // in the selected style (Gauntlet demo responses add its plain-English
+  // status block, custom profiles add their live draft flavor); the
+  // bridge/daemon ignore the extra option fields.
+  const { profile } = useProfile();
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busyRef = useRef(false);
@@ -95,12 +105,17 @@ export function useChat() {
       // point instead of appending a fresh message. History before the edited
       // message is never mutated.
       const pending = transcript.editDraftRef.current;
+      // The profile rides only when a non-default profile is active — the
+      // default needs no flavoring and the call shape stays unchanged. The
+      // full profile object is passed so demo-mode simulation can follow the
+      // live draft (name/tagline/working style) without an extra lookup.
+      const activeProfile = profileRef.current.id !== "standard" ? profileRef.current : undefined;
       if (pending) {
         transcript.editDraftRef.current = null;
         transcript.setEditDraft(null);
-        return transcript.editAndResend(pending.index, trimmed);
+        return transcript.editAndResend(pending.index, trimmed, activeProfile);
       }
-      return transcript.runTurn(trimmed);
+      return transcript.runTurn(trimmed, undefined, activeProfile);
     },
     [busy, transcript],
   );
@@ -201,6 +216,7 @@ export function useChat() {
     loadDemoMessages: transcript.loadDemoMessages,
     editDraft: transcript.editDraft,
     requestEdit: transcript.requestEdit,
-    retry: transcript.retry,
+    retry: (message: TranscriptMessage) =>
+      transcript.retry(message, profileRef.current.id !== "standard" ? profileRef.current : undefined),
   };
 }

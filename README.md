@@ -119,6 +119,76 @@ field. Flat, minimal, legible from 16px to 512px. Source: `public/sophos-icon.sv
 
 ---
 
+## Code Mode — the typed tool SDK
+
+Code Mode (selectable from the header profile chip, next to Standard /
+Minimal / Creator) exposes the agent's tools through a **typed TypeScript
+SDK**: the agent writes ONE program that calls many tools in a single step
+instead of dozens of separate tool round-trips — exactly what DeepSeek
+Harness's Code mode does.
+
+- **Deterministic SDK renderer** — turns a live tool registry into typed
+  TypeScript stubs: lexicographic tool order, byte-identical output for an
+  unchanged tool set, and unsupported schemas degrade to a permissive
+  contract instead of throwing. Only erasable TypeScript is emitted, so
+  stripping types yields valid JavaScript.
+- **Live tool registry** — built from the same sources the rest of the app
+  already uses: built-in tools, extension tools (`getExtensions`), MCP tools
+  (enabled servers in Settings → Advanced, probed via `testMcpServer`), and
+  skills (`getRuntimeInfo`).
+- **run_code program view** — a right-side drawer decomposes each program
+  into its individual tool-call cards (the same cards the chat renders) and
+  records the program + every call in the Trajectory log, so runs are
+  searchable, resumable, and forkable like any session.
+
+> **Known limitation:** `run_code` is **demo-mode only** for now. The daemon
+> contract has no seam for a sandboxed TypeScript runtime, so programs are
+> simulated and every output is clearly labeled — a real runtime needs a
+> daemon/bridge contract change (see CHANGELOG).
+
+---
+
+## Profile Studio — build your own agent
+
+The Profile Studio (opens from the header profile chip → **Profile Studio —
+build your own**) is the DeepSeek Harness **Creator mode made visual**: inspect
+the live runtime, compose capabilities, and test in memory — no restart, no
+Save required to see the effect.
+
+- **Inspect the live runtime** — the editor composes from the same live tool
+  registry the Code Mode SDK renders (built-in tools + extension/MCP tools +
+  discovered skills, with per-category counts). A source that is absent — no
+  MCP servers configured, no extensions, the runtime not reporting skills —
+  degrades honestly: the group renders its count and a plain note instead of
+  pretending.
+- **Compose** — name, tagline, description, working style (one chip per
+  line), base mode (Standard / Minimal / Creator / Code), tool toggles per
+  category, skill toggles, and a safety posture (auto-approve safe tools vs.
+  a confirm list). A live composition summary updates with every toggle.
+- **Test in memory (hot reload)** — every edit applies to the running app
+  immediately: the header chip, the composer hint, and (in demo mode) the
+  simulated responses all follow the draft. **Save** persists to settings and
+  selects a new profile; **Discard** drops the draft; **Delete** removes the
+  profile and falls back to Standard defaults if it was active. A malformed
+  or empty profile (no name / no tools) degrades to Standard defaults
+  instead of crashing.
+- **Picker integration** — custom profiles live in a **Custom** section
+  beside the five built-ins (Gauntlet / Standard / Minimal / Creator / Code),
+  each with Edit / Delete actions; the selection and the store survive
+  restarts.
+
+> **Known limitation:** a custom profile's instructions are an **additive
+> UI-layer hint, exactly like the built-in profiles** — the daemon contract
+> has no seam to apply the composed system prompt / tool set / safety posture
+> to live sessions (the bridge forwards only `streamingBehavior` and
+> `queueIfBusy` from prompt options). Custom profiles therefore visibly drive
+> the header chip, composer hint, composition summary, and demo responses,
+> and persist in settings — but wiring them into the live daemon needs a
+> bridge/daemon contract change (a future release). See CHANGELOG for the
+> full limitation and the `custom-protocol` build note.
+
+---
+
 ## Build from source
 
 ### Prerequisites

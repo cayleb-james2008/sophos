@@ -5,7 +5,51 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.1] — 2026-08-16 (Beta)
+
+### Added
+- **Profile Studio (Creator mode, made visual)** — build YOUR OWN agent profile from the live runtime, exactly the three things DeepSeek Harness Creator mode is built around: **inspect** the live runtime, **compose** capabilities, **test in memory**. The studio opens from the header profile chip (Profile → Profile Studio — build your own) and the picker gains a **Custom** section beside the five built-ins (Gauntlet / Standard / Minimal / Creator / Code).
+  - **Custom-profile store** — persists in settings under the additive `customProfiles` key (same pattern as `agentProfile` / `mcpServers` / `disabledSkills`; the bridge SettingsStore merges unknown keys and the daemon ignores them). Parsing is guarded: garbage in → clean list out, malformed entries are sanitized, and an unusable profile (no name, no tools) **degrades to Standard defaults instead of crashing** — the header chip, composer hint, and demo responses always have something sane to render.
+  - **Studio editor** — name, tagline, description, working style (one chip per line), base mode (Standard / Minimal / Creator / Code), **tool toggles from the LIVE Code Mode registry** (built-in / extension / MCP / skill groups with per-category counts — a source that is absent degrades honestly with a note), skill toggles (discovered skills + "All enabled skills"), and safety posture (auto-approve vs. a confirm list).
+  - **Live runtime inspection** — the editor composes from the same deterministic registry the Code Mode SDK renders (`getRuntimeInfo` / `getExtensions` / `testMcpServer` — no new IPC), with a live composition summary that updates with every toggle and a "what the app shows right now" preview of the header chip, composer hint, and demo-response flavor.
+  - **Hot reload + in-memory testing** — every edit dispatches to the shared profile state, so the running app follows the draft immediately without saving: the header chip, composer hint, and (in demo mode) the simulated responses all read the draft. **Save** persists to settings (and selects a newly created profile), **Discard** drops the draft, **Delete** removes the profile (falling back to Standard when it was active). No restart needed for any of it.
+  - **Picker integration** — custom profiles appear in a "Custom" section with per-profile composition summaries plus Edit / Delete actions; the selection and the store survive restarts (persisted settings, guarded load).
+- **Custom profiles ride on prompts as an additive demo hint** — the active profile's live display flavor (`profileFlavor`, name/tagline/working-style/mode) rides on prompt options so demo-mode simulation follows the studio draft even before Save; the Rust shell and bridge strip unknown option fields, so it never reaches the daemon.
+
+### Known limitations
+- **Custom profile instructions are a UI-layer hint, exactly like the built-ins** — the daemon contract has no seam to apply a profile's composed instructions (system prompt / tool set / safety posture) to live sessions: the bridge forwards only `streamingBehavior` and `queueIfBusy` from prompt options, and `setSettings` merges unknown keys without the daemon acting on them. Custom profiles therefore behave like today's built-in profiles: they visibly change the header chip, composer hint, composition summary, and demo responses, and persist in settings — but wiring them into the live daemon requires a bridge/daemon/contract change (a future release). This is a documented seam, not a blocker: the full studio ships on the additive-hint contract.
+- **`cargo build --release` now requires the `custom-protocol` tauri feature** — a plain `cargo build --release` without it produced a release exe whose WebView2 could not reach the embedded frontend (connection refused on the app URL). Enabled `tauri = { features = ["custom-protocol"] }` (what `tauri build` enables by default); the cua-driver e2e suites run against the raw exe, so this keeps `cargo build --release` a working build path.
+
+### Changed
+- **Profile selector** — the trigger's mode chip now reads the effective composition mode, so while the studio is open it follows the draft; the picker renders a Custom section and a Profile Studio entry.
+
+### Tests
+- Unit tests — 1077 pass (up from 1031), `tsc --noEmit` clean. New coverage: the custom-profile store (guarded parse, sanitize/coerce, validate, degrade-to-Standard, id generation, system-prompt synthesis, composition), the studio editor reducer (every action, working-style parsing, live composition summary), and demo-mode follow-the-draft (browser preview path with profile objects, MockIpcClient resolution from settings + live `profileFlavor`, custom code-mode routing, Gauntlet/string backward compatibility).
+- cua-driver e2e — **8 suites green** against the rebuilt release exe: the new `verify/cua/studio.test.mjs` covers the studio opening from the header chip, create → auto-select → picker listing, demo responses following the custom profile's flavor, edit hot-reload + Save, Discard revert, Delete → Standard fallback, and selection + store surviving an app restart; the existing 7 suites (SMOKE, SESSIONS, AGENTS, CHAT, INBOX, SETTINGS, SHELL) stay green.
+
+## [0.7.0] — 2026-08-16 (Beta)
+
+### Added
+- **Conversation-first shell** — the app now opens like Claude Desktop / ChatGPT Codex: session history in a left sidebar, transcript center-stage, composer at the bottom, and a model picker top-right in the header. Sessions/Agents/Inbox/Engine are demoted from top-level pages to drawers/panels opened from the bottom nav rail.
+- **Softer neutral retheme** — warm neutral palette (dark `#1a1a18` / light `#f5f4f1`), rounded corners (12px buttons/cards, pill composer), comfortable spacing, clean light/dark across the whole app.
+- **Automatic local-model detection** — scans for running local AI endpoints (Ollama, LM Studio, llama.cpp, any OpenAI-compatible server) on the common ports, lists their models with friendly names in the model picker under a "Local servers" section, with a re-scan control. No manual URL typing.
+- **Agent profiles & runtime modes** — the Gauntlet baseline profile (goal+bar first, blind self-review, check-before-build probes, plain-English reporting with honest evidence markers) plus DeepSeek Harness-style runtime modes (Standard / Minimal / Creator) that compose which model, tools, skills, and safety each profile uses. Selectable in-app via the header profile chip; persists across restarts.
+- **Trajectory event log** — append-only per-session event log ("every run is traceable") with a Trajectory panel that searches, filters, replays step-by-step, resumes, and forks any session's event stream.
+- **Code Mode (the next DeepSeek Harness mode)** — a new agent profile + runtime mode that exposes the agent's tools through a typed TypeScript SDK, so the agent writes ONE program that calls many tools in a single step instead of dozens of separate tool round-trips. Selectable from the same header profile chip as Standard/Minimal/Creator; selecting it visibly changes the composer hint, the composition summary, and (in demo mode) the simulated responses. The SDK renders **deterministically** — lexicographic tool order, byte-identical output for an unchanged tool set, unsupported schemas degrade instead of throwing — from a **live tool registry** built from built-in tools plus extension/MCP tools and skills surfaced by the existing runtime-info calls (`getRuntimeInfo` / `getExtensions` / `testMcpServer`). A **run_code program view** decomposes one program into its individual tool-call cards (the same cards the chat renders) and records the program + every call in the Trajectory log — searchable, resumable, forkable like any session. Demo-mode simulation makes the whole flow work and testable without a live engine.
+
+### Known limitations
+- **run_code is demo-mode only** — the daemon contract has no seam for a sandboxed TypeScript runtime (no contract method can host or stream arbitrary TS execution), and the contract is off-limits for this release. Code Mode therefore ships the complete demo-mode experience: programs are simulated, every output is clearly labeled simulated, and the SDK section renders from whatever the live runtime reports. Wiring a real sandboxed runtime requires a daemon/bridge/contract change (a future release).
+
+### Changed
+- **Version** — 0.6.0 → 0.7.0 (package.json, tauri.conf.json, Cargo.toml) so the About tab matches the sidebar's release literal.
+
+### Fixed
+- **Settings e2e About-tab version assertion** — `verify/cua/settings.test.mjs` still asserted the app version `0.6.0` after the 0.7.0 bump, so the SETTINGS suite failed against the current build. Updated to `0.7.0`.
+
+### Tests
+- Unit tests — 1029 pass (up from 984), `tsc --noEmit` clean. New coverage: the SDK renderer (determinism, degradation, type-stripped contract), the tool registry, the demo decomposition (program builder, decomposer, store reducer, both demo paths), and the code profile.
+- cua-driver e2e — all 7 suites stay green against the rebuilt app: SMOKE, SESSIONS, AGENTS, CHAT (11/11), INBOX, SETTINGS, SHELL (6/6). The chain runner occasionally hits WebView2 launch/timing flakes on this machine (documented harness behavior) — each suite was also verified green standalone.
+- Visual regression — baselines refreshed to the v0.7 look; 5/5 views within the 0.1% threshold.
 
 ## [0.6.0] — 2026-08-16 (Beta)
 

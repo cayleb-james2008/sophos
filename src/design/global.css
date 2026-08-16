@@ -1,142 +1,161 @@
-/* Sophos — global styles for the stark terminal-minimal command center.
+/* Sophos — global styles for the conversation-first agent desktop (v0.7).
  *
  * The whole palette lives in CSS custom properties so the theme can switch at
- * the DOM level. `:root` carries the DARK defaults (the current palette — the
- * visual-regression harness asserts these exact values), and
- * `:root[data-theme="light"]` overrides them with the inverted light palette.
+ * the DOM level. `:root` carries the DARK defaults and
+ * `:root[data-theme="light"]` overrides them with the light palette.
  * The theme application layer (src/design/theme.ts + the anti-flash script in
  * index.html) decides which `data-theme` value lands on <html>.
+ *
+ * v0.7 design language: warm neutral surfaces, one soft sage accent, rounded
+ * corners (--pa-radius-* scale), gentle elevation instead of flat hairlines,
+ * and a comfortable density. The component CSS consumes the --pa-* tokens, so
+ * the palette switch is a single file.
  */
 
 :root {
   color-scheme: dark;
 
-  /* ---- Surfaces ---- */
-  --pa-ink: #0e0e0e;            /* app background */
-  --pa-paper: #f4f4f4;          /* primary text */
-  --pa-card: #151515;           /* card surface */
-  --pa-secondary: #202020;     /* secondary surface */
-  --pa-overlay: #111;          /* popover / raised */
-  --pa-muted: #1b1b1b;         /* muted surface */
-  --pa-accent-surface: #2c2c2c; /* accent surface / strong border */
+  /* ---- Surfaces (warm neutral scale) ---- */
+  --pa-ink: #1a1a18;            /* app background */
+  --pa-paper: #ece9e2;          /* primary text */
+  --pa-card: #232320;           /* card surface */
+  --pa-secondary: #2c2c28;     /* secondary surface */
+  --pa-overlay: #20201d;       /* popover / raised */
+  --pa-muted: #262623;         /* muted surface */
+  --pa-accent-surface: #33332e; /* accent surface / strong border */
 
   /* ---- RGB channels (for rgba(var(--pa-X-rgb), A) alpha variants) ---- */
-  --pa-ink-rgb: 14, 14, 14;
-  --pa-paper-rgb: 244, 244, 244;
-  --pa-card-rgb: 21, 21, 21;
-  --pa-secondary-rgb: 32, 32, 32;
-  --pa-overlay-rgb: 17, 17, 17;
-  --pa-border-rgb: 42, 42, 42;
-  --pa-green-rgb: 133, 237, 117;
-  --pa-amber-rgb: 243, 188, 86;
-  --pa-danger-rgb: 239, 68, 68;
-  --pa-info-rgb: 139, 124, 246;
-  --pa-tool-rgb: 56, 189, 248;
+  --pa-ink-rgb: 26, 26, 24;
+  --pa-paper-rgb: 236, 233, 226;
+  --pa-card-rgb: 35, 35, 32;
+  --pa-secondary-rgb: 44, 44, 40;
+  --pa-overlay-rgb: 32, 32, 29;
+  --pa-border-rgb: 74, 72, 66;
+  --pa-green-rgb: 130, 184, 155;
+  --pa-amber-rgb: 217, 169, 94;
+  --pa-danger-rgb: 224, 101, 95;
+  --pa-info-rgb: 157, 143, 224;
+  --pa-tool-rgb: 111, 184, 214;
 
-  /* ---- Borders (hairline) ---- */
-  --pa-line: rgba(244, 244, 244, 0.12); /* subtle divider */
-  --pa-line-strong: rgba(244, 244, 244, 0.2); /* stronger divider */
-  --pa-border: #2a2a2a;        /* hairline border */
-  --pa-border-strong: #2c2c2c; /* hover / strong border */
+  /* ---- Borders (soft hairlines) ---- */
+  --pa-line: rgba(236, 233, 226, 0.09); /* subtle divider */
+  --pa-line-strong: rgba(236, 233, 226, 0.16); /* stronger divider */
+  --pa-border: #3f3d38;        /* hairline border */
+  --pa-border-strong: #4a4842; /* hover / strong border */
 
   /* ---- Text hierarchy (opacity on paper) ---- */
-  --pa-paper-strong: rgba(244, 244, 244, 0.9);
-  --pa-paper-muted: rgba(244, 244, 244, 0.6);
-  --pa-paper-dim: rgba(244, 244, 244, 0.45);
-  --pa-paper-faint: rgba(244, 244, 244, 0.3);
+  --pa-paper-strong: rgba(236, 233, 226, 0.92);
+  --pa-paper-muted: rgba(236, 233, 226, 0.64);
+  --pa-paper-dim: rgba(236, 233, 226, 0.46);
+  --pa-paper-faint: rgba(236, 233, 226, 0.3);
 
   /* ---- Glass ---- */
-  --pa-glass: rgba(14, 14, 14, 0.78);
+  --pa-glass: rgba(26, 26, 24, 0.82);
 
-  /* ---- Accent — terminal green (the ONE place of color) ---- */
-  --pa-green: #85ed75;
-  --pa-green-hover: #9fff8a;
-  --pa-green-soft: rgba(133, 237, 117, 0.12);
-  --pa-green-border: rgba(133, 237, 117, 0.4);
-  --pa-amber: #f3bc56;
-  --pa-amber-soft: rgba(243, 188, 86, 0.12);
+  /* ---- Accent — soft sage (one place of color, friendlier than terminal green) ---- */
+  --pa-green: #82b89b;
+  --pa-green-hover: #97c9ad;
+  --pa-green-soft: rgba(130, 184, 155, 0.14);
+  --pa-green-border: rgba(130, 184, 155, 0.38);
+  --pa-amber: #d9a95e;
+  --pa-amber-soft: rgba(217, 169, 94, 0.13);
 
-  /* ---- Semantic (functional status) ---- */
-  --pa-danger: #ef4444;
-  --pa-danger-soft: rgba(239, 68, 68, 0.1);
-  --pa-info: #8b7cf6;
-  --pa-info-soft: rgba(139, 124, 246, 0.12);
-  --pa-tool: #38bdf8;
+  /* ---- Semantic (functional status, muted) ---- */
+  --pa-danger: #e0655f;
+  --pa-danger-soft: rgba(224, 101, 95, 0.12);
+  --pa-info: #9d8fe0;
+  --pa-info-soft: rgba(157, 143, 224, 0.13);
+  --pa-tool: #6fb8d6;
 
-  /* ---- Scrollbar (hairline, sharp) ---- */
-  --pa-scroll-thumb: #2a2a2a;
-  --pa-scroll-thumb-hover: #2c2c2c;
+  /* ---- Scrollbar (rounded, quiet) ---- */
+  --pa-scroll-thumb: #3f3d38;
+  --pa-scroll-thumb-hover: #4a4842;
 
-  /* ---- Focus ring (keyboard only, terminal green) ---- */
-  --pa-focus-ring: rgba(133, 237, 117, 0.85);
+  /* ---- Focus ring (keyboard only, soft sage) ---- */
+  --pa-focus-ring: rgba(130, 184, 155, 0.8);
 
   /* ---- Body glow (radial wash behind the app) ---- */
-  --pa-glow: rgba(133, 237, 117, 0.05);
+  --pa-glow: rgba(130, 184, 155, 0.05);
 
   /* ---- Geometry / motion ---- */
-  --pa-radius: 0px;
-  --pa-blur: 12px;
+  --pa-radius: 12px;
+  --pa-radius-sm: 8px;
+  --pa-radius-md: 12px;
+  --pa-radius-lg: 16px;
+  --pa-radius-full: 9999px;
+  --pa-blur: 14px;
+
+  /* ---- Elevation (soft, warm shadows) ---- */
+  --pa-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --pa-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.24);
+  --pa-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.32);
 }
 
-/* Light theme — inverts the dark palette. Derived from the same Prime
-   Intellect design DNA: near-white surfaces, hairline black borders, a slightly
-   darker green accent for contrast on light backgrounds. */
+/* Light theme — the same warm neutral language, inverted. */
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --pa-ink: #f4f4f4;
-  --pa-paper: #0e0e0e;
+  --pa-ink: #f5f4f1;
+  --pa-paper: #1d1c1a;
   --pa-card: #ffffff;
-  --pa-secondary: #e8e8e8;
+  --pa-secondary: #ecebe6;
   --pa-overlay: #ffffff;
-  --pa-muted: #f0f0f0;
-  --pa-accent-surface: #dcdcdc;
+  --pa-muted: #f0efeb;
+  --pa-accent-surface: #e3e1da;
 
-  --pa-ink-rgb: 244, 244, 244;
-  --pa-paper-rgb: 14, 14, 14;
+  --pa-ink-rgb: 245, 244, 241;
+  --pa-paper-rgb: 29, 28, 26;
   --pa-card-rgb: 255, 255, 255;
-  --pa-secondary-rgb: 232, 232, 232;
+  --pa-secondary-rgb: 236, 235, 230;
   --pa-overlay-rgb: 255, 255, 255;
-  --pa-border-rgb: 0, 0, 0;
-  --pa-green-rgb: 63, 176, 80;
-  --pa-amber-rgb: 198, 149, 39;
-  --pa-danger-rgb: 211, 51, 51;
-  --pa-info-rgb: 109, 92, 224;
-  --pa-tool-rgb: 14, 165, 233;
+  --pa-border-rgb: 205, 201, 192;
+  --pa-green-rgb: 61, 125, 97;
+  --pa-amber-rgb: 158, 116, 52;
+  --pa-danger-rgb: 190, 70, 63;
+  --pa-info-rgb: 106, 92, 179;
+  --pa-tool-rgb: 38, 130, 163;
 
-  --pa-line: rgba(0, 0, 0, 0.12);
-  --pa-line-strong: rgba(0, 0, 0, 0.2);
-  --pa-border: rgba(0, 0, 0, 0.12);
-  --pa-border-strong: rgba(0, 0, 0, 0.2);
+  --pa-line: rgba(29, 28, 26, 0.1);
+  --pa-line-strong: rgba(29, 28, 26, 0.16);
+  --pa-border: rgba(29, 28, 26, 0.14);
+  --pa-border-strong: rgba(29, 28, 26, 0.24);
 
-  --pa-paper-strong: rgba(14, 14, 14, 0.9);
-  --pa-paper-muted: rgba(14, 14, 14, 0.6);
-  --pa-paper-dim: rgba(14, 14, 14, 0.45);
-  --pa-paper-faint: rgba(14, 14, 14, 0.3);
+  --pa-paper-strong: rgba(29, 28, 26, 0.92);
+  --pa-paper-muted: rgba(29, 28, 26, 0.62);
+  --pa-paper-dim: rgba(29, 28, 26, 0.45);
+  --pa-paper-faint: rgba(29, 28, 26, 0.3);
 
-  --pa-glass: rgba(244, 244, 244, 0.78);
+  --pa-glass: rgba(245, 244, 241, 0.82);
 
-  --pa-green: #3fb050;
-  --pa-green-hover: #2f9a42;
-  --pa-green-soft: rgba(63, 176, 80, 0.12);
-  --pa-green-border: rgba(63, 176, 80, 0.4);
-  --pa-amber: #c69527;
-  --pa-amber-soft: rgba(198, 149, 39, 0.12);
+  --pa-green: #3d7d61;
+  --pa-green-hover: #336b52;
+  --pa-green-soft: rgba(61, 125, 97, 0.12);
+  --pa-green-border: rgba(61, 125, 97, 0.38);
+  --pa-amber: #9e7434;
+  --pa-amber-soft: rgba(158, 116, 52, 0.12);
 
-  --pa-danger: #d33;
-  --pa-danger-soft: rgba(211, 51, 51, 0.1);
-  --pa-info: #6d5ce0;
-  --pa-info-soft: rgba(109, 92, 224, 0.12);
-  --pa-tool: #0ea5e9;
+  --pa-danger: #be463f;
+  --pa-danger-soft: rgba(190, 70, 63, 0.1);
+  --pa-info: #6a5cb3;
+  --pa-info-soft: rgba(106, 92, 179, 0.12);
+  --pa-tool: #2682a3;
 
-  --pa-scroll-thumb: #c9c9c9;
-  --pa-scroll-thumb-hover: #bdbdbd;
+  --pa-scroll-thumb: #c9c6be;
+  --pa-scroll-thumb-hover: #b5b1a8;
 
-  --pa-focus-ring: rgba(63, 176, 80, 0.85);
-  --pa-glow: rgba(63, 176, 80, 0.06);
+  --pa-focus-ring: rgba(61, 125, 97, 0.7);
+  --pa-glow: rgba(61, 125, 97, 0.06);
 
-  --pa-radius: 0px;
-  --pa-blur: 12px;
+  --pa-radius: 12px;
+  --pa-radius-sm: 8px;
+  --pa-radius-md: 12px;
+  --pa-radius-lg: 16px;
+  --pa-radius-full: 9999px;
+  --pa-blur: 14px;
+
+  --pa-shadow-sm: 0 1px 2px rgba(29, 28, 26, 0.08);
+  --pa-shadow-md: 0 4px 16px rgba(29, 28, 26, 0.1);
+  --pa-shadow-lg: 0 12px 40px rgba(29, 28, 26, 0.14);
 }
 
 * {
@@ -168,24 +187,27 @@ body {
    src: local() for a family that is not installed system-wide errors and
    shadows the web font. ---- */
 
-/* ---- Scrollbars (hairline, sharp) ---- */
+/* ---- Scrollbars (rounded, quiet) ---- */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--pa-scroll-thumb);
-  border-radius: 0;
-  border: 2px solid var(--pa-ink);
+  border-radius: var(--pa-radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--pa-scroll-thumb-hover);
+  background-clip: padding-box;
+  border: 2px solid transparent;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* ---- Focus ring (keyboard only, terminal green) ---- */
+/* ---- Focus ring (keyboard only, soft sage) ---- */
 :focus-visible {
   outline: none;
 }
@@ -335,11 +357,11 @@ body {
 @keyframes pa-reward-row-update {
   from {
     background-position: 160% 0;
-    box-shadow: inset 0 0 0 1px rgba(133, 237, 117, 0.34);
+    box-shadow: inset 0 0 0 1px rgba(130, 184, 155, 0.3);
   }
   to {
     background-position: -30% 0;
-    box-shadow: inset 0 0 0 1px rgba(133, 237, 117, 0);
+    box-shadow: inset 0 0 0 1px rgba(130, 184, 155, 0);
   }
 }
 
