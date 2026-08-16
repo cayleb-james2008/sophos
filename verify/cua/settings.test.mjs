@@ -289,9 +289,9 @@ const tests = [
       assertText(after, "Beta");
       assertText(after, "GitLab");
       assertText(after, "Changelog");
-      // Version badge (v0.5.0 from package.json); "v" and "0.5.0" render as
+      // Version badge (v0.6.0 from package.json); "v" and "0.6.0" render as
       // separate tokens, so match the version number alone.
-      assertText(after, "0.5.0");
+      assertText(after, "0.6.0");
       takeScreenshot(appHandle.pid, "settings-about", appHandle.windowId);
     },
   },

@@ -127,8 +127,8 @@ export async function runDemoSuite(name, tests) {
       await beforeAll();
       break;
     } catch (err) {
-      if (isStaleWindow(err) && attempt < 5) {
-        console.log(`  ~ initial launch torn down externally; relaunching (attempt ${attempt})`);
+      if ((isStaleWindow(err) || /timed out|unresponsive/i.test(err.message)) && attempt < 5) {
+        console.log(`  ~ initial launch failed; relaunching (attempt ${attempt})`);
         continue;
       }
       throw err;

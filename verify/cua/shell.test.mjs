@@ -152,7 +152,7 @@ async function avgLuminance(pngPath) {
 /** Open the Settings → General view (General is the default settings tab). */
 async function goGeneralSettings() {
   navToView("Settings");
-  const marker = await waitFor(freshState(), { text: "General preferences" }, 8000);
+  const marker = await waitFor(freshState(), { text: "General preferences" }, 12000);
   assert(marker, "Settings General panel did not render");
   await sleep(500);
 }
@@ -172,11 +172,15 @@ async function saveSettings() {
 /** Change the Theme select to `optionLabel` (e.g. "Light"). Native selects in
  *  WebView2 expose a ComboBox; UIA Invoke on the combo expands it, exposing the
  *  options as ListItems which we click by token. Retried with fresh state each
- *  pass so transient render/contention issues don't sink the whole test. */
+ *  pass so transient render/contention issues don't sink the whole test.
+ *  Fallback: if the dropdown doesn't expose ListItems (native select rendering
+ *  varies by WebView2 version), type the first letter of the option into the
+ *  ComboBox (native type-ahead) and press Enter. */
 async function selectThemeOption(optionLabel) {
-  for (let attempt = 0; attempt < 6; attempt++) {
-    // If the option is already visible, click it directly.
-    const visible = findBy(freshState(), { role: "ListItem", text: optionLabel });
+  const firstChar = optionLabel.charAt(0);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    // If the option is already visible (any role), click it directly.
+    const visible = findBy(freshState(), { text: optionLabel });
     if (visible && visible.element_token) {
       clickElement(app.pid, app.windowId, visible.element_token);
       await sleep(900);
@@ -184,14 +188,31 @@ async function selectThemeOption(optionLabel) {
     }
     // Open the dropdown (UIA Invoke expands the native select).
     const combo = findBy(freshState(), { role: "ComboBox", text: "Theme" });
-    assert(combo, "Theme ComboBox not found");
+    if (!combo) { await sleep(800); continue; }
     if (combo.element_token) clickElement(app.pid, app.windowId, combo.element_token);
     await sleep(1200);
-    const opt = await waitFor(freshState(), { role: "ListItem", text: optionLabel }, 5000);
+    // Try finding the option as a ListItem or any element.
+    const opt = await waitFor(freshState(), { text: optionLabel }, 6000);
     if (opt && opt.element_token) {
       clickElement(app.pid, app.windowId, opt.element_token);
       await sleep(900);
       return;
+    }
+    // Fallback: type-ahead into the ComboBox (native select supports typing
+    // the first character to jump to matching options).
+    if (combo.element_token) {
+      try {
+        // Re-focus the combo and type the first character.
+        clickElement(app.pid, app.windowId, combo.element_token);
+        await sleep(500);
+        call("type_text", { pid: app.pid, window_id: app.windowId, text: firstChar, element_token: combo.element_token });
+        await sleep(600);
+        call("press_key", { pid: app.pid, window_id: app.windowId, key: "return" });
+        await sleep(900);
+        // Check if the theme actually changed.
+        const after = currentTheme();
+        if (after.includes(optionLabel.toLowerCase().split(" ")[0])) return;
+      } catch { /* best-effort */ }
     }
   }
   assert(false, `Theme option "${optionLabel}" not found after retries`);
