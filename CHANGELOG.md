@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-16 (Beta)
+
+### Added
+- **Demo mode** — launching the app with `--demo` (or `SOPHOS_DEMO_MODE=1`) makes the Rust shell skip the daemon/sidecar and inject `window.__SOPHOS_DEMO__ = true`, so the frontend uses the MockIpcClient. The full UI (Sessions, Agents, Chat, Inbox, Settings, Engine Terminal) is demonstrable and testable via cua-driver without a live provider.
+- **cua-driver e2e test harness** — a reusable end-to-end test harness (`verify/cua/`) that drives the real Sophos desktop app through the cua-driver CLI: launches the app, reads UIA accessibility trees, clicks elements, types text, takes screenshots, and runs assertions. Six test suites cover every view: Sessions (8 tests), Agents (6 tests), Chat (12 tests), Inbox (5 tests), Settings (10 tests), Shell/Global (5 tests).
+- **Simulated streaming chat turn in demo mode** — MockIpcClient now simulates a full streaming assistant turn (thinking → demo_echo tool call → chunked answer → queue-idle snapshot that clears busy), making the core Chat features demonstrable in demo mode.
+- **Engine Terminal demo mode** — the Engine Terminal detects demo mode and renders a simulated live engine (status dots lit, process graph live, clearly-labeled demo log stream) instead of a dead empty terminal.
+
+### Fixed
+- **Session creation didn't update the session list** — `newSession`, `forkSession`, and `cloneSession` created a new session ID and set it active but never added the new session to `listSessions()`, so new sessions didn't appear in the Sessions graph. Now appends to a mutable session list.
+- **Agent relay textarea wasn't typeable by computer-use** — the cua-driver harness types via UIA ValuePattern, which sets the DOM value without firing React's synthetic onChange. Added a native `input` listener + 200ms polling fallback to sync the DOM value into the React draft state.
+- **Agents detail inspector overflow** — the agent detail console/body `max-height: 58%` was too tall, pushing the message composer below the visible area. Constrained to 38% and added `flex: 1` + `overflow: hidden` to the main container.
+- **Inbox mark-as-read didn't work** — the Inbox graph passed node IDs with a `msg-` prefix (e.g., `msg-in-api-1`) to `markMsgRead`, but the lookup used the raw message ID (e.g., `in-api-1`), so the lookup always missed. Now strips the `msg-` prefix before the lookup.
+- **Inbox showed no relay peers in demo mode** — when `listAgents()` returned empty (demo mode), the Inbox had no peers to route messages between. Now falls back to the RLM children (the same agents the Agents fleet surfaces).
+- **First-run wizard appeared in demo mode** — the onboarding wizard launched even in `--demo` mode, blocking the UI behind a setup flow with no purpose without a live provider. Now skips onboarding in demo mode (treated as fully ready).
+- **abort() was a no-op in demo mode** — `abort()` did nothing, so there was no way to stop a simulated turn. Now clears the in-flight chat turn timers.
+- **steer() was a no-op in demo mode** — `steer()` did nothing, so the steering indicator never round-tripped. Now emits an acknowledgement event.
+- **Side questions never completed in demo mode** — `startSideQuestion` started with a "running" status but never completed, leaving the inline panel stuck. Now emits a "complete" event with a demo answer after 1.3s.
+- **Onboarding "Run again" silently did nothing** — `clearOnboardingDismissed()` only cleared the dismiss flag, not the "first message exists" flag, so re-launching the wizard from Settings silently did nothing after a first chat. Now clears both flags.
+- **Updater manifest endpoint** — switched the auto-updater endpoint from the previous URL to the GitLab raw file URL for reliable manifest delivery.
+
+### Tests
+- **cua-driver e2e** — 6 test suites (Sessions, Agents, Chat, Inbox, Settings, Shell/Global) covering every view in the app, run in demo mode against the real Tauri release build.
+- **Unit tests** — 984 tests pass (up from 982), `tsc --noEmit` clean.
+
 ## [0.5.0] — 2026-08-15 (Beta)
 
 ### Added

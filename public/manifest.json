@@ -1,12 +1,12 @@
 {
-  "version": "0.5.0",
-  "notes": "Sophos v0.5.0 (Beta) — /cd command, subagent model policy, per-child composition knobs, keyboard shortcuts overlay, design system refactor (inline styles eliminated), 106 tests. All versions before v1.0 are beta.",
-  "pub_date": "2026-08-15T00:00:00Z",
+  "version": "0.6.0",
+  "notes": "Sophos v0.6.0 (Beta) — demo mode for testing without a live provider, cua-driver e2e test harness (6 suites), 12 bug fixes from the computer-use testing pass, Engine Terminal demo mode. 984 unit tests. All versions before v1.0 are beta.",
+  "pub_date": "2026-08-16T00:00:00Z",
   "channel": "beta",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcGFrUGtKMTgrdm90VDZ1TzNlNmxvVFZBT1lnVXhrMWRldlhNdjBPZEdHdnhoT3IyM21HWUU1WURzdGQzSmRVdHd2bXd6TzRrR01vNTY2ZTZlNm5mWEFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2ODE1MjExCWZpbGU6U29waG9zXzAuNS4wX3g2NC1zZXR1cC5leGUKY2xxeUVRcGd1ZWgvQmV0R1hSTjlsQTVDQlpYQUZYZ2ZjT2RaT3pvK2p6Q3hUaHpZUHhhdW5rSnlFcTNSTHVIc0JxcDNXUVBLL1hlTW44ZEZ3K2ZFQWc9PQo=",
-      "url": "https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.5.0/Sophos_0.5.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcFljekNVYWQwYSt1QnFTRmpybyswTzhLVGx3S2tCcmhZVGF0Q3gvSGxlVEJYdkNlbmtOUlNtRUgzL0MwUElxUytTMGdqN0g5QlZrY3FHWEFQbmNJWXdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2ODQyOTIwCWZpbGU6U29waG9zXzAuNi4wX3g2NC1zZXR1cC5leGUKN1FOM3BDak14djNDclNBUmRLVlRXNnkxcGg1dTIrQjU4TzNkekxTNGVLQTRhR1JNNFRQZklYSk1CZ3JnY1ZBeWEwRDFGSnQxU2lBdkM2ZEtBNkFIQlE9PQo=",
+      "url": "https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.6.0/Sophos_0.6.0_x64-setup.exe"
     }
   }
 }
