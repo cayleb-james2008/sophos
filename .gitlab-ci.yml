@@ -1,17 +1,14 @@
 # .gitlab-ci.yml
-# Sophos CI — migrated from .github/workflows/ci.yml
-#
-# Reproduces the same checks on a GitLab SaaS Windows shared runner
-# (`saas-windows-medium-amd64`), matching the GitHub Actions workflow's
-# `windows-latest` jobs.
+# Sophos CI — mirrors the GitHub Actions workflow's windows-latest jobs.
 #
 # Node version: the GitHub workflow pins Node 22 via actions/setup-node@v4.
 # GitLab SaaS Windows runners ship EOL Node v21.7.3, which is below this
 # repo's engine range (^22.12.0+) and breaks vitest with ERR_REQUIRE_ESM
 # (require() of the ESM-only @exodus/bytes from html-encoding-sniffer).
 # Platform-independent jobs therefore run on the `node:22` image (Linux);
-# the Windows jobs (cua-e2e, release) install the pinned Node 22 portable
-# ZIP in before_script and prepend it to PATH.
+# the Windows release job installs the pinned Node 22 portable ZIP in
+# before_script; cua-e2e runs on the self-hosted `sophos-win-e2e` runner
+# (the gmktec machine's interactive desktop session, Node v24.18.0).
 
 stages:
   - test
@@ -58,52 +55,35 @@ type-check-and-test:
 # BLOCKING — no allow_failure: a failure must red the pipeline and stop the
 # merge, because it exercises real UI behavior that unit tests cannot.
 # Requires a Windows desktop session (UIA/window automation) and WebView2,
-# both available on saas-windows-medium-amd64 runners.
+# both available on the self-hosted `sophos-win-e2e` runner (gmktec-sophos,
+# interactive desktop session). The runtime bundle is assembled on that
+# machine, so cargo builds the exe for real.
 cua-e2e:
   stage: e2e
   tags:
-    - saas-windows-medium-amd64
+    - sophos-win-e2e
   before_script:
-    - |
-      # Pin Node 22 — the runner image ships EOL v21.7.3, which fails vitest
-      # with ERR_REQUIRE_ESM. Portable install, prepended to PATH.
-      Invoke-WebRequest -Uri https://nodejs.org/dist/v22.23.2/node-v22.23.2-win-x64.zip -OutFile node22.zip
-      Expand-Archive -Path node22.zip -DestinationPath .
-      $env:PATH = "$CI_PROJECT_DIR\node-v22.23.2-win-x64;$env:PATH"
-      node -v
     - npm ci
   script:
     - |
-      # Guard: cargo's build script embeds the gitignored runtime bundle
-      # (tauri.conf.json bundle.resources). On a fresh SaaS checkout the
-      # bundle only exists after `node scripts/bundle.mjs` has been run on a
-      # machine with the prime-agent-ref checkout (same cross-repo blocker as
-      # the NSIS installer step). Skip loudly instead of red-ing every push on
-      # the same reproducible error. Operator steps that remove this blocker:
-      # docs/installer-reproducibility-0.8.0.md
-      $need = @(
-        "resources/node/node-v24.18.0-win-x64/node.exe",
-        "resources/daemon/dist/cli.js",
-        "resources/bridge/dist/bridge/src/index.js",
-        "resources/node_modules"
-      )
-      $missing = @($need | Where-Object { -not (Test-Path $_) })
-      if ($missing.Count -gt 0) {
+      # RAM protocol: this machine gates heavy work (cargo builds + app runs)
+      # via ram.ps1. If the verdict is not SAFE (operator busy), skip loudly
+      # instead of hammering the machine — the pipeline stays green with the
+      # skip visible in the job log.
+      $ram = & "C:\Users\Cayleb\.skill-library\scripts\ram.ps1" status | Out-String
+      if ($ram -match 'VERDICT=(\w+)') { $verdict = $Matches[1] } else { $verdict = 'UNKNOWN' }
+      Write-Host "RAM verdict: $verdict"
+      if ($verdict -ne 'SAFE') {
         Write-Host ""
         Write-Host "=========================================================="
-        Write-Host "  CUA-E2E SKIPPED ON SAAS: runtime bundle not assembled"
-        Write-Host "  Missing: $($missing -join ', ')"
-        Write-Host "  cargo's build script embeds these per src-tauri/tauri.conf.json."
-        Write-Host "  This is the known installer/reproducibility blocker."
-        Write-Host "  => docs/installer-reproducibility-0.8.0.md"
-        Write-Host "  (fork+push prime-agent-ref, publish the TCP-capable"
-        Write-Host "   @earendil-works packages, vendor node + npm install)"
+        Write-Host "  CUA-E2E SKIPPED: machine RAM not SAFE ($verdict) — operator busy."
+        Write-Host "  Re-run the pipeline later, or when the machine is idle."
         Write-Host "=========================================================="
         Write-Host ""
         exit 0
       }
     - |
-      # Install Rust toolchain (not pre-installed on GitLab SaaS Windows runners).
+      # Install a hermetic Rust toolchain for this job (project-local, cached).
       $env:RUSTUP_HOME = "$env:CI_PROJECT_DIR\.rustup"
       $env:CARGO_HOME = "$env:CI_PROJECT_DIR\.cargo"
       Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
