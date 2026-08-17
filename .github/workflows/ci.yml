@@ -36,6 +36,14 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Updater harness (config + keys + signature crypto)
+        # BLOCKING — verifies the local updater wiring without any network:
+        # tauri.conf.json updater config, capability + plugin registration,
+        # signing key pair hygiene, Ed25519 signature crypto (incl. tamper
+        # rejection), and the local dummy feed. Pure local Node, so a failure
+        # must red the build.
+        run: npm run test:updater
+
       - name: Live update-feed integrity check
         # BLOCKING — verifies the published auto-updater feed exactly as the
         # app consumes it (fetch manifest from the configured endpoint,

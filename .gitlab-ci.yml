@@ -47,6 +47,12 @@ type-check-and-test:
   script:
     - npx tsc --noEmit
     - npx vitest run
+    # Updater harness — BLOCKING. Verifies the local updater wiring with no
+    # network: tauri.conf.json updater config, capability + plugin
+    # registration, signing key pair hygiene, Ed25519 signature crypto
+    # (incl. tamper rejection), and the local dummy feed. Pure local Node,
+    # so a failure must red the pipeline.
+    - npm run test:updater
     # Live update-feed integrity check — BLOCKING. Verifies the published
     # auto-updater feed exactly as the app consumes it (fetch the manifest
     # from the configured endpoint, download the announced installer, verify
