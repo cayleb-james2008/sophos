@@ -16,13 +16,10 @@ import { startOwnedDevServer, stopOwnedDevServer } from "./e2e/helpers.mjs";
 const verifyDir = dirname(fileURLToPath(import.meta.url));
 const read = (name) => readFile(join(verifyDir, name), "utf8");
 
-const browser = await read("e2e-browser.mjs");
-const isolate = await read("e2e-isolate.mjs");
 const daemon = await read("e2e.mjs");
 const helper = await read("e2e/helpers.mjs");
-const p5 = await read("e2e/p5-verify.mjs");
 
-for (const [name, source] of Object.entries({ browser, isolate, daemon, helper, p5 })) {
+for (const [name, source] of Object.entries({ daemon, helper })) {
   assert(!source.includes("killStrayChrome"), `${name} must not kill unrelated Chrome processes`);
   assert(!source.includes("killStrays"), `${name} must not scan and kill unrelated daemon processes`);
   assert(!source.includes("clearWorkers"), `${name} must not delete shared daemon/session state`);
@@ -34,9 +31,7 @@ assert(daemon.includes("HOME: testHome"), "live daemon verifier must isolate HOM
 assert(daemon.includes("sophos-e2e-${process.pid}-${Date.now()}"), "named-pipe verifier endpoint must be unique");
 assert(helper.includes("owned ephemeral Vite server"), "browser reports must identify the owned server boundary");
 assert(helper.includes("never probes or reuses port 1420"), "browser server helper must document fixed-port isolation");
-assert(browser.includes("startOwnedDevServer") && isolate.includes("startOwnedDevServer"), "browser suites must start an owned server");
-assert(browser.includes("MockIpcClient") && helper.includes("Demo mode — engine not connected"), "browser suites must assert the mock boundary");
-assert(!browser.includes("localhost:1420") && !isolate.includes("localhost:1420") && !p5.includes("localhost:1420"), "browser suites must not target fixed port 1420");
+assert(helper.includes("Demo mode — engine not connected"), "browser helper must assert the mock boundary");
 
 const server = await startOwnedDevServer();
 try {

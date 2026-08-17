@@ -3,6 +3,10 @@
  * verify/e2e.mjs — Headless end-to-end verification for the Prime Agent
  * Desktop Windows bundle (piece P5). Model-free / offline.
  *
+ * LOCAL-ONLY: boots the gitignored bundled runtime (resources/node/…/node.exe,
+ * resources/daemon/dist, resources/bridge/dist) assembled by
+ * `node scripts/bundle.mjs`. It is NOT run in CI; run it locally before merge.
+ *
  * Strategy (per transport contract: "try named-pipe mode first and fall back
  * to TCP"):
  *   0. layout check      — mirrors settings.rs resolve_runtime_paths()

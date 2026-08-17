@@ -9,9 +9,7 @@ on:
 
 jobs:
   test:
-    # verify/e2e.mjs is Windows-specific: it drives named-pipe transports
-    # (`\\.\pipe\...`), uses `taskkill /T` for process-tree teardown, and boots
-    # a bundled `node-v24.18.0-win-x64` runtime. Run the whole job on Windows.
+    # Run on Windows to match the release target and the cua-e2e job.
     runs-on: windows-latest
 
     defaults:
@@ -60,27 +58,14 @@ jobs:
         # must red the build. Network-dependent (hits the live GitLab feed).
         run: node verify/live-feed.mjs
 
-      # e2e.mjs boots the BUNDLED runtime (resources/node/<version>/node.exe +
-      # resources/daemon/dist + resources/bridge/dist + shared node_modules),
-      # which is gitignored and assembled only on the developer machine by
-      # `node scripts/bundle.mjs` (it needs a local prime-agent-ref checkout and
-      # the AppData node_modules ship — neither exists in a fresh CI checkout).
-      # So this step is best-effort here: it still runs, but a failure does not
-      # red the build. Run `node scripts/bundle.mjs && node verify/e2e.mjs`
-      # locally before merge; see CONTRIBUTING.md.
-      - name: End-to-end verification (best-effort)
-        run: node verify/e2e.mjs
-        continue-on-error: true
-
   # cua-e2e — drives the REAL Sophos desktop app (Tauri v2 release build) via
   # the cua-driver CLI and UIA accessibility automation (verify/cua/*). These
   # tests run in DEMO MODE (the `--demo` flag skips the daemon + sidecar and
   # injects window.__SOPHOS_DEMO__ = true, so the frontend uses the
-  # MockIpcClient with simulated Sessions/Agents data). Unlike the bundled
-  # verify/e2e.mjs step above (which needs a gitignored bundled runtime that
-  # doesn't exist in a fresh CI checkout), the cua-driver suite only needs the
-  # compiled exe + the cua-driver binary — both produced entirely here from
-  # source. So this job is BLOCKING: a failure must red the build and stop the
+  # MockIpcClient with simulated Sessions/Agents data). The cua-driver suite
+  # only needs the compiled exe + the cua-driver binary — both produced
+  # entirely here from source. So this job is BLOCKING: a failure must red the
+  # build and stop the
   # merge, because it exercises real UI behavior that unit tests cannot.
   #
   # Requires a desktop session (UIA/window automation) and WebView2, both

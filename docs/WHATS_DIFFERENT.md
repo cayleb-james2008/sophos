@@ -125,8 +125,6 @@ screenshot or a worker's say-so.
 | `verify/live-safety-installed.mjs` | Python execution, breaker inputs, approve-gate, and kernel fix — against the **installed** app's shipped binary. |
 | `verify/live-safety-controls.mjs` | The same, against a fresh real daemon + bridge. |
 | `verify/ipc-roundtrip.mjs` | 56/56 IPC commands round-trip over the real bridge. |
-| `verify/e2e-browser.mjs` | 36/36 browser-driven tests on the live dev server. |
-| `verify/e2e-isolate.mjs` | Runs named tests in a **fresh browser each, repeated N times** to distinguish real regressions from environment flakes. |
 
 ---
 
