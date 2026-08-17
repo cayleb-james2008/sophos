@@ -126,9 +126,11 @@ cua-e2e:
       - src-tauri/target/
     policy: pull-push
 
-# release — runs ONLY on tag pipelines. Verifies the release end-to-end: the
-# frontend + Rust exe build, the live update-feed integrity check, and (when
-# the gitignored runtime bundle is present) the NSIS installer build.
+# release — runs ONLY on tag pipelines. Gated on type-check-and-test +
+# cua-e2e, which already build the exe and run the full e2e suite on the tag;
+# this job adds the two release-specific checks: the live update-feed
+# integrity check and (when the gitignored runtime bundle is present) the
+# NSIS installer build.
 #
 # The NSIS installer needs resources/daemon/dist, resources/bridge/dist,
 # resources/node_modules and resources/node/…/node.exe — all gitignored and
@@ -136,7 +138,7 @@ cua-e2e:
 # prime-agent-ref checkout + AppData node_modules. That bundle is not
 # reproducible on a fresh hosted runner, so the installer step builds only
 # when the bundle is present and otherwise skips with a clear message — the
-# exe build + live-feed check always run, so a tag is still verified.
+# live-feed check always runs, so a tag is still verified.
 release:
   stage: release
   tags:
@@ -147,8 +149,6 @@ release:
   before_script:
     - npm ci
   script:
-    - npm run build
-    - Push-Location src-tauri; cargo build --release; Pop-Location
     - node verify/live-feed.mjs
     - |
       $need = @(
