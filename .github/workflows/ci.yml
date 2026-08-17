@@ -112,6 +112,12 @@ jobs:
         # tsc && vite build — emits dist/ that the Tauri shell embeds.
         run: npm run build
 
+      - name: Rust unit tests
+        # cargo test runs the Rust shell's unit tests (lease sweep, settings
+        # probe, engine_log, etc.) against the compiled crate.
+        working-directory: src-tauri
+        run: cargo test
+
       - name: Build Tauri release exe
         # cargo build --release compiles the Rust shell and embeds the
         # frontend from ../dist, producing

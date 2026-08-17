@@ -112,6 +112,7 @@ cua-e2e:
       # We deliberately do NOT run `npx tauri build`, which would try to bundle
       # installers and needs the gitignored resources/ directory.
       Push-Location src-tauri
+      cargo test
       cargo build --release
       Pop-Location
       # Install cua-driver (binary at %LOCALAPPDATA%\Programs\Cua\cua-driver\bin\).
