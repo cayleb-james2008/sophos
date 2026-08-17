@@ -4,6 +4,8 @@
 // over stdio, asserts the framing and results, and reports pass/fail.
 //
 // Usage:  node verify.mjs   (from the bridge/ directory)
+// Env:    PRIME_AGENT_REF=<prime-agent-ref checkout root> (packages/coding-agent
+//         derived; default: sibling checkout), DAEMON_CLI, BRIDGE, SOCKET.
 // Each run uses a unique named-pipe/Unix-socket endpoint and passes it to both
 // the daemon and bridge; production transport defaults are not changed.
 // Output: prints PASS/FAIL lines plus a final summary.
@@ -13,12 +15,29 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const REF_ROOT = resolve(
-  process.env.REF ?? resolve(REPO_ROOT, "..", "prime-agent-ref", "packages", "coding-agent"),
-);
+/** PRIME_AGENT_REF points at the prime-agent-ref checkout ROOT (same meaning
+ * as in scripts/bundle.mjs and the README); packages/coding-agent is derived.
+ * Throws a clear error when the checkout or the package is missing. */
+function resolvePrimeAgentRef() {
+  const checkout = resolve(
+    process.env.PRIME_AGENT_REF ?? resolve(REPO_ROOT, "..", "prime-agent-ref"),
+  );
+  const pkg = join(checkout, "packages", "coding-agent");
+  if (!existsSync(checkout) || !existsSync(pkg)) {
+    throw new Error(
+      `PRIME_AGENT_REF is not a usable prime-agent-ref checkout: ${checkout}\n` +
+        `(expected packages/coding-agent under it). Set PRIME_AGENT_REF to the ` +
+        `checkout root, or keep the default sibling checkout (${resolve(REPO_ROOT, "..", "prime-agent-ref")}).`,
+    );
+  }
+  return checkout;
+}
+
+const REF_ROOT = join(resolvePrimeAgentRef(), "packages", "coding-agent");
 const DAEMON_CLI = process.env.DAEMON_CLI || join(REF_ROOT, "dist", "cli.js");
 const BRIDGE = process.env.BRIDGE || join(REPO_ROOT, "bridge", "dist", "bridge", "src", "index.js");
 

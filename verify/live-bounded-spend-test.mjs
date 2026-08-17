@@ -2,11 +2,28 @@
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { mkdtempSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const REF = 'C:/Users/Cayleb/Desktop/workspace/prime-agent-ref/packages/coding-agent';
+/** PRIME_AGENT_REF points at the prime-agent-ref checkout ROOT (same meaning
+ * as in scripts/bundle.mjs and the README); packages/coding-agent is derived.
+ * Throws a clear error when the checkout or the package is missing. */
+function resolvePrimeAgentRef() {
+  const checkout =
+    process.env.PRIME_AGENT_REF || 'C:/Users/Cayleb/Desktop/workspace/prime-agent-ref';
+  const pkg = join(checkout, 'packages', 'coding-agent');
+  if (!existsSync(checkout) || !existsSync(pkg)) {
+    throw new Error(
+      `PRIME_AGENT_REF is not a usable prime-agent-ref checkout: ${checkout}\n` +
+        `(expected packages/coding-agent under it). Set PRIME_AGENT_REF to the ` +
+        `checkout root, or restore the default C:/Users/Cayleb/Desktop/workspace/prime-agent-ref.`,
+    );
+  }
+  return checkout;
+}
+
+const REF = join(resolvePrimeAgentRef(), 'packages', 'coding-agent');
 const INST = 'C:/Users/Cayleb/AppData/Local/Sophos';
 const NODE = INST + '/node/node.exe';
 const DAEMON_SRC = join(REF, 'dist', 'bundle', 'cli.js');
@@ -37,7 +54,8 @@ const _writeBoundedConfig = () => {
     parsed.autonomousConfig = { active: false, maxTurns: MAX_TURNS, maxTokens: MAX_TOKENS };
     writeFileSync(_settingsPath, JSON.stringify(parsed, null, 2));
     return true;
-  } catch (e) { warn('could not pre-write settings', e.message); return false;
+  } catch (e) { warn('could not pre-write settings', e.message); return false; }
+};
 
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
