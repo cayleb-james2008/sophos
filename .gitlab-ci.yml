@@ -5,11 +5,13 @@
 # (`saas-windows-medium-amd64`), matching the GitHub Actions workflow's
 # `windows-latest` jobs.
 #
-# Node version: the original pins Node 22 via actions/setup-node@v4. GitLab
-# SaaS Windows shared runners provide Node from the runner image; this port
-# does not pin a version, so the effective Node is whatever the
-# saas-windows-medium-amd64 image ships. If a specific Node version is
-# required, install it in before_script (e.g. via a version manager).
+# Node version: the GitHub workflow pins Node 22 via actions/setup-node@v4.
+# GitLab SaaS Windows runners ship EOL Node v21.7.3, which is below this
+# repo's engine range (^22.12.0+) and breaks vitest with ERR_REQUIRE_ESM
+# (require() of the ESM-only @exodus/bytes from html-encoding-sniffer).
+# Platform-independent jobs therefore run on the `node:22` image (Linux);
+# the Windows jobs (cua-e2e, release) install the pinned Node 22 portable
+# ZIP in before_script and prepend it to PATH.
 
 stages:
   - test
@@ -19,8 +21,9 @@ stages:
 # Type-check and unit tests. These MUST pass — a failure blocks the pipeline.
 type-check-and-test:
   stage: test
+  image: node:22
   tags:
-    - saas-windows-medium-amd64
+    - saas-linux-medium-amd64
   before_script:
     - npm ci
   script:
@@ -61,6 +64,13 @@ cua-e2e:
   tags:
     - saas-windows-medium-amd64
   before_script:
+    - |
+      # Pin Node 22 — the runner image ships EOL v21.7.3, which fails vitest
+      # with ERR_REQUIRE_ESM. Portable install, prepended to PATH.
+      Invoke-WebRequest -Uri https://nodejs.org/dist/v22.23.2/node-v22.23.2-win-x64.zip -OutFile node22.zip
+      Expand-Archive -Path node22.zip -DestinationPath .
+      $env:PATH = "$CI_PROJECT_DIR\node-v22.23.2-win-x64;$env:PATH"
+      node -v
     - npm ci
   script:
     - |
@@ -114,6 +124,12 @@ release:
     - if: $CI_COMMIT_TAG
   needs: [type-check-and-test, cua-e2e]
   before_script:
+    - |
+      # Pin Node 22 — same portable install as cua-e2e (see above).
+      Invoke-WebRequest -Uri https://nodejs.org/dist/v22.23.2/node-v22.23.2-win-x64.zip -OutFile node22.zip
+      Expand-Archive -Path node22.zip -DestinationPath .
+      $env:PATH = "$CI_PROJECT_DIR\node-v22.23.2-win-x64;$env:PATH"
+      node -v
     - npm ci
   script:
     - node verify/live-feed.mjs
