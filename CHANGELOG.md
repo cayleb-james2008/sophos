@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust — `cargo test` 25 pass (6 new `lease.rs` tests + the existing sidecar-recovery and native-session tests), zero warnings.
 - cua-driver e2e — **8/8 suites green** against the rebuilt release exe (SMOKE 6/6, SESSIONS 8/8, AGENTS 6/6, CHAT 11 passed, INBOX 5/5, SETTINGS 10/10, SHELL 6/6, STUDIO 7/7), fresh screenshots + run record committed (see `verify/cua/e2e-run-0.8.0.md`). The CHAT suite now drives the release build (not the debug build), and the per-suite timeout was raised 5→10 minutes because CHAT and STUDIO legitimately run ~5 minutes and a single WebView2 timing-flake retry could previously redden a passing run. Three triggers stay labelled SKIPs (CHAT steering indicator + slash click-select, SHELL keyboard-shortcuts overlay) — documented background-WebView2 input limitations, each covered by unit tests.
 
+Release notes: [`docs/release-notes-v0.8.0.md`](docs/release-notes-v0.8.0.md) (installer, downloads, screenshots). GitLab release prep: [`docs/gitlab-release-v0.8.0.md`](docs/gitlab-release-v0.8.0.md).
+
 ## [0.7.2] — 2026-08-16 (Beta)
 
 ### Added
