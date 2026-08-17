@@ -55,18 +55,7 @@ The NSIS installer bundles the portable Node runtime, daemon `dist/`, bridge `di
 
 ## Screenshots
 
-> Use these **absolute** raw URLs in the GitLab release description. GitLab only renders images from absolute URLs — relative paths (e.g. `verify/cua/screenshots/chat-send.png`) and local paths (`C:\…`) render as broken images on the release page.
-
-| View | URL |
-|---|---|
-| Chat (streaming turn) | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/chat-send.png` |
-| Sessions graph | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/sessions-graph.png` |
-| Agents fleet | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/agents-fleet.png` |
-| Inbox message flow | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/inbox-flow.png` |
-| Settings → About (v0.8.0) | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/settings-about.png` |
-| Engine terminal | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/shell-engine.png` |
-| Profile Studio | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/studio-created.png` |
-| App overview (smoke) | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/smoke-initial.png` |
+Fresh screenshots for every view are committed under `verify/cua/screenshots/`. The ready-to-paste GitLab release description — with images embedded via absolute `/-/raw/master/…` URLs so they render on the release page (relative/local paths do not) — is in [`docs/gitlab-release-v0.8.0.md`](gitlab-release-v0.8.0.md).
 
 ---
 

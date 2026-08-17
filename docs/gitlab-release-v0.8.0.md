@@ -61,7 +61,7 @@ curl --request POST \
      "https://gitlab.com/api/v4/projects/85429532/releases"
 ```
 
-Paste the full release notes (from `docs/release-notes-v0.8.0.md`) into the description, using the absolute screenshot URLs below.
+Paste the ready-to-paste description from the section below — it embeds the screenshots as absolute `/-/raw/master/…` URLs, which is what actually renders on the release page (relative/local paths render as broken images).
 
 ### 3. Push the manifest to the update-feed branch
 
@@ -83,21 +83,6 @@ git tag v0.8.0 && git push origin v0.8.0
 ```
 
 ---
-
-## Screenshot fix (GitLab release page)
-
-The release page rendered screenshots as broken images because the description used relative/local paths. GitLab only resolves **absolute** `/-/raw/<branch>/<path>` URLs. Use these (branch `master`):
-
-| View | Absolute URL |
-|---|---|
-| Chat | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/chat-send.png` |
-| Sessions | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/sessions-graph.png` |
-| Agents | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/agents-fleet.png` |
-| Inbox | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/inbox-flow.png` |
-| Settings → About | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/settings-about.png` |
-| Engine terminal | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/shell-engine.png` |
-| Profile Studio | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/studio-created.png` |
-| Overview | `https://gitlab.com/caylebalvarez-james/sophos/-/raw/master/verify/cua/screenshots/smoke-initial.png` |
 
 ## Ready-to-paste release description (images fixed)
 
