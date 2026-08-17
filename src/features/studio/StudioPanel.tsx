@@ -17,10 +17,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Text, Button, IconButton, Badge, Spinner } from "../../design";
 import { useIpc, type IpcClient } from "../../ipc/client";
 import type { McpTestResult, Settings } from "../../ipc/contract";
-import { useProfile } from "../profiles/profiles";
+import { describeImportOutcome, useProfile } from "../profiles/profiles";
 import { assembleRegistry, countByCategory, type McpServerConfig, type ToolCategory, type ToolRegistryEntry } from "../code/toolRegistry";
 import { isCustomProfileUsable, studioCompositionSummary, workingStyleToText } from "./editor";
 import { customDemoFlavor } from "./store";
+import { exportProfileToFile, importProfileFromFile, parseCustomProfileFile } from "./portable";
 import "./studio.css";
 
 interface RegistryState {
@@ -95,6 +96,7 @@ export function StudioPanel() {
     closeStudio,
     saveDraft,
     deleteCustomProfile,
+    importCustomProfile,
   } = useProfile();
   const ipc = useIpc();
 
@@ -102,6 +104,7 @@ export function StudioPanel() {
   const [registryError, setRegistryError] = useState<string | null>(null);
   const [workingText, setWorkingText] = useState("");
   const [confirmDraft, setConfirmDraft] = useState("");
+  const [portNotice, setPortNotice] = useState<{ kind: "success" | "collision" | "error"; message: string } | null>(null);
 
   // Load the live registry whenever the studio opens.
   useEffect(() => {
@@ -153,6 +156,38 @@ export function StudioPanel() {
     if (studioEditingId) void deleteCustomProfile(studioEditingId);
   }, [studioEditingId, deleteCustomProfile]);
 
+  // Clear the portability notice whenever the studio (re)opens so a stale
+  // import/export result never lingers into the next session.
+  useEffect(() => {
+    setPortNotice(null);
+  }, [studioOpen]);
+
+  const handleExport = useCallback(async () => {
+    if (!studioDraft) return;
+    const result = await exportProfileToFile(studioDraft);
+    if (!result.ok) {
+      if (!result.cancelled) setPortNotice({ kind: "error", message: result.error });
+      return;
+    }
+    setPortNotice({ kind: "success", message: result.detail });
+  }, [studioDraft]);
+
+  const handleImport = useCallback(async () => {
+    const picked = await importProfileFromFile();
+    if (!picked.ok) {
+      if (!picked.cancelled) setPortNotice({ kind: "error", message: picked.error });
+      return;
+    }
+    const parsed = parseCustomProfileFile(picked.text ?? "");
+    if (!parsed.ok) {
+      setPortNotice({ kind: "error", message: parsed.error });
+      return;
+    }
+    const outcome = await importCustomProfile(parsed.profile);
+    // Collisions are resolved visibly — never silently overwritten.
+    setPortNotice(describeImportOutcome(outcome));
+  }, [importCustomProfile]);
+
   if (!studioOpen) return null;
 
   const modeLabel = draft ? draft.mode[0].toUpperCase() + draft.mode.slice(1) : "";
@@ -180,6 +215,19 @@ export function StudioPanel() {
               Hot reload — the header chip, composer hint, and demo responses follow this draft right now. Save persists; Discard reverts.
             </Text>
           </div>
+
+          {/* --- Portability notice (import/export outcomes, incl. collisions) --- */}
+          {portNotice ? (
+            <div
+              className={`st__notice st__notice--${portNotice.kind}`}
+              role="status"
+              data-testid="studio-port-notice"
+            >
+              <Text variant="micro" tone={portNotice.kind === "error" ? "danger" : portNotice.kind === "collision" ? "warning" : "success"}>
+                {portNotice.message}
+              </Text>
+            </div>
+          ) : null}
 
           {/* --- Identity --- */}
           <section className="st__section">
@@ -450,13 +498,27 @@ export function StudioPanel() {
 
         <footer className="st__footer">
           <div className="st__footer-left">
-            {!usable ? (
-              <Text variant="micro" tone="warning">Add a name and at least one tool to save — an unusable profile degrades to Standard defaults.</Text>
-            ) : null}
+            <Button variant="outline" size="sm" type="button" onClick={handleImport} data-testid="studio-import" title="Import a custom profile from a .sophos-profile.json file">
+              Import…
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={handleExport}
+              disabled={!usable}
+              data-testid="studio-export"
+              title={usable ? "Export this draft as a shareable JSON file" : "Add a name and at least one tool before exporting"}
+            >
+              Export
+            </Button>
             {studioEditingId ? (
               <Button variant="danger" size="sm" type="button" onClick={handleDelete} className="st__delete">
                 Delete
               </Button>
+            ) : null}
+            {!usable ? (
+              <Text variant="micro" tone="warning" className="st__footer-hint">Add a name and at least one tool to save — an unusable profile degrades to Standard defaults.</Text>
             ) : null}
           </div>
           <div className="st__footer-actions">

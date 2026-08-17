@@ -90,7 +90,7 @@ export function Sidebar({
           <SigmaGlyph size={14} />
         </span>
         <span className="sidebar__wordmark">SOPHOS</span>
-        <span className="sidebar__version">v0.7.0-beta</span>
+        <span className="sidebar__version">v0.7.1-beta</span>
       </div>
 
       {/* New chat */}

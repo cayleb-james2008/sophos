@@ -111,9 +111,9 @@ handles launch/teardown and reports pass/fail per test.
 - `node verify/cua/inbox.test.mjs` — cua-driver e2e for ALL Inbox features.
 - `node verify/cua/settings.test.mjs` — cua-driver e2e for ALL Settings features.
 - `node verify/cua/shell.test.mjs` — cua-driver e2e for ALL shell / global features.
-- `node verify/cua/run-all.mjs` — runs all 7 suites in sequence, exits 0 on all-pass / 1 on any fail.
+- `node verify/cua/run-all.mjs` — runs all 8 suites in sequence, exits 0 on all-pass / 1 on any fail.
 - `npm run test:cua` — same as above (npm script alias).
-- `npx vitest run` — 984 unit tests pass (no regressions).
+- `npx vitest run` — 1113 unit tests pass (no regressions).
 - `npx tsc --noEmit` — clean.
 
 ## CI integration

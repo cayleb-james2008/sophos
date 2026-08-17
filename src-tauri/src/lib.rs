@@ -78,6 +78,26 @@ fn native_markdown_render(markdown: String) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// Profile Studio file portability commands (v0.7.1)
+// ---------------------------------------------------------------------------
+// Two tiny read/write commands back the Profile Studio's export/import: the
+// frontend picks a path with the (already-permissioned) dialog plugin, then
+// reads or writes the file contents here. They are frontend<->shell commands
+// only — the daemon contract (contract.rs / src/ipc/contract.ts) is untouched.
+
+/// Read a UTF-8 text file (used to import a custom profile).
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Could not read file: {e}"))
+}
+
+/// Write UTF-8 text to a file (used to export a custom profile).
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(&path, contents).map_err(|e| format!("Could not write file: {e}"))
+}
+
+// ---------------------------------------------------------------------------
 // Engine log commands (NEW)
 // ---------------------------------------------------------------------------
 
@@ -257,7 +277,9 @@ pub fn run() {
             get_engine_logs,
             restart_engine,
             stop_engine,
-            get_engine_status
+            get_engine_status,
+            read_text_file,
+            write_text_file
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

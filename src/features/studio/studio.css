@@ -249,9 +249,22 @@
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 12px 16px;
   border-top: 1px solid var(--pa-border);
 }
-.st__footer-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.st__footer-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+.st__footer-hint { max-width: 320px; }
 .st__footer-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Portability notice (import/export outcomes — incl. visible collisions) */
+.st__notice {
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--pa-paper-rgb), 0.18);
+  border-radius: var(--pa-radius-md);
+  background: rgba(var(--pa-paper-rgb), 0.04);
+}
+.st__notice--success { border-color: rgba(var(--pa-success-rgb, 111, 214, 145), 0.45); background: rgba(var(--pa-success-rgb, 111, 214, 145), 0.07); }
+.st__notice--collision { border-color: rgba(var(--pa-warning-rgb, 240, 173, 78), 0.5); background: rgba(var(--pa-warning-rgb, 240, 173, 78), 0.08); }
+.st__notice--error { border-color: rgba(var(--pa-danger-rgb, 239, 83, 80), 0.5); background: rgba(var(--pa-danger-rgb, 239, 83, 80), 0.08); }

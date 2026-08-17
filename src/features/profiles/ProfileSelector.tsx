@@ -4,10 +4,12 @@
 // responses all follow the active profile. The dropdown shows each profile's
 // working style and its composed model/tools/skills/safety.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, Button, Spinner } from "../../design";
-import { useProfile, PROFILES, MODES, compositionSummary, type ProfileMode } from "./profiles";
+import { describeImportOutcome, useProfile, PROFILES, MODES, compositionSummary, type ProfileMode } from "./profiles";
 import { studioCompositionSummary } from "../studio/editor";
+import { exportProfileToFile, importProfileFromFile, parseCustomProfileFile } from "../studio/portable";
+import type { CustomProfile } from "../studio/store";
 import "./profiles.css";
 
 export function ProfileSelector() {
@@ -22,9 +24,17 @@ export function ProfileSelector() {
     openStudioCreate,
     openStudioEdit,
     deleteCustomProfile,
+    importCustomProfile,
   } = useProfile();
   const [open, setOpen] = useState(false);
+  const [notice, setNotice] = useState<{ kind: "success" | "collision" | "error"; message: string } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // A fresh notice whenever the dropdown opens — stale import/export results
+  // never linger into the next interaction.
+  useEffect(() => {
+    if (open) setNotice(null);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +60,31 @@ export function ProfileSelector() {
   const handleMode = (mode: ProfileMode) => {
     void setMode(mode);
   };
+
+  const handleImport = useCallback(async () => {
+    const picked = await importProfileFromFile();
+    if (!picked.ok) {
+      if (!picked.cancelled) setNotice({ kind: "error", message: picked.error });
+      return;
+    }
+    const parsed = parseCustomProfileFile(picked.text ?? "");
+    if (!parsed.ok) {
+      setNotice({ kind: "error", message: parsed.error });
+      return;
+    }
+    const outcome = await importCustomProfile(parsed.profile);
+    // Collisions resolve visibly (copy name / fresh id) — never overwritten.
+    setNotice(describeImportOutcome(outcome));
+  }, [importCustomProfile]);
+
+  const handleExportCard = useCallback(async (profile: CustomProfile) => {
+    const result = await exportProfileToFile(profile);
+    if (!result.ok) {
+      if (!result.cancelled) setNotice({ kind: "error", message: result.error });
+      return;
+    }
+    setNotice({ kind: "success", message: result.detail });
+  }, []);
 
   return (
     <div ref={rootRef} className="pr-root">
@@ -121,10 +156,22 @@ export function ProfileSelector() {
           <div className="pr-custom">
             <div className="pr-custom-head">
               <Text variant="micro" tone="dim" mono uppercase>Custom</Text>
-              <Button variant="ghost" size="sm" type="button" onClick={() => { setOpen(false); openStudioCreate(); }} title="Build a new custom profile in the Profile Studio">
-                + New profile
-              </Button>
+              <div className="pr-custom-head-actions">
+                <Button variant="ghost" size="sm" type="button" onClick={handleImport} data-testid="picker-import" title="Import a custom profile from a .sophos-profile.json file">
+                  Import…
+                </Button>
+                <Button variant="ghost" size="sm" type="button" onClick={() => { setOpen(false); openStudioCreate(); }} title="Build a new custom profile in the Profile Studio">
+                  + New profile
+                </Button>
+              </div>
             </div>
+            {notice ? (
+              <div className={`pr-notice pr-notice--${notice.kind}`} role="status" data-testid="picker-port-notice">
+                <Text variant="micro" tone={notice.kind === "error" ? "danger" : notice.kind === "collision" ? "warning" : "success"}>
+                  {notice.message}
+                </Text>
+              </div>
+            ) : null}
             {customProfiles.length === 0 ? (
               <Text variant="micro" tone="muted" className="pr-custom-empty">
                 No custom profiles yet — open the studio to compose one from the live tool registry.
@@ -159,6 +206,7 @@ export function ProfileSelector() {
                       </button>
                       <div className="pr-custom-actions">
                         <button type="button" className="pr-custom-action" onClick={() => { setOpen(false); openStudioEdit(p.id); }} aria-label={`Edit ${p.name}`}>Edit</button>
+                        <button type="button" className="pr-custom-action" onClick={() => void handleExportCard(p)} aria-label={`Export ${p.name}`}>Export</button>
                         <button type="button" className="pr-custom-action pr-custom-action--danger" onClick={() => void deleteCustomProfile(p.id)} aria-label={`Delete ${p.name}`}>Delete</button>
                       </div>
                     </div>

@@ -31,6 +31,7 @@ import {
   type CustomProfile,
 } from "../studio/store";
 import { studioReducer, type StudioAction } from "../studio/editor";
+import { mergeImportedProfile, type ImportResolution } from "../studio/portable";
 
 export type ProfileMode = "standard" | "minimal" | "creator" | "code";
 
@@ -237,6 +238,32 @@ export interface ProfileApi {
   saveDraft: () => Promise<void>;
   /** Remove a custom profile; falls back to Standard when it was selected. */
   deleteCustomProfile: (id: string) => Promise<void>;
+  /**
+   * Import a parsed custom profile (portability half): collision-safe merge
+   * against the live store (never overwrites — see mergeImportedProfile),
+   * persists, selects it so its effect is visible immediately, and returns
+   * the outcome so the UI can show the resolution. No file I/O here — callers
+   * read/parse the file first. */
+  importCustomProfile: (profile: CustomProfile) => Promise<CustomProfileImportResult>;
+}
+
+/** Outcome of importCustomProfile — the adopted profile + the resolution (if
+ * the merge had to rename / re-id it). */
+export interface CustomProfileImportResult {
+  profile: CustomProfile;
+  resolution: ImportResolution | null;
+}
+
+/** Human phrasing of an import outcome for a VISIBLE notice (never silent). */
+export function describeImportOutcome(outcome: CustomProfileImportResult): { kind: "success" | "collision"; message: string } {
+  const r = outcome.resolution;
+  if (r) {
+    return {
+      kind: "collision",
+      message: `Imported as “${r.finalName}” — “${r.originalName}” already exists, so nothing was overwritten.`,
+    };
+  }
+  return { kind: "success", message: `Imported “${outcome.profile.name}”.` };
 }
 
 function useProfileState(): ProfileApi {
@@ -384,6 +411,19 @@ function useProfileState(): ProfileApi {
     [persistCustoms, apply],
   );
 
+  /** Portability half: import a parsed profile — merge (never overwrite),
+   * persist, and select it so its effect is visible immediately. */
+  const importCustomProfile = useCallback(
+    async (profile: CustomProfile): Promise<CustomProfileImportResult> => {
+      const { profile: merged, resolution } = mergeImportedProfile(profile, customProfilesRef.current);
+      const next = [...customProfilesRef.current, merged];
+      await persistCustoms(next);
+      await apply({ id: merged.id, mode: merged.mode });
+      return { profile: merged, resolution };
+    },
+    [persistCustoms, apply],
+  );
+
   // --- Effective profile (hot reload) ---
   // While the studio is open the running app follows the DRAFT (valid ones as
   //-is; unusable ones degrade to Standard). Otherwise it follows the resolved
@@ -416,6 +456,7 @@ function useProfileState(): ProfileApi {
     studioDispatch,
     saveDraft,
     deleteCustomProfile,
+    importCustomProfile,
   };
 }
 

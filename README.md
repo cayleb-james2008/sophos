@@ -174,8 +174,20 @@ Save required to see the effect.
   instead of crashing.
 - **Picker integration** — custom profiles live in a **Custom** section
   beside the five built-ins (Gauntlet / Standard / Minimal / Creator / Code),
-  each with Edit / Delete actions; the selection and the store survive
+  each with Edit / Export / Delete actions; the selection and the store survive
   restarts.
+- **Portability (export / import)** — save any custom profile to a
+  **human-readable JSON file** (`*.sophos-profile.json`, a pretty-printed
+  `sophos-custom-profile` envelope) and load it back or share it: **Export**
+  from the studio footer (the live draft, even before Save) or a profile's
+  card in the picker writes through the **native save dialog**; **Import** via
+  the **native open dialog** re-parses the file through the same guarded
+  store sanitizer settings use, so an export → import round-trip reproduces
+  the identical composition. Parsing never crashes — malformed JSON, a
+  foreign file, a future version, or a broken field shape each produce a
+  clear error — and a name collision is **never silently overwritten**: the
+  incoming profile becomes a unique copy (`"Name (copy)"`) with a visible
+  notice saying nothing was overwritten.
 
 > **Known limitation:** a custom profile's instructions are an **additive
 > UI-layer hint, exactly like the built-in profiles** — the daemon contract
