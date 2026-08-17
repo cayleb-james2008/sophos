@@ -49,6 +49,8 @@ Sophos is a Windows-native coding agent that brings [Prime Intellect's](https://
 
 The NSIS installer bundles the portable Node runtime, daemon `dist/`, bridge `dist/`, and shared `node_modules/` — zero manual dependencies. No admin required; installs to `~\AppData\Local\Sophos`. The auto-updater ships the same binary via the signed update feed.
 
+> **CI note:** the tag-job installer step currently skips on hosted runners — the daemon/bridge bundle is not reproducible from a fresh checkout. See [`docs/installer-reproducibility-0.8.0.md`](installer-reproducibility-0.8.0.md) for the exact blocker and the operator steps to make it build in CI.
+
 > **⚠️ Beta Notice:** All Sophos versions before v1.0 are beta releases. Features may change, and there may be bugs. Use in production at your own risk.
 
 ---

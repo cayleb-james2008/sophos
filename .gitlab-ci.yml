@@ -138,7 +138,8 @@ cua-e2e:
 # prime-agent-ref checkout + AppData node_modules. That bundle is not
 # reproducible on a fresh hosted runner, so the installer step builds only
 # when the bundle is present and otherwise skips with a clear message — the
-# live-feed check always runs, so a tag is still verified.
+# live-feed check always runs, so a tag is still verified. See
+# docs/installer-reproducibility-0.8.0.md for the blocker + operator steps.
 release:
   stage: release
   tags:

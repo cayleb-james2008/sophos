@@ -147,7 +147,8 @@ jobs:
   # reproducible on a fresh hosted runner, so the installer step builds only
   # when the bundle is present (e.g. a self-hosted runner with the full local
   # checkout) and otherwise skips with a warning — the live-feed check always
-  # runs, so a tag is still verified.
+  # runs, so a tag is still verified. See docs/installer-reproducibility-0.8.0.md
+  # for the exact blocker and the operator steps to make this reproducible.
   release:
     runs-on: windows-latest
     if: startsWith(github.ref, 'refs/tags/')
