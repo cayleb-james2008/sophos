@@ -2,12 +2,29 @@
 import { chromium } from "playwright-core";
 import fs from "node:fs";
 
-const SHOTS = "C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-onboarding/eval-shots";
+// SHOTS_DIR overrides the eval-screenshot dir (created if missing).
+const SHOTS =
+  process.env.SHOTS_DIR ||
+  "C:/Users/Cayleb/.traycer/worktrees/cayleb-james2008__sophos/gauntlet-onboarding/eval-shots";
 fs.mkdirSync(SHOTS, { recursive: true });
+
+// CHROMIUM_EXE overrides the Playwright chromium executable; fail with a
+// clear error rather than a confusing ENOENT inside chromium.launch.
+const CHROMIUM_EXE =
+  process.env.CHROMIUM_EXE ||
+  "C:/Users/Cayleb/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe";
+if (!fs.existsSync(CHROMIUM_EXE)) {
+  throw new Error(
+    `CHROMIUM_EXE does not exist: ${CHROMIUM_EXE}\n` +
+      `Set CHROMIUM_EXE to your Playwright chromium executable ` +
+      `(e.g. %LOCALAPPDATA%/ms-playwright/chromium-<rev>/chrome-win64/chrome.exe), ` +
+      `or restore the default C:/Users/Cayleb/AppData/Local/ms-playwright/.../chrome.exe.`,
+  );
+}
 
 const browser = await chromium.launch({
   headless: true,
-  executablePath: "C:/Users/Cayleb/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe",
+  executablePath: CHROMIUM_EXE,
 });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await ctx.newPage();

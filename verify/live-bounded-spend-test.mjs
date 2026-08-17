@@ -24,7 +24,22 @@ function resolvePrimeAgentRef() {
 }
 
 const REF = join(resolvePrimeAgentRef(), 'packages', 'coding-agent');
-const INST = 'C:/Users/Cayleb/AppData/Local/Sophos';
+/** SOPHOS_INSTALL_DIR points at the installed Sophos app dir (node/node.exe is
+ * spawned from it). Throws a clear error when the install dir is missing. */
+function resolveInstallDir() {
+  const dir =
+    process.env.SOPHOS_INSTALL_DIR || 'C:/Users/Cayleb/AppData/Local/Sophos';
+  if (!existsSync(dir) || !existsSync(join(dir, 'node', 'node.exe'))) {
+    throw new Error(
+      `SOPHOS_INSTALL_DIR is not an installed Sophos app directory: ${dir}\n` +
+        `(expected node/node.exe under it). Set SOPHOS_INSTALL_DIR to the install ` +
+        `dir, or restore the default C:/Users/Cayleb/AppData/Local/Sophos.`,
+    );
+  }
+  return dir;
+}
+
+const INST = resolveInstallDir();
 const NODE = INST + '/node/node.exe';
 const DAEMON_SRC = join(REF, 'dist', 'bundle', 'cli.js');
 const BRIDGE = INST + '/bridge/dist/bridge/src/index.js';
