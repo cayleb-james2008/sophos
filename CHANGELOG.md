@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Tests
 - Unit — 1118 pass (up from 1113), `tsc --noEmit` clean. New coverage: `UpdateBanner` (renders nothing until the event, shows the announced version + notes, Install invokes `install_update` and flips to the downloading state, install-error surfaces visibly, listeners unregister on unmount).
 - cua-driver e2e — settings suite re-verified green (version badge now asserts 0.7.2); the update apply flow was verified live end to end (installed 0.7.2 pulled and installed the signed update from a staging feed, then relaunched).
+- **Live feed integrity check (`npm run test:live-feed`)** — new `verify/live-feed.mjs` fetches the manifest from the app's configured endpoint, downloads the announced installer, and cryptographically verifies the Ed25519 signature over the bytes with the configured pubkey (plus a tamper-rejection negative test). Wired into CI (GitHub Actions + GitLab) as a blocking check: a broken feed reds the build because the auto-updater would be broken for every user.
 
 ## [0.7.1] — 2026-08-16 (Beta)
 

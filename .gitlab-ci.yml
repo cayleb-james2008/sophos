@@ -47,6 +47,14 @@ type-check-and-test:
   script:
     - npx tsc --noEmit
     - npx vitest run
+    # Live update-feed integrity check — BLOCKING. Verifies the published
+    # auto-updater feed exactly as the app consumes it (fetch the manifest
+    # from the configured endpoint, download the announced installer, verify
+    # the Ed25519 signature over the bytes with the configured pubkey, reject
+    # tampering). A broken feed means the auto-updater is broken for every
+    # user, so a failure must red the pipeline. Network-dependent (hits the
+    # live GitLab feed from the runner).
+    - node verify/live-feed.mjs
 
 # Best-effort e2e — Windows-specific, bundled runtime not assembled in CI.
 # A failure here does NOT block the pipeline (allow_failure: true).

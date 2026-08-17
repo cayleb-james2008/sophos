@@ -36,6 +36,15 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Live update-feed integrity check
+        # BLOCKING — verifies the published auto-updater feed exactly as the
+        # app consumes it (fetch manifest from the configured endpoint,
+        # download the announced installer, verify the Ed25519 signature over
+        # the bytes with the configured pubkey, reject tampering). A broken
+        # feed means the auto-updater is broken for every user, so a failure
+        # must red the build. Network-dependent (hits the live GitLab feed).
+        run: node verify/live-feed.mjs
+
       # e2e.mjs boots the BUNDLED runtime (resources/node/<version>/node.exe +
       # resources/daemon/dist + resources/bridge/dist + shared node_modules),
       # which is gitignored and assembled only on the developer machine by

@@ -23,6 +23,7 @@
     "updater:serve": "node scripts/serve-update-feed.mjs",
     "updater:build": "node scripts/build-signed-update.mjs",
     "test:updater": "node verify/updater-test.mjs",
+    "test:live-feed": "node verify/live-feed.mjs",
     "test:cua": "node verify/cua/run-all.mjs"
   },
   "dependencies": {
