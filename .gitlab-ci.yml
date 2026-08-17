@@ -36,6 +36,7 @@
 stages:
   - test
   - e2e
+  - release
 
 # Type-check and unit tests. These MUST pass — a failure blocks the pipeline.
 type-check-and-test:
@@ -124,3 +125,47 @@ cua-e2e:
       - .cargo/registry/
       - src-tauri/target/
     policy: pull-push
+
+# release — runs ONLY on tag pipelines. Verifies the release end-to-end: the
+# frontend + Rust exe build, the live update-feed integrity check, and (when
+# the gitignored runtime bundle is present) the NSIS installer build.
+#
+# The NSIS installer needs resources/daemon/dist, resources/bridge/dist,
+# resources/node_modules and resources/node/…/node.exe — all gitignored and
+# assembled locally by `node scripts/bundle.mjs` from the (locally-modified)
+# prime-agent-ref checkout + AppData node_modules. That bundle is not
+# reproducible on a fresh hosted runner, so the installer step builds only
+# when the bundle is present and otherwise skips with a clear message — the
+# exe build + live-feed check always run, so a tag is still verified.
+release:
+  stage: release
+  tags:
+    - saas-windows-medium-amd64
+  rules:
+    - if: $CI_COMMIT_TAG
+  needs: [type-check-and-test, cua-e2e]
+  before_script:
+    - npm ci
+  script:
+    - npm run build
+    - Push-Location src-tauri; cargo build --release; Pop-Location
+    - node verify/live-feed.mjs
+    - |
+      $need = @(
+        "resources/node/node-v24.18.0-win-x64/node.exe",
+        "resources/daemon/dist/cli.js",
+        "resources/bridge/dist/bridge/src/index.js",
+        "resources/node_modules"
+      )
+      $missing = @($need | Where-Object { -not (Test-Path $_) })
+      if ($missing.Count -gt 0) {
+        Write-Host "Installer build skipped: gitignored runtime bundle not assembled in CI (missing $($missing -join ', ')). Run 'node scripts/bundle.mjs' then 'npm run tauri build' locally."
+      } else {
+        npm run tauri build
+      }
+  artifacts:
+    paths:
+      - src-tauri/target/release/bundle/nsis/Sophos_*_x64-setup.exe
+      - src-tauri/target/release/bundle/nsis/Sophos_*_x64-setup.exe.sig
+    when: on_success
+    expire_in: 7 days

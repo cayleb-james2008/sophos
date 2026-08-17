@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: ["**"]
+    tags: ["v*"]
   pull_request:
     branches: ["**"]
 
@@ -133,3 +134,87 @@ jobs:
         # app in demo mode through every cua-driver e2e suite; it exits 0 on
         # all-pass and 1 on any failure.
         run: node verify/cua/run-all.mjs
+
+  # release — runs ONLY on tag pushes (v*). Verifies the release end-to-end:
+  # the frontend + Rust exe build, the live update-feed integrity check, and
+  # (when the gitignored runtime bundle is present) the NSIS installer build.
+  #
+  # The NSIS installer needs resources/daemon/dist, resources/bridge/dist,
+  # resources/node_modules and resources/node/…/node.exe — all gitignored and
+  # assembled locally by `node scripts/bundle.mjs` from the (locally-modified)
+  # prime-agent-ref checkout + AppData node_modules. That bundle is not
+  # reproducible on a fresh hosted runner, so the installer step builds only
+  # when the bundle is present (e.g. a self-hosted runner with the full local
+  # checkout) and otherwise skips with a warning — the exe build + live-feed
+  # check always run, so a tag is still verified.
+  release:
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [test, cua-e2e]
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+    env:
+      # Optional — configure these two secrets to produce a SIGNED installer in
+      # CI. Without them the installer still builds, but no .sig is generated
+      # (sign with `npx tauri signer sign` at release time).
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build frontend + release exe
+        # Always runs — proves the release code compiles end-to-end even when
+        # the installer step below is skipped.
+        run: |
+          npm run build
+          cd src-tauri
+          cargo build --release
+          cd ..
+
+      - name: Live update-feed integrity check
+        # BLOCKING — verifies the published feed (manifest + installer download
+        # + Ed25519 signature) exactly as the app consumes it.
+        run: node verify/live-feed.mjs
+
+      - name: Build NSIS installer (when the runtime bundle is present)
+        id: installer
+        shell: pwsh
+        run: |
+          $need = @(
+            "resources/node/node-v24.18.0-win-x64/node.exe",
+            "resources/daemon/dist/cli.js",
+            "resources/bridge/dist/bridge/src/index.js",
+            "resources/node_modules"
+          )
+          $missing = @($need | Where-Object { -not (Test-Path $_) })
+          if ($missing.Count -gt 0) {
+            Write-Host "::warning::Installer build skipped: gitignored runtime bundle not assembled in CI (missing $($missing -join ', ')). Run 'node scripts/bundle.mjs' then 'npm run tauri build' locally."
+            "INSTALLER_BUILT=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            exit 0
+          }
+          npm run tauri build
+          "INSTALLER_BUILT=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload NSIS installer artifact
+        if: steps.installer.outputs.INSTALLER_BUILT == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sophos-${{ github.ref_name }}-x64-setup
+          path: |
+            src-tauri/target/release/bundle/nsis/Sophos_*_x64-setup.exe
+            src-tauri/target/release/bundle/nsis/Sophos_*_x64-setup.exe.sig
+          if-no-files-found: error
