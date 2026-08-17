@@ -27,8 +27,8 @@
 // app mid-suite.
 
 import { existsSync, readFileSync, rmSync } from "node:fs";
-import { execSync } from "node:child_process";
 import { startDaemon, stopDaemon, sleep, getWindowState, clickElement, pressKey, hotkey, bringToFront, listWindows, call } from "./driver.mjs";
+import { killLingeringAppInstances as killLingeringInstances } from "./cleanup.mjs";
 import { closeApp } from "./launch.mjs";
 import { launchDemoApp } from "./demo-launch.mjs";
 import { getTextContent, takeScreenshot } from "./helpers.mjs";
@@ -65,30 +65,6 @@ function freshState() {
       throw new Error("app instance replaced by a concurrent worker");
     }
   }
-}
-
-/** Kill every running Sophos app instance plus its WebView2 children (the
- *  WebView2 descendants hold the Local Storage file lock after the main process
- *  dies, which blocks a clean storage reset). Killing only the app's own
- *  msedgewebview2 descendants avoids disrupting other apps' WebView2. */
-async function killLingeringInstances() {
-  for (const w of listWindows()) {
-    if (w.app_name && w.app_name.toLowerCase().includes("prime-agent")) {
-      try { call("kill_app", { pid: w.pid }); } catch { /* already gone */ }
-    }
-  }
-  await sleep(1500);
-  try {
-    const ps =
-      "$roots=Get-CimInstance Win32_Process|Where-Object{$_.Name -eq 'prime-agent-windows.exe'};" +
-      "foreach($p in $roots){Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue};" +
-      "Get-CimInstance Win32_Process|Where-Object{$_.Name -eq 'msedgewebview2.exe'}|ForEach-Object{" +
-      "$pp=$_.ParentProcessId;$isChild=$false;" +
-      "for($i=0;$i -lt 8 -and $pp;$i++){$par=Get-CimInstance Win32_Process -Filter \"ProcessId=$pp\" -ErrorAction SilentlyContinue;if(-not $par){break};if($par.Name -eq 'prime-agent-windows.exe'){$isChild=$true;break};$pp=$par.ParentProcessId};" +
-      "if($isChild){Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}}";
-    execSync(`powershell -NoProfile -Command "${ps}"`, { timeout: 30000 });
-  } catch { /* best-effort */ }
-  await sleep(2000);
 }
 
 /** Remove the WebView2 localStorage so onboarding/theme start from a clean slate. */

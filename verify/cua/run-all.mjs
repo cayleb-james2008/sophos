@@ -15,6 +15,7 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { killLingeringAppInstances, restartDaemon } from "./cleanup.mjs";
 
 /** Ordered suites, in the order they must run. */
 const SUITES = [
@@ -70,23 +71,47 @@ function runSuiteChild(suite) {
       resolve(result);
     };
 
+    const timedOutResult = () => ({
+      label: suite.label,
+      file: suite.file,
+      ok: false,
+      timedOut: true,
+      code: null,
+      signal: "SIGKILL",
+      reason: `timed out after ${SUITE_TIMEOUT_MS / 1000}s`,
+    });
+
+    // Tear down what a killed suite left behind, THEN resolve — so the next
+    // suite never starts while orphaned processes are still being torn down.
+    // A suite killed by SIGKILL skips its own afterAll(), leaving the Sophos
+    // app + its WebView2 children + a possibly-degraded daemon behind; this
+    // kills those children and restarts the daemon. Best-effort and
+    // time-capped (the cua-driver CLI and the PowerShell both carry their own
+    // timeouts) so a stuck cleanup can never hang the runner.
+    const cleanupAndFinish = async () => {
+      console.error(`  … ${suite.label}: cleaning up app + WebView2 children, restarting daemon`);
+      let capped = false;
+      const cap = setTimeout(() => {
+        capped = true;
+        console.error(`  ! ${suite.label}: cleanup exceeded 60s (non-fatal); proceeding to next suite`);
+        finish(timedOutResult());
+      }, 60_000);
+      try {
+        await killLingeringAppInstances();
+        await restartDaemon();
+      } catch (err) {
+        console.error(`  ! ${suite.label}: cleanup failed (non-fatal): ${err.message}`);
+      } finally {
+        clearTimeout(cap);
+        if (!capped) finish(timedOutResult());
+      }
+    };
+
     const killTimer = setTimeout(() => {
       killedByTimer = true;
       console.error(`  ! ${suite.label}: exceeded ${SUITE_TIMEOUT_MS / 1000}s timeout; killing`);
       child.kill("SIGKILL");
-      // If the child ignores the kill and never emits `close`, force-resolve
-      // as a timed-out failure so the runner advances to the next suite.
-      setTimeout(() => {
-        finish({
-          label: suite.label,
-          file: suite.file,
-          ok: false,
-          timedOut: true,
-          code: null,
-          signal: "SIGKILL",
-          reason: `timed out after ${SUITE_TIMEOUT_MS / 1000}s (child did not exit)`,
-        });
-      }, 5000);
+      cleanupAndFinish();
     }, SUITE_TIMEOUT_MS);
 
     child.on("error", (err) => {
@@ -102,26 +127,30 @@ function runSuiteChild(suite) {
     });
 
     child.on("close", (code, signal) => {
+      // A timeout or an abnormal natural termination skips the suite's own
+      // afterAll(), so it may leave the app + WebView2 + daemon behind.
+      // cleanupAndFinish owns resolution in that case.
+      const abnormal = killedByTimer || signal !== null || code === null;
+      if (abnormal) {
+        if (!killedByTimer) {
+          clearTimeout(killTimer);
+          killedByTimer = true;
+          console.error(`  ! ${suite.label}: abnormal exit (code=${code}, signal=${signal}); cleaning up`);
+          cleanupAndFinish();
+        }
+        // If killedByTimer was already true, cleanupAndFinish() is running and
+        // will resolve — do not resolve twice.
+        return;
+      }
       clearTimeout(killTimer);
-      // If our timeout fired, this close is the aftermath of the SIGKILL -
-      // label it a timeout regardless of how the platform surfaces the exit
-      // (Windows may report a nonzero code with signal=null rather than
-      // code=null/signal=SIGKILL). Otherwise, a null code/signal signals a
-      // natural abnormal termination.
-      const timedOut = killedByTimer || signal !== null || code === null;
-      const ok = !timedOut && code === 0;
       finish({
         label: suite.label,
         file: suite.file,
-        ok,
-        timedOut,
+        ok: code === 0,
+        timedOut: false,
         code,
         signal,
-        reason: timedOut
-          ? `timed out after ${SUITE_TIMEOUT_MS / 1000}s`
-          : code === 0
-            ? "exit 0"
-            : `exit ${code}`,
+        reason: code === 0 ? "exit 0" : `exit ${code}`,
       });
     });
   });
