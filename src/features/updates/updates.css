@@ -1,0 +1,28 @@
+/* UpdateBanner — auto-updater prompt strip (v0.7.2). */
+
+.upd-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(var(--pa-info-rgb), 0.09);
+  border-bottom: 1px solid rgba(var(--pa-info-rgb), 0.28);
+}
+
+.upd-banner--quiet {
+  background: rgba(var(--pa-border-rgb), 0.12);
+  border-bottom-color: rgba(var(--pa-border-rgb), 0.3);
+}
+
+.upd-banner--error {
+  background: rgba(var(--pa-danger-rgb), 0.1);
+  border-bottom: 1px solid rgba(var(--pa-danger-rgb), 0.33);
+}
+
+.upd-banner__main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}

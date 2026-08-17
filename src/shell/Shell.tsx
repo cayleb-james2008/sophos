@@ -11,6 +11,7 @@ import { EnginePanel } from "../features/engine/EnginePanel";
 import { RefinementGateProvider } from "../features/longrunning/useRefinementGate";
 import { RefinementGateBanner } from "../features/longrunning/RefinementGateBanner";
 import { RunGuardBanner } from "../features/longrunning/RunGuardBanner";
+import { UpdateBanner } from "../features/updates/UpdateBanner";
 import { ShortcutsOverlay, type ShortcutsGroup } from "../design";
 import { useHotkeys, type Hotkey } from "../hooks/useHotkeys";
 import type { View } from "./nav";
@@ -61,6 +62,7 @@ export function Shell({
       <RefinementGateProvider />
       <RefinementGateBanner />
       <RunGuardBanner />
+      <UpdateBanner />
       <div className="shell__body">
         <Sidebar active={active} onNavigate={onNavigate} />
         <main className="shell__main">

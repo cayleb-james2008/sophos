@@ -18,7 +18,7 @@ mod native;
 mod settings;
 mod sidecar;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent};
@@ -145,6 +145,92 @@ pub struct EngineStatus {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-updater trigger (v0.7.2)
+// ---------------------------------------------------------------------------
+// The updater plugin (tauri-plugin-updater) is registered in `run()` below.
+// It has no built-in "update available" prompt (its `dialog` option only
+// covers install progress), so this module owns the whole check-and-prompt
+// flow:
+//   - at startup, a fire-and-forget task checks the feed (never blocks or
+//     fails the app) and emits `update-available` (version + notes),
+//     `update-up-to-date`, or `update-check-error` to the frontend;
+//   - the frontend shows a banner and calls `install_update`, which
+//     downloads + verifies the signed installer and relaunches the app.
+// The found Update is parked here until the user accepts (or the app exits).
+// SOPHOS_UPDATE_ENDPOINT overrides the compiled feed endpoint (staging/e2e).
+
+static PENDING_UPDATE: Mutex<Option<tauri_plugin_updater::Update>> = Mutex::new(None);
+
+/// Fire-and-forget startup update check.
+fn spawn_update_check(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = check_for_update(&app).await {
+            eprintln!("[updater] check failed: {e}");
+            let _ = app.emit("update-check-error", e.to_string());
+        }
+    });
+}
+
+/// Query the update feed and surface the result to the frontend.
+async fn check_for_update(app: &AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+
+    let mut builder = app.updater_builder();
+    if let Ok(endpoint) = std::env::var("SOPHOS_UPDATE_ENDPOINT") {
+        let url = url::Url::parse(&endpoint)
+            .map_err(|e| format!("invalid SOPHOS_UPDATE_ENDPOINT '{endpoint}': {e}"))?;
+        builder = builder.endpoints(vec![url]).map_err(|e| e.to_string())?;
+        // Test/staging seam: the plugin rejects non-https endpoints in
+        // release builds and requires real TLS verification by default.
+        // This override is only active when the operator explicitly sets
+        // SOPHOS_UPDATE_ENDPOINT (e2e apply test), so production stays on
+        // the https feed with full certificate verification.
+        builder = builder.configure_client(|client| client.danger_accept_invalid_certs(true));
+    }
+    let updater = builder.build().map_err(|e| e.to_string())?;
+
+    match updater.check().await {
+        Ok(Some(update)) => {
+            let version = update.version.clone();
+            let notes = update.body.clone().unwrap_or_default();
+            eprintln!("[updater] update available: {version}");
+            *PENDING_UPDATE.lock().unwrap() = Some(update);
+            let _ = app.emit(
+                "update-available",
+                serde_json::json!({ "version": version, "notes": notes }),
+            );
+        }
+        Ok(None) => {
+            eprintln!("[updater] up to date");
+            let _ = app.emit("update-up-to-date", ());
+        }
+        Err(e) => return Err(e.to_string()),
+    }
+    Ok(())
+}
+
+/// Install the pending update (found by the startup check) and relaunch.
+#[tauri::command]
+fn install_update(app: AppHandle) -> Result<(), String> {
+    let update = PENDING_UPDATE
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or_else(|| "no update pending".to_string())?;
+    eprintln!("[updater] installing {}", update.version);
+    tauri::async_runtime::spawn(async move {
+        match update.download_and_install(|_, _| {}, || {}).await {
+            Ok(()) => eprintln!("[updater] install complete"),
+            Err(e) => {
+                eprintln!("[updater] install failed: {e}");
+                let _ = app.emit("update-install-error", e.to_string());
+            }
+        }
+    });
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Health monitor
 // ---------------------------------------------------------------------------
 
@@ -248,6 +334,14 @@ pub fn run() {
             } else {
                 daemon.start(&node_path, &daemon_path, daemon_tcp);
                 sidecar.start();
+            }
+
+            // Fire-and-forget update check — the app quietly polls the feed on
+            // every launch and prompts only when a newer version exists.
+            // Spawned before the health monitor below so `handle` is still
+            // owned here (spawn_health_monitor takes it by value).
+            spawn_update_check(handle.clone());
+            if !demo_mode {
                 spawn_health_monitor(handle, daemon.clone(), sidecar.clone(), daemon_tcp);
             }
 
@@ -279,7 +373,8 @@ pub fn run() {
             stop_engine,
             get_engine_status,
             read_text_file,
-            write_text_file
+            write_text_file,
+            install_update
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

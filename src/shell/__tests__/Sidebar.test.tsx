@@ -40,7 +40,7 @@ describe("Sidebar", () => {
     render(<Sidebar active="chat" onNavigate={() => {}} />);
     expect(screen.getByText("SOPHOS")).toBeInTheDocument();
     // The sidebar version literal tracks the current release (v0.7).
-    expect(screen.getByText("v0.7.1-beta")).toBeInTheDocument();
+    expect(screen.getByText("v0.7.2-beta")).toBeInTheDocument();
     expect(screen.getByText("Command")).toBeInTheDocument();
     expect(screen.getByText("⌘K")).toBeInTheDocument();
   });

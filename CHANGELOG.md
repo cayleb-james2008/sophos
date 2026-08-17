@@ -5,6 +5,15 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] — 2026-08-16 (Beta)
+
+### Added
+- **Real auto-updater trigger** — the app now checks the update feed on every launch (fire-and-forget, never blocks or fails startup) and shows a one-click banner when a newer version is available: "Update available — Sophos X.Y.Z" with an **Install & restart** button. The Rust shell owns the whole flow — the startup check (feed endpoint overridable with `SOPHOS_UPDATE_ENDPOINT` for staging/e2e) emits `update-available` / `update-up-to-date` / `update-check-error` events, the `UpdateBanner` in the Shell listens and renders, and clicking Install calls `install_update`, which downloads the signed installer, verifies its Ed25519 signature against the configured pubkey, installs it, and relaunches the app. Previously the updater plugin was registered but nothing ever called `check()`, so the published feeds (0.4 → 0.6) were never consumed — this is the trigger that makes the update feed actually reach users.
+
+### Tests
+- Unit — 1118 pass (up from 1113), `tsc --noEmit` clean. New coverage: `UpdateBanner` (renders nothing until the event, shows the announced version + notes, Install invokes `install_update` and flips to the downloading state, install-error surfaces visibly, listeners unregister on unmount).
+- cua-driver e2e — settings suite re-verified green (version badge now asserts 0.7.2); the update apply flow was verified live end to end (installed 0.7.2 pulled and installed the signed update from a staging feed, then relaunched).
+
 ## [0.7.1] — 2026-08-16 (Beta)
 
 ### Added
