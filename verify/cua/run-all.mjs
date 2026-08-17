@@ -32,8 +32,9 @@ const SUITES = [
 /** Hard per-suite timeout (ms). The slowest suites legitimately take ~5 minutes
  * (CHAT ~4.5min, STUDIO ~5min, SHELL's theme retry loop under WebView2 timing
  * flakes can run long), so 10 minutes leaves headroom while still catching a
- * genuinely hung suite. */
-const SUITE_TIMEOUT_MS = 10 * 60 * 1000;
+ * genuinely hung suite. Override with CUA_SUITE_TIMEOUT_MS to exercise the
+ * timeout path quickly in a smoke test. */
+const SUITE_TIMEOUT_MS = Number(process.env.CUA_SUITE_TIMEOUT_MS) || 10 * 60 * 1000;
 
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -41,7 +42,7 @@ const thisDir = path.dirname(fileURLToPath(import.meta.url));
  * Run one suite as a child process. Resolves with the suite result object.
  * Never rejects — crashes and timeouts are captured as failures.
  */
-function runSuiteChild(suite) {
+export function runSuiteChild(suite) {
   return new Promise((resolve) => {
     const scriptPath = path.join(thisDir, suite.file);
     const child = spawn(process.execPath, [scriptPath], {
@@ -60,11 +61,13 @@ function runSuiteChild(suite) {
       stderr += d;
     });
 
-    // Hard per-suite timeout: kill the child, then force-resolve shortly after
-    // in case the child somehow survives the kill and never emits `close`
-    // (belt-and-suspenders so the runner can never hang on a zombie child).
+    // The suite is resolved exactly once, either normally or (after cleanup)
+    // on the abnormal paths below. `settled` also gates the `close` handler so
+    // a spawn failure (already resolved via `error`) can't trigger a spurious
+    // cleanup, and `cleaningUp` makes cleanup idempotent across the timeout
+    // and `close` paths firing back-to-back.
     let settled = false;
-    let killedByTimer = false;
+    let cleaningUp = false;
     const finish = (result) => {
       if (settled) return;
       settled = true;
@@ -81,37 +84,57 @@ function runSuiteChild(suite) {
       reason: `timed out after ${SUITE_TIMEOUT_MS / 1000}s`,
     });
 
-    // Tear down what a killed suite left behind, THEN resolve — so the next
-    // suite never starts while orphaned processes are still being torn down.
-    // A suite killed by SIGKILL skips its own afterAll(), leaving the Sophos
-    // app + its WebView2 children + a possibly-degraded daemon behind; this
-    // kills those children and restarts the daemon. Best-effort and
-    // time-capped (the cua-driver CLI and the PowerShell both carry their own
-    // timeouts) so a stuck cleanup can never hang the runner.
-    const cleanupAndFinish = async () => {
+    // Non-timeout failure result. `code`/`signal` describe HOW it failed:
+    // a normal non-zero exit (a test failed after afterAll ran) or a hard
+    // termination (signal / null code — a crash that skipped afterAll).
+    const failResult = (code, signal) => ({
+      label: suite.label,
+      file: suite.file,
+      ok: false,
+      timedOut: false,
+      code,
+      signal,
+      reason:
+        signal !== null || code === null ? `abnormal exit (code=${code}, signal=${signal})` : `exit ${code}`,
+    });
+
+    const passResult = () => ({
+      label: suite.label,
+      file: suite.file,
+      ok: true,
+      timedOut: false,
+      code: 0,
+      signal: null,
+      reason: "exit 0",
+    });
+
+    // Tear down after every suite, THEN resolve — so the next suite never
+    // starts while the previous one's processes are still being torn down.
+    // Even a clean pass leaves WebView2 crashpad-handler processes behind (they
+    // outlive the app), and a killed/crashed suite additionally leaves the app
+    // + a possibly-degraded daemon; this sweep kills the app + Sophos WebView2
+    // and restarts the daemon regardless of outcome. Every sub-step is
+    // time-bounded (driver CLI calls, the PowerShell pass, and startDaemon's
+    // readiness poll all carry their own timeouts), so this can never hang the
+    // runner. Whichever path fires first (timeout or `close`) owns the result;
+    // the other becomes a no-op.
+    const cleanupAndFinish = async (result) => {
+      if (cleaningUp) return;
+      cleaningUp = true;
       console.error(`  … ${suite.label}: cleaning up app + WebView2 children, restarting daemon`);
-      let capped = false;
-      const cap = setTimeout(() => {
-        capped = true;
-        console.error(`  ! ${suite.label}: cleanup exceeded 60s (non-fatal); proceeding to next suite`);
-        finish(timedOutResult());
-      }, 60_000);
       try {
         await killLingeringAppInstances();
         await restartDaemon();
       } catch (err) {
         console.error(`  ! ${suite.label}: cleanup failed (non-fatal): ${err.message}`);
-      } finally {
-        clearTimeout(cap);
-        if (!capped) finish(timedOutResult());
       }
+      finish(result());
     };
 
     const killTimer = setTimeout(() => {
-      killedByTimer = true;
       console.error(`  ! ${suite.label}: exceeded ${SUITE_TIMEOUT_MS / 1000}s timeout; killing`);
       child.kill("SIGKILL");
-      cleanupAndFinish();
+      cleanupAndFinish(timedOutResult);
     }, SUITE_TIMEOUT_MS);
 
     child.on("error", (err) => {
@@ -127,31 +150,19 @@ function runSuiteChild(suite) {
     });
 
     child.on("close", (code, signal) => {
-      // A timeout or an abnormal natural termination skips the suite's own
-      // afterAll(), so it may leave the app + WebView2 + daemon behind.
-      // cleanupAndFinish owns resolution in that case.
-      const abnormal = killedByTimer || signal !== null || code === null;
-      if (abnormal) {
-        if (!killedByTimer) {
-          clearTimeout(killTimer);
-          killedByTimer = true;
-          console.error(`  ! ${suite.label}: abnormal exit (code=${code}, signal=${signal}); cleaning up`);
-          cleanupAndFinish();
-        }
-        // If killedByTimer was already true, cleanupAndFinish() is running and
-        // will resolve — do not resolve twice.
-        return;
-      }
       clearTimeout(killTimer);
-      finish({
-        label: suite.label,
-        file: suite.file,
-        ok: code === 0,
-        timedOut: false,
-        code,
-        signal,
-        reason: code === 0 ? "exit 0" : `exit ${code}`,
-      });
+      // A spawn failure already resolved via `error` (Node emits `close` after
+      // it, with null code/signal) — nothing ran, so there is nothing to clean.
+      if (settled) return;
+      // Tear down after EVERY suite, not just failures: a clean `kill_app`
+      // still leaves WebView2 crashpad-handler processes behind (they don't
+      // self-exit), so a passing suite leaks too. The exit code only sets the
+      // pass/fail label — cleanup is unconditional.
+      const passed = code === 0;
+      if (!cleaningUp && !passed) {
+        console.error(`  ! ${suite.label}: ${failResult(code, signal).reason}; cleaning up`);
+      }
+      cleanupAndFinish(passed ? passResult : () => failResult(code, signal));
     });
   });
 }
@@ -183,7 +194,9 @@ async function main() {
   console.log("  SUMMARY");
   console.log("================================================");
   for (const r of results) {
-    console.log(`  [${r.ok ? "PASS" : "FAIL"}] ${r.label.padEnd(10)} ${r.file} (${r.elapsedMs}ms) ${r.timedOut ? "TIMEOUT" : ""}`);
+    console.log(
+      `  [${r.ok ? "PASS" : "FAIL"}] ${r.label.padEnd(10)} ${r.file} (${r.elapsedMs}ms) ${r.timedOut ? "TIMEOUT" : ""}`,
+    );
   }
   console.log(`\n  ${passed}/${results.length} suites passed, ${failed} failed (${totalMs}ms total)`);
 
@@ -198,4 +211,5 @@ async function main() {
   }
 }
 
-main();
+const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMainModule) main();

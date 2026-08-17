@@ -10,10 +10,11 @@ import { execSync } from "node:child_process";
 import { call, listWindows, startDaemon, stopDaemon, sleep } from "./driver.mjs";
 
 /**
- * Kill every running Sophos app instance plus its WebView2 descendants.
- * Killing only the app's own msedgewebview2 descendants avoids disrupting
- * other apps' WebView2 (the descendants hold the Local Storage file lock after
- * the main process dies). Best-effort — never throws.
+ * Kill every running Sophos app instance plus every Sophos WebView2 process.
+ * WebView2 is matched by the Tauri identifier (`com.sophos.app`) in its
+ * command line, not by parent chain, so other apps' WebView2 are left alone
+ * while detached survivors (crashpad-handler, orphaned renderers) are still
+ * caught after the app process has already died. Best-effort — never throws.
  */
 export async function killLingeringAppInstances() {
   try {
@@ -33,13 +34,18 @@ export async function killLingeringAppInstances() {
   }
   await sleep(1500);
   try {
-    const ps =
-      "$roots=Get-CimInstance Win32_Process|Where-Object{$_.Name -eq 'prime-agent-windows.exe'};" +
-      "foreach($p in $roots){Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue};" +
-      "Get-CimInstance Win32_Process|Where-Object{$_.Name -eq 'msedgewebview2.exe'}|ForEach-Object{" +
-      "$pp=$_.ParentProcessId;$isChild=$false;" +
-      "for($i=0;$i -lt 8 -and $pp;$i++){$par=Get-CimInstance Win32_Process -Filter \"ProcessId=$pp\" -ErrorAction SilentlyContinue;if(-not $par){break};if($par.Name -eq 'prime-agent-windows.exe'){$isChild=$true;break};$pp=$par.ParentProcessId};" +
-      "if($isChild){Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}}";
+    // Force sweep by identity: kill every Sophos app process and every Sophos
+    // WebView2 process (matched on the Tauri identifier in its command line).
+    // Matching `com.sophos.app` — rather than walking the parent chain — is
+    // what reaches crashpad-handler / detached WebView2 that outlive the app's
+    // death (an ancestor walk misses them once their parent PID is gone).
+    const ps = [
+      "$targets = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {",
+      "  $_.Name -eq 'prime-agent-windows.exe' -or",
+      "  ($_.Name -eq 'msedgewebview2.exe' -and $_.CommandLine -like '*com.sophos.app*')",
+      "};",
+      "foreach ($p in $targets) { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }",
+    ].join(" ");
     execSync(`powershell -NoProfile -Command "${ps}"`, { timeout: 30000 });
   } catch {
     // Best-effort.

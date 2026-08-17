@@ -20,8 +20,12 @@ import { existsSync } from "node:fs";
 
 /** Path to the cua-driver binary. Override with the CUA_DRIVER_BIN env var. */
 export const DRIVER_BIN =
-  process.env.CUA_DRIVER_BIN ||
-  "C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe";
+  process.env.CUA_DRIVER_BIN || "C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe";
+
+/** Hard cap on any single `cua-driver` CLI call. The CLI has its own short
+ * internal timeouts, but a wedged daemon/named-pipe must never be able to block
+ * the suite runner (or its post-timeout cleanup) indefinitely. */
+const CLI_CALL_TIMEOUT_MS = 60_000;
 
 /** Small sleep helper (ms). */
 export function sleep(ms) {
@@ -38,6 +42,7 @@ export function call(tool, args = {}) {
     input: JSON.stringify(args),
     encoding: "utf-8",
     windowsHide: true,
+    timeout: CLI_CALL_TIMEOUT_MS,
   });
 
   if (result.error) {
@@ -92,7 +97,11 @@ export function callWithForegroundFallback(tool, args = {}) {
  * up it is left untouched. Returns `{ alreadyRunning }`.
  */
 export function startDaemon() {
-  const status = spawnSync(DRIVER_BIN, ["status"], { encoding: "utf-8", windowsHide: true });
+  const status = spawnSync(DRIVER_BIN, ["status"], {
+    encoding: "utf-8",
+    windowsHide: true,
+    timeout: CLI_CALL_TIMEOUT_MS,
+  });
   if (status.stdout && /daemon is running/i.test(status.stdout)) {
     return { alreadyRunning: true };
   }
@@ -106,7 +115,11 @@ export function startDaemon() {
 
   // Poll until the daemon answers.
   for (let i = 0; i < 40; i++) {
-    const s = spawnSync(DRIVER_BIN, ["status"], { encoding: "utf-8", windowsHide: true });
+    const s = spawnSync(DRIVER_BIN, ["status"], {
+      encoding: "utf-8",
+      windowsHide: true,
+      timeout: CLI_CALL_TIMEOUT_MS,
+    });
     if (s.stdout && /daemon is running/i.test(s.stdout)) {
       return { alreadyRunning: false };
     }
@@ -121,7 +134,11 @@ export function startDaemon() {
 
 /** Stop the cua-driver daemon. Returns the driver's status output. */
 export function stopDaemon() {
-  const result = spawnSync(DRIVER_BIN, ["stop"], { encoding: "utf-8", windowsHide: true });
+  const result = spawnSync(DRIVER_BIN, ["stop"], {
+    encoding: "utf-8",
+    windowsHide: true,
+    timeout: CLI_CALL_TIMEOUT_MS,
+  });
   return result.stdout || result.stderr || "";
 }
 
