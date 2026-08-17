@@ -1,12 +1,12 @@
 {
-  "version": "0.7.1",
-  "notes": "Sophos v0.7.1 (Beta) — Profile Studio (Creator mode made visual): build your own agent profiles from the live runtime with hot reload and in-memory testing, plus profile export/import with native dialogs and collision-safe round-trips. Builds on the v0.7 conversation-first shell, automatic local-model detection, agent profiles with the Gauntlet baseline and Standard / Minimal / Creator / Code modes, the Trajectory event log, and Code Mode's typed TypeScript tool SDK. 1113 unit tests. All versions before v1.0 are beta.",
+  "version": "0.7.2",
+  "notes": "Sophos v0.7.2 (Beta) — real auto-updater trigger: the app checks the update feed on every launch (fire-and-forget) and shows a one-click banner when a newer version is available (download, Ed25519-verify, install, relaunch). Builds on the v0.7 conversation-first shell, automatic local-model detection, agent profiles with the Gauntlet baseline and Standard / Minimal / Creator / Code modes, the Trajectory event log, Code Mode's typed TypeScript tool SDK, and the v0.7.1 Profile Studio with export/import. 1118 unit tests. All versions before v1.0 are beta.",
   "pub_date": "2026-08-16T00:00:00Z",
   "channel": "beta",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcGFCdUhRUmhMcFoyb1lkTXpVYWJ1L3BCMFVNZnFIdStrOTJ0b3JScUs5ZUdxdWVjWndOM3kxMkRGOUg1cEwzK0RkSWQ5ZG5UR2NPTjFzb0JVelZ4SGcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2OTI2MzY4CWZpbGU6U29waG9zXzAuNy4xX3g2NC1zZXR1cC5leGUKU0pybFFPclpCYTF6Z2hHa2hMVUdvZVlNcVRoZWtYVnJiZ0hnZmJIWFAycmV5cDVaZkFCUW0ybnVxcFBVKzJIamhMNWdMckNBN0gvTGlCeFY4Z05vQmc9PQo=",
-      "url": "https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.7.1/Sophos_0.7.1_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcGVpUHkwT0xNQ2dOOHljMTY0WDdtOG5GTjJFK0RPNER2bVRzeG5MRUgyUDFkNXU2TjF3VW1veGUzV2NwSW5QY1dpRlpqUnVCQzR6NnFmN2FSRzhhV2dVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2OTMzNjQxCWZpbGU6U29waG9zXzAuNy4yX3g2NC1zZXR1cC5leGUKL0ZyNE42K2dsQnNlblpEclIyLzRCNjVrbmpENWpmcUlyYXg2Wkxmam5CYk5IYWJZbVNKb1hzeGdZdXFxUXNhclpCd0Y5WEV6THFpNUcyVXdOc1IyQ0E9PQo=",
+      "url": "https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.7.2/Sophos_0.7.2_x64-setup.exe"
     }
   }
 }
