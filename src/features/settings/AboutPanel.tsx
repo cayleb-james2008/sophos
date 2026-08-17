@@ -24,11 +24,7 @@ export function AboutPanel() {
           A Windows-native coding agent. All versions before v1.0 are beta releases.
         </Text>
         <div className="about-panel__links">
-          <a
-            href="https://gitlab.com/caylebalvarez-james/sophos"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a href="https://gitlab.com/caylebalvarez-james/sophos" target="_blank" rel="noopener noreferrer">
             GitLab
           </a>
           <span> · </span>

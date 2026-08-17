@@ -75,10 +75,20 @@ vi.mock("../../../features/providers/ModelSelector", () => ({
 }));
 
 vi.mock("../../../features/settings/OnboardingWizard", () => ({
-  OnboardingWizard: ({ onSetupProviders, onStartChat }: { onSetupProviders: () => void; onStartChat: () => void }) => (
+  OnboardingWizard: ({
+    onSetupProviders,
+    onStartChat,
+  }: {
+    onSetupProviders: () => void;
+    onStartChat: () => void;
+  }) => (
     <div data-testid="mock-onboarding">
-      <button type="button" onClick={onSetupProviders}>setup providers</button>
-      <button type="button" onClick={onStartChat}>start chat</button>
+      <button type="button" onClick={onSetupProviders}>
+        setup providers
+      </button>
+      <button type="button" onClick={onStartChat}>
+        start chat
+      </button>
     </div>
   ),
 }));
@@ -90,7 +100,13 @@ class ResizeObserverMock {
 }
 
 const clipboard = { writeText: vi.fn().mockResolvedValue(undefined) };
-const asst = (content: string): TranscriptMessage => ({ id: "a-1", role: "assistant", content, timestamp: "2026-01-01T12:00:00.000Z", status: "complete" });
+const asst = (content: string): TranscriptMessage => ({
+  id: "a-1",
+  role: "assistant",
+  content,
+  timestamp: "2026-01-01T12:00:00.000Z",
+  status: "complete",
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -138,7 +154,10 @@ describe("ChatView error card", () => {
   it("enables Retry and re-issues the last assistant turn when one exists", () => {
     const a = asst("an answer");
     mockState.chat.error = "boom";
-    mockState.chat.messages = [{ id: "u-1", role: "user", content: "q", timestamp: "2026", status: "complete" }, a];
+    mockState.chat.messages = [
+      { id: "u-1", role: "user", content: "q", timestamp: "2026", status: "complete" },
+      a,
+    ];
     render(<ChatView />);
     // Scope to the error card: the assistant row also renders a MessageActions retry.
     const retry = within(screen.getByRole("alert")).getByRole("button", { name: /retry/i });

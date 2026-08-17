@@ -120,7 +120,10 @@ export function ShortcutsOverlay({ open, onClose, groups }: ShortcutsOverlayProp
             <h3 className="shortcuts-overlay__grouphead">{group.title}</h3>
             <div className="shortcuts-overlay__rows">
               {group.shortcuts.map((s) => (
-                <div key={`${s.key}-${s.modifiers?.join("-") ?? ""}-${s.description}`} className="shortcuts-overlay__row">
+                <div
+                  key={`${s.key}-${s.modifiers?.join("-") ?? ""}-${s.description}`}
+                  className="shortcuts-overlay__row"
+                >
                   <div className="shortcuts-overlay__label">{s.description}</div>
                   <KeyCombo keyName={s.key} modifiers={s.modifiers} />
                 </div>

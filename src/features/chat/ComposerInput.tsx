@@ -25,7 +25,21 @@ type Props = {
   onSetName: (name: string) => void;
 };
 
-export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSend, onAbort, onSteer, onQueueFollowUp, onClearFollowUps, onPopFollowUp, onSideQuestion, onShell, onSetName }: Props) {
+export function ComposerInput({
+  busy,
+  setupReady,
+  editDraft,
+  starterDraft,
+  onSend,
+  onAbort,
+  onSteer,
+  onQueueFollowUp,
+  onClearFollowUps,
+  onPopFollowUp,
+  onSideQuestion,
+  onShell,
+  onSetName,
+}: Props) {
   const [value, setValue] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
   const canSend = value.trim().length > 0 && !busy && setupReady;
@@ -47,12 +61,18 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
     if (cdNoticeTimer.current) window.clearTimeout(cdNoticeTimer.current);
     cdNoticeTimer.current = window.setTimeout(() => setCdNotice(null), 2600);
   };
-  useEffect(() => () => {
-    if (cdNoticeTimer.current) window.clearTimeout(cdNoticeTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (cdNoticeTimer.current) window.clearTimeout(cdNoticeTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
-    ipc.getSlashCommands().then(setSlashCommands).catch(() => {});
+    ipc
+      .getSlashCommands()
+      .then(setSlashCommands)
+      .catch(() => {});
   }, [ipc]);
 
   // Daemon-discovered commands plus the client-side set (/cd). Every filter and
@@ -105,7 +125,6 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
     updateSlashState(v, e.target.selectionStart);
   };
 
-
   // Auto-grow the textarea.
   useEffect(() => {
     const el = taRef.current;
@@ -120,15 +139,24 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
     el.style.height = "auto";
     el.focus();
   };
-  const clearInput = () => { setValue(""); focusInput(); };
+  const clearInput = () => {
+    setValue("");
+    focusInput();
+  };
 
   // Load edit-and-resend draft; keyed by starter seq so re-picking refills.
   useEffect(() => {
-    if (editDraft) { setValue(editDraft.text); focusInput(); }
+    if (editDraft) {
+      setValue(editDraft.text);
+      focusInput();
+    }
   }, [editDraft]);
   useEffect(() => {
-    if (starterDraft) { setValue(starterDraft.text); focusInput(); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (starterDraft) {
+      setValue(starterDraft.text);
+      focusInput();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on seq so a new starter applies exactly once; the text is read from the latest draft at effect time.
   }, [starterDraft?.seq]);
 
   // Route a submitted line by prefix + busy state.
@@ -143,14 +171,42 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
     if (raw.startsWith("/btw ") || raw.startsWith("/side ")) {
       const kind: "btw" | "side" = raw.startsWith("/btw ") ? "btw" : "side";
       const q = (kind === "btw" ? raw.slice(5) : raw.slice(6)).trim();
-      if (q) { onSideQuestion(kind, q); clearInput(); }
+      if (q) {
+        onSideQuestion(kind, q);
+        clearInput();
+      }
       return;
     }
-    if (raw.startsWith("!!")) { const cmd = raw.slice(2).trim(); if (cmd) { onShell(cmd, true); clearInput(); } return; }
-    if (raw.startsWith("!")) { const cmd = raw.slice(1).trim(); if (cmd) { onShell(cmd, false); clearInput(); } return; }
-    if (raw.startsWith("/name ")) { const name = raw.slice(6).trim(); if (name) { onSetName(name); clearInput(); } return; }
+    if (raw.startsWith("!!")) {
+      const cmd = raw.slice(2).trim();
+      if (cmd) {
+        onShell(cmd, true);
+        clearInput();
+      }
+      return;
+    }
+    if (raw.startsWith("!")) {
+      const cmd = raw.slice(1).trim();
+      if (cmd) {
+        onShell(cmd, false);
+        clearInput();
+      }
+      return;
+    }
+    if (raw.startsWith("/name ")) {
+      const name = raw.slice(6).trim();
+      if (name) {
+        onSetName(name);
+        clearInput();
+      }
+      return;
+    }
     if (!trimmed || !setupReady) return;
-    if (busy) { onSteer(trimmed); clearInput(); return; }
+    if (busy) {
+      onSteer(trimmed);
+      clearInput();
+      return;
+    }
     onSend(trimmed);
     clearInput();
   };
@@ -210,7 +266,11 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
     if (e.key === "Enter" && e.altKey) {
       e.preventDefault();
       const t = value.trim();
-      if (t) { onQueueFollowUp(t); setValue(""); focusInput(); }
+      if (t) {
+        onQueueFollowUp(t);
+        setValue("");
+        focusInput();
+      }
       return;
     }
     // Enter sends (idle) or steers (busy); Shift+Enter is a newline.
@@ -226,13 +286,19 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
   return (
     <div className="composer-input">
       {cdNotice ? (
-        <div className="composer-cd-notice" role="status">{cdNotice}</div>
+        <div className="composer-cd-notice" role="status">
+          {cdNotice}
+        </div>
       ) : null}
 
       {fileHintVisible ? (
         <div className="composer-input-filehint">
-          <Text variant="micro" tone="accent" mono>@</Text>
-          <Text variant="micro" tone="muted">reference a project file</Text>
+          <Text variant="micro" tone="accent" mono>
+            @
+          </Text>
+          <Text variant="micro" tone="muted">
+            reference a project file
+          </Text>
         </div>
       ) : null}
 
@@ -241,8 +307,14 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
           commands={allCommands}
           query={slashQuery}
           onSelect={(cmd) => {
-            if (cmd.name === "cd") { setSlashOpen(false); void handleCd(); return; }
-            setValue(`/${cmd.name} `); setSlashOpen(false); focusInput();
+            if (cmd.name === "cd") {
+              setSlashOpen(false);
+              void handleCd();
+              return;
+            }
+            setValue(`/${cmd.name} `);
+            setSlashOpen(false);
+            focusInput();
           }}
           onDismiss={() => setSlashOpen(false)}
           selectedIndex={slashSelectedIdx}
@@ -250,18 +322,44 @@ export function ComposerInput({ busy, setupReady, editDraft, starterDraft, onSen
         />
       ) : null}
 
-      <textarea ref={taRef} value={value} onChange={handleChange} onKeyDown={onKeyDown}
-        placeholder={busy ? "Working… type to steer (Enter), queue a follow-up (Alt+Enter)" : setupReady ? "Message Sophos…  (@ file · ! shell · /btw side question)" : "Finish setup above to enable your first chat"}
-        rows={1} aria-label="Message input" className="composer-input-textarea pa-focus-ring" />
+      <textarea
+        ref={taRef}
+        value={value}
+        onChange={handleChange}
+        onKeyDown={onKeyDown}
+        placeholder={
+          busy
+            ? "Working… type to steer (Enter), queue a follow-up (Alt+Enter)"
+            : setupReady
+              ? "Message Sophos…  (@ file · ! shell · /btw side question)"
+              : "Finish setup above to enable your first chat"
+        }
+        rows={1}
+        aria-label="Message input"
+        className="composer-input-textarea pa-focus-ring"
+      />
 
       {busy ? (
-        <Button variant="danger" type="button" onClick={onAbort} title="Stop generating" aria-label="Stop generating"
-          className="composer-input-btn composer-input-btn--stop">
+        <Button
+          variant="danger"
+          type="button"
+          onClick={onAbort}
+          title="Stop generating"
+          aria-label="Stop generating"
+          className="composer-input-btn composer-input-btn--stop"
+        >
           <StopIcon color={tokens.color.danger} />
         </Button>
       ) : (
-        <Button variant="primary" type="button" onClick={submit} disabled={!canSend} title="Send (Enter)" aria-label="Send message"
-          className={`composer-input-btn ${canSend ? "composer-input-btn--send" : "composer-input-btn--send-disabled"}`}>
+        <Button
+          variant="primary"
+          type="button"
+          onClick={submit}
+          disabled={!canSend}
+          title="Send (Enter)"
+          aria-label="Send message"
+          className={`composer-input-btn ${canSend ? "composer-input-btn--send" : "composer-input-btn--send-disabled"}`}
+        >
           <SendIcon color={canSend ? tokens.color.bg : tokens.color.textDim} />
         </Button>
       )}

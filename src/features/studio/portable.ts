@@ -65,9 +65,7 @@ export function serializeCustomProfile(profile: CustomProfile): string {
   return JSON.stringify(envelope, null, 2);
 }
 
-export type ParseProfileResult =
-  | { ok: true; profile: CustomProfile }
-  | { ok: false; error: string };
+export type ParseProfileResult = { ok: true; profile: CustomProfile } | { ok: false; error: string };
 
 /**
  * Parse an exported file back into a profile. Accepts the envelope written by
@@ -106,7 +104,10 @@ export function parseCustomProfileFile(text: string): ParseProfileResult {
     }
   } else if ("profile" in record) {
     // A foreign envelope — reject with a clear message instead of guessing.
-    return { ok: false, error: "The file looks like an export from another app — it is not a Sophos custom profile." };
+    return {
+      ok: false,
+      error: "The file looks like an export from another app — it is not a Sophos custom profile.",
+    };
   } else {
     raw = record;
   }
@@ -122,7 +123,10 @@ export function parseCustomProfileFile(text: string): ParseProfileResult {
   if (r.skills !== undefined && !Array.isArray(r.skills)) {
     return { ok: false, error: "The profile's skill list is malformed (expected an array of skill names)." };
   }
-  if (r.safety !== undefined && (typeof r.safety !== "object" || r.safety === null || Array.isArray(r.safety))) {
+  if (
+    r.safety !== undefined &&
+    (typeof r.safety !== "object" || r.safety === null || Array.isArray(r.safety))
+  ) {
     return { ok: false, error: "The profile's safety posture is malformed (expected an object)." };
   }
 
@@ -130,7 +134,8 @@ export function parseCustomProfileFile(text: string): ParseProfileResult {
   if (!isCustomProfileUsable(profile)) {
     return {
       ok: false,
-      error: "The file does not contain a usable profile — a custom profile needs a name and at least one tool.",
+      error:
+        "The file does not contain a usable profile — a custom profile needs a name and at least one tool.",
     };
   }
   return { ok: true, profile };
@@ -182,15 +187,28 @@ export function mergeImportedProfile(
 
   if (!idTaken && !nameTaken) return { profile: clean, resolution: null };
 
-  let profile: CustomProfile = { ...clean, tools: [...clean.tools], skills: [...clean.skills], safety: { ...clean.safety, confirm: [...clean.safety.confirm] } };
-  const resolution: ImportResolution = { idChanged: false, renamed: false, originalName: clean.name, finalName: clean.name };
+  let profile: CustomProfile = {
+    ...clean,
+    tools: [...clean.tools],
+    skills: [...clean.skills],
+    safety: { ...clean.safety, confirm: [...clean.safety.confirm] },
+  };
+  const resolution: ImportResolution = {
+    idChanged: false,
+    renamed: false,
+    originalName: clean.name,
+    finalName: clean.name,
+  };
 
   if (idTaken) {
     profile = { ...profile, id: newCustomProfileId() };
     resolution.idChanged = true;
   }
   if (nameTaken) {
-    const finalName = uniqueCopyName(clean.name, existing.map((p) => p.name));
+    const finalName = uniqueCopyName(
+      clean.name,
+      existing.map((p) => p.name),
+    );
     profile = { ...profile, name: finalName };
     resolution.renamed = true;
     resolution.finalName = finalName;
@@ -208,24 +226,37 @@ export type ProfileFileResult =
   | { ok: false; cancelled: false; error: string };
 
 /** Read a file the user picked in the native dialog (Tauri shell command). */
-async function readViaTauri(path: string): Promise<{ ok: true; text: string } | { ok: false; cancelled: false; error: string }> {
+async function readViaTauri(
+  path: string,
+): Promise<{ ok: true; text: string } | { ok: false; cancelled: false; error: string }> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     const text = await invoke<string>("read_text_file", { path });
     return { ok: true, text };
   } catch (err) {
-    return { ok: false, cancelled: false, error: `Could not read the selected file: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      ok: false,
+      cancelled: false,
+      error: `Could not read the selected file: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 }
 
 /** Write the exported file to a path the user chose in the native dialog. */
-async function writeViaTauri(path: string, contents: string): Promise<{ ok: true } | { ok: false; cancelled: false; error: string }> {
+async function writeViaTauri(
+  path: string,
+  contents: string,
+): Promise<{ ok: true } | { ok: false; cancelled: false; error: string }> {
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     await invoke("write_text_file", { path, contents });
     return { ok: true };
   } catch (err) {
-    return { ok: false, cancelled: false, error: `Could not write the file: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      ok: false,
+      cancelled: false,
+      error: `Could not write the file: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 }
 
@@ -252,7 +283,8 @@ async function pickInBrowser(): Promise<ProfileFileResult & { text?: string }> {
       }
       const reader = new FileReader();
       reader.onload = () => finish({ ok: true, detail: file.name, text: String(reader.result ?? "") });
-      reader.onerror = () => finish({ ok: false, cancelled: false, error: "The selected file could not be read." });
+      reader.onerror = () =>
+        finish({ ok: false, cancelled: false, error: "The selected file could not be read." });
       reader.readAsText(file);
     });
     // Browsers fire no event when the picker is cancelled — detect the focus
@@ -285,7 +317,11 @@ function downloadInBrowser(text: string, filename: string): ProfileFileResult {
     URL.revokeObjectURL(url);
     return { ok: true, detail: `Downloaded ${filename}` };
   } catch (err) {
-    return { ok: false, cancelled: false, error: `Could not save the file: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      ok: false,
+      cancelled: false,
+      error: `Could not save the file: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 }
 
@@ -308,7 +344,11 @@ export async function exportProfileToFile(profile: CustomProfile): Promise<Profi
       if (!written.ok) return written;
       return { ok: true, detail: `Saved to ${path}` };
     } catch (err) {
-      return { ok: false, cancelled: false, error: `Could not open the save dialog: ${err instanceof Error ? err.message : String(err)}` };
+      return {
+        ok: false,
+        cancelled: false,
+        error: `Could not open the save dialog: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   }
   return downloadInBrowser(contents, filename);
@@ -332,7 +372,11 @@ export async function importProfileFromFile(): Promise<ProfileFileResult & { tex
       if (!read.ok) return read;
       return { ok: true, detail: path, text: read.text };
     } catch (err) {
-      return { ok: false, cancelled: false, error: `Could not open the file dialog: ${err instanceof Error ? err.message : String(err)}` };
+      return {
+        ok: false,
+        cancelled: false,
+        error: `Could not open the file dialog: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   }
   return pickInBrowser();

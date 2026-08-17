@@ -66,7 +66,11 @@ function asStringArray(value: unknown): string[] {
 }
 
 function asMode(value: unknown): ProfileMode {
-  return value === "minimal" || value === "creator" || value === "code" ? value : value === "standard" ? "standard" : "standard";
+  return value === "minimal" || value === "creator" || value === "code"
+    ? value
+    : value === "standard"
+      ? "standard"
+      : "standard";
 }
 
 function asSafety(value: unknown): { autoApprove: boolean; confirm: string[] } {
@@ -91,7 +95,11 @@ export function sanitizeCustomProfile(raw: unknown): CustomProfile {
   // Preserve an EXPLICIT empty tool list so isCustomProfileUsable can flag the
   // profile unusable (→ degrades to Standard at activation). Only garbage
   // (non-array) input falls back to the Standard-style default set.
-  const tools = Array.isArray(r.tools) ? asStringArray(r.tools) : r.tools === undefined ? [] : [...DEFAULT_CUSTOM_TOOLS];
+  const tools = Array.isArray(r.tools)
+    ? asStringArray(r.tools)
+    : r.tools === undefined
+      ? []
+      : [...DEFAULT_CUSTOM_TOOLS];
   const skills = asStringArray(r.skills);
   const safety = asSafety(r.safety);
   const workingStyle = asStringArray(r.workingStyle);
@@ -186,7 +194,9 @@ export function createCustomProfileDraft(patch: Partial<CustomProfile> = {}): Cu
  * built-in profiles use (name + mode + working style), so a custom profile's
  * instructions always match what the studio shows.
  */
-export function buildCustomSystemPrompt(profile: Pick<CustomProfile, "name" | "mode" | "workingStyle" | "tagline">): string {
+export function buildCustomSystemPrompt(
+  profile: Pick<CustomProfile, "name" | "mode" | "workingStyle" | "tagline">,
+): string {
   const style = profile.workingStyle.length ? profile.workingStyle.join("; ") : "clear, direct work";
   const modeNote =
     profile.mode === "minimal"
@@ -219,9 +229,13 @@ export function customComposition(profile: CustomProfile): ProfileComposition {
  * reflects the live draft: editing the name/tagline/working-style chips in the
  * studio changes the next simulated response immediately — before Save.
  */
-export function customDemoFlavor(profile: Pick<CustomProfile, "name" | "tagline" | "workingStyle"> | undefined): string {
+export function customDemoFlavor(
+  profile: Pick<CustomProfile, "name" | "tagline" | "workingStyle"> | undefined,
+): string {
   if (!profile || !profile.name) return "";
-  const style = profile.workingStyle.length ? profile.workingStyle.slice(0, 3).join(", ") : "custom composition";
+  const style = profile.workingStyle.length
+    ? profile.workingStyle.slice(0, 3).join(", ")
+    : "custom composition";
   return [
     `\n\nStatus — demo run in the “${profile.name}” custom profile (simulated response; evidence is a UI round-trip, not a live tool run)`,
     profile.tagline ? `\nProfile — ${profile.tagline}` : "",

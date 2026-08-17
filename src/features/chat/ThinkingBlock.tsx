@@ -9,7 +9,16 @@ import { Text, Button } from "../../design";
 
 function ThinkingIcon({ size = 13, color }: { size?: number; color: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12 3a4 4 0 0 0-4 4c0 1.2.5 2.2 1.3 3A4 4 0 0 0 8 13a4 4 0 0 0 8 0 4 4 0 0 0-1.3-3A4 4 0 0 0 16 7a4 4 0 0 0-4-4z" />
       <path d="M9 18h6M10 21h4" />
     </svg>
@@ -44,11 +53,7 @@ export function ThinkingBlock({
         {streaming ? (
           <span className="thinking-dots">
             {[0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className="thinking-dot"
-                style={{ "--delay": `${i * 0.2}s` } as CSSProperties}
-              />
+              <span key={i} className="thinking-dot" style={{ "--delay": `${i * 0.2}s` } as CSSProperties} />
             ))}
           </span>
         ) : (
@@ -75,9 +80,7 @@ export function ThinkingBlock({
 
       {open ? (
         <div className="thinking-body">
-          <div className="thinking-text">
-            {hasContent ? thinking : "Reasoning in progress…"}
-          </div>
+          <div className="thinking-text">{hasContent ? thinking : "Reasoning in progress…"}</div>
         </div>
       ) : null}
     </div>

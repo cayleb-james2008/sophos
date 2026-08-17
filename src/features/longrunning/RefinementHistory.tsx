@@ -106,7 +106,8 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
         </Text>
         <Text variant="body" tone="muted">
           Refinement iterates on the agent's own instructions to tighten them against the goal. A proposed
-          change is held for your review — apply it only if you approve. Roll back a prior pass if it regressed.
+          change is held for your review — apply it only if you approve. Roll back a prior pass if it
+          regressed.
         </Text>
 
         {/* Trust note — D37/D38: the human holds the pen. */}
@@ -131,9 +132,7 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
             </Text>
           </div>
 
-          {pending.result.summary ? (
-            <Text variant="body">{pending.result.summary}</Text>
-          ) : null}
+          {pending.result.summary ? <Text variant="body">{pending.result.summary}</Text> : null}
           {pending.result.rationale ? (
             <Text variant="micro" tone="muted">
               Rationale: {pending.result.rationale}
@@ -152,9 +151,7 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
               </Text>
               {(pending.result.appliedEdits ?? []).map((e, i) => (
                 <div key={e.id ?? i} className="lr-ref-edit">
-                  <span
-                    className={`lr-ref-edit-dot${e.applied ? " lr-ref-edit-dot--applied" : ""}`}
-                  />
+                  <span className={`lr-ref-edit-dot${e.applied ? " lr-ref-edit-dot--applied" : ""}`} />
                   <Text variant="micro" mono className="lr-ref-edittitle">
                     {e.title ?? e.action ?? e.kind ?? "edit"}
                   </Text>
@@ -212,7 +209,13 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
           disabled={busy}
         />
         <div>
-          <Button variant="accent-soft" size="md" icon={<RefreshIcon size={13} />} onClick={() => void refineNow()} loading={busy}>
+          <Button
+            variant="accent-soft"
+            size="md"
+            icon={<RefreshIcon size={13} />}
+            onClick={() => void refineNow()}
+            loading={busy}
+          >
             Refine now
           </Button>
         </div>
@@ -229,9 +232,9 @@ export function RefinementHistory({ initial = [] }: RefinementHistoryProps) {
               No refinements yet
             </Text>
             <Text variant="micro" tone="dim">
-              Run a "refine now" pass above. When the daemon reports a proposed change it appears here for your
-              review — apply it to accept, discard to reject. Past passes with timestamps and rollback controls
-              are listed below.
+              Run a "refine now" pass above. When the daemon reports a proposed change it appears here for
+              your review — apply it to accept, discard to reject. Past passes with timestamps and rollback
+              controls are listed below.
             </Text>
           </div>
         ) : (

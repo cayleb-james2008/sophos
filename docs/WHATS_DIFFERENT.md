@@ -24,7 +24,7 @@ leaking, venv paths being wrong, and installers that didn't exist.
 | **#660** Kernel bootstrap uses `bin/python` (POSIX); on Windows the venv interpreter lives at `Scripts/python.exe`, so the IPython kernel **never starts** and the agent has no execution tool. | The Tauri shell resolves the real Windows interpreter and passes it via `PRIME_AGENT_KERNEL_PYTHON`. Verified: the installed app executes Python and reports live interpreter state. |
 | **#665 / #719** No Windows installer at all; "doesn't work on Windows". | A signed NSIS installer and MSI, built fresh from current source, installs to `~\AppData\Local\Sophos` with a bundled Node runtime, daemon, and bridge. No admin, no manual dependency install. |
 | **#735 / #668 / #869** Multiple console windows steal focus on launch and on every tool call. | Tauri spawns the daemon and bridge with `CREATE_NO_WINDOW` (hides those two processes). Because that flag does **not** propagate to grandchildren, the daemon is also launched with a `--require` preload (`scripts/no-window-preload.cjs`) that defaults every daemon-side `child_process` spawn (`spawn`, `spawnSync`, `exec`, `execSync`, `execFile`, `execFileSync`) to `windowsHide: true` — so the daemon's own children (kernels, shells, tool processes) no longer flash or steal focus. Explicit `windowsHide` values are preserved. |
-| **#666 / #667 / #841 / #1045** `fsync` EPERM, stale session leases, crashed-worker lock directories, and poisoned worker descriptors make a crashed Windows host effectively unrecoverable without manual filesystem surgery. | The bundled runtime clears stale leases and orphaned worker descriptors at startup, so a host restart no longer bricks every session. |
+| **#666 / #667 / #841 / #1045** `fsync` EPERM, stale session leases, crashed-worker lock directories, and poisoned worker descriptors make a crashed Windows host effectively unrecoverable without manual filesystem surgery. | A conservative Rust startup sweep (v0.8.0, `src-tauri/src/lease.rs`) clears crash-leftover lease debris and reclaims stale session leases (dead owner PID + past a 1-hour grace window) before the daemon spawns. The bundled daemon additionally self-heals a stale lease on next acquire; orphaned worker descriptors are self-managed by the daemon supervisor on startup. |
 | **#735 / #1023 / #1047** Shell-resolution bugs (Git Bash required, `%%bash` routing into WSL, `npm run check` failing without POSIX `sh`). | Bundled Node runtime and internal shell resolution remove the Git Bash dependency entirely. |
 
 **Result:** upstream's #1 complaint — "doesn't work on Windows" — is the
@@ -141,7 +141,7 @@ live in the daemon itself, and patching the bundled daemon would be
 overwritten on every upstream sync. These are recorded here so the list is
 honest:
 
-- **#666 / #667 / #841 / #1045** — the underlying daemon lease/fsync bugs; Sophos works around them with startup cleanup but the root cause is upstream's.
+- **#666 / #667 / #841 / #1045** — the underlying daemon lease/fsync bugs; Sophos works around them with the v0.8.0 startup lease sweep (`src-tauri/src/lease.rs`) but the root cause is upstream's.
 - **#986** — goal-looping logic in the daemon's continuation engine; Sophos adds a client-side watchdog that surfaces and stops the loop.
 - **#1000** — programmatic-prompt delivery timing in the daemon; Sophos guarantees delivery at the bridge layer.
 - **#1054** — child-usage event volume in the daemon; Sophos coalesces at the UI layer.

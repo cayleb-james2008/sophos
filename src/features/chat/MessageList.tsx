@@ -40,7 +40,7 @@ function ChatEmptyState({ onFillPrompt }: { onFillPrompt: (text: string) => void
     <div className="msglist-empty">
       <div className="msglist-empty-inner">
         <div className="msglist-empty-prompt">
-          <span className="msglist-empty-prompt-acc">$</span>{" "}sophos
+          <span className="msglist-empty-prompt-acc">$</span> sophos
         </div>
         <div className="msglist-empty-title">
           <Text variant="title">Start a conversation</Text>
@@ -110,14 +110,23 @@ export function MessageList({
   // per distinct request instead of re-arming on every height bump / scroll.
   const lastFocusSeq = useRef(0);
 
-  const { startIndex, endIndex, topPad, bottomPad, totalHeight, onScroll, measureRowRef, reset, scrollToIndex } =
-    useVirtualList({
-      count: messages.length,
-      estimateHeight: ROW_ESTIMATE,
-      gap: 12, // tokens.space.md
-      overscan: OVERSCAN,
-      scrollRef,
-    });
+  const {
+    startIndex,
+    endIndex,
+    topPad,
+    bottomPad,
+    totalHeight,
+    onScroll,
+    measureRowRef,
+    reset,
+    scrollToIndex,
+  } = useVirtualList({
+    count: messages.length,
+    estimateHeight: ROW_ESTIMATE,
+    gap: 12, // tokens.space.md
+    overscan: OVERSCAN,
+    scrollRef,
+  });
 
   // Drop cached row heights when the transcript identity changes (new session),
   // so stale measurements never map onto different messages. Heights are keyed
@@ -168,7 +177,7 @@ export function MessageList({
     if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
     highlightTimer.current = window.setTimeout(() => setHighlightIndex(null), 2400);
     clearMessageFocus();
-  }, [focus.seq, focus.id, messages, scrollToIndex, clearMessageFocus]);
+  }, [focus.seq, focus.id, messages, scrollToIndex]);
 
   // Clear the highlight timer on unmount.
   useEffect(() => {
@@ -191,11 +200,7 @@ export function MessageList({
   const visible = messages.slice(startIndex, endIndex);
 
   return (
-    <div
-      ref={scrollRef}
-      onScroll={onScrollStick}
-      className="msglist"
-    >
+    <div ref={scrollRef} onScroll={onScrollStick} className="msglist">
       <div className="msglist-inner">
         {/* Top spacer — reserves the height of rows above the window. */}
         <div className="msglist-spacer" style={{ "--pad": `${topPad}px` } as CSSProperties} aria-hidden />

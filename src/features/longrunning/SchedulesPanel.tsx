@@ -38,7 +38,9 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
   // misleading empty state when jobs were created in another attached view.
   useEffect(() => {
     if (connection.schedules) {
-      setSchedules(connection.schedules.map((s) => ({ id: s.id, cron: s.cron, prompt: s.prompt, active: s.active })));
+      setSchedules(
+        connection.schedules.map((s) => ({ id: s.id, cron: s.cron, prompt: s.prompt, active: s.active })),
+      );
     }
   }, [connection.schedules, connection.activeSessionId]);
   const [cron, setCron] = useState("");
@@ -53,7 +55,10 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
     setBusy(true);
     await run(async () => {
       const result = await ipc.addSchedule(c, p);
-      setSchedules((prev) => [...prev, { id: result.id, cron: result.cron, prompt: result.prompt, active: result.active }]);
+      setSchedules((prev) => [
+        ...prev,
+        { id: result.id, cron: result.cron, prompt: result.prompt, active: result.active },
+      ]);
       setCron("");
       setPrompt("");
     }, "Could not add schedule (daemon unreachable?)");
@@ -91,8 +96,8 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
             : "No schedules — add a cron above."}
         </Text>
         <Text variant="body" tone="muted">
-          Schedule a one-time or recurring prompt for the agent. Use a standard cron expression (e.g. "0 9 * * 1-5")
-          plus the prompt to deliver when the schedule fires.
+          Schedule a one-time or recurring prompt for the agent. Use a standard cron expression (e.g. "0 9 * *
+          1-5") plus the prompt to deliver when the schedule fires.
         </Text>
 
         {error ? <ActionErrorBanner message={error} /> : null}
@@ -139,20 +144,16 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
               No schedules
             </Text>
             <Text variant="micro" tone="dim">
-              A schedule delivers a prompt to the agent on a cron cadence (e.g. "0 9 * * 1-5"). Add one above to
-              run recurring or one-time prompts. Scheduled jobs persist and continue while the UI is detached.
+              A schedule delivers a prompt to the agent on a cron cadence (e.g. "0 9 * * 1-5"). Add one above
+              to run recurring or one-time prompts. Scheduled jobs persist and continue while the UI is
+              detached.
             </Text>
           </div>
         ) : (
           <div className="lr-hb-list">
             {schedules.map((s) => (
-              <div
-                key={s.id}
-                className="lr-hb-item"
-              >
-                <span
-                  className={`lr-hb-dot${s.active === false ? "" : " lr-hb-dot--active"}`}
-                />
+              <div key={s.id} className="lr-hb-item">
+                <span className={`lr-hb-dot${s.active === false ? "" : " lr-hb-dot--active"}`} />
                 <div className="lr-hb-itemmain">
                   <Text variant="label" weight="medium" mono>
                     {s.cron}
@@ -164,7 +165,13 @@ export function SchedulesPanel({ initial = [] }: SchedulesPanelProps) {
                     next run (est.): {estimateNextDue(s.cron) ?? "—"} · last fired: not reported by daemon
                   </Text>
                 </div>
-                <IconButton title="Remove schedule" onClick={() => void remove(s.id)} tone="danger" size="sm" disabled={busy}>
+                <IconButton
+                  title="Remove schedule"
+                  onClick={() => void remove(s.id)}
+                  tone="danger"
+                  size="sm"
+                  disabled={busy}
+                >
                   <XIcon size={13} />
                 </IconButton>
               </div>

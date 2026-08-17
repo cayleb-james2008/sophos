@@ -8,61 +8,75 @@
 
 export type IpcCommand =
   | { method: "prompt"; params: { text: string; options?: PromptOptions } }
-  | { method: "abort"; params: {} }
+  | { method: "abort"; params: Record<string, never> }
   | { method: "steer"; params: { text: string } }
-  | { method: "setModel"; params: { provider: string; model: string; thinking?: string; serviceTier?: string; transport?: string; contextWindow?: number; maxOutputTokens?: number } }
+  | {
+      method: "setModel";
+      params: {
+        provider: string;
+        model: string;
+        thinking?: string;
+        serviceTier?: string;
+        transport?: string;
+        contextWindow?: number;
+        maxOutputTokens?: number;
+      };
+    }
   | { method: "newSession"; params: { cwd?: string; goal?: string } }
   | { method: "switchSession"; params: { id: string } }
   | { method: "resumeSession"; params: { pathOrId: string } }
   | { method: "forkSession"; params: { pathOrId: string } }
-  | { method: "listSessions"; params: {} }
-  | { method: "listAgents"; params: {} }
+  | { method: "listSessions"; params: Record<string, never> }
+  | { method: "listAgents"; params: Record<string, never> }
   | { method: "attachAgent"; params: { id: string } }
   | { method: "detachAgent"; params: { id: string } }
-  | { method: "getState"; params: {} }
-  | { method: "getTranscript"; params: {} }
-  | { method: "getModels"; params: {} }
-  | { method: "getProviders"; params: {} }
+  | { method: "getState"; params: Record<string, never> }
+  | { method: "getTranscript"; params: Record<string, never> }
+  | { method: "getModels"; params: Record<string, never> }
+  | { method: "getProviders"; params: Record<string, never> }
   | { method: "login"; params: { provider: string; apiKey?: string } }
   | { method: "logout"; params: { provider: string } }
-  | { method: "getSettings"; params: {} }
+  | { method: "getSettings"; params: Record<string, never> }
   | { method: "setSettings"; params: { settings: Record<string, unknown> } }
   | { method: "runCommand"; params: { command: string; args?: string[] } }
-  | { method: "getContextStats"; params: {} }
-  | { method: "getRlmChildren"; params: {} }
+  | { method: "getContextStats"; params: Record<string, never> }
+  | { method: "getRlmChildren"; params: Record<string, never> }
   | { method: "sendAgentMessage"; params: { agentId: string; message: string } }
-  | { method: "listInbox"; params: {} }
+  | { method: "listInbox"; params: Record<string, never> }
   | { method: "markMessageRead"; params: { messageId: string } }
   | { method: "compact"; params: { prompt?: string } }
-  | { method: "retry"; params: {} }
-  | { method: "refine"; params: {} }
+  | { method: "retry"; params: Record<string, never> }
+  | { method: "refine"; params: Record<string, never> }
   | { method: "exportSession"; params: { format?: string } }
-  | { method: "shareSession"; params: {} }
-  | { method: "getSessionTree"; params: {} }
-  | { method: "cloneSession"; params: {} }
+  | { method: "shareSession"; params: Record<string, never> }
+  | { method: "getSessionTree"; params: Record<string, never> }
+  | { method: "cloneSession"; params: Record<string, never> }
   | { method: "nameSession"; params: { name: string } }
   | { method: "sideQuestion"; params: { text: string } }
   | { method: "addSchedule"; params: { cron: string; prompt: string } }
   | { method: "removeSchedule"; params: { id: string } }
   | { method: "setHeartbeat"; params: { schedule: string; prompt?: string } }
-  | { method: "removeHeartbeat"; params: {} }
+  | { method: "removeHeartbeat"; params: Record<string, never> }
   | { method: "navigateTree"; params: { entryId: string } }
   | { method: "startSideQuestion"; params: { text: string } }
   | { method: "exportToHtml"; params: { outputPath?: string } }
   | { method: "exportToJsonl"; params: { outputPath?: string } }
   | { method: "setSessionName"; params: { name: string } }
-  | { method: "getContextTree"; params: {} }
-  | { method: "getRuntimeInfo"; params: {} }
-  | { method: "getKernelState"; params: {} }
-  | { method: "getHarnessState"; params: {} }
+  | { method: "getContextTree"; params: Record<string, never> }
+  | { method: "getRuntimeInfo"; params: Record<string, never> }
+  | { method: "getKernelState"; params: Record<string, never> }
+  | { method: "getHarnessState"; params: Record<string, never> }
   | { method: "getAgentState"; params: { id: string } }
-  | { method: "createSkill"; params: { name: string; description: string; content: string; pythonImport?: string } }
+  | {
+      method: "createSkill";
+      params: { name: string; description: string; content: string; pythonImport?: string };
+    }
   | { method: "installSkill"; params: { path: string } }
   | { method: "installExtension"; params: { path: string } }
   | { method: "removeExtension"; params: { path: string } }
-  | { method: "getExtensions"; params: {} }
+  | { method: "getExtensions"; params: Record<string, never> }
   | { method: "testMcpServer"; params: { name: string; command: string; args?: string[] } }
-  | { method: "getSlashCommands"; params: {} };
+  | { method: "getSlashCommands"; params: Record<string, never> };
 
 export interface PromptOptions {
   thinking?: string;
@@ -254,7 +268,8 @@ export type KernelHealthReason =
   | "browser_preview"
   | "unavailable";
 
-export type KernelHealthAction = "none" | "wait" | "run_cell" | "retry" | "restart" | "refresh" | "open_tauri";
+export type KernelHealthAction =
+  "none" | "wait" | "run_cell" | "retry" | "restart" | "refresh" | "open_tauri";
 
 export interface KernelHealthDiagnostic {
   reason: KernelHealthReason;

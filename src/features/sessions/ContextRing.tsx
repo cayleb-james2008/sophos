@@ -26,7 +26,12 @@ export function ContextRing({
   const cx = size / 2;
 
   return (
-    <div className="ctx-ring" style={{ "--ring-size": `${size}px` } as CSSProperties} role="img" aria-label={`Context window ${pct}% used`}>
+    <div
+      className="ctx-ring"
+      style={{ "--ring-size": `${size}px` } as CSSProperties}
+      role="img"
+      aria-label={`Context window ${pct}% used`}
+    >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle className="ctx-ring__track" cx={cx} cy={cx} r={r} />
         <circle

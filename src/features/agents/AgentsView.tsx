@@ -121,7 +121,12 @@ export function AgentsView() {
         <div className="ag-errorbanner" role="alert">
           <span>⚡</span>
           <span>Agent relay degraded — {error}</span>
-          <Button variant="danger" className="ag-errorbanner__action" onClick={() => void refresh()} aria-label="Retry">
+          <Button
+            variant="danger"
+            className="ag-errorbanner__action"
+            onClick={() => void refresh()}
+            aria-label="Retry"
+          >
             Retry
           </Button>
         </div>
@@ -166,7 +171,11 @@ export function AgentsView() {
             <div className="ag-graphblank">
               <div className="ag-graphblank__card">
                 <b>No agents in range</b>
-                <span>The fleet graph shows daemon-backed agents and RLM children. Attach an agent or spawn an RLM child to appear here. Agents appear when they connect; expect live status and message relay once one is present.</span>
+                <span>
+                  The fleet graph shows daemon-backed agents and RLM children. Attach an agent or spawn an RLM
+                  child to appear here. Agents appear when they connect; expect live status and message relay
+                  once one is present.
+                </span>
               </div>
             </div>
           ) : null}

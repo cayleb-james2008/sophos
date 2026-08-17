@@ -73,9 +73,12 @@ export function useChat() {
     return () => window.clearInterval(interval);
   }, [refreshContextStats]);
 
-  useEffect(() => () => {
-    if (statsTimer.current != null) window.clearTimeout(statsTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (statsTimer.current != null) window.clearTimeout(statsTimer.current);
+    },
+    [],
+  );
 
   // ---- Live IPC: context/usage stats ----
   useIpcEvent((event) => {

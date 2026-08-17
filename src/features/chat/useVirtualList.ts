@@ -98,6 +98,11 @@ export function useVirtualList({
       arr[i + 1] = arr[i] + (heightsRef.current[i] ?? estimateHeight) + gap;
     }
     return arr;
+    // `version` is an intentional cache-buster: row heights live in a ref
+    // (not state), so the ResizeObserver bumps `version` to force a recompute.
+    // `heightsRef` is intentionally omitted from deps — it is a stable ref,
+    // not reactive state, so listing it would not change when the memo runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `heightsRef` is a stable ref; `version` is the real cache-buster and is already listed.
   }, [count, estimateHeight, gap, version]);
 
   const totalHeight = count === 0 ? 0 : offsets[count] - gap;
@@ -199,5 +204,15 @@ export function useVirtualList({
     [scrollRef],
   );
 
-  return { startIndex, endIndex, topPad, bottomPad, totalHeight, onScroll, measureRowRef, reset, scrollToIndex };
+  return {
+    startIndex,
+    endIndex,
+    topPad,
+    bottomPad,
+    totalHeight,
+    onScroll,
+    measureRowRef,
+    reset,
+    scrollToIndex,
+  };
 }

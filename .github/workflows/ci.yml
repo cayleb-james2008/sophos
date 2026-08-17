@@ -33,6 +33,12 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
+      - name: Lint (zero warnings)
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
       - name: Unit tests
         run: npx vitest run
 

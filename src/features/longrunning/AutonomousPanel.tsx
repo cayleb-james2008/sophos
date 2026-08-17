@@ -122,13 +122,19 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
         </Text>
         <Text variant="body" tone="muted">
           Bounded host policy that continues the session without human input until configured quality gates
-          pass or a continuation, turn, token, or wall-clock limit is reached. Opt-in — the agent never acts on
-          its own unless you start it.
+          pass or a continuation, turn, token, or wall-clock limit is reached. Opt-in — the agent never acts
+          on its own unless you start it.
         </Text>
 
         {active ? (
           <div className="lr-actions">
-            <Button variant="danger" size="md" icon={<XIcon size={13} />} onClick={() => void stop()} loading={busy}>
+            <Button
+              variant="danger"
+              size="md"
+              icon={<XIcon size={13} />}
+              onClick={() => void stop()}
+              loading={busy}
+            >
               Stop autonomous
             </Button>
             <Button variant="outline" size="md" onClick={() => void nudge()} disabled={busy}>
@@ -136,7 +142,13 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
             </Button>
           </div>
         ) : (
-          <Button variant="primary" size="md" icon={<PlayIcon size={13} />} onClick={() => void start()} loading={busy}>
+          <Button
+            variant="primary"
+            size="md"
+            icon={<PlayIcon size={13} />}
+            onClick={() => void start()}
+            loading={busy}
+          >
             Start autonomous
           </Button>
         )}
@@ -145,8 +157,8 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
           <div className="lr-note">
             <Text variant="micro" tone="dim">
               Autonomous mode is off. Start it explicitly to let the agent continue without human input. While
-              active, the SystemBar shows a green AUTO indicator and the budget above is enforced. Expect it to
-              stop when a quality gate passes or a limit is reached.
+              active, the SystemBar shows a green AUTO indicator and the budget above is enforced. Expect it
+              to stop when a quality gate passes or a limit is reached.
             </Text>
           </div>
         ) : null}
@@ -167,7 +179,13 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
             <Button variant="outline" size="sm" onClick={() => void nudge()} disabled={busy}>
               Nudge
             </Button>
-            <Button variant="ghost" size="sm" icon={<XIcon size={12} />} onClick={() => void stop()} disabled={busy}>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<XIcon size={12} />}
+              onClick={() => void stop()}
+              disabled={busy}
+            >
               Stop
             </Button>
           </div>
@@ -187,9 +205,10 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
           ) : null}
         </div>
         <Text variant="micro" tone="dim">
-          The active budget is owned by the daemon session and is read-only here. Sophos does not show editable
-          controls that would appear to change limits without an IPC setter. Start a new session with the daemon's
-          autonomous limit flags when you need a different budget; the values above are the limits currently reported.
+          The active budget is owned by the daemon session and is read-only here. Sophos does not show
+          editable controls that would appear to change limits without an IPC setter. Start a new session with
+          the daemon's autonomous limit flags when you need a different budget; the values above are the
+          limits currently reported.
         </Text>
       </div>
 
@@ -204,13 +223,16 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
         </div>
         {gates.length === 0 ? (
           <Text variant="micro" tone="dim">
-            No quality gates configured. Gates run before the session may finish; a failed gate returns its output for another attempt.
+            No quality gates configured. Gates run before the session may finish; a failed gate returns its
+            output for another attempt.
           </Text>
         ) : (
           <div className="lr-list">
             {gates.map((g) => (
               <div key={g.id} className="lr-row">
-                <span className="lr-gate-check"><CheckIcon size={13} /></span>
+                <span className="lr-gate-check">
+                  <CheckIcon size={13} />
+                </span>
                 <Text variant="micro" mono>
                   {g.command}
                 </Text>

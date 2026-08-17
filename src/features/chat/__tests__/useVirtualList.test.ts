@@ -40,7 +40,13 @@ const GAP = 10;
 describe("useVirtualList", () => {
   it("mounts the full window for a small count", () => {
     const { result } = renderHook(() =>
-      useVirtualList({ count: 5, estimateHeight: EST, gap: GAP, overscan: 2, scrollRef: { current: scrollEl } }),
+      useVirtualList({
+        count: 5,
+        estimateHeight: EST,
+        gap: GAP,
+        overscan: 2,
+        scrollRef: { current: scrollEl },
+      }),
     );
     expect(result.current.startIndex).toBe(0);
     expect(result.current.endIndex).toBe(5);
@@ -49,14 +55,26 @@ describe("useVirtualList", () => {
 
   it("returns zero total height for an empty list", () => {
     const { result } = renderHook(() =>
-      useVirtualList({ count: 0, estimateHeight: EST, gap: GAP, overscan: 2, scrollRef: { current: scrollEl } }),
+      useVirtualList({
+        count: 0,
+        estimateHeight: EST,
+        gap: GAP,
+        overscan: 2,
+        scrollRef: { current: scrollEl },
+      }),
     );
     expect(result.current.totalHeight).toBe(0);
   });
 
   it("windows a large transcript based on the scroll offset", () => {
     const { result } = renderHook(() =>
-      useVirtualList({ count: 100, estimateHeight: EST, gap: GAP, overscan: 2, scrollRef: { current: scrollEl } }),
+      useVirtualList({
+        count: 100,
+        estimateHeight: EST,
+        gap: GAP,
+        overscan: 2,
+        scrollRef: { current: scrollEl },
+      }),
     );
     expect(result.current.startIndex).toBe(0);
     expect(result.current.endIndex).toBeLessThan(100);
@@ -73,7 +91,13 @@ describe("useVirtualList", () => {
 
   it("scrollToIndex clamps and positions the scroll container", () => {
     const { result } = renderHook(() =>
-      useVirtualList({ count: 100, estimateHeight: EST, gap: GAP, overscan: 2, scrollRef: { current: scrollEl } }),
+      useVirtualList({
+        count: 100,
+        estimateHeight: EST,
+        gap: GAP,
+        overscan: 2,
+        scrollRef: { current: scrollEl },
+      }),
     );
     act(() => result.current.scrollToIndex(50));
     // offset[50] = 5500, minus the 40px focus offset.
@@ -86,7 +110,13 @@ describe("useVirtualList", () => {
 
   it("measureRowRef observes rendered rows and measurement bumps the total", () => {
     const { result } = renderHook(() =>
-      useVirtualList({ count: 3, estimateHeight: EST, gap: GAP, overscan: 0, scrollRef: { current: scrollEl } }),
+      useVirtualList({
+        count: 3,
+        estimateHeight: EST,
+        gap: GAP,
+        overscan: 0,
+        scrollRef: { current: scrollEl },
+      }),
     );
     const row = document.createElement("div");
     row.dataset.index = "0";
@@ -103,7 +133,13 @@ describe("useVirtualList", () => {
 
   it("ignores height-0 measurements", () => {
     const { result } = renderHook(() =>
-      useVirtualList({ count: 2, estimateHeight: EST, gap: GAP, overscan: 0, scrollRef: { current: scrollEl } }),
+      useVirtualList({
+        count: 2,
+        estimateHeight: EST,
+        gap: GAP,
+        overscan: 0,
+        scrollRef: { current: scrollEl },
+      }),
     );
     const row = document.createElement("div");
     row.dataset.index = "0";
@@ -119,7 +155,13 @@ describe("useVirtualList", () => {
 
   it("reset clears cached heights", () => {
     const { result } = renderHook(() =>
-      useVirtualList({ count: 3, estimateHeight: EST, gap: GAP, overscan: 0, scrollRef: { current: scrollEl } }),
+      useVirtualList({
+        count: 3,
+        estimateHeight: EST,
+        gap: GAP,
+        overscan: 0,
+        scrollRef: { current: scrollEl },
+      }),
     );
     const row = document.createElement("div");
     row.dataset.index = "0";

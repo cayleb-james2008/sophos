@@ -46,7 +46,11 @@ export function McpServersPanel({
     } catch (e) {
       setResults((prev) => ({
         ...prev,
-        [s.name]: { serverName: s.name, connected: false, error: e instanceof Error ? e.message : "Test failed" },
+        [s.name]: {
+          serverName: s.name,
+          connected: false,
+          error: e instanceof Error ? e.message : "Test failed",
+        },
       }));
     } finally {
       setTesting((t) => (t === s.name ? null : t));
@@ -156,7 +160,9 @@ export function McpServersPanel({
                       }}
                       className="sp-checkbox"
                     />
-                    <Text variant="micro" tone="muted">Enable</Text>
+                    <Text variant="micro" tone="muted">
+                      Enable
+                    </Text>
                   </label>
                   <Button size="sm" variant="outline" onClick={() => void handleTest(s)} disabled={isTesting}>
                     Test

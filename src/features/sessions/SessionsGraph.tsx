@@ -6,7 +6,15 @@
 // context / goals / rlmChildren enrichment) — a representation change only.
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Handle, Position, useNodesState, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
+import {
+  Handle,
+  Position,
+  useNodesState,
+  type Edge,
+  type Node,
+  type NodeChange,
+  type NodeProps,
+} from "@xyflow/react";
 import { GraphFlow, NodeFrame, PulseEdge, dagreLayout, type PulseEdgeData } from "../graph";
 import { tokens } from "../../design/tokens";
 import { Button } from "../../design";
@@ -57,16 +65,32 @@ function SessionNode({ data, selected }: NodeProps<SessionGraphNode>) {
       mono={data.mono}
       width={data.kind === "goal" ? GOAL_W : data.kind === "rlm" ? RLM_W : WIDTH}
       selected={selected}
-      corner={
-        data.ring ? <CtxReadout tokens={data.ring.tokens} window={data.ring.window} /> : undefined
-      }
+      corner={data.ring ? <CtxReadout tokens={data.ring.tokens} window={data.ring.window} /> : undefined}
       actions={
         data.kind === "session"
           ? [
-              <Button key="r" variant="outline" className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onResume?.(); }} title="Resume session">
+              <Button
+                key="r"
+                variant="outline"
+                className="pg-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onResume?.();
+                }}
+                title="Resume session"
+              >
                 Resume
               </Button>,
-              <Button key="f" variant="accent-soft" className="pg-btn pg-btn--accent" onClick={(e) => { e.stopPropagation(); data.onFork?.(); }} title="Fork session">
+              <Button
+                key="f"
+                variant="accent-soft"
+                className="pg-btn pg-btn--accent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  data.onFork?.();
+                }}
+                title="Fork session"
+              >
                 Fork
               </Button>,
             ]
@@ -88,7 +112,10 @@ function CtxReadout({ tokens: t, window: w }: { tokens?: number; window?: number
   return (
     <span className="pg-ctx" title={`Context ${formatTokens(t)} / ${formatTokens(w)} tokens`}>
       <span className="pg-ctx__bar">
-        <span className={`pg-ctx__fill${danger ? " pg-ctx__fill--danger" : ""}`} style={{ "--fill-w": `${pct}%` } as CSSProperties} />
+        <span
+          className={`pg-ctx__fill${danger ? " pg-ctx__fill--danger" : ""}`}
+          style={{ "--fill-w": `${pct}%` } as CSSProperties}
+        />
       </span>
       <span className="pg-ctx__pct">CTX {pct}%</span>
     </span>
@@ -143,7 +170,7 @@ export function SessionsGraph({
         en.context && en.context.contextWindow
           ? { tokens: en.context.tokens, window: en.context.contextWindow, messages: en.context.messages }
           : undefined;
-      const sessionStatus = isActive(s.id) ? "active" : s.status ?? "idle";
+      const sessionStatus = isActive(s.id) ? "active" : (s.status ?? "idle");
 
       nodes.push({
         id: s.id,
@@ -171,7 +198,12 @@ export function SessionsGraph({
         nodes.push({
           id: gid,
           type: "session",
-          data: { kind: "goal", label: g.objective, status: goalStatus(g.status), subtitle: g.progress ? `progress · ${g.progress}` : g.status },
+          data: {
+            kind: "goal",
+            label: g.objective,
+            status: goalStatus(g.status),
+            subtitle: g.progress ? `progress · ${g.progress}` : g.status,
+          },
           position: { x: 0, y: 0 },
           width: GOAL_W,
           height: NODE_HEIGHT.goal,
@@ -184,7 +216,12 @@ export function SessionsGraph({
         nodes.push({
           id: cid,
           type: "session",
-          data: { kind: "rlm", label: c.name ?? c.id, status: c.status, subtitle: c.summary ?? "RLM subagent" },
+          data: {
+            kind: "rlm",
+            label: c.name ?? c.id,
+            status: c.status,
+            subtitle: c.summary ?? "RLM subagent",
+          },
           position: { x: 0, y: 0 },
           width: RLM_W,
           height: NODE_HEIGHT.rlm,
@@ -210,7 +247,7 @@ export function SessionsGraph({
       return p ? { ...n, position: { x: p.x, y: p.y } } : n;
     });
     return { positioned, edges };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- layout is keyed on the listed data identities; the dagre node/edge arrays are derived from them and would thrash the layout if rebuilt each render.
   }, [sessions, enrichment, activeSessionId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<SessionGraphNode>([]);
@@ -267,14 +304,14 @@ export function SessionsGraph({
         onNodesChange={handleNodesChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-      /* The session tree is laid out to fit the canvas, so a mini-map added no
+        /* The session tree is laid out to fit the canvas, so a mini-map added no
          navigational value and read as a stray UI element mid-canvas
          (vision-critic D2). Matches the Agents fleet graph. */
-      showMiniMap={false}
-      onNodeClick={(id) => {
-        const kind = layout.positioned.find((n) => n.id === id)?.data?.kind;
-        if (kind === "session") onSelect(id);
-      }}
+        showMiniMap={false}
+        onNodeClick={(id) => {
+          const kind = layout.positioned.find((n) => n.id === id)?.data?.kind;
+          if (kind === "session") onSelect(id);
+        }}
       />
       {/* Reset layout — drops manual drags and reapplies the dagre auto-layout. */}
       <button
@@ -294,7 +331,13 @@ function ResetGlyph() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M20 3v5h-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M20 3v5h-5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

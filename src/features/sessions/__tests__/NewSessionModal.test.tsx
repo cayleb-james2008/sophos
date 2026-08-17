@@ -9,11 +9,14 @@ import { NewSessionModal } from "../NewSessionModal";
 
 type AnyFn = (...args: never[]) => unknown;
 
-const mockClient = vi.hoisted(() => ({
-  getSettings: vi.fn(),
-  setSettings: vi.fn(),
-  newSession: vi.fn(),
-} as Record<string, AnyFn>));
+const mockClient = vi.hoisted(
+  () =>
+    ({
+      getSettings: vi.fn(),
+      setSettings: vi.fn(),
+      newSession: vi.fn(),
+    }) as Record<string, AnyFn>,
+);
 
 vi.mock("../../../ipc/client", async () => ({
   useIpc: () => mockClient,
@@ -65,7 +68,9 @@ describe("NewSessionModal", () => {
     await userEvent.type(screen.getByLabelText("Goal"), "  Ship the release  ");
 
     await userEvent.click(screen.getByRole("button", { name: /create session/i }));
-    await waitFor(() => expect(mockClient.newSession).toHaveBeenCalledWith("C:\\work\\project", "Ship the release"));
+    await waitFor(() =>
+      expect(mockClient.newSession).toHaveBeenCalledWith("C:\\work\\project", "Ship the release"),
+    );
     expect(onCreated).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });

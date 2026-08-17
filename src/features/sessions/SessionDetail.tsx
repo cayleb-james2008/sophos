@@ -12,13 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Text, Badge, Modal, TextArea } from "../../design";
-import type {
-  SessionInfo,
-  TranscriptMessage,
-  ContextStats,
-  Goal,
-  RlmChild,
-} from "../../ipc/contract";
+import type { SessionInfo, TranscriptMessage, ContextStats, Goal, RlmChild } from "../../ipc/contract";
 import { useIpc } from "../../ipc/client";
 import { formatDate, formatTokens, initials, durationLabel, relativeTime } from "./format";
 import { ContextRing } from "./ContextRing";
@@ -200,7 +194,12 @@ export function SessionDetail({
               }}
             />
           ) : (
-            <Button variant="ghost" className="detail__title-edit" onClick={startRename} title="Rename session">
+            <Button
+              variant="ghost"
+              className="detail__title-edit"
+              onClick={startRename}
+              title="Rename session"
+            >
               <b>{title}</b>
               <PencilIcon size={11} />
             </Button>
@@ -235,7 +234,11 @@ export function SessionDetail({
             <div className="detail__skeleton" />
           ) : contextPct != null ? (
             <div className="context-block">
-              <ContextRing tokens={context?.tokens} contextWindow={context?.contextWindow} messages={context?.messages} />
+              <ContextRing
+                tokens={context?.tokens}
+                contextWindow={context?.contextWindow}
+                messages={context?.messages}
+              />
               <div className="context-block__meta">
                 <span>
                   <b>{formatTokens(context?.tokens)}</b> / {formatTokens(context?.contextWindow)} tokens
@@ -251,9 +254,7 @@ export function SessionDetail({
               No context data available
             </Text>
           )}
-          {context?.compaction?.reason && (
-            <div className="context-meter__compaction">{compactState}</div>
-          )}
+          {context?.compaction?.reason && <div className="context-meter__compaction">{compactState}</div>}
         </section>
 
         {/* Goals */}
@@ -298,7 +299,10 @@ export function SessionDetail({
                   </div>
                   <div className="rlm-child__meta">
                     <b>{child.name || child.id.slice(0, 12)}</b>
-                    <small>{child.status}{child.summary ? ` · ${child.summary}` : ""}</small>
+                    <small>
+                      {child.status}
+                      {child.summary ? ` · ${child.summary}` : ""}
+                    </small>
                   </div>
                 </div>
               ))}
@@ -340,7 +344,10 @@ export function SessionDetail({
           <SectionHeader icon={<PlayIcon size={12} />} label="Session info" />
           <div className="detail__metadata">
             <Row label="Working directory" value={session.cwd || "—"} />
-            <Row label="Messages in context" value={context?.messages != null ? String(context.messages) : "—"} />
+            <Row
+              label="Messages in context"
+              value={context?.messages != null ? String(context.messages) : "—"}
+            />
             <Row label="Tokens in context" value={formatTokens(context?.tokens)} />
             <Row label="Created" value={formatDate(session.createdAt)} />
             <Row label="Last updated" value={formatDate(session.updatedAt)} />
@@ -381,7 +388,12 @@ export function SessionDetail({
             <Button variant="ghost" onClick={() => setCompactOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" icon={<CompactIcon size={14} />} onClick={() => void runCompact()} loading={compacting}>
+            <Button
+              variant="primary"
+              icon={<CompactIcon size={14} />}
+              onClick={() => void runCompact()}
+              loading={compacting}
+            >
               Compact now
             </Button>
           </>
@@ -486,7 +498,13 @@ function TranscriptRow({
   onConfirmFork: () => void;
 }) {
   const roleLabel =
-    msg.role === "assistant" ? "ASSISTANT" : msg.role === "user" ? "USER" : msg.role === "tool" ? "TOOL" : "SYSTEM";
+    msg.role === "assistant"
+      ? "ASSISTANT"
+      : msg.role === "user"
+        ? "USER"
+        : msg.role === "tool"
+          ? "TOOL"
+          : "SYSTEM";
   const roleClass = `transcript__role${msg.role === "assistant" ? "--assistant" : msg.role === "user" ? "--user" : "--system"}`;
   const isUser = msg.role === "user";
   return (
@@ -496,7 +514,12 @@ function TranscriptRow({
         <span className="transcript__time">
           {msg.timestamp ? relativeTime(msg.timestamp) : ""}
           {isUser && (
-            <Button variant="ghost" className="transcript__fork" title="Fork a new session from this message" onClick={onForkRequest}>
+            <Button
+              variant="ghost"
+              className="transcript__fork"
+              title="Fork a new session from this message"
+              onClick={onForkRequest}
+            >
               <ForkIcon size={10} /> Fork from here
             </Button>
           )}
@@ -524,7 +547,11 @@ function TranscriptRow({
             {msg.toolCalls.map((tc) => (
               <div key={tc.id} className="transcript__tool">
                 <span className="transcript__tool-name">{tc.name}</span>
-                {tc.status && <span className={`transcript__tool-status transcript__tool-status--${tc.status}`}>{tc.status}</span>}
+                {tc.status && (
+                  <span className={`transcript__tool-status transcript__tool-status--${tc.status}`}>
+                    {tc.status}
+                  </span>
+                )}
               </div>
             ))}
           </div>

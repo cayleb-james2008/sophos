@@ -56,7 +56,16 @@ describe("SettingsView", () => {
 
   it("exposes every tab in the bar", () => {
     render(<SettingsView />);
-    for (const label of ["General", "Providers", "Subagents", "Skills", "Extensions", "Advanced", "Long-running", "About"]) {
+    for (const label of [
+      "General",
+      "Providers",
+      "Subagents",
+      "Skills",
+      "Extensions",
+      "Advanced",
+      "Long-running",
+      "About",
+    ]) {
       expect(screen.getByRole("tab", { name: new RegExp(label, "i") })).toBeInTheDocument();
     }
   });

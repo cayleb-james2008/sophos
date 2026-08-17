@@ -28,8 +28,11 @@ const SUITES = [
   { file: "studio.test.mjs", label: "STUDIO" },
 ];
 
-/** Hard per-suite timeout (ms). 5 minutes is generous for 30s–2min suites. */
-const SUITE_TIMEOUT_MS = 5 * 60 * 1000;
+/** Hard per-suite timeout (ms). The slowest suites legitimately take ~5 minutes
+ * (CHAT ~4.5min, STUDIO ~5min, SHELL's theme retry loop under WebView2 timing
+ * flakes can run long), so 10 minutes leaves headroom while still catching a
+ * genuinely hung suite. */
+const SUITE_TIMEOUT_MS = 10 * 60 * 1000;
 
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 

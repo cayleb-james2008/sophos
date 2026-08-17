@@ -11,14 +11,17 @@ import { SessionsView } from "../SessionsView";
 
 type AnyFn = (...args: never[]) => unknown;
 
-const mockClient = vi.hoisted(() => ({
-  listSessions: vi.fn(),
-  getContextStats: vi.fn(),
-  getRlmChildren: vi.fn(),
-  resumeSession: vi.fn(),
-  forkSession: vi.fn(),
-  switchSession: vi.fn(),
-} as Record<string, AnyFn>));
+const mockClient = vi.hoisted(
+  () =>
+    ({
+      listSessions: vi.fn(),
+      getContextStats: vi.fn(),
+      getRlmChildren: vi.fn(),
+      resumeSession: vi.fn(),
+      forkSession: vi.fn(),
+      switchSession: vi.fn(),
+    }) as Record<string, AnyFn>,
+);
 
 const mockAppState = vi.hoisted(() => ({
   sessionsFilter: undefined,
@@ -45,7 +48,13 @@ vi.mock("../../../state/AppState", async () => ({
 }));
 
 vi.mock("../SessionsGraph", async () => ({
-  SessionsGraph: ({ sessions, onResume }: { sessions: Array<{ id: string; title?: string }>; onResume: (id: string) => void }) => (
+  SessionsGraph: ({
+    sessions,
+    onResume,
+  }: {
+    sessions: Array<{ id: string; title?: string }>;
+    onResume: (id: string) => void;
+  }) => (
     <div data-testid="sessions-graph">
       <span>GRAPH</span>
       {sessions.map((s) => (
@@ -94,7 +103,9 @@ describe("SessionsView", () => {
     await waitFor(() => expect(screen.getByText("Session command center")).toBeInTheDocument());
     // Counts sit inside <b>, which getByText ignores, so match full textContent;
     // they populate only after listSessions resolves.
-    await waitFor(() => expect(screen.getByText((_, el) => el?.textContent === "1 active")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText((_, el) => el?.textContent === "1 active")).toBeInTheDocument(),
+    );
     expect(screen.getByText((_, el) => el?.textContent === "1 saved")).toBeInTheDocument();
     expect(screen.getByTestId("sessions-graph")).toBeInTheDocument();
   });

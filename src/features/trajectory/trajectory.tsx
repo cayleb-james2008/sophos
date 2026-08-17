@@ -11,7 +11,7 @@
 // Append-only means entries are only ever pushed. The log is a pure record of
 // what the app observed — nothing is edited or removed in place.
 
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useIpcEvent, useConnectionState } from "../../ipc/client";
 import type { IpcEvent } from "../../ipc/contract";
 import { decomposeProgram } from "../code/demoTurn";
@@ -80,13 +80,37 @@ function summarizeEvent(event: IpcEvent): Omit<TrajectoryEntry, "id" | "seq" | "
       const kind = ev?.kind as string | undefined;
       switch (kind) {
         case "user_message":
-          return { kind: "prompt", label: "User prompt", summary: String(ev?.text ?? ""), detail: String(ev?.text ?? ""), source: "session_event" };
+          return {
+            kind: "prompt",
+            label: "User prompt",
+            summary: String(ev?.text ?? ""),
+            detail: String(ev?.text ?? ""),
+            source: "session_event",
+          };
         case "thinking_delta":
-          return { kind: "thinking", label: "Thinking", summary: String(ev?.thinking ?? "").slice(0, 140), detail: String(ev?.thinking ?? ""), source: "session_event" };
+          return {
+            kind: "thinking",
+            label: "Thinking",
+            summary: String(ev?.thinking ?? "").slice(0, 140),
+            detail: String(ev?.thinking ?? ""),
+            source: "session_event",
+          };
         case "tool_call":
-          return { kind: "tool", label: "Tool call", summary: `called ${String(ev?.name ?? "?")}`, detail: typeof ev?.input === "string" ? ev.input : JSON.stringify(ev?.input ?? {}), source: "session_event" };
+          return {
+            kind: "tool",
+            label: "Tool call",
+            summary: `called ${String(ev?.name ?? "?")}`,
+            detail: typeof ev?.input === "string" ? ev.input : JSON.stringify(ev?.input ?? {}),
+            source: "session_event",
+          };
         case "tool_result":
-          return { kind: "tool", label: "Tool result", summary: `result of ${String(ev?.name ?? "?")}`, detail: String(ev?.output ?? ""), source: "session_event" };
+          return {
+            kind: "tool",
+            label: "Tool result",
+            summary: `result of ${String(ev?.name ?? "?")}`,
+            detail: String(ev?.output ?? ""),
+            source: "session_event",
+          };
         case "run_code": {
           // Code Mode: one program that calls many tools in a single step. The
           // program itself is recorded here; each of its tool calls arrives as
@@ -104,28 +128,92 @@ function summarizeEvent(event: IpcEvent): Omit<TrajectoryEntry, "id" | "seq" | "
           };
         }
         case "run_complete":
-          return { kind: "program", label: "Code program", summary: "run_code complete", detail: JSON.stringify(ev ?? {}), source: "session_event" };
+          return {
+            kind: "program",
+            label: "Code program",
+            summary: "run_code complete",
+            detail: JSON.stringify(ev ?? {}),
+            source: "session_event",
+          };
         case "text":
-          return { kind: "message", label: "Assistant message", summary: String(ev?.text ?? "").slice(0, 140), detail: String(ev?.text ?? ""), source: "session_event" };
+          return {
+            kind: "message",
+            label: "Assistant message",
+            summary: String(ev?.text ?? "").slice(0, 140),
+            detail: String(ev?.text ?? ""),
+            source: "session_event",
+          };
         case "side_question_event":
-          return { kind: "prompt", label: "Side question", summary: String(ev?.text ?? "").slice(0, 120), detail: JSON.stringify(ev), source: "session_event" };
+          return {
+            kind: "prompt",
+            label: "Side question",
+            summary: String(ev?.text ?? "").slice(0, 120),
+            detail: JSON.stringify(ev),
+            source: "session_event",
+          };
         case "session_created":
-          return { kind: "system", label: "Session created", summary: String(ev?.sessionId ?? ev?.id ?? "new session"), detail: JSON.stringify(ev), source: "session_event" };
+          return {
+            kind: "system",
+            label: "Session created",
+            summary: String(ev?.sessionId ?? ev?.id ?? "new session"),
+            detail: JSON.stringify(ev),
+            source: "session_event",
+          };
         default:
-          return { kind: "state", label: `Session event (${kind ?? "?"})`, summary: JSON.stringify(ev ?? {}).slice(0, 120), detail: JSON.stringify(ev ?? {}), source: "session_event" };
+          return {
+            kind: "state",
+            label: `Session event (${kind ?? "?"})`,
+            summary: JSON.stringify(ev ?? {}).slice(0, 120),
+            detail: JSON.stringify(ev ?? {}),
+            source: "session_event",
+          };
       }
     }
     case "agent_watch":
-      return { kind: "agent", label: "Agent watch", summary: `${event.event.kind} ${event.event.childId}`, detail: JSON.stringify(event.event), source: "agent_watch" };
+      return {
+        kind: "agent",
+        label: "Agent watch",
+        summary: `${event.event.kind} ${event.event.childId}`,
+        detail: JSON.stringify(event.event),
+        source: "agent_watch",
+      };
     case "agent_message":
-      return { kind: "agent", label: "Agent message", summary: `${event.message.fromAgentName ?? event.message.fromAgentId} → ${event.message.toAgentName ?? event.message.toAgentId}: ${event.message.text.slice(0, 120)}`, detail: event.message.text, source: "agent_message" };
+      return {
+        kind: "agent",
+        label: "Agent message",
+        summary: `${event.message.fromAgentName ?? event.message.fromAgentId} → ${event.message.toAgentName ?? event.message.toAgentId}: ${event.message.text.slice(0, 120)}`,
+        detail: event.message.text,
+        source: "agent_message",
+      };
     case "refinement_result":
-      return { kind: "refinement", label: "Refinement", summary: event.result?.summary ?? "refinement proposed", detail: JSON.stringify(event.result), source: "refinement_result" };
+      return {
+        kind: "refinement",
+        label: "Refinement",
+        summary: event.result?.summary ?? "refinement proposed",
+        detail: JSON.stringify(event.result),
+        source: "refinement_result",
+      };
     case "connection_status":
-      return { kind: "state", label: "Connection", summary: event.status.kind, detail: JSON.stringify(event.status), source: "connection_status" };
+      return {
+        kind: "state",
+        label: "Connection",
+        summary: event.status.kind,
+        detail: JSON.stringify(event.status),
+        source: "connection_status",
+      };
     case "snapshot":
     case "resynced":
-      return { kind: "state", label: event.type === "snapshot" ? "Snapshot" : "Resync", summary: `queue ${event.state.queue?.mode ?? "—"}`, detail: JSON.stringify({ activeSessionId: event.state.activeSessionId, queue: event.state.queue, model: event.state.model }), source: event.type };
+      return {
+        kind: "state",
+        label: event.type === "snapshot" ? "Snapshot" : "Resync",
+        summary: `queue ${event.state.queue?.mode ?? "—"}`,
+        detail: JSON.stringify({
+          activeSessionId: event.state.activeSessionId,
+          queue: event.state.queue,
+          model: event.state.model,
+        }),
+        source: event.type,
+      };
     default:
       return null;
   }
@@ -140,31 +228,40 @@ export function TrajectoryProvider({ children }: { children: React.ReactNode }) 
   // The connection state gives us the active session id for tagging entries.
   const conn = useConnectionState();
 
-  const append = (sessionId: string, partial: Omit<TrajectoryEntry, "id" | "seq" | "ts" | "sessionId">) => {
-    seq.current += 1;
-    const entry: TrajectoryEntry = {
-      id: `t-${seq.current}`,
-      seq: seq.current,
-      ts: new Date().toISOString(),
-      sessionId,
-      ...partial,
-    };
-    setLogs((prev) => {
-      const list = [...(prev[sessionId] ?? []), entry];
-      const next = { ...prev, [sessionId]: list.length > MAX_ENTRIES_PER_SESSION ? list.slice(-MAX_ENTRIES_PER_SESSION) : list };
-      writePersisted(next);
-      return next;
-    });
-  };
+  const append = useCallback(
+    (sessionId: string, partial: Omit<TrajectoryEntry, "id" | "seq" | "ts" | "sessionId">) => {
+      seq.current += 1;
+      const entry: TrajectoryEntry = {
+        id: `t-${seq.current}`,
+        seq: seq.current,
+        ts: new Date().toISOString(),
+        sessionId,
+        ...partial,
+      };
+      setLogs((prev) => {
+        const list = [...(prev[sessionId] ?? []), entry];
+        const next = {
+          ...prev,
+          [sessionId]: list.length > MAX_ENTRIES_PER_SESSION ? list.slice(-MAX_ENTRIES_PER_SESSION) : list,
+        };
+        writePersisted(next);
+        return next;
+      });
+    },
+    [],
+  );
 
-  const record = (sessionId: string, partial: Omit<TrajectoryEntry, "id" | "seq" | "ts" | "sessionId">) => {
-    append(sessionId || "session-unknown", partial);
-  };
+  const record = useCallback(
+    (sessionId: string, partial: Omit<TrajectoryEntry, "id" | "seq" | "ts" | "sessionId">) => {
+      append(sessionId || "session-unknown", partial);
+    },
+    [append],
+  );
 
-  const clearAll = () => {
+  const clearAll = useCallback(() => {
     setLogs({});
     writePersisted({});
-  };
+  }, []);
 
   useIpcEvent((event) => {
     const sessionId = conn.activeSessionId ?? "session-unknown";
@@ -181,7 +278,7 @@ export function TrajectoryProvider({ children }: { children: React.ReactNode }) 
     }
   }, [conn.activeSessionId, logs]);
 
-  const value = useMemo(() => ({ logs, record, clearAll }), [logs]);
+  const value = useMemo(() => ({ logs, record, clearAll }), [logs, record, clearAll]);
   return <TrajectoryContext.Provider value={value}>{children}</TrajectoryContext.Provider>;
 }
 

@@ -35,7 +35,9 @@ beforeEach(() => {
   (mockClient.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
     extensions: [{ name: "my-ext", path: "C:\\ext", enabled: true }],
   });
-  (mockClient.getRuntimeInfo as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.parse(JSON.stringify(RUNTIME)));
+  (mockClient.getRuntimeInfo as ReturnType<typeof vi.fn>).mockResolvedValue(
+    JSON.parse(JSON.stringify(RUNTIME)),
+  );
   (mockClient.getExtensions as ReturnType<typeof vi.fn>).mockResolvedValue([
     {
       name: "my-ext",
@@ -81,7 +83,9 @@ describe("ExtensionsPanel", () => {
 
     await waitFor(() => {
       expect(mockClient.setSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ extensions: [expect.objectContaining({ name: "my-ext", enabled: false })] }),
+        expect.objectContaining({
+          extensions: [expect.objectContaining({ name: "my-ext", enabled: false })],
+        }),
       );
     });
   });

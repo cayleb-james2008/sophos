@@ -33,7 +33,10 @@ describe("FleetStrip", () => {
       { id: "2", status: "running" },
       { id: "3", status: "idle" },
     ]);
-    (mockClient.getContextStats as ReturnType<typeof vi.fn>).mockResolvedValue({ tokens: 100000, contextWindow: 1000000 });
+    (mockClient.getContextStats as ReturnType<typeof vi.fn>).mockResolvedValue({
+      tokens: 100000,
+      contextWindow: 1000000,
+    });
     (mockClient.getProviders as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: "ollama-cloud", connected: true },
       { id: "openrouter", connected: false },

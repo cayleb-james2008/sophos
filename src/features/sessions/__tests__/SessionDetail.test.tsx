@@ -11,15 +11,18 @@ import { SessionDetail } from "../SessionDetail";
 
 type AnyFn = (...args: never[]) => unknown;
 
-const mockClient = vi.hoisted(() => ({
-  getTranscript: vi.fn(),
-  getContextStats: vi.fn(),
-  getState: vi.fn(),
-  setSessionName: vi.fn(),
-  cloneSession: vi.fn(),
-  compact: vi.fn(),
-  forkSession: vi.fn(),
-} as Record<string, AnyFn>));
+const mockClient = vi.hoisted(
+  () =>
+    ({
+      getTranscript: vi.fn(),
+      getContextStats: vi.fn(),
+      getState: vi.fn(),
+      setSessionName: vi.fn(),
+      cloneSession: vi.fn(),
+      compact: vi.fn(),
+      forkSession: vi.fn(),
+    }) as Record<string, AnyFn>,
+);
 
 vi.mock("../../../ipc/client", async () => ({
   useIpc: () => mockClient,
@@ -37,7 +40,9 @@ const session: SessionInfo = {
   updatedAt: new Date("2026-01-15T11:00:00.000Z").toISOString(),
 };
 
-const transcript = [{ id: "m1", role: "user", content: "Hello from the user", timestamp: "2026-01-15T10:05:00.000Z" }];
+const transcript = [
+  { id: "m1", role: "user", content: "Hello from the user", timestamp: "2026-01-15T10:05:00.000Z" },
+];
 
 function makeState() {
   return {
@@ -48,7 +53,11 @@ function makeState() {
 
 function makeClient() {
   (mockClient.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue(transcript);
-  (mockClient.getContextStats as ReturnType<typeof vi.fn>).mockResolvedValue({ tokens: 2000, contextWindow: 10000, messages: 3 });
+  (mockClient.getContextStats as ReturnType<typeof vi.fn>).mockResolvedValue({
+    tokens: 2000,
+    contextWindow: 10000,
+    messages: 3,
+  });
   (mockClient.getState as ReturnType<typeof vi.fn>).mockResolvedValue(makeState());
   (mockClient.setSessionName as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
   (mockClient.cloneSession as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
@@ -58,7 +67,14 @@ function makeClient() {
 
 function renderDetail() {
   const handlers = { onSwitch: vi.fn(), onResume: vi.fn(), onFork: vi.fn() };
-  render(<SessionDetail session={session} onSwitch={handlers.onSwitch} onResume={handlers.onResume} onFork={handlers.onFork} />);
+  render(
+    <SessionDetail
+      session={session}
+      onSwitch={handlers.onSwitch}
+      onResume={handlers.onResume}
+      onFork={handlers.onFork}
+    />,
+  );
   return handlers;
 }
 

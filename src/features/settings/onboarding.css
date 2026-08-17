@@ -12,9 +12,8 @@
   padding: clamp(24px, 5vw, 72px);
   background:
     linear-gradient(135deg, rgba(var(--pa-ink-rgb), 0.94), rgba(var(--pa-ink-rgb), 0.78)),
-    radial-gradient(circle at 76% 8%, rgba(var(--pa-green-rgb), 0.12), transparent 28rem),
-    var(--pa-ink);
-  animation: pa-fade-in 180ms cubic-bezier(0.16,1,0.3,1) both;
+    radial-gradient(circle at 76% 8%, rgba(var(--pa-green-rgb), 0.12), transparent 28rem), var(--pa-ink);
+  animation: pa-fade-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .pa-onboarding::before {
   position: absolute;
@@ -34,10 +33,12 @@
   background:
     linear-gradient(145deg, rgba(var(--pa-secondary-rgb), 0.7), rgba(var(--pa-ink-rgb), 0.82)),
     var(--pa-overlay);
-  box-shadow: 0 28px 80px rgba(0,0,0,0.38), inset 0 1px rgba(var(--pa-paper-rgb), 0.05);
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.38),
+    inset 0 1px rgba(var(--pa-paper-rgb), 0.05);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  animation: pa-slide-up 180ms cubic-bezier(0.16,1,0.3,1) both;
+  animation: pa-slide-up 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .pa-onboarding__edge {
   position: absolute;
@@ -60,7 +61,9 @@
   align-items: center;
   gap: 9px;
   color: var(--pa-paper);
-  font: 600 12px/1 "Geist", sans-serif;
+  font:
+    600 12px/1 "Geist",
+    sans-serif;
   letter-spacing: 0.1em;
 }
 .pa-onboarding__brand-mark {
@@ -71,11 +74,15 @@
   justify-content: center;
   border: 1px solid rgba(var(--pa-green-rgb), 0.45);
   color: var(--pa-green);
-  font: 600 10px/1 "Geist Mono", monospace;
+  font:
+    600 10px/1 "Geist Mono",
+    monospace;
 }
 .pa-onboarding__eyebrow {
   color: rgba(var(--pa-paper-rgb), 0.45);
-  font: 10px/1 "Geist Mono", monospace;
+  font:
+    10px/1 "Geist Mono",
+    monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -99,26 +106,46 @@
   gap: 8px;
   margin-bottom: 18px;
   color: var(--pa-green);
-  font: 10px/1 "Geist Mono", monospace;
+  font:
+    10px/1 "Geist Mono",
+    monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-.pa-onboarding__kicker::before { width: 18px; height: 1px; content: ""; background: currentColor; }
+.pa-onboarding__kicker::before {
+  width: 18px;
+  height: 1px;
+  content: "";
+  background: currentColor;
+}
 .pa-onboarding__title {
   max-width: 600px;
   margin: 0;
   color: var(--pa-paper);
-  font: 500 clamp(34px, 5vw, 62px)/0.98 "Geist", sans-serif;
+  font:
+    500 clamp(34px, 5vw, 62px)/0.98 "Geist",
+    sans-serif;
   letter-spacing: -0.055em;
 }
-.pa-onboarding__title em { color: var(--pa-green); font-style: normal; }
+.pa-onboarding__title em {
+  color: var(--pa-green);
+  font-style: normal;
+}
 .pa-onboarding__lede {
   max-width: 500px;
   margin: 20px 0 0;
   color: rgba(var(--pa-paper-rgb), 0.62);
-  font: 16px/1.6 "Geist", sans-serif;
+  font:
+    16px/1.6 "Geist",
+    sans-serif;
 }
-.pa-onboarding__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 28px; }
+.pa-onboarding__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
 .pa-onboarding__action-primary {
   min-height: 38px;
   padding: 0 16px;
@@ -126,10 +153,17 @@
   background: #fff;
   color: #0e0e0e;
   cursor: pointer;
-  font: 500 12px/1 "Geist", sans-serif;
-  transition: background 100ms ease, transform 100ms ease;
+  font:
+    500 12px/1 "Geist",
+    sans-serif;
+  transition:
+    background 100ms ease,
+    transform 100ms ease;
 }
-.pa-onboarding__action-primary:hover { background: var(--pa-paper); transform: translateY(-1px); }
+.pa-onboarding__action-primary:hover {
+  background: var(--pa-paper);
+  transform: translateY(-1px);
+}
 .pa-onboarding__action-secondary {
   min-height: 38px;
   padding: 0 12px;
@@ -137,21 +171,47 @@
   background: rgba(var(--pa-paper-rgb), 0.04);
   color: rgba(var(--pa-paper-rgb), 0.62);
   cursor: pointer;
-  font: 11px/1 "Geist Mono", monospace;
+  font:
+    11px/1 "Geist Mono",
+    monospace;
 }
-.pa-onboarding__action-secondary:hover { border-color: rgba(var(--pa-paper-rgb), 0.28); color: var(--pa-paper); }
-.pa-onboarding__aside { display: flex; flex-direction: column; background: rgba(var(--pa-ink-rgb), 0.12); }
-.pa-onboarding__aside-label { padding: 22px 22px 12px; color: rgba(var(--pa-paper-rgb), 0.45); font: 10px/1 "Geist Mono", monospace; letter-spacing: 0.14em; text-transform: uppercase; }
-.pa-onboarding__archetypes { display: grid; grid-template-columns: 1fr; }
+.pa-onboarding__action-secondary:hover {
+  border-color: rgba(var(--pa-paper-rgb), 0.28);
+  color: var(--pa-paper);
+}
+.pa-onboarding__aside {
+  display: flex;
+  flex-direction: column;
+  background: rgba(var(--pa-ink-rgb), 0.12);
+}
+.pa-onboarding__aside-label {
+  padding: 22px 22px 12px;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  font:
+    10px/1 "Geist Mono",
+    monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pa-onboarding__archetypes {
+  display: grid;
+  grid-template-columns: 1fr;
+}
 .pa-onboarding__archetype {
   position: relative;
   display: grid;
-  grid-template-columns: 28px minmax(0,1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: 12px;
   padding: 16px 22px;
   border-top: 1px solid rgba(var(--pa-paper-rgb), 0.1);
 }
-.pa-onboarding__archetype::after { position: absolute; inset: auto 0 0 0; height: 1px; content: ""; background: linear-gradient(90deg, transparent, rgba(var(--pa-green-rgb), 0.22), transparent); }
+.pa-onboarding__archetype::after {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(var(--pa-green-rgb), 0.22), transparent);
+}
 .pa-onboarding__archetype-mark {
   display: flex;
   width: 26px;
@@ -161,11 +221,27 @@
   border: 1px solid rgba(var(--pa-paper-rgb), 0.16);
   background: linear-gradient(145deg, rgba(var(--pa-paper-rgb), 0.1), rgba(var(--pa-paper-rgb), 0.02));
   color: var(--pa-green);
-  font: 11px/1 "Geist Mono", monospace;
+  font:
+    11px/1 "Geist Mono",
+    monospace;
 }
-.pa-onboarding__archetype-copy { display: flex; flex-direction: column; gap: 4px; }
-.pa-onboarding__archetype-title { color: var(--pa-paper); font: 500 13px/1.2 "Geist", sans-serif; }
-.pa-onboarding__archetype-detail { color: rgba(var(--pa-paper-rgb), 0.5); font: 11px/1.45 "Geist", sans-serif; }
+.pa-onboarding__archetype-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pa-onboarding__archetype-title {
+  color: var(--pa-paper);
+  font:
+    500 13px/1.2 "Geist",
+    sans-serif;
+}
+.pa-onboarding__archetype-detail {
+  color: rgba(var(--pa-paper-rgb), 0.5);
+  font:
+    11px/1.45 "Geist",
+    sans-serif;
+}
 .pa-onboarding__footer {
   display: flex;
   align-items: center;
@@ -175,27 +251,108 @@
   border-top: 1px solid rgba(var(--pa-paper-rgb), 0.12);
   background: rgba(var(--pa-paper-rgb), 0.025);
 }
-.pa-onboarding__status { display: flex; min-width: 0; align-items: center; gap: 9px; }
-.pa-onboarding__status-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--pa-amber); }
-.pa-onboarding__status-dot--ready { background: var(--pa-green); animation: pa-beat 1.8s ease-in-out infinite; }
-.pa-onboarding__status-copy { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
-.pa-onboarding__status-title { color: rgba(var(--pa-paper-rgb), 0.72); font: 11px/1 "Geist Mono", monospace; }
-.pa-onboarding__status-detail { overflow: hidden; color: rgba(var(--pa-paper-rgb), 0.4); text-overflow: ellipsis; white-space: nowrap; font: 10px/1 "Geist Mono", monospace; }
-.pa-onboarding__checks { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.pa-onboarding__check { display: inline-flex; align-items: center; gap: 5px; color: rgba(var(--pa-paper-rgb), 0.45); font: 9px/1 "Geist Mono", monospace; }
-.pa-onboarding__check-dot { width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: var(--pa-amber); }
-.pa-onboarding__check-dot--ready { background: var(--pa-green); }
-.pa-onboarding__check-dot--preview { background: rgba(var(--pa-paper-rgb), 0.35); }
-.pa-onboarding__skip { padding: 4px 0; border: 0; background: transparent; color: rgba(var(--pa-paper-rgb), 0.35); cursor: pointer; font: 10px/1 "Geist Mono", monospace; }
-.pa-onboarding__skip:hover { color: var(--pa-paper); }
+.pa-onboarding__status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+.pa-onboarding__status-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--pa-amber);
+}
+.pa-onboarding__status-dot--ready {
+  background: var(--pa-green);
+  animation: pa-beat 1.8s ease-in-out infinite;
+}
+.pa-onboarding__status-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.pa-onboarding__status-title {
+  color: rgba(var(--pa-paper-rgb), 0.72);
+  font:
+    11px/1 "Geist Mono",
+    monospace;
+}
+.pa-onboarding__status-detail {
+  overflow: hidden;
+  color: rgba(var(--pa-paper-rgb), 0.4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font:
+    10px/1 "Geist Mono",
+    monospace;
+}
+.pa-onboarding__checks {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pa-onboarding__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  font:
+    9px/1 "Geist Mono",
+    monospace;
+}
+.pa-onboarding__check-dot {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--pa-amber);
+}
+.pa-onboarding__check-dot--ready {
+  background: var(--pa-green);
+}
+.pa-onboarding__check-dot--preview {
+  background: rgba(var(--pa-paper-rgb), 0.35);
+}
+.pa-onboarding__skip {
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: rgba(var(--pa-paper-rgb), 0.35);
+  cursor: pointer;
+  font:
+    10px/1 "Geist Mono",
+    monospace;
+}
+.pa-onboarding__skip:hover {
+  color: var(--pa-paper);
+}
 
 @media (max-width: 780px) {
-  .pa-onboarding { align-items: flex-start; padding: 18px; }
-  .pa-onboarding__body { grid-template-columns: 1fr; }
-  .pa-onboarding__hero { padding: 34px 24px; border-right: 0; }
-  .pa-onboarding__aside { border-top: 1px solid rgba(var(--pa-paper-rgb), 0.12); }
-  .pa-onboarding__footer { align-items: flex-start; flex-direction: column; }
-  .pa-onboarding__checks { gap: 8px; }
+  .pa-onboarding {
+    align-items: flex-start;
+    padding: 18px;
+  }
+  .pa-onboarding__body {
+    grid-template-columns: 1fr;
+  }
+  .pa-onboarding__hero {
+    padding: 34px 24px;
+    border-right: 0;
+  }
+  .pa-onboarding__aside {
+    border-top: 1px solid rgba(var(--pa-paper-rgb), 0.12);
+  }
+  .pa-onboarding__footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .pa-onboarding__checks {
+    gap: 8px;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -209,8 +366,8 @@
   align-items: center;
   gap: 0;
   padding: 0 22px;
-  border-bottom: 1px solid rgba(244,244,244,0.12);
-  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid rgba(244, 244, 244, 0.12);
+  background: rgba(255, 255, 255, 0.02);
 }
 .pa-onboarding__step {
   position: relative;
@@ -218,13 +375,17 @@
   align-items: center;
   gap: 8px;
   padding: 13px 18px 13px 0;
-  color: rgba(244,244,244,0.4);
-  font: 10px/1 "Geist Mono", monospace;
+  color: rgba(244, 244, 244, 0.4);
+  font:
+    10px/1 "Geist Mono",
+    monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: default;
 }
-.pa-onboarding__step + .pa-onboarding__step { padding-left: 18px; }
+.pa-onboarding__step + .pa-onboarding__step {
+  padding-left: 18px;
+}
 .pa-onboarding__step + .pa-onboarding__step::before {
   position: absolute;
   left: 0;
@@ -232,7 +393,7 @@
   width: 1px;
   height: 12px;
   content: "";
-  background: rgba(244,244,244,0.12);
+  background: rgba(244, 244, 244, 0.12);
   transform: translateY(-50%);
 }
 .pa-onboarding__step-index {
@@ -241,18 +402,24 @@
   height: 16px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(244,244,244,0.18);
-  color: rgba(244,244,244,0.45);
-  font: 9px/1 "Geist Mono", monospace;
+  border: 1px solid rgba(244, 244, 244, 0.18);
+  color: rgba(244, 244, 244, 0.45);
+  font:
+    9px/1 "Geist Mono",
+    monospace;
 }
-.pa-onboarding__step--active { color: #f4f4f4; }
+.pa-onboarding__step--active {
+  color: #f4f4f4;
+}
 .pa-onboarding__step--active .pa-onboarding__step-index {
-  border-color: rgba(133,237,117,0.55);
+  border-color: rgba(133, 237, 117, 0.55);
   color: #85ed75;
 }
-.pa-onboarding__step--done { color: rgba(133,237,117,0.75); }
+.pa-onboarding__step--done {
+  color: rgba(133, 237, 117, 0.75);
+}
 .pa-onboarding__step--done .pa-onboarding__step-index {
-  border-color: rgba(133,237,117,0.4);
+  border-color: rgba(133, 237, 117, 0.4);
   color: #85ed75;
 }
 
@@ -264,7 +431,9 @@
   flex-direction: column;
   align-items: flex-start;
 }
-.pa-onboarding__wizard .pa-onboarding__title { font-size: clamp(30px, 4.5vw, 52px); }
+.pa-onboarding__wizard .pa-onboarding__title {
+  font-size: clamp(30px, 4.5vw, 52px);
+}
 
 /* Provider status row */
 .pa-onboarding__provider-status {
@@ -275,8 +444,8 @@
   max-width: 520px;
   margin-top: 24px;
   padding: 14px 16px;
-  border: 1px solid rgba(244,244,244,0.14);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(244, 244, 244, 0.14);
+  background: rgba(255, 255, 255, 0.03);
 }
 .pa-onboarding__provider-copy {
   display: flex;
@@ -285,8 +454,18 @@
   flex-direction: column;
   gap: 3px;
 }
-.pa-onboarding__provider-title { color: #f4f4f4; font: 500 13px/1.2 "Geist", sans-serif; }
-.pa-onboarding__provider-detail { color: rgba(244,244,244,0.5); font: 11px/1.45 "Geist", sans-serif; }
+.pa-onboarding__provider-title {
+  color: #f4f4f4;
+  font:
+    500 13px/1.2 "Geist",
+    sans-serif;
+}
+.pa-onboarding__provider-detail {
+  color: rgba(244, 244, 244, 0.5);
+  font:
+    11px/1.45 "Geist",
+    sans-serif;
+}
 
 /* Current model summary */
 .pa-onboarding__model-current {
@@ -297,11 +476,21 @@
   max-width: 520px;
   margin-top: 24px;
   padding: 14px 16px;
-  border: 1px solid rgba(133,237,117,0.3);
-  background: rgba(133,237,117,0.05);
+  border: 1px solid rgba(133, 237, 117, 0.3);
+  background: rgba(133, 237, 117, 0.05);
 }
-.pa-onboarding__model-current-name { color: #f4f4f4; font: 500 14px/1.2 "Geist", sans-serif; }
-.pa-onboarding__model-current-meta { color: rgba(244,244,244,0.5); font: 10px/1 "Geist Mono", monospace; }
+.pa-onboarding__model-current-name {
+  color: #f4f4f4;
+  font:
+    500 14px/1.2 "Geist",
+    sans-serif;
+}
+.pa-onboarding__model-current-meta {
+  color: rgba(244, 244, 244, 0.5);
+  font:
+    10px/1 "Geist Mono",
+    monospace;
+}
 
 /* Model picker list */
 .pa-onboarding__model-list {
@@ -312,10 +501,16 @@
   flex-direction: column;
   gap: 14px;
 }
-.pa-onboarding__model-group { display: flex; flex-direction: column; gap: 6px; }
+.pa-onboarding__model-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .pa-onboarding__model-group-label {
-  color: rgba(244,244,244,0.45);
-  font: 10px/1 "Geist Mono", monospace;
+  color: rgba(244, 244, 244, 0.45);
+  font:
+    10px/1 "Geist Mono",
+    monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -325,19 +520,37 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border: 1px solid rgba(244,244,244,0.12);
-  background: rgba(255,255,255,0.02);
-  color: rgba(244,244,244,0.72);
+  border: 1px solid rgba(244, 244, 244, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(244, 244, 244, 0.72);
   cursor: pointer;
-  font: 500 12.5px/1 "Geist", sans-serif;
+  font:
+    500 12.5px/1 "Geist",
+    sans-serif;
   text-align: left;
-  transition: border-color 100ms ease, background 100ms ease;
+  transition:
+    border-color 100ms ease,
+    background 100ms ease;
 }
-.pa-onboarding__model-option:hover { border-color: rgba(133,237,117,0.4); background: rgba(133,237,117,0.05); }
+.pa-onboarding__model-option:hover {
+  border-color: rgba(133, 237, 117, 0.4);
+  background: rgba(133, 237, 117, 0.05);
+}
 .pa-onboarding__model-option[aria-selected="true"] {
-  border-color: rgba(133,237,117,0.5);
-  background: rgba(133,237,117,0.08);
+  border-color: rgba(133, 237, 117, 0.5);
+  background: rgba(133, 237, 117, 0.08);
   color: #f4f4f4;
 }
-.pa-onboarding__model-option-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pa-onboarding__model-option-meta { flex-shrink: 0; color: rgba(244,244,244,0.45); font: 10px/1 "Geist Mono", monospace; }
+.pa-onboarding__model-option-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pa-onboarding__model-option-meta {
+  flex-shrink: 0;
+  color: rgba(244, 244, 244, 0.45);
+  font:
+    10px/1 "Geist Mono",
+    monospace;
+}

@@ -34,7 +34,16 @@ function build() {
     onSearchTranscriptRequest,
   );
   const all = groups.flatMap((g) => g.commands);
-  return { ipc, onNavigate, onNewSession, onNameRequest, onFindSessionRequest, onSearchTranscriptRequest, groups, all };
+  return {
+    ipc,
+    onNavigate,
+    onNewSession,
+    onNameRequest,
+    onFindSessionRequest,
+    onSearchTranscriptRequest,
+    groups,
+    all,
+  };
 }
 
 function byId(all: ReturnType<typeof build>["all"], id: string) {

@@ -19,7 +19,9 @@
    Nodes are auto-positioned by dagre; a transform transition turns every
    re-layout into a clean settle instead of a jump. */
 .react-flow__node:not(.dragging) {
-  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease;
+  transition:
+    transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.28s ease;
   will-change: transform;
   cursor: default;
 }
@@ -114,7 +116,9 @@
   background: var(--pa-card);
   border: 1px solid var(--pa-border);
   border-radius: var(--pa-radius-md);
-  transition: border-color 0.18s cubic-bezier(0.3, 0, 0.2, 1), box-shadow 0.18s ease;
+  transition:
+    border-color 0.18s cubic-bezier(0.3, 0, 0.2, 1),
+    box-shadow 0.18s ease;
   height: 100%;
   width: var(--node-w);
 }
@@ -385,12 +389,30 @@
     display: none;
   }
 }
-.pa-graph__controls { z-index: 5; }
-.pa-graph__minimap { z-index: 5; width: 140px; height: 90px; }
+.pa-graph__controls {
+  z-index: 5;
+}
+.pa-graph__minimap {
+  z-index: 5;
+  width: 140px;
+  height: 90px;
+}
 
 /* ---- Inline-style purge: legend + pill modifiers ---- */
-.pg-legend__swatch--accent { background: var(--pa-green); }
-.pg-legend__swatch--ok { background: var(--pa-green); }
-.pg-legend__swatch--err { background: var(--pa-danger); }
-.pg-legend__preview { color: rgba(var(--pa-paper-rgb), 0.45); }
-.pg-pill--muted { background: var(--pa-overlay); border-color: var(--pa-border); color: rgba(var(--pa-paper-rgb), 0.45); }
+.pg-legend__swatch--accent {
+  background: var(--pa-green);
+}
+.pg-legend__swatch--ok {
+  background: var(--pa-green);
+}
+.pg-legend__swatch--err {
+  background: var(--pa-danger);
+}
+.pg-legend__preview {
+  color: rgba(var(--pa-paper-rgb), 0.45);
+}
+.pg-pill--muted {
+  background: var(--pa-overlay);
+  border-color: var(--pa-border);
+  color: rgba(var(--pa-paper-rgb), 0.45);
+}

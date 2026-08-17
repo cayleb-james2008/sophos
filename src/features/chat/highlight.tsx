@@ -29,7 +29,8 @@ interface Tok {
 
 function tokenizeJson(text: string): Tok[] {
   const out: Tok[] = [];
-  const re = /("(?:\\.|[^"\\])*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(\btrue\b|\bfalse\b|\bnull\b)|([{}[\],:])/g;
+  const re =
+    /("(?:\\.|[^"\\])*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(\btrue\b|\bfalse\b|\bnull\b)|([{}[\],:])/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
@@ -56,7 +57,8 @@ const PY_KEYWORDS =
 
 function tokenizePython(text: string): Tok[] {
   const out: Tok[] = [];
-  const re = /(#.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(-?\d+(?:\.\d+)?)|(\bdef\b|\bclass\b)|([()\[\]{},.:=+\-*/%<>!&|])/gm;
+  const re =
+    /(#.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(-?\d+(?:\.\d+)?)|(\bdef\b|\bclass\b)|([()[\]{},.:=+\-*/%<>!&|])/gm;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
@@ -97,7 +99,8 @@ function tokenizePython(text: string): Tok[] {
 
 function tokenizeShell(text: string): Tok[] {
   const out: Tok[] = [];
-  const re = /(#.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(-{1,2}[a-zA-Z][\w-]*)|(\$[A-Za-z_][\w]*)|([|&;<>])/gm;
+  const re =
+    /(#.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(-{1,2}[a-zA-Z][\w-]*)|(\$[A-Za-z_][\w]*)|([|&;<>])/gm;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
@@ -124,7 +127,13 @@ function tokenizePlain(text: string): Tok[] {
 export function HighlightedCode({ code, lang, style }: { code: string; lang?: Lang; style?: CSS }) {
   const detected = lang ?? detectLang(code);
   const tokensArr =
-    detected === "json" ? tokenizeJson(code) : detected === "python" ? tokenizePython(code) : detected === "shell" ? tokenizeShell(code) : tokenizePlain(code);
+    detected === "json"
+      ? tokenizeJson(code)
+      : detected === "python"
+        ? tokenizePython(code)
+        : detected === "shell"
+          ? tokenizeShell(code)
+          : tokenizePlain(code);
 
   return (
     <pre className="hl-code" style={style}>

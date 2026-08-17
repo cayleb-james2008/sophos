@@ -82,6 +82,10 @@ export function SessionTree({ session }: { session?: SessionInfo | null }) {
     if (version > 0) void load();
   }, [version, load]);
 
+  // Rules of Hooks: derive the branch count BEFORE the `!session` early return
+  // so the useMemo is always called in the same order on every render.
+  const branchCount = useMemo(() => countBranches(roots), [roots]);
+
   const toggle = (id: string) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -116,8 +120,6 @@ export function SessionTree({ session }: { session?: SessionInfo | null }) {
     );
   }
 
-  const branchCount = useMemo(() => countBranches(roots), [roots]);
-
   return (
     <div className="session-tree">
       <div className="session-tree__toolbar">
@@ -127,7 +129,13 @@ export function SessionTree({ session }: { session?: SessionInfo | null }) {
         <span className="session-tree__count">
           {branchCount} branch{branchCount === 1 ? "" : "es"}
         </span>
-        <Button variant="ghost" size="sm" icon={<RefreshIcon size={12} />} onClick={() => void load()} loading={loading}>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<RefreshIcon size={12} />}
+          onClick={() => void load()}
+          loading={loading}
+        >
           Refresh
         </Button>
       </div>
@@ -187,8 +195,15 @@ export function SessionTree({ session }: { session?: SessionInfo | null }) {
             <span className={`session-tree__role session-tree__role--${typeRole(preview.type).cls}`}>
               {preview.type.toUpperCase()}
             </span>
-            <span className="session-tree__preview-time">{preview.timestamp ? relativeTime(preview.timestamp) : ""}</span>
-            <IconButton className="session-tree__preview-close" title="Close preview" size="sm" onClick={() => setPreview(null)}>
+            <span className="session-tree__preview-time">
+              {preview.timestamp ? relativeTime(preview.timestamp) : ""}
+            </span>
+            <IconButton
+              className="session-tree__preview-close"
+              title="Close preview"
+              size="sm"
+              onClick={() => setPreview(null)}
+            >
               <XIcon size={12} />
             </IconButton>
           </div>

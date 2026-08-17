@@ -24,7 +24,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Persistent settings file.
@@ -83,7 +83,15 @@ function normalizeString(value: unknown): string | undefined {
 }
 
 const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-const STRING_SETTING_KEYS = ["shellPath", "sessionDir", "defaultCwd", "defaultProvider", "defaultModel", "defaultThinking", "daemonCliPath"] as const;
+const STRING_SETTING_KEYS = [
+  "shellPath",
+  "sessionDir",
+  "defaultCwd",
+  "defaultProvider",
+  "defaultModel",
+  "defaultThinking",
+  "daemonCliPath",
+] as const;
 
 function normalizeThinking(value: unknown): string | undefined {
   const thinking = normalizeString(value);
@@ -99,7 +107,11 @@ function normalizeTheme(value: unknown): Settings["theme"] {
 }
 
 function normalizeSettings(raw: Record<string, unknown>): Settings {
-  const out: Record<string, unknown> = { ...raw, theme: normalizeTheme(raw.theme) ?? "dark", daemonTcp: false };
+  const out: Record<string, unknown> = {
+    ...raw,
+    theme: normalizeTheme(raw.theme) ?? "dark",
+    daemonTcp: false,
+  };
 
   for (const key of STRING_SETTING_KEYS) {
     const value = normalizeStringSetting(key, raw[key]);
@@ -125,10 +137,12 @@ function normalizeSettings(raw: Record<string, unknown>): Settings {
   if (Array.isArray(raw.localProviders)) {
     out.localProviders = raw.localProviders.filter((value): value is Record<string, unknown> => {
       if (!isRecord(value)) return false;
-      return normalizeString(value.id) !== undefined
-        && normalizeString(value.name) !== undefined
-        && normalizeString(value.baseUrl) !== undefined
-        && (value.kind === "ollama" || value.kind === "openai-compatible");
+      return (
+        normalizeString(value.id) !== undefined &&
+        normalizeString(value.name) !== undefined &&
+        normalizeString(value.baseUrl) !== undefined &&
+        (value.kind === "ollama" || value.kind === "openai-compatible")
+      );
     });
   } else {
     delete out.localProviders;
@@ -159,9 +173,11 @@ function normalizePatch(patch: Partial<Settings>): Record<string, unknown> {
     if (value === undefined) delete result.daemonTcp;
     else result.daemonTcp = value;
   }
-  if (Object.prototype.hasOwnProperty.call(raw, "modelConfig")) result.modelConfig = normalized.modelConfig ?? {};
+  if (Object.prototype.hasOwnProperty.call(raw, "modelConfig"))
+    result.modelConfig = normalized.modelConfig ?? {};
   if (Object.prototype.hasOwnProperty.call(raw, "auth")) result.auth = normalized.auth ?? {};
-  if (Object.prototype.hasOwnProperty.call(raw, "localProviders")) result.localProviders = normalized.localProviders ?? [];
+  if (Object.prototype.hasOwnProperty.call(raw, "localProviders"))
+    result.localProviders = normalized.localProviders ?? [];
   return result;
 }
 
@@ -193,7 +209,10 @@ export function writeAuthKey(provider: string, apiKey?: string): void {
     let auth: Record<string, { type: "api_key"; key: string }> = {};
     if (existsSync(AUTH_PATH)) {
       try {
-        auth = JSON.parse(readFileSync(AUTH_PATH, "utf8")) as Record<string, { type: "api_key"; key: string }>;
+        auth = JSON.parse(readFileSync(AUTH_PATH, "utf8")) as Record<
+          string,
+          { type: "api_key"; key: string }
+        >;
         if (!auth || typeof auth !== "object" || Array.isArray(auth)) auth = {};
       } catch {
         auth = {};
@@ -215,7 +234,6 @@ export function writeAuthKey(provider: string, apiKey?: string): void {
 
 import type { AgentMessage as PiAgentMessage } from "@earendil-works/pi-agent-core";
 import type {
-  AgentInfo,
   AgentMessage,
   AgentSessionState,
   AutonomousConfig,
@@ -308,14 +326,13 @@ export type InternalStatus = "connecting" | "connected" | "disconnected" | "reco
 export function isRecoverableDaemonClose(reason: string): boolean {
   // Session lifecycle closures (completed, killed, replaced, shutdown, update)
   // are terminal. Only transport-loss errors should create a new attachment.
-  return reason.startsWith("Lost connection to the Prime Agent daemon.")
-    || reason.startsWith("Daemon reconnection failed:");
+  return (
+    reason.startsWith("Lost connection to the Prime Agent daemon.") ||
+    reason.startsWith("Daemon reconnection failed:")
+  );
 }
 
-export function toConnectionStatus(
-  status: InternalStatus,
-  reason?: string,
-): ConnectionStatus {
+export function toConnectionStatus(status: InternalStatus, reason?: string): ConnectionStatus {
   switch (status) {
     case "connecting":
       return { kind: "connecting" };
@@ -332,7 +349,10 @@ export function toConnectionStatus(
 // Mappers — AgentConnection → IPC contract
 // ---------------------------------------------------------------------------
 
-function mapModel(model: AgentConnectionModel | undefined, thinkingLevel: string | undefined): ConnectionState["model"] {
+function mapModel(
+  model: AgentConnectionModel | undefined,
+  thinkingLevel: string | undefined,
+): ConnectionState["model"] {
   if (!model) return undefined;
   return {
     provider: model.provider,
@@ -370,11 +390,12 @@ function mapGoals(state: AgentConnectionState): Goal[] | undefined {
     error: "cleared",
   };
   const status: Goal["status"] = statusMap[statusRaw] ?? (activeFlag ? "active" : "completed");
-  const id = typeof goal.goalId === "string" && goal.goalId
-    ? (goal.goalId as string)
-    : typeof goal.id === "string" && goal.id
-      ? (goal.id as string)
-      : "default";
+  const id =
+    typeof goal.goalId === "string" && goal.goalId
+      ? (goal.goalId as string)
+      : typeof goal.id === "string" && goal.id
+        ? (goal.id as string)
+        : "default";
   const progress = typeof goal.progress === "string" ? (goal.progress as string) : undefined;
   return [{ id, objective, status, progress }];
 }
@@ -465,13 +486,14 @@ function mapRlmChildren(snapshot: AgentConnectionSnapshot | undefined): RlmChild
     id: c.id,
     sessionId: c.activeSessionId,
     name: c.sessionName ?? c.label,
-    status: (c.status === "queued" || c.status === "running")
-      ? "running"
-      : c.status === "done"
-        ? "done"
-        : c.status === "error" || c.status === "cancelled"
-          ? "error"
-          : "idle",
+    status:
+      c.status === "queued" || c.status === "running"
+        ? "running"
+        : c.status === "done"
+          ? "done"
+          : c.status === "error" || c.status === "cancelled"
+            ? "error"
+            : "idle",
     parentId: c.parentId,
     summary: c.answerPreview,
   }));
@@ -643,11 +665,8 @@ export function mapAgentMessage(msg: PiAgentMessage, idx: number): TranscriptMes
   const m = msg as unknown as Record<string, unknown>;
   const role = (typeof m.role === "string" ? m.role : "system") as TranscriptMessage["role"];
   const id = typeof m.id === "string" ? m.id : `msg-${idx}`;
-  const timestamp = typeof m.timestamp === "string"
-    ? m.timestamp
-    : typeof m.createdAt === "string"
-      ? m.createdAt
-      : undefined;
+  const timestamp =
+    typeof m.timestamp === "string" ? m.timestamp : typeof m.createdAt === "string" ? m.createdAt : undefined;
 
   // Content can be string | ContentPart[].
   let content = "";
@@ -668,7 +687,11 @@ export function mapAgentMessage(msg: PiAgentMessage, idx: number): TranscriptMes
 
   let thinking: string | undefined;
   if (typeof m.thinking === "string") thinking = m.thinking;
-  else if (m.thinking && typeof m.thinking === "object" && "text" in (m.thinking as Record<string, unknown>)) {
+  else if (
+    m.thinking &&
+    typeof m.thinking === "object" &&
+    "text" in (m.thinking as Record<string, unknown>)
+  ) {
     thinking = String((m.thinking as Record<string, unknown>).text ?? "");
   }
 
@@ -676,8 +699,18 @@ export function mapAgentMessage(msg: PiAgentMessage, idx: number): TranscriptMes
     ? (m.toolCalls as Array<Record<string, unknown>>).map((tc, i) => ({
         id: typeof tc.id === "string" ? tc.id : `tc-${idx}-${i}`,
         name: typeof tc.name === "string" ? tc.name : typeof tc.toolName === "string" ? tc.toolName : "tool",
-        input: typeof tc.input === "string" ? tc.input : tc.input !== undefined ? JSON.stringify(tc.input) : undefined,
-        output: typeof tc.output === "string" ? tc.output : tc.output !== undefined ? JSON.stringify(tc.output) : undefined,
+        input:
+          typeof tc.input === "string"
+            ? tc.input
+            : tc.input !== undefined
+              ? JSON.stringify(tc.input)
+              : undefined,
+        output:
+          typeof tc.output === "string"
+            ? tc.output
+            : tc.output !== undefined
+              ? JSON.stringify(tc.output)
+              : undefined,
         status: (typeof tc.status === "string" ? tc.status : "complete") as "running" | "complete" | "error",
       }))
     : undefined;
@@ -701,30 +734,66 @@ export async function getTranscript(conn: AgentConnection): Promise<TranscriptMe
 function textFromContent(value: unknown): string {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return "";
-  return value.map((part) => {
-    if (!part || typeof part !== "object") return "";
-    const p = part as Record<string, unknown>;
-    return typeof p.text === "string" ? p.text : "";
-  }).join("");
+  return value
+    .map((part) => {
+      if (!part || typeof part !== "object") return "";
+      const p = part as Record<string, unknown>;
+      return typeof p.text === "string" ? p.text : "";
+    })
+    .join("");
 }
 
 const KERNEL_HEALTH_COPY: Record<KernelHealthReason, Omit<KernelHealthDiagnostic, "reason">> = {
-  healthy: { message: "The Python workspace is healthy and responding.", nextStep: "No action is needed.", action: "none" },
-  starting: { message: "The Python workspace is starting.", nextStep: "Wait a few seconds, then refresh this panel.", action: "wait" },
-  not_started: { message: "The Python workspace has not started yet.", nextStep: "Run a code cell to start it.", action: "run_cell" },
-  bootstrap_failed: { message: "The Python workspace could not start.", nextStep: "Refresh once. If it stays unavailable, restart the engine and check that Python support is installed.", action: "retry" },
-  dead: { message: "The Python workspace stopped unexpectedly.", nextStep: "Restart the engine to create a fresh workspace. In-memory variables will be lost.", action: "restart" },
-  namespace_unavailable: { message: "The Python workspace is running, but its live state could not be read.", nextStep: "Wait for the current cell to finish, then refresh this panel.", action: "refresh" },
-  browser_preview: { message: "The browser preview has no live Python workspace.", nextStep: "Open the Tauri app to inspect the live kernel.", action: "open_tauri" },
-  unavailable: { message: "Kernel health is temporarily unavailable.", nextStep: "Check the engine connection, then refresh this panel.", action: "refresh" },
+  healthy: {
+    message: "The Python workspace is healthy and responding.",
+    nextStep: "No action is needed.",
+    action: "none",
+  },
+  starting: {
+    message: "The Python workspace is starting.",
+    nextStep: "Wait a few seconds, then refresh this panel.",
+    action: "wait",
+  },
+  not_started: {
+    message: "The Python workspace has not started yet.",
+    nextStep: "Run a code cell to start it.",
+    action: "run_cell",
+  },
+  bootstrap_failed: {
+    message: "The Python workspace could not start.",
+    nextStep:
+      "Refresh once. If it stays unavailable, restart the engine and check that Python support is installed.",
+    action: "retry",
+  },
+  dead: {
+    message: "The Python workspace stopped unexpectedly.",
+    nextStep: "Restart the engine to create a fresh workspace. In-memory variables will be lost.",
+    action: "restart",
+  },
+  namespace_unavailable: {
+    message: "The Python workspace is running, but its live state could not be read.",
+    nextStep: "Wait for the current cell to finish, then refresh this panel.",
+    action: "refresh",
+  },
+  browser_preview: {
+    message: "The browser preview has no live Python workspace.",
+    nextStep: "Open the Tauri app to inspect the live kernel.",
+    action: "open_tauri",
+  },
+  unavailable: {
+    message: "Kernel health is temporarily unavailable.",
+    nextStep: "Check the engine connection, then refresh this panel.",
+    action: "refresh",
+  },
 };
 
 /** Map only allowlisted health fields; daemon errors never cross into the UI. */
 export function mapKernelDiagnostic(value: unknown): KernelHealthDiagnostic {
-  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const reason = typeof raw.reason === "string" && Object.prototype.hasOwnProperty.call(KERNEL_HEALTH_COPY, raw.reason)
-    ? raw.reason as KernelHealthReason
-    : "unavailable";
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const reason =
+    typeof raw.reason === "string" && Object.prototype.hasOwnProperty.call(KERNEL_HEALTH_COPY, raw.reason)
+      ? (raw.reason as KernelHealthReason)
+      : "unavailable";
   return { reason, ...KERNEL_HEALTH_COPY[reason] };
 }
 
@@ -751,27 +820,36 @@ export async function getKernelState(conn: AgentConnection): Promise<KernelState
       if (!part || typeof part !== "object") continue;
       const block = part as Record<string, unknown>;
       if (block.type !== "toolCall" || block.name !== "ipython") continue;
-      const args = block.arguments && typeof block.arguments === "object"
-        ? block.arguments as Record<string, unknown>
-        : {};
+      const args =
+        block.arguments && typeof block.arguments === "object"
+          ? (block.arguments as Record<string, unknown>)
+          : {};
       const code = typeof args.code === "string" ? args.code : "";
       const id = typeof block.id === "string" ? block.id : `cell-${cells.length + 1}`;
       const result = results.get(id);
-      const details = result?.details && typeof result.details === "object"
-        ? result.details as Record<string, unknown>
-        : undefined;
+      const details =
+        result?.details && typeof result.details === "object"
+          ? (result.details as Record<string, unknown>)
+          : undefined;
       const stdout = typeof details?.stdout === "string" ? details.stdout : "";
       const resultText = typeof details?.result === "string" ? details.result : "";
       const output = stdout || resultText || (result ? textFromContent(result.content) : undefined);
-      const errorDetails = details?.error && typeof details.error === "object"
-        ? details.error as Record<string, unknown>
-        : undefined;
-      const error = typeof errorDetails?.evalue === "string"
-        ? errorDetails.evalue
-        : result?.isError === true ? (typeof details?.stderr === "string" ? details.stderr : output) : undefined;
-      const executionCount = typeof details?.executionCount === "number" && Number.isInteger(details.executionCount)
-        ? details.executionCount
-        : undefined;
+      const errorDetails =
+        details?.error && typeof details.error === "object"
+          ? (details.error as Record<string, unknown>)
+          : undefined;
+      const error =
+        typeof errorDetails?.evalue === "string"
+          ? errorDetails.evalue
+          : result?.isError === true
+            ? typeof details?.stderr === "string"
+              ? details.stderr
+              : output
+            : undefined;
+      const executionCount =
+        typeof details?.executionCount === "number" && Number.isInteger(details.executionCount)
+          ? details.executionCount
+          : undefined;
       cells.push({
         id,
         code,
@@ -786,7 +864,13 @@ export async function getKernelState(conn: AgentConnection): Promise<KernelState
   const latest = cells[cells.length - 1];
   const running = kernelState.running && kernelState.namespace !== null;
   return {
-    status: !activeTools.includes("ipython") ? "unavailable" : latest?.status === "running" ? "running" : running ? "configured" : "unavailable",
+    status: !activeTools.includes("ipython")
+      ? "unavailable"
+      : latest?.status === "running"
+        ? "running"
+        : running
+          ? "configured"
+          : "unavailable",
     persistent: activeTools.includes("ipython"),
     toolAvailable: activeTools.includes("ipython"),
     sessionId: daemonState.sessionId,
@@ -804,7 +888,9 @@ function readJsonFile(path: string): Record<string, unknown> | undefined {
   try {
     if (!existsSync(path)) return undefined;
     const value = JSON.parse(readFileSync(path, "utf8"));
-    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
   } catch {
     return undefined;
   }
@@ -840,8 +926,14 @@ export async function getHarnessState(conn: AgentConnection): Promise<HarnessSta
             content: typeof entry.content === "string" ? entry.content : "",
             path: typeof entry.path === "string" ? entry.path : undefined,
             scope: entry.scope === "local" ? "local" : "global",
-            reference: entry.reference && typeof entry.reference === "object" ? entry.reference as Record<string, unknown> : undefined,
-            arguments: entry.arguments && typeof entry.arguments === "object" ? entry.arguments as Record<string, unknown> : undefined,
+            reference:
+              entry.reference && typeof entry.reference === "object"
+                ? (entry.reference as Record<string, unknown>)
+                : undefined,
+            arguments:
+              entry.arguments && typeof entry.arguments === "object"
+                ? (entry.arguments as Record<string, unknown>)
+                : undefined,
             version: typeof entry.version === "number" ? entry.version : undefined,
             updatedAt: typeof entry.updated_at === "string" ? entry.updated_at : undefined,
           });
@@ -856,7 +948,9 @@ export async function getHarnessState(conn: AgentConnection): Promise<HarnessSta
           id: typeof r.id === "string" ? r.id : `refinement-${refinements.length + 1}`,
           summary: typeof r.summary === "string" ? r.summary : undefined,
           trigger: typeof r.trigger === "string" ? r.trigger : undefined,
-          changes: Array.isArray(r.changes) ? r.changes.filter((x): x is string => typeof x === "string") : undefined,
+          changes: Array.isArray(r.changes)
+            ? r.changes.filter((x): x is string => typeof x === "string")
+            : undefined,
           outcome: typeof r.outcome === "string" ? r.outcome : undefined,
           timestamp: typeof r.created_at === "string" ? r.created_at : undefined,
           rollbackOf: typeof r.rollbackOf === "string" ? r.rollbackOf : undefined,
@@ -866,13 +960,19 @@ export async function getHarnessState(conn: AgentConnection): Promise<HarnessSta
   }
   const historyPath = join(PRIME_AGENT_DIR, "harness", "refinements.jsonl");
   if (existsSync(historyPath)) {
-    for (const line of readFileSync(historyPath, "utf8").split(/\\r?\\n/).filter(Boolean)) {
+    for (const line of readFileSync(historyPath, "utf8")
+      .split(/\\r?\\n/)
+      .filter(Boolean)) {
       const value = readJsonFileFromText(line);
       if (!value || typeof value.id !== "string") continue;
       refinements.push({
         id: value.id,
         summary: typeof value.summary === "string" ? value.summary : undefined,
-        changes: Array.isArray(value.appliedEdits) ? value.appliedEdits.map((e) => `${e.applied ? "applied" : "failed"} ${e.action ?? "edit"} ${e.kind ?? ""}`) : undefined,
+        changes: Array.isArray(value.appliedEdits)
+          ? value.appliedEdits.map(
+              (e) => `${e.applied ? "applied" : "failed"} ${e.action ?? "edit"} ${e.kind ?? ""}`,
+            )
+          : undefined,
         timestamp: typeof value.id === "string" ? value.id : undefined,
         rollbackOf: typeof value.rollbackOf === "string" ? value.rollbackOf : undefined,
       });
@@ -884,7 +984,9 @@ export async function getHarnessState(conn: AgentConnection): Promise<HarnessSta
 function readJsonFileFromText(text: string): Record<string, unknown> | undefined {
   try {
     const value = JSON.parse(text);
-    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
   } catch {
     return undefined;
   }
@@ -964,11 +1066,7 @@ function mapSessionInfo(s: SavedSessionShape): SessionInfo {
     cwd: s.cwd,
     createdAt: s.created instanceof Date ? s.created.toISOString() : undefined,
     updatedAt: s.modified instanceof Date ? s.modified.toISOString() : undefined,
-    status: s.state?.status === "active"
-      ? "active"
-      : s.state?.status === "archived"
-        ? "idle"
-        : "saved",
+    status: s.state?.status === "active" ? "active" : s.state?.status === "archived" ? "idle" : "saved",
   };
 }
 
@@ -1075,8 +1173,14 @@ export function resolvePreferredModel(
   current?: { provider?: string; model?: string; id?: string },
 ): { provider: string; model: string } {
   return {
-    provider: normalizeString(settings.defaultProvider) ?? normalizeString(current?.provider) ?? DEFAULT_MODEL_SELECTION.provider,
-    model: normalizeString(settings.defaultModel) ?? normalizeString(current?.model ?? current?.id) ?? DEFAULT_MODEL_SELECTION.model,
+    provider:
+      normalizeString(settings.defaultProvider) ??
+      normalizeString(current?.provider) ??
+      DEFAULT_MODEL_SELECTION.provider,
+    model:
+      normalizeString(settings.defaultModel) ??
+      normalizeString(current?.model ?? current?.id) ??
+      DEFAULT_MODEL_SELECTION.model,
   };
 }
 
@@ -1108,8 +1212,11 @@ export function writeModelOverrideToModelsJson(
       }
     }
     const providersObj =
-      (root.providers as Record<string, unknown> | undefined) ?? (root.providers = {} as Record<string, unknown>);
-    const prov = (providersObj[provider] as Record<string, unknown> | undefined) ?? (providersObj[provider] = {} as Record<string, unknown>);
+      (root.providers as Record<string, unknown> | undefined) ??
+      (root.providers = {} as Record<string, unknown>);
+    const prov =
+      (providersObj[provider] as Record<string, unknown> | undefined) ??
+      (providersObj[provider] = {} as Record<string, unknown>);
 
     // 1) Custom model entry: providers[provider].models[] with matching id.
     const models = Array.isArray(prov.models) ? (prov.models as Array<Record<string, unknown>>) : undefined;
@@ -1175,7 +1282,11 @@ export class InboxStore {
   private messages: AgentMessage[] = [];
   private nextId = 1;
 
-  add(fromAgentId: string, message: string, opts?: { fromAgentName?: string; toAgentId?: string; toAgentName?: string; threadId?: string }): AgentMessage {
+  add(
+    fromAgentId: string,
+    message: string,
+    opts?: { fromAgentName?: string; toAgentId?: string; toAgentName?: string; threadId?: string },
+  ): AgentMessage {
     const msg: AgentMessage = {
       id: `inbox-${this.nextId++}`,
       fromAgentId,
@@ -1244,9 +1355,10 @@ function mapChildSessionState(child: AgentConnectionRlmChild, messages: PiAgentM
     sessionId: child.activeSessionId,
     model: child.model,
     summary: child.recap ?? child.answerPreview,
-    activity: child.activity && typeof child.activity === "object"
-      ? (child.activity as { kind?: string }).kind
-      : undefined,
+    activity:
+      child.activity && typeof child.activity === "object"
+        ? (child.activity as { kind?: string }).kind
+        : undefined,
     tokenCount: child.tokenCount,
     toolUseCount: child.toolUseCount,
     transcript: messages.map((message, index) => mapAgentMessage(message, index)),
@@ -1257,11 +1369,13 @@ function transcriptChanged(before: TranscriptMessage[], after: TranscriptMessage
   if (before.length !== after.length) return true;
   return after.some((message, index) => {
     const previous = before[index];
-    return previous?.id !== message.id ||
+    return (
+      previous?.id !== message.id ||
       previous?.role !== message.role ||
       previous?.content !== message.content ||
       previous?.status !== message.status ||
-      JSON.stringify(previous?.toolCalls) !== JSON.stringify(message.toolCalls);
+      JSON.stringify(previous?.toolCalls) !== JSON.stringify(message.toolCalls)
+    );
   });
 }
 
@@ -1344,7 +1458,9 @@ export class ConnectionHolder {
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         if (typeof process !== "undefined" && process.stderr) {
-          process.stderr.write(`[bridge:connection] connect attempt ${attempt}/${maxAttempts} failed: ${reason}\n`);
+          process.stderr.write(
+            `[bridge:connection] connect attempt ${attempt}/${maxAttempts} failed: ${reason}\n`,
+          );
         }
         if (attempt >= maxAttempts) {
           this.setStatus("disconnected", reason);
@@ -1493,7 +1609,9 @@ export class ConnectionHolder {
     // Try to attach to an existing session first.
     try {
       const listResp = await this.client.request({ type: "list" }, 10_000);
-      const sessions = (listResp as unknown as { data?: { sessions?: Array<{ activeSessionId?: string; id: string }> } }).data?.sessions;
+      const sessions = (
+        listResp as unknown as { data?: { sessions?: Array<{ activeSessionId?: string; id: string }> } }
+      ).data?.sessions;
       if (Array.isArray(sessions) && sessions.length > 0) {
         const first = sessions[0];
         const id = first.activeSessionId ?? first.id;
@@ -1568,7 +1686,10 @@ export class ConnectionHolder {
   async resolveForkEntryId(conn: AgentConnection, pathOrId: string): Promise<string | undefined> {
     let forkable: Array<{ entryId?: string; text?: string }> = [];
     try {
-      const msgs = (await conn.getUserMessagesForForking()) as unknown as Array<{ entryId?: string; text?: string }>;
+      const msgs = (await conn.getUserMessagesForForking()) as unknown as Array<{
+        entryId?: string;
+        text?: string;
+      }>;
       if (Array.isArray(msgs)) forkable = msgs;
     } catch {
       // daemon lacks the read — fall through to tree-based resolution below
@@ -1613,7 +1734,9 @@ export class ConnectionHolder {
   }
 
   /** Attach one persistent watcher to a child session and publish its initial state. */
-  async attachChildAgent(child: AgentConnectionRlmChild): Promise<{ childId: string; sessionId: string; attached: true }> {
+  async attachChildAgent(
+    child: AgentConnectionRlmChild,
+  ): Promise<{ childId: string; sessionId: string; attached: true }> {
     const sessionId = child.activeSessionId;
     if (!sessionId) throw new Error(`agent not found or not attachable: ${child.id}`);
 
@@ -1636,13 +1759,19 @@ export class ConnectionHolder {
       state: mapChildSessionState(child, []),
       refreshTail: Promise.resolve(),
     };
-    watch.unsubscribe = watcher.subscribe((event) => { void this.handleChildWatchEvent(watch, event); });
+    watch.unsubscribe = watcher.subscribe((event) => {
+      void this.handleChildWatchEvent(watch, event);
+    });
     this.childWatches.set(sessionId, watch);
 
     try {
       watch.state = mapChildSessionState(child, await watcher.getMessages());
-      if (this.childWatches.get(sessionId) !== watch) throw new Error("child watcher was closed during attach");
-      this.events.onEvent({ type: "agent_watch", event: { kind: "attached", childId: child.id, sessionId, state: watch.state } });
+      if (this.childWatches.get(sessionId) !== watch)
+        throw new Error("child watcher was closed during attach");
+      this.events.onEvent({
+        type: "agent_watch",
+        event: { kind: "attached", childId: child.id, sessionId, state: watch.state },
+      });
       return { childId: child.id, sessionId, attached: true };
     } catch (error) {
       await this.closeChildWatch(sessionId, "attach failed");
@@ -1662,7 +1791,8 @@ export class ConnectionHolder {
 
   private publishChildState(watch: ChildWatch, next: AgentSessionState): void {
     if (this.childWatches.get(watch.sessionId) !== watch) return;
-    const statusChanged = next.status !== watch.state.status ||
+    const statusChanged =
+      next.status !== watch.state.status ||
       next.summary !== watch.state.summary ||
       next.activity !== watch.state.activity ||
       next.tokenCount !== watch.state.tokenCount ||
@@ -1685,9 +1815,15 @@ export class ConnectionHolder {
     if (messagesChanged) {
       const message = next.transcript[next.transcript.length - 1];
       if (message) {
-        this.events.onEvent({ type: "agent_watch", event: { kind: "message", childId: watch.childId, state: next, message } });
+        this.events.onEvent({
+          type: "agent_watch",
+          event: { kind: "message", childId: watch.childId, state: next, message },
+        });
       }
-      this.events.onEvent({ type: "agent_watch", event: { kind: "transcript", childId: watch.childId, state: next, message } });
+      this.events.onEvent({
+        type: "agent_watch",
+        event: { kind: "transcript", childId: watch.childId, state: next, message },
+      });
     }
   }
 
@@ -1697,27 +1833,29 @@ export class ConnectionHolder {
       await this.closeChildWatch(watch.sessionId, event.error ?? "child session closed");
       return;
     }
-    watch.refreshTail = watch.refreshTail.then(async () => {
-      if (this.childWatches.get(watch.sessionId) !== watch) return;
-      const messages = await watch.watcher.getMessages();
-      if (this.childWatches.get(watch.sessionId) !== watch) return;
-      const child = this.snapshot?.children?.find((candidate) => candidate.id === watch.childId);
-      const fallback: AgentConnectionRlmChild = {
-        id: watch.childId,
-        activeSessionId: watch.sessionId,
-        label: watch.childId,
-        status: watch.state.status as AgentConnectionRlmChild["status"],
-        sessionDir: "",
-      };
-      this.publishChildState(watch, mapChildSessionState(child ?? fallback, messages));
-    }).catch((error) => {
-      if (this.childWatches.get(watch.sessionId) !== watch) return;
-      this.publishChildState(watch, {
-        ...watch.state,
-        status: "error",
-        summary: error instanceof Error ? error.message : String(error),
+    watch.refreshTail = watch.refreshTail
+      .then(async () => {
+        if (this.childWatches.get(watch.sessionId) !== watch) return;
+        const messages = await watch.watcher.getMessages();
+        if (this.childWatches.get(watch.sessionId) !== watch) return;
+        const child = this.snapshot?.children?.find((candidate) => candidate.id === watch.childId);
+        const fallback: AgentConnectionRlmChild = {
+          id: watch.childId,
+          activeSessionId: watch.sessionId,
+          label: watch.childId,
+          status: watch.state.status as AgentConnectionRlmChild["status"],
+          sessionDir: "",
+        };
+        this.publishChildState(watch, mapChildSessionState(child ?? fallback, messages));
+      })
+      .catch((error) => {
+        if (this.childWatches.get(watch.sessionId) !== watch) return;
+        this.publishChildState(watch, {
+          ...watch.state,
+          status: "error",
+          summary: error instanceof Error ? error.message : String(error),
+        });
       });
-    });
     await watch.refreshTail;
   }
 
@@ -1727,11 +1865,16 @@ export class ConnectionHolder {
     this.childWatches.delete(sessionId);
     watch.unsubscribe();
     await watch.watcher.close().catch(() => {});
-    this.events.onEvent({ type: "agent_watch", event: { kind: "detached", childId: watch.childId, sessionId, reason } });
+    this.events.onEvent({
+      type: "agent_watch",
+      event: { kind: "detached", childId: watch.childId, sessionId, reason },
+    });
   }
 
   private async closeAllChildWatches(reason: string): Promise<void> {
-    await Promise.all([...this.childWatches.keys()].map((sessionId) => this.closeChildWatch(sessionId, reason)));
+    await Promise.all(
+      [...this.childWatches.keys()].map((sessionId) => this.closeChildWatch(sessionId, reason)),
+    );
   }
 
   /**
@@ -1843,12 +1986,17 @@ export class ConnectionHolder {
           lastError = error instanceof Error ? error.message : String(error);
           const remaining = deadline - Date.now();
           if (remaining <= 0) break;
-          await new Promise((resolve) => setTimeout(resolve, Math.min(remaining, 500 * 2 ** Math.min(attempt++, 3))));
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.min(remaining, 500 * 2 ** Math.min(attempt++, 3))),
+          );
         }
       }
       if (!this.stopping) {
         this.setStatus("disconnected", lastError);
-        this.events.onEvent({ type: "connection_status", status: { kind: "disconnected", reason: lastError } });
+        this.events.onEvent({
+          type: "connection_status",
+          status: { kind: "disconnected", reason: lastError },
+        });
       }
     })();
     this.reconnectPromise = recovery;
@@ -1917,9 +2065,10 @@ export class ConnectionHolder {
                   ...watch.state,
                   status: child.status,
                   summary: child.recap ?? child.answerPreview,
-                  activity: child.activity && typeof child.activity === "object"
-                    ? (child.activity as { kind?: string }).kind
-                    : undefined,
+                  activity:
+                    child.activity && typeof child.activity === "object"
+                      ? (child.activity as { kind?: string }).kind
+                      : undefined,
                   tokenCount: child.tokenCount,
                   toolUseCount: child.toolUseCount,
                 });
@@ -1940,9 +2089,10 @@ export class ConnectionHolder {
         if (innerType === "refine_complete" || innerType === "refine_failed") {
           this.events.onEvent({
             type: "refinement_result",
-            result: innerType === "refine_complete"
-              ? mapRefinementResult((evt.event as unknown as Record<string, unknown>).result)
-              : { error: refineEventError(evt.event) },
+            result:
+              innerType === "refine_complete"
+                ? mapRefinementResult((evt.event as unknown as Record<string, unknown>).result)
+                : { error: refineEventError(evt.event) },
           });
         }
         this.events.onEvent({ type: "session_event", event: mapSessionEvent(evt.event) });
@@ -1990,7 +2140,12 @@ export class ConnectionHolder {
       case "extension_error":
         this.events.onEvent({
           type: "session_event",
-          event: { kind: "extension_error", extensionPath: evt.extensionPath, event: evt.event, error: evt.error },
+          event: {
+            kind: "extension_error",
+            extensionPath: evt.extensionPath,
+            event: evt.event,
+            error: evt.error,
+          },
         });
         return;
       case "heartbeats_changed":
@@ -2035,7 +2190,10 @@ export class ConnectionHolder {
    * refresh. Generation-checking prevents a slow older read from publishing a
    * stale child roster after a newer event has already been processed.
    */
-  private async emitEnrichedSnapshot(kind: "snapshot" | "resynced", generation = ++this.snapshotEventGeneration): Promise<void> {
+  private async emitEnrichedSnapshot(
+    kind: "snapshot" | "resynced",
+    generation = ++this.snapshotEventGeneration,
+  ): Promise<void> {
     const conn = this.conn;
     if (!conn || !this.latestState) return;
     const base = mapConnectionState(this.latestState, this.status, this.disconnectReason, this.snapshot);
@@ -2049,6 +2207,8 @@ export class ConnectionHolder {
 // Header accessor — used by getTranscript and similar.
 // ---------------------------------------------------------------------------
 
-export async function getSessionHeader(conn: AgentConnection): Promise<AgentConnectionSessionHeader | undefined> {
+export async function getSessionHeader(
+  conn: AgentConnection,
+): Promise<AgentConnectionSessionHeader | undefined> {
   return conn.getSessionHeader();
 }

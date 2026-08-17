@@ -79,7 +79,11 @@ export const BUILTIN_TOOLS: ToolRegistryEntry[] = [
     name: "read_file",
     description: "Read a file from the session workspace.",
     category: "builtin",
-    schema: { type: "object", properties: { path: { type: "string", description: "Path of the file to read" } }, required: ["path"] },
+    schema: {
+      type: "object",
+      properties: { path: { type: "string", description: "Path of the file to read" } },
+      required: ["path"],
+    },
   },
   {
     name: "edit_file",
@@ -112,19 +116,30 @@ export const BUILTIN_TOOLS: ToolRegistryEntry[] = [
     name: "web_search",
     description: "Search the web for current information.",
     category: "builtin",
-    schema: { type: "object", properties: { query: { type: "string", description: "Search query" } }, required: ["query"] },
+    schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "Search query" } },
+      required: ["query"],
+    },
   },
   {
     name: "run_cell",
     description: "Run a code cell in the persistent kernel.",
     category: "builtin",
-    schema: { type: "object", properties: { code: { type: "string", description: "Cell source" } }, required: ["code"] },
+    schema: {
+      type: "object",
+      properties: { code: { type: "string", description: "Cell source" } },
+      required: ["code"],
+    },
   },
   {
     name: "refine",
     description: "Refine the session's goal and plan.",
     category: "builtin",
-    schema: { type: "object", properties: { prompt: { type: "string", description: "Optional refinement direction" } } },
+    schema: {
+      type: "object",
+      properties: { prompt: { type: "string", description: "Optional refinement direction" } },
+    },
   },
   {
     name: "inspect_runtime",
@@ -153,7 +168,15 @@ export interface RegistrySources {
  * sorting a copy never mutates the caller's array. */
 export function sortEntries(entries: ToolRegistryEntry[]): ToolRegistryEntry[] {
   return [...entries].sort((a, b) =>
-    a.name < b.name ? -1 : a.name > b.name ? 1 : a.category < b.category ? -1 : a.category > b.category ? 1 : 0,
+    a.name < b.name
+      ? -1
+      : a.name > b.name
+        ? 1
+        : a.category < b.category
+          ? -1
+          : a.category > b.category
+            ? 1
+            : 0,
   );
 }
 
@@ -205,9 +228,11 @@ export function countByCategory(entries: ToolRegistryEntry[]): Record<ToolCatego
 
 /** Read the persisted MCP server list from settings (additive field). */
 function readMcpServers(settings: Settings | null): McpServerConfig[] {
-  const raw = (settings as Settings & { mcpServers?: McpServerConfig[] } | null)?.mcpServers;
+  const raw = (settings as (Settings & { mcpServers?: McpServerConfig[] }) | null)?.mcpServers;
   if (!Array.isArray(raw)) return [];
-  return raw.filter((s): s is McpServerConfig => !!s && typeof s.name === "string" && typeof s.command === "string");
+  return raw.filter(
+    (s): s is McpServerConfig => !!s && typeof s.name === "string" && typeof s.command === "string",
+  );
 }
 
 /**
@@ -219,8 +244,14 @@ function readMcpServers(settings: Settings | null): McpServerConfig[] {
 export async function loadToolRegistry(client: IpcClient, settings?: Settings): Promise<ToolRegistryEntry[]> {
   const [runtime, extensions, s] = await Promise.all([
     client.getRuntimeInfo().catch(() => null),
-    typeof client.getExtensions === "function" ? client.getExtensions().catch(() => null) : Promise.resolve(null),
-    settings ? Promise.resolve(settings) : typeof client.getSettings === "function" ? client.getSettings().catch(() => null) : Promise.resolve(null),
+    typeof client.getExtensions === "function"
+      ? client.getExtensions().catch(() => null)
+      : Promise.resolve(null),
+    settings
+      ? Promise.resolve(settings)
+      : typeof client.getSettings === "function"
+        ? client.getSettings().catch(() => null)
+        : Promise.resolve(null),
   ]);
 
   const servers = readMcpServers(s);

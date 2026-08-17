@@ -10,7 +10,12 @@ type IconProps = {
   style?: React.CSSProperties;
 };
 
-function base({ size = 16, color = "currentColor", strokeWidth = 1.5, style }: IconProps): React.SVGProps<SVGSVGElement> {
+function base({
+  size = 16,
+  color = "currentColor",
+  strokeWidth = 1.5,
+  style,
+}: IconProps): React.SVGProps<SVGSVGElement> {
   return {
     width: size,
     height: size,
@@ -81,7 +86,17 @@ export function ChevronDownIcon(p: IconProps) {
 
 export function SearchIcon(p: IconProps) {
   return (
-    <svg width={p.size} height={p.size} viewBox="0 0 24 24" fill="none" stroke={p.color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width={p.size}
+      height={p.size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={p.color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <circle cx="11" cy="11" r="7" />
       <line x1="21" y1="21" x2="16.5" y2="16.5" />
     </svg>

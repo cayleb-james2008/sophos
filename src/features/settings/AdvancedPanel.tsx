@@ -20,7 +20,11 @@ export function AdvancedPanel() {
   const [runtime, setRuntime] = useState<RuntimeInfo>();
   const [children, setChildren] = useState<RlmChild[]>([]);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const [daemonStatus, setDaemonStatus] = useState<{ connected: boolean; tcpEnabled?: boolean; socketPath?: string }>({ connected: false });
+  const [daemonStatus, setDaemonStatus] = useState<{
+    connected: boolean;
+    tcpEnabled?: boolean;
+    socketPath?: string;
+  }>({ connected: false });
   const [mcpServers, setMcpServers] = useState<McpServer[]>([]);
   const [settings, setSettings] = useState<Settings & { mcpServers?: McpServer[] }>({});
   const [loading, setLoading] = useState(true);
@@ -82,19 +86,31 @@ export function AdvancedPanel() {
           <DaemonTransportCard />
           <ContextPanel context={context} onCompact={() => void ipc.compact().then(() => refresh())} />
           <RlmChildrenPanel children={children} onRefresh={() => void refresh()} />
-          <AgentsPanel agents={agents} onAttach={(id) => void ipc.attachAgent(id).then(() => refresh())} onRefresh={() => void refresh()} />
+          <AgentsPanel
+            agents={agents}
+            onAttach={(id) => void ipc.attachAgent(id).then(() => refresh())}
+            onRefresh={() => void refresh()}
+          />
           <DaemonDiagnosticsCard status={daemonStatus} onRefresh={() => void refresh()} />
           <McpServersPanel
             servers={mcpServers}
-            onChange={(next) => void ipc.setSettings({ ...settings, mcpServers: next } as Record<string, unknown>).then(() => refresh())}
+            onChange={(next) =>
+              void ipc
+                .setSettings({ ...settings, mcpServers: next } as Record<string, unknown>)
+                .then(() => refresh())
+            }
             onAdd={(name, command, args) => {
               const next = [...mcpServers, { name, command, args, enabled: true }];
-              void ipc.setSettings({ ...settings, mcpServers: next } as Record<string, unknown>).then(() => refresh());
+              void ipc
+                .setSettings({ ...settings, mcpServers: next } as Record<string, unknown>)
+                .then(() => refresh());
             }}
             onTest={(name, command, args) => ipc.testMcpServer(name, command, args)}
             onRemove={(name) => {
               const next = mcpServers.filter((s) => s.name !== name);
-              void ipc.setSettings({ ...settings, mcpServers: next } as Record<string, unknown>).then(() => refresh());
+              void ipc
+                .setSettings({ ...settings, mcpServers: next } as Record<string, unknown>)
+                .then(() => refresh());
             }}
           />
         </>
@@ -124,9 +140,9 @@ function TrustModelCard() {
         <Badge tone="warning">Not a sandbox</Badge>
       </div>
       <Text variant="body" tone="muted">
-        Sophos executes model-generated code with your user permissions. It is not a security sandbox —
-        code the agent runs can read, write, and execute on your machine with the same rights you have.
-        Review what you ask it to run, and treat it like any tool with access to your system.
+        Sophos executes model-generated code with your user permissions. It is not a security sandbox — code
+        the agent runs can read, write, and execute on your machine with the same rights you have. Review what
+        you ask it to run, and treat it like any tool with access to your system.
       </Text>
       <Text variant="micro" tone="dim">
         This matches the project's documented stance: the kernel is not a security boundary, and
@@ -145,7 +161,9 @@ function KernelCard({ runtime }: { runtime?: RuntimeInfo }) {
       <div className="sp-head">
         <div className="sp-headrow">
           <CpuIcon size={16} />
-          <Text variant="label" weight="semibold">Persistent IPython kernel</Text>
+          <Text variant="label" weight="semibold">
+            Persistent IPython kernel
+          </Text>
         </div>
         <Badge tone={configured ? "success" : browserPreview ? "neutral" : "warning"} dot>
           {configured ? "Configured" : browserPreview ? "Browser preview" : "Unavailable"}
@@ -158,8 +176,16 @@ function KernelCard({ runtime }: { runtime?: RuntimeInfo }) {
             ? "The browser preview has no daemon or kernel. Open the Tauri app to inspect the live session capability."
             : "The live daemon did not expose the IPython tool for this session."}
       </Text>
-      {kernel?.sessionId ? <Text variant="micro" tone="dim" mono>session {kernel.sessionId}</Text> : null}
-      {runtime?.cwd ? <Text variant="micro" tone="dim" mono className="ap-cwd">cwd {runtime.cwd}</Text> : null}
+      {kernel?.sessionId ? (
+        <Text variant="micro" tone="dim" mono>
+          session {kernel.sessionId}
+        </Text>
+      ) : null}
+      {runtime?.cwd ? (
+        <Text variant="micro" tone="dim" mono className="ap-cwd">
+          cwd {runtime.cwd}
+        </Text>
+      ) : null}
     </Card>
   );
 }

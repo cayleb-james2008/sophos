@@ -16,7 +16,12 @@ const mockConn = vi.hoisted(() => ({
 const mockModels = vi.hoisted(() => ({
   providers: [{ id: "ollama-cloud", name: "Ollama Cloud", connected: true }],
   models: [
-    { id: "deepseek-v4-flash:0731-cloud", name: "DeepSeek V4 Flash 0731", provider: "ollama-cloud", contextWindow: 1000000 },
+    {
+      id: "deepseek-v4-flash:0731-cloud",
+      name: "DeepSeek V4 Flash 0731",
+      provider: "ollama-cloud",
+      contextWindow: 1000000,
+    },
   ],
   loading: false,
   error: null,

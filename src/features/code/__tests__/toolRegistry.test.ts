@@ -27,7 +27,16 @@ function sources(overrides: Partial<RegistrySources> = {}): RegistrySources {
       extensions: ["~/.pi/agent/extensions/github-integration"],
     },
     extensions: [
-      { name: "github-integration", path: "x", enabled: true, tools: [{ name: "create_issue", description: "Create a GitHub issue" }, { name: "list_prs", description: "List open pull requests" }], slashCommands: [] },
+      {
+        name: "github-integration",
+        path: "x",
+        enabled: true,
+        tools: [
+          { name: "create_issue", description: "Create a GitHub issue" },
+          { name: "list_prs", description: "List open pull requests" },
+        ],
+        slashCommands: [],
+      },
     ],
     mcpServers: [
       { name: "filesystem", command: "npx", args: ["-y", "server-filesystem"], enabled: true },
@@ -86,7 +95,15 @@ describe("assembleRegistry", () => {
   it("dedupes by name with built-ins winning", () => {
     const registry = assembleRegistry(
       sources({
-        extensions: [{ name: "web", path: "x", enabled: true, tools: [{ name: "web_search", description: "extension copy" }], slashCommands: [] }],
+        extensions: [
+          {
+            name: "web",
+            path: "x",
+            enabled: true,
+            tools: [{ name: "web_search", description: "extension copy" }],
+            slashCommands: [],
+          },
+        ],
       }),
     );
     const webSearch = registry.find((e) => e.name === "web_search");
@@ -98,7 +115,9 @@ describe("assembleRegistry", () => {
     const registry = assembleRegistry({ runtime: null, extensions: null, mcpServers: null, mcpResults: {} });
     // Built-ins always present — the SDK section can always render.
     expect(registry.length).toBe(BUILTIN_TOOLS.length);
-    expect(assembleRegistry({ runtime: null, extensions: null, mcpServers: [], mcpResults: {} })).toHaveLength(BUILTIN_TOOLS.length);
+    expect(
+      assembleRegistry({ runtime: null, extensions: null, mcpServers: [], mcpResults: {} }),
+    ).toHaveLength(BUILTIN_TOOLS.length);
   });
 
   it("counts per category deterministically", () => {
@@ -122,7 +141,9 @@ describe("malformed registry entries", () => {
     const weird: ToolRegistryEntry = { name: "mystery_tool", category: "extension", source: "x" };
     const registry = assembleRegistry({
       runtime: null,
-      extensions: [{ name: "x", path: "p", enabled: true, tools: [{ name: "mystery_tool" }], slashCommands: [] }],
+      extensions: [
+        { name: "x", path: "p", enabled: true, tools: [{ name: "mystery_tool" }], slashCommands: [] },
+      ],
       mcpServers: null,
       mcpResults: {},
     });

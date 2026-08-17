@@ -4,9 +4,23 @@ import { createElement, type ReactNode } from "react";
 import { ChatIcon, SessionsIcon, AgentsIcon, SettingsIcon } from "./icons";
 
 function InboxIcon({ size = 16, color = "currentColor" }: { size?: number; color?: string }) {
-  return createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color, strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" },
-    createElement("path", { d: "M4 5h16v14H4z" }), createElement("path", { d: "m4 7 8 6 8-6" }),
-    createElement("path", { d: "M17 4v4" }), createElement("circle", { cx: 17, cy: 4, r: 2, fill: color, stroke: "none" }));
+  return createElement(
+    "svg",
+    {
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: color,
+      strokeWidth: 1.5,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+    },
+    createElement("path", { d: "M4 5h16v14H4z" }),
+    createElement("path", { d: "m4 7 8 6 8-6" }),
+    createElement("path", { d: "M17 4v4" }),
+    createElement("circle", { cx: 17, cy: 4, r: 2, fill: color, stroke: "none" }),
+  );
 }
 
 export type View = "chat" | "sessions" | "agents" | "inbox" | "settings";

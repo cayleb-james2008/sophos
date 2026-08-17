@@ -49,7 +49,12 @@ function validProfile(overrides: Partial<CustomProfile> = {}): CustomProfile {
 }
 
 function serializedFile(profile: CustomProfile): string {
-  return JSON.stringify({ format: "sophos-custom-profile", version: 1, exportedAt: new Date().toISOString(), profile });
+  return JSON.stringify({
+    format: "sophos-custom-profile",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    profile,
+  });
 }
 
 function Harness({ apiRef }: { apiRef: { current: ProfileApi | null } }) {
@@ -101,7 +106,9 @@ describe("Profile Studio export", () => {
     act(() => {
       apiRef.current?.studioDispatch({ type: "name", value: "Exporter Bot" });
     });
-    await waitFor(() => expect((screen.getByTestId("studio-export") as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect((screen.getByTestId("studio-export") as HTMLButtonElement).disabled).toBe(false),
+    );
 
     mockDialog.save.mockResolvedValue("C:\\exports\\exporter-bot.sophos-profile.json");
     mockCore.invoke.mockResolvedValue(undefined);
@@ -113,7 +120,10 @@ describe("Profile Studio export", () => {
         expect.objectContaining({ defaultPath: "exporter-bot.sophos-profile.json" }),
       );
     });
-    expect(mockCore.invoke).toHaveBeenCalledWith("write_text_file", expect.objectContaining({ path: "C:\\exports\\exporter-bot.sophos-profile.json" }));
+    expect(mockCore.invoke).toHaveBeenCalledWith(
+      "write_text_file",
+      expect.objectContaining({ path: "C:\\exports\\exporter-bot.sophos-profile.json" }),
+    );
     const writeArgs = mockCore.invoke.mock.calls[0][1] as { contents: string };
     const written = JSON.parse(writeArgs.contents) as { format: string; profile: { name: string } };
     expect(written.format).toBe("sophos-custom-profile");
@@ -163,7 +173,9 @@ describe("Profile Studio import", () => {
     await waitFor(() => {
       expect(mockDialog.open).toHaveBeenCalledWith(expect.objectContaining({ multiple: false }));
     });
-    expect(mockCore.invoke).toHaveBeenCalledWith("read_text_file", { path: "C:\\imports\\builder.sophos-profile.json" });
+    expect(mockCore.invoke).toHaveBeenCalledWith("read_text_file", {
+      path: "C:\\imports\\builder.sophos-profile.json",
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("studio-port-notice").textContent).toContain("Imported “Builder Bot”.");
@@ -171,7 +183,9 @@ describe("Profile Studio import", () => {
     // Persisted + selected — the store and the effective profile both follow.
     expect(apiRef.current?.customProfiles.map((p) => p.id)).toContain("custom-incoming");
     expect(apiRef.current?.selection.id).toBe("custom-incoming");
-    expect(mockIpc.setSettings).toHaveBeenCalledWith(expect.objectContaining({ customProfiles: expect.any(Array) }));
+    expect(mockIpc.setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ customProfiles: expect.any(Array) }),
+    );
   });
 
   it("resolves a name collision visibly — imports as a copy, never overwrites", async () => {

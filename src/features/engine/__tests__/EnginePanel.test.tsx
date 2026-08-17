@@ -9,9 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { EnginePanel } from "../EnginePanel";
 
 const mockConn = vi.hoisted(() => ({
-  rlmChildren: [
-    { id: "w-1", name: "api-reviewer", status: "running" },
-  ],
+  rlmChildren: [{ id: "w-1", name: "api-reviewer", status: "running" }],
   status: { kind: "connected" },
 }));
 

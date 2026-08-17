@@ -31,7 +31,7 @@ type InboxNodeData = {
   mono?: string;
   direction?: "out" | "in";
   unread?: boolean;
-}
+};
 
 export type InboxGraphNode = Node<InboxNodeData, "inbox">;
 
@@ -39,19 +39,31 @@ const NODE_HEIGHT: Record<NodeKind, number> = { self: 74, peer: 84, message: 92 
 
 function InboxNode({ data, selected }: NodeProps<InboxGraphNode>) {
   const isMsg = data.kind === "message";
-  const kindLabel = data.kind === "self" ? "YOU" : data.kind === "peer" ? "AGENT" : data.direction === "out" ? "OUT · SENT" : "IN · RECEIVED";
-  const corner = isMsg && data.unread ? (
-    <span className="pg-pill">UNREAD</span>
-  ) : isMsg ? (
-    <span className="pg-pill pg-pill--muted">
-      {data.direction === "out" ? "SENT" : "READ"}
-    </span>
-  ) : undefined;
+  const kindLabel =
+    data.kind === "self"
+      ? "YOU"
+      : data.kind === "peer"
+        ? "AGENT"
+        : data.direction === "out"
+          ? "OUT · SENT"
+          : "IN · RECEIVED";
+  const corner =
+    isMsg && data.unread ? (
+      <span className="pg-pill">UNREAD</span>
+    ) : isMsg ? (
+      <span className="pg-pill pg-pill--muted">{data.direction === "out" ? "SENT" : "READ"}</span>
+    ) : undefined;
 
   return (
     <NodeFrame
       kind={kindLabel}
-      title={data.kind === "message" ? (data.label.length > 46 ? data.label.slice(0, 46) + "…" : data.label) : data.label}
+      title={
+        data.kind === "message"
+          ? data.label.length > 46
+            ? data.label.slice(0, 46) + "…"
+            : data.label
+          : data.label
+      }
       status={data.status}
       subtitle={data.kind === "message" ? undefined : data.subtitle}
       mono={data.mono}
@@ -105,7 +117,13 @@ export function InboxGraph({ peerId, peerName, peerStatus, thread, onSelectMsg }
     nodes.push({
       id: peerId,
       type: "inbox",
-      data: { kind: "peer", label: peerName ?? peerId, status: peerStatus ?? "idle", subtitle: "agent relay peer", mono: `${peerId.slice(0, 10).toUpperCase()}` },
+      data: {
+        kind: "peer",
+        label: peerName ?? peerId,
+        status: peerStatus ?? "idle",
+        subtitle: "agent relay peer",
+        mono: `${peerId.slice(0, 10).toUpperCase()}`,
+      },
       position: { x: 0, y: 0 },
       width: PEER_W,
       height: NODE_HEIGHT.peer,
@@ -124,7 +142,7 @@ export function InboxGraph({ peerId, peerName, peerStatus, thread, onSelectMsg }
           status: outgoing ? "saved" : m.read ? "done" : "warn",
           direction: outgoing ? "out" : "in",
           unread: !outgoing && !m.read,
-          mono: `${time(m.timestamp)} · ${outgoing ? "→" : "←"} ${outgoing ? peerName ?? "agent" : "you"}`,
+          mono: `${time(m.timestamp)} · ${outgoing ? "→" : "←"} ${outgoing ? (peerName ?? "agent") : "you"}`,
         },
         position: { x: 0, y: 0 },
         width: MSG_W,
@@ -148,7 +166,11 @@ export function InboxGraph({ peerId, peerName, peerStatus, thread, onSelectMsg }
 
     if (nodes.length === 0) return { positioned: [] as InboxGraphNode[], edges: [] as Edge[] };
     const pos = dagreLayout(
-      nodes.map((n) => ({ id: n.id, width: n.width ?? MSG_W, height: n.height ?? NODE_HEIGHT[(n.data as InboxNodeData).kind] })),
+      nodes.map((n) => ({
+        id: n.id,
+        width: n.width ?? MSG_W,
+        height: n.height ?? NODE_HEIGHT[(n.data as InboxNodeData).kind],
+      })),
       layoutEdges,
       { rankdir: "LR", nodesep: 30, ranksep: 170, marginx: 40, marginy: 40 },
     );
@@ -180,13 +202,16 @@ export function InboxGraph({ peerId, peerName, peerStatus, thread, onSelectMsg }
     >
       <div className="pg-legend">
         <span>
-          <i className="pg-legend__swatch pg-legend__swatch--accent" />sent →
+          <i className="pg-legend__swatch pg-legend__swatch--accent" />
+          sent →
         </span>
         <span>
-          <i className="pg-legend__swatch pg-legend__swatch--ok" />received → you
+          <i className="pg-legend__swatch pg-legend__swatch--ok" />
+          received → you
         </span>
         <span>
-          <i className="pg-legend__swatch pg-legend__swatch--err" />unread
+          <i className="pg-legend__swatch pg-legend__swatch--err" />
+          unread
         </span>
       </div>
     </GraphFlow>

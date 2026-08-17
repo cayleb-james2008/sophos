@@ -149,7 +149,11 @@ export function profileDemoBlock(profile: string | AgentProfile | undefined): st
 }
 
 /** Start a simulated assistant turn that echoes the user's actual input. */
-export function simulateResponse(userText: string, cb: SimCallbacks, profile?: string | AgentProfile): () => void {
+export function simulateResponse(
+  userText: string,
+  cb: SimCallbacks,
+  profile?: string | AgentProfile,
+): () => void {
   // Code Mode: the simulated turn writes ONE program that calls several tools
   // and decomposes it into tool-call cards (bus → Code Mode panel) + a
   // deterministic answer. Everything is clearly labeled as simulated.
@@ -216,62 +220,67 @@ export function simulateResponse(userText: string, cb: SimCallbacks, profile?: s
 
   // 2. Stream thinking.
   thinkingChunks.forEach((chunk, i) => {
-    push(() => {
-      cb.onUpdate((msgs) =>
-        msgs.map((m) =>
-          m.id === assistantId
-            ? { ...m, thinking: `${m.thinking ?? ""}${i > 0 ? " " : ""}${chunk}` }
-            : m,
-        ),
-      );
-    }, 500 + i * 700);
+    push(
+      () => {
+        cb.onUpdate((msgs) =>
+          msgs.map((m) =>
+            m.id === assistantId ? { ...m, thinking: `${m.thinking ?? ""}${i > 0 ? " " : ""}${chunk}` } : m,
+          ),
+        );
+      },
+      500 + i * 700,
+    );
   });
 
   // 3. Add running tool calls, then complete them.
-  push(() => {
-    cb.onUpdate((msgs) =>
-      msgs.map((m) =>
-        m.id === assistantId
-          ? {
-              ...m,
-              toolCalls: [
-                { ...demoToolCall, status: "running" },
-                { ...demoEditCall, status: "running" },
-              ],
-            }
-          : m,
-      ),
-    );
-  }, 500 + thinkingChunks.length * 700);
+  push(
+    () => {
+      cb.onUpdate((msgs) =>
+        msgs.map((m) =>
+          m.id === assistantId
+            ? {
+                ...m,
+                toolCalls: [
+                  { ...demoToolCall, status: "running" },
+                  { ...demoEditCall, status: "running" },
+                ],
+              }
+            : m,
+        ),
+      );
+    },
+    500 + thinkingChunks.length * 700,
+  );
 
-  push(() => {
-    cb.onUpdate((msgs) =>
-      msgs.map((m) =>
-        m.id === assistantId
-          ? { ...m, toolCalls: [demoToolCall, demoEditCall] }
-          : m,
-      ),
-    );
-  }, 500 + thinkingChunks.length * 700 + 1600);
+  push(
+    () => {
+      cb.onUpdate((msgs) =>
+        msgs.map((m) => (m.id === assistantId ? { ...m, toolCalls: [demoToolCall, demoEditCall] } : m)),
+      );
+    },
+    500 + thinkingChunks.length * 700 + 1600,
+  );
 
   // 4. Stream the answer.
   let acc = "";
   answerChunks.forEach((chunk, i) => {
-    push(() => {
-      acc += chunk;
-      cb.onUpdate((msgs) =>
-        msgs.map((m) => (m.id === assistantId ? { ...m, content: acc } : m)),
-      );
-    }, 500 + thinkingChunks.length * 700 + 1600 + 400 + i * 500);
+    push(
+      () => {
+        acc += chunk;
+        cb.onUpdate((msgs) => msgs.map((m) => (m.id === assistantId ? { ...m, content: acc } : m)));
+      },
+      500 + thinkingChunks.length * 700 + 1600 + 400 + i * 500,
+    );
   });
 
   // 5. Mark complete.
-  push(() => {
-    cb.onUpdate((msgs) =>
-      msgs.map((m) => (m.id === assistantId ? { ...m, status: "complete" } : m)),
-    );
-    cb.onDone();
-  }, 500 + thinkingChunks.length * 700 + 1600 + 400 + answerChunks.length * 500 + 300);
+  push(
+    () => {
+      cb.onUpdate((msgs) => msgs.map((m) => (m.id === assistantId ? { ...m, status: "complete" } : m)));
+      cb.onDone();
+    },
+    500 + thinkingChunks.length * 700 + 1600 + 400 + answerChunks.length * 500 + 300,
+  );
 
   return () => {
     timers.forEach((t) => window.clearTimeout(t));
@@ -325,82 +334,122 @@ function simulateCodeTurn(userText: string, cb: SimCallbacks): () => void {
 
   // 2. Stream thinking.
   thinkingChunks.forEach((chunk, i) => {
-    push(() => {
-      cb.onUpdate((msgs) =>
-        msgs.map((m) =>
-          m.id === assistantId
-            ? { ...m, thinking: `${m.thinking ?? ""}${i > 0 ? " " : ""}${chunk}` }
-            : m,
-        ),
-      );
-    }, 500 + i * 700);
+    push(
+      () => {
+        cb.onUpdate((msgs) =>
+          msgs.map((m) =>
+            m.id === assistantId ? { ...m, thinking: `${m.thinking ?? ""}${i > 0 ? " " : ""}${chunk}` } : m,
+          ),
+        );
+      },
+      500 + i * 700,
+    );
   });
 
   // 3. Start the run: publish run_code, attach running tool calls.
-  push(() => {
-    publishCodeRunEvent({ type: "run_code", runId, sessionId: sessionTag, program, ts: new Date().toISOString() });
-    cb.onUpdate((msgs) =>
-      msgs.map((m) =>
-        m.id === assistantId
-          ? {
-              ...m,
-              toolCalls: calls.map((c) => ({
-                id: `${runId}-${c.name}`,
-                name: c.name,
-                input: JSON.stringify(c.input),
-                status: "running" as const,
-              })),
-            }
-          : m,
-      ),
-    );
-  }, 500 + thinkingChunks.length * 700);
-
-  // 4. Complete each call: publish tool_call/tool_result, update the card.
-  calls.forEach((c, i) => {
-    push(() => {
-      publishCodeRunEvent({ type: "tool_call", runId, sessionId: sessionTag, name: c.name, input: JSON.stringify(c.input), ts: new Date().toISOString() });
-    }, 500 + thinkingChunks.length * 700 + 400 + i * 700);
-    push(() => {
-      publishCodeRunEvent({ type: "tool_result", runId, sessionId: sessionTag, name: c.name, output: c.output, ts: new Date().toISOString() });
+  push(
+    () => {
+      publishCodeRunEvent({
+        type: "run_code",
+        runId,
+        sessionId: sessionTag,
+        program,
+        ts: new Date().toISOString(),
+      });
       cb.onUpdate((msgs) =>
         msgs.map((m) =>
           m.id === assistantId
             ? {
                 ...m,
-                toolCalls: (m.toolCalls ?? []).map((tc) =>
-                  tc.name === c.name ? { ...tc, output: c.output, status: "complete" as const } : tc,
-                ),
+                toolCalls: calls.map((c) => ({
+                  id: `${runId}-${c.name}`,
+                  name: c.name,
+                  input: JSON.stringify(c.input),
+                  status: "running" as const,
+                })),
               }
             : m,
         ),
       );
-    }, 500 + thinkingChunks.length * 700 + 400 + i * 700 + 600);
+    },
+    500 + thinkingChunks.length * 700,
+  );
+
+  // 4. Complete each call: publish tool_call/tool_result, update the card.
+  calls.forEach((c, i) => {
+    push(
+      () => {
+        publishCodeRunEvent({
+          type: "tool_call",
+          runId,
+          sessionId: sessionTag,
+          name: c.name,
+          input: JSON.stringify(c.input),
+          ts: new Date().toISOString(),
+        });
+      },
+      500 + thinkingChunks.length * 700 + 400 + i * 700,
+    );
+    push(
+      () => {
+        publishCodeRunEvent({
+          type: "tool_result",
+          runId,
+          sessionId: sessionTag,
+          name: c.name,
+          output: c.output,
+          ts: new Date().toISOString(),
+        });
+        cb.onUpdate((msgs) =>
+          msgs.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  toolCalls: (m.toolCalls ?? []).map((tc) =>
+                    tc.name === c.name ? { ...tc, output: c.output, status: "complete" as const } : tc,
+                  ),
+                }
+              : m,
+          ),
+        );
+      },
+      500 + thinkingChunks.length * 700 + 400 + i * 700 + 600,
+    );
   });
 
   // 5. Mark the run complete.
-  push(() => {
-    publishCodeRunEvent({ type: "run_complete", runId, sessionId: sessionTag, ts: new Date().toISOString() });
-  }, 500 + thinkingChunks.length * 700 + 400 + calls.length * 700 + 800);
+  push(
+    () => {
+      publishCodeRunEvent({
+        type: "run_complete",
+        runId,
+        sessionId: sessionTag,
+        ts: new Date().toISOString(),
+      });
+    },
+    500 + thinkingChunks.length * 700 + 400 + calls.length * 700 + 800,
+  );
 
   // 6. Stream the answer.
   let acc = "";
   answerChunks.forEach((chunk, i) => {
-    push(() => {
-      acc += chunk;
-      cb.onUpdate((msgs) =>
-        msgs.map((m) => (m.id === assistantId ? { ...m, content: acc } : m)),
-      );
-    }, 500 + thinkingChunks.length * 700 + 400 + calls.length * 700 + 900 + i * 500);
+    push(
+      () => {
+        acc += chunk;
+        cb.onUpdate((msgs) => msgs.map((m) => (m.id === assistantId ? { ...m, content: acc } : m)));
+      },
+      500 + thinkingChunks.length * 700 + 400 + calls.length * 700 + 900 + i * 500,
+    );
   });
 
   // 7. Mark complete.
-  push(() => {
-    cb.onUpdate((msgs) =>
-      msgs.map((m) => (m.id === assistantId ? { ...m, status: "complete" } : m)),
-    );
-    cb.onDone();
-  }, 500 + thinkingChunks.length * 700 + 400 + calls.length * 700 + 900 + answerChunks.length * 500 + 300);
+  push(
+    () => {
+      cb.onUpdate((msgs) => msgs.map((m) => (m.id === assistantId ? { ...m, status: "complete" } : m)));
+      cb.onDone();
+    },
+    500 + thinkingChunks.length * 700 + 400 + calls.length * 700 + 900 + answerChunks.length * 500 + 300,
+  );
 
   return () => {
     timers.forEach((t) => window.clearTimeout(t));

@@ -25,6 +25,7 @@ import {
   stopOwnedDevServer,
   launch,
   gotoApp,
+  freezeClock,
   captureView,
   dismissOnboarding,
 } from "./helpers.mjs";
@@ -62,6 +63,7 @@ async function main() {
     server = await startOwnedDevServer();
     const { browser: b, page } = await launch();
     browser = b;
+    await freezeClock(page);
     await gotoApp(page, server.url);
     await dismissOnboarding(page);
     tmp = mkdtempSync(join(tmpdir(), "sophos-visual-current-"));

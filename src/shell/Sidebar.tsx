@@ -17,13 +17,7 @@ import { SigmaGlyph, SearchIcon } from "./icons";
 import { NAV_ITEMS, type View } from "./nav";
 import { relativeTime } from "../features/sessions/format";
 
-export function Sidebar({
-  active,
-  onNavigate,
-}: {
-  active: View;
-  onNavigate: (view: View) => void;
-}) {
+export function Sidebar({ active, onNavigate }: { active: View; onNavigate: (view: View) => void }) {
   const ipc = useIpc();
   const conn = useConnectionState();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
@@ -90,12 +84,21 @@ export function Sidebar({
           <SigmaGlyph size={14} />
         </span>
         <span className="sidebar__wordmark">SOPHOS</span>
-        <span className="sidebar__version">v0.7.2-beta</span>
+        <span className="sidebar__version">v0.8.0-beta</span>
       </div>
 
       {/* New chat */}
       <button type="button" className="pa-focus-ring sidebar__newchat" onClick={() => void handleNewChat()}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
@@ -111,7 +114,9 @@ export function Sidebar({
               Recent
             </Text>
             {sessions.length > 0 ? (
-              <Text variant="micro" tone="dim" mono>{sessions.length}</Text>
+              <Text variant="micro" tone="dim" mono>
+                {sessions.length}
+              </Text>
             ) : null}
           </div>
 
@@ -153,8 +158,12 @@ export function Sidebar({
                 >
                   <span className="sidebar__history-title">{session.title ?? session.id}</span>
                   <span className="sidebar__history-meta">
-                    {session.updatedAt || session.createdAt ? relativeTime(session.updatedAt ?? session.createdAt ?? "") : "—"}
-                    {session.status === "active" ? <span className="sidebar__history-live" aria-label="active" /> : null}
+                    {session.updatedAt || session.createdAt
+                      ? relativeTime(session.updatedAt ?? session.createdAt ?? "")
+                      : "—"}
+                    {session.status === "active" ? (
+                      <span className="sidebar__history-live" aria-label="active" />
+                    ) : null}
                   </span>
                 </button>
               );

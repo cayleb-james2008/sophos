@@ -62,12 +62,33 @@ function makeClient() {
     { id: "r-1", name: "critic", status: "done", parentId: "s-1", sessionId: "s-2", summary: "reviewed" },
   ]);
   (mockState.client.listInbox as ReturnType<typeof vi.fn>).mockResolvedValue([
-    { id: "m-1", fromAgentId: "a-1", fromAgentName: "Worker", toAgentId: "self", text: "hello", timestamp: "2026-01-01T00:00:00.000Z", read: false },
+    {
+      id: "m-1",
+      fromAgentId: "a-1",
+      fromAgentName: "Worker",
+      toAgentId: "self",
+      text: "hello",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      read: false,
+    },
   ]);
-  (mockState.client.attachAgent as ReturnType<typeof vi.fn>).mockResolvedValue({ childId: "a-1", sessionId: "s-1", attached: true });
+  (mockState.client.attachAgent as ReturnType<typeof vi.fn>).mockResolvedValue({
+    childId: "a-1",
+    sessionId: "s-1",
+    attached: true,
+  });
   (mockState.client.detachAgent as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-  (mockState.client.getAgentState as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "a-1", status: "running", transcript: [] });
-  (mockState.client.sendAgentMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "rec-1", target: { activeSessionId: "s-1", sessionId: "s-1" }, message: "hi", deliveryStatus: "delivered" });
+  (mockState.client.getAgentState as ReturnType<typeof vi.fn>).mockResolvedValue({
+    id: "a-1",
+    status: "running",
+    transcript: [],
+  });
+  (mockState.client.sendAgentMessage as ReturnType<typeof vi.fn>).mockResolvedValue({
+    id: "rec-1",
+    target: { activeSessionId: "s-1", sessionId: "s-1" },
+    message: "hi",
+    deliveryStatus: "delivered",
+  });
   (mockState.client.markMessageRead as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 }
 
@@ -91,7 +112,10 @@ describe("useAgents", () => {
     const { result } = renderHook(() => useAgents());
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => {
-      mockState.fire({ type: "agent_list", agents: [{ id: "a-2", name: "New", status: "idle", sessionId: "s-3" }] });
+      mockState.fire({
+        type: "agent_list",
+        agents: [{ id: "a-2", name: "New", status: "idle", sessionId: "s-3" }],
+      });
     });
     expect(result.current.rows.filter((r) => r.kind === "daemon").map((r) => r.id)).toEqual(["a-2"]);
   });
@@ -128,7 +152,9 @@ describe("useAgents", () => {
   });
 
   it("send failure surfaces an error and does not clear the draft", async () => {
-    (mockState.client.sendAgentMessage as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("relay down"));
+    (mockState.client.sendAgentMessage as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("relay down"),
+    );
     const { result } = renderHook(() => useAgents());
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -137,6 +163,51 @@ describe("useAgents", () => {
       await result.current.send();
     });
     expect(result.current.error).toBe("relay down");
+  });
+
+  it("auto-mark-read on selection settles without an infinite render loop", async () => {
+    // Regression: AgentsView marks the selected agent's thread read as soon as
+    // it is viewed. When an unread message is addressed TO the selected agent,
+    // the old markAgentRead ALWAYS produced a new inbox array reference
+    // (Array.map) even when nothing changed, which re-created the callback,
+    // which re-ran the auto-mark effect — an infinite setState -> re-render ->
+    // effect loop ("Maximum update depth exceeded", jamming the main thread in
+    // the browser harness). The loop mechanics, driven directly: the first
+    // pass marks the message read (inbox legitimately changes); every
+    // subsequent pass must leave the reference untouched.
+    (mockState.client.listInbox as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: "m-unread",
+        fromAgentId: "peer-1",
+        fromAgentName: "Peer",
+        toAgentId: "a-1",
+        text: "work item for you",
+        timestamp: "2026-01-01T00:00:00.000Z",
+        read: false,
+      },
+    ]);
+    const { result } = renderHook(() => useAgents());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(result.current.selectedId).toBe("a-1"));
+    expect(result.current.totalUnread).toBe(1);
+
+    await act(async () => {
+      await result.current.markAgentRead("a-1");
+    });
+    expect(result.current.totalUnread).toBe(0);
+    const afterFirstPass = result.current.inbox;
+
+    // Idle passes (as re-triggered by the view effect when the callback
+    // identity changes): nothing left to mark, so the reference must stay
+    // identical. Under the always-map bug this kept changing forever.
+    await act(async () => {
+      await result.current.markAgentRead("a-1");
+    });
+    expect(result.current.inbox).toBe(afterFirstPass);
+    await act(async () => {
+      await result.current.markAgentRead("a-1");
+    });
+    expect(result.current.inbox).toBe(afterFirstPass);
   });
 
   it("markRead flags the message as read locally", async () => {

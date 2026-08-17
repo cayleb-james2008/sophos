@@ -14,9 +14,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const advance = (ms: number) => act(() => {
-  vi.advanceTimersByTime(ms);
-});
+const advance = (ms: number) =>
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
 
 describe("useStall", () => {
   it("never flags stalled while inactive", () => {

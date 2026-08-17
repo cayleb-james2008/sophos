@@ -11,19 +11,27 @@ import { ChevronDownIcon, TerminalIcon, SigmaGlyph } from "./icons";
 
 function statusKind(status: { kind: string }): "connecting" | "connected" | "disconnected" | "reconnecting" {
   switch (status.kind) {
-    case "connecting": return "connecting";
-    case "connected": return "connected";
-    case "reconnecting": return "reconnecting";
-    default: return "disconnected";
+    case "connecting":
+      return "connecting";
+    case "connected":
+      return "connected";
+    case "reconnecting":
+      return "reconnecting";
+    default:
+      return "disconnected";
   }
 }
 
 function statusLabel(kind: string): string {
   switch (kind) {
-    case "connected": return "Engine live";
-    case "connecting": return "Connecting";
-    case "reconnecting": return "Reconnecting";
-    default: return "Engine offline";
+    case "connected":
+      return "Engine live";
+    case "connecting":
+      return "Connecting";
+    case "reconnecting":
+      return "Reconnecting";
+    default:
+      return "Engine offline";
   }
 }
 
@@ -56,7 +64,13 @@ function DetailRow({ label, value, accent = false }: { label: string; value: str
   );
 }
 
-export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean; onToggleEngine: () => void }) {
+export function SystemBar({
+  engineOpen,
+  onToggleEngine,
+}: {
+  engineOpen: boolean;
+  onToggleEngine: () => void;
+}) {
   const state = useConnectionState();
   const ipc = useIpc();
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -67,7 +81,10 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
 
   useEffect(() => {
     let mounted = true;
-    ipc.listAgents().then((items) => mounted && setAgents(items ?? [])).catch(() => {});
+    ipc
+      .listAgents()
+      .then((items) => mounted && setAgents(items ?? []))
+      .catch(() => {});
     const unsubscribe = ipc.onEvent((event) => {
       if (event.type === "agent_list") setAgents(event.agents);
       if (event.type === "agent_status") {
@@ -82,11 +99,16 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
 
   useEffect(() => {
     let mounted = true;
-    ipc.listSessions().then((sessions) => {
-      if (!mounted) return;
-      setCwd(sessions.find((session) => session.id === activeSessionId)?.cwd);
-    }).catch(() => mounted && setCwd(undefined));
-    return () => { mounted = false; };
+    ipc
+      .listSessions()
+      .then((sessions) => {
+        if (!mounted) return;
+        setCwd(sessions.find((session) => session.id === activeSessionId)?.cwd);
+      })
+      .catch(() => mounted && setCwd(undefined));
+    return () => {
+      mounted = false;
+    };
   }, [ipc, activeSessionId]);
 
   useEffect(() => {
@@ -116,9 +138,13 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
   const autoBudget = state.autonomousConfig
     ? [
         state.autonomousConfig.maxTurns != null ? `${state.autonomousConfig.maxTurns} turns` : null,
-        state.autonomousConfig.maxTokens != null ? `${formatTokens(state.autonomousConfig.maxTokens)} tok` : null,
+        state.autonomousConfig.maxTokens != null
+          ? `${formatTokens(state.autonomousConfig.maxTokens)} tok`
+          : null,
         state.autonomousConfig.maxTime ? state.autonomousConfig.maxTime : null,
-      ].filter((value): value is string => Boolean(value)).join(" · ")
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(" · ")
     : "";
   const gate = useRefinementGate();
   const refinePending = gate.pending != null;
@@ -128,13 +154,19 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
   return (
     <header className="system-bar">
       <div className="system-bar__brand">
-        <span className="system-bar__mark" aria-hidden="true"><SigmaGlyph size={14} /></span>
+        <span className="system-bar__mark" aria-hidden="true">
+          <SigmaGlyph size={14} />
+        </span>
         <span className="system-bar__wordmark">SOPHOS</span>
         <span className="system-bar__divider" aria-hidden="true" />
         <span className="system-bar__platform">Windows</span>
       </div>
 
-      <div key={`${kind}:${model}:${provider}:${tokensUsed}:${pct}`} className="system-bar__readout system-bar__readout--updated" aria-label="Engine status">
+      <div
+        key={`${kind}:${model}:${provider}:${tokensUsed}:${pct}`}
+        className="system-bar__readout system-bar__readout--updated"
+        aria-label="Engine status"
+      >
         <Tooltip content={label} side="bottom">
           <div className="system-bar__cell">
             <span className={`system-bar__dot system-bar__dot--${kind}`} aria-hidden="true" />
@@ -144,23 +176,40 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
         </Tooltip>
         <div className="system-bar__cell">
           <span className="system-bar__label">Model</span>
-          <span className="system-bar__value" title={`${model} / ${provider}`}>{model}</span>
+          <span className="system-bar__value" title={`${model} / ${provider}`}>
+            {model}
+          </span>
         </div>
-        <Tooltip content={`Context ${formatTokens(tokensUsed)} / ${formatTokens(contextWindow)}`} side="bottom">
+        <Tooltip
+          content={`Context ${formatTokens(tokensUsed)} / ${formatTokens(contextWindow)}`}
+          side="bottom"
+        >
           <div className="system-bar__cell">
             <span className="system-bar__label">Context</span>
             <span className="system-bar__context-track" aria-hidden="true">
-              <span className={`system-bar__context-fill system-bar__context-fill--${Math.min(100, Math.round(pct / 5) * 5)}${pct > 85 ? " system-bar__context-fill--warn" : ""}`} />
+              <span
+                className={`system-bar__context-fill system-bar__context-fill--${Math.min(100, Math.round(pct / 5) * 5)}${pct > 85 ? " system-bar__context-fill--warn" : ""}`}
+              />
             </span>
             <span className="system-bar__value">{pct}%</span>
           </div>
         </Tooltip>
       </div>
 
-      {(autoActive || refinePending) ? (
+      {autoActive || refinePending ? (
         <div className="system-bar__alerts">
-          {autoActive ? <span className="system-bar__alert"><span className="system-bar__alert-dot" />AUTO</span> : null}
-          {refinePending ? <span className="system-bar__alert"><span className="system-bar__alert-dot" />REFINE</span> : null}
+          {autoActive ? (
+            <span className="system-bar__alert">
+              <span className="system-bar__alert-dot" />
+              AUTO
+            </span>
+          ) : null}
+          {refinePending ? (
+            <span className="system-bar__alert">
+              <span className="system-bar__alert-dot" />
+              REFINE
+            </span>
+          ) : null}
         </div>
       ) : null}
 
@@ -173,10 +222,17 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
           onClick={() => setDetailsOpen((open) => !open)}
         >
           Details
-          <span className={`system-bar__chevron${detailsOpen ? " system-bar__chevron--open" : ""}`}><ChevronDownIcon size={11} color="currentColor" /></span>
+          <span className={`system-bar__chevron${detailsOpen ? " system-bar__chevron--open" : ""}`}>
+            <ChevronDownIcon size={11} color="currentColor" />
+          </span>
         </button>
         <Tooltip content={engineOpen ? "Hide engine terminal" : "Show engine terminal"} side="bottom">
-          <IconButton title={engineOpen ? "Hide engine terminal" : "Show engine terminal"} onClick={onToggleEngine} tone={engineOpen ? "accent" : "default"} size="sm">
+          <IconButton
+            title={engineOpen ? "Hide engine terminal" : "Show engine terminal"}
+            onClick={onToggleEngine}
+            tone={engineOpen ? "accent" : "default"}
+            size="sm"
+          >
             <TerminalIcon size={15} color={engineOpen ? tokens.color.accentHover : tokens.color.textDim} />
           </IconButton>
         </Tooltip>
@@ -187,11 +243,24 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
             <div className="system-bar__details-panel" role="dialog" aria-label="Session details">
               <DetailRow label="Agents" value={`${runningAgents} live`} accent={runningAgents > 0} />
               <DetailRow label="Directory" value={cwd ? truncatePath(cwd, 34) : "—"} />
-              <DetailRow label="Context" value={`${formatTokens(tokensUsed)} / ${formatTokens(contextWindow)} · ${pct}%`} />
+              <DetailRow
+                label="Context"
+                value={`${formatTokens(tokensUsed)} / ${formatTokens(contextWindow)} · ${pct}%`}
+              />
               <DetailRow label="Session cost" value={formatCost(cost?.sessionCost)} />
-              {cost?.totalCost != null ? <DetailRow label="Total cost" value={formatCost(cost.totalCost)} /> : null}
-              <DetailRow label="Autonomous" value={autoActive ? autoBudget || "active" : "off"} accent={autoActive} />
-              <DetailRow label="Refinement" value={refinePending ? "awaiting review" : "none pending"} accent={refinePending} />
+              {cost?.totalCost != null ? (
+                <DetailRow label="Total cost" value={formatCost(cost.totalCost)} />
+              ) : null}
+              <DetailRow
+                label="Autonomous"
+                value={autoActive ? autoBudget || "active" : "off"}
+                accent={autoActive}
+              />
+              <DetailRow
+                label="Refinement"
+                value={refinePending ? "awaiting review" : "none pending"}
+                accent={refinePending}
+              />
             </div>
           </>
         ) : null}

@@ -6,20 +6,21 @@ import { Text, StatusDot, Button, IconButton } from "../../design";
 import type { SideQuestion, SideQuestionStatus } from "./useChat";
 import { ChevronIcon, XSmall } from "./chatIcons";
 
-const sideStatusMeta: Record<SideQuestionStatus, { tone: "success" | "warning" | "danger" | "info"; label: string; dot: "connected" | "connecting" | "disconnected" | "idle" }> = {
+const sideStatusMeta: Record<
+  SideQuestionStatus,
+  {
+    tone: "success" | "warning" | "danger" | "info";
+    label: string;
+    dot: "connected" | "connecting" | "disconnected" | "idle";
+  }
+> = {
   running: { tone: "info", label: "running", dot: "connecting" },
   complete: { tone: "success", label: "complete", dot: "connected" },
   cancelled: { tone: "warning", label: "cancelled", dot: "idle" },
   error: { tone: "danger", label: "error", dot: "disconnected" },
 };
 
-export function SideQuestionPanel({
-  sq,
-  onDismiss,
-}: {
-  sq: SideQuestion;
-  onDismiss: (id: string) => void;
-}) {
+export function SideQuestionPanel({ sq, onDismiss }: { sq: SideQuestion; onDismiss: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const meta = sideStatusMeta[sq.status];
   return (

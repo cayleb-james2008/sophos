@@ -13,7 +13,13 @@ import { useEffect, useRef, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Text, Card, Badge, Button, Modal, Input, Select, Spinner } from "../../design";
 import { useIpc } from "../../ipc/client";
-import type { LocalProviderConfig, LocalProviderKind, ModelInfo, ProviderInfo, Settings } from "../../ipc/contract";
+import type {
+  LocalProviderConfig,
+  LocalProviderKind,
+  ModelInfo,
+  ProviderInfo,
+  Settings,
+} from "../../ipc/contract";
 import { useModels, modelKey } from "../providers/useModels";
 import { KeyIcon, LogoutIcon, PlugIcon, CpuIcon } from "../sessions/icons";
 
@@ -138,7 +144,11 @@ function ProviderCard({
   models: ModelInfo[];
   expandedKey: string | null;
   onToggle: (key: string) => void;
-  onApply: (provider: string, model: string, runtime: { contextWindow?: number; maxOutputTokens?: number }) => void;
+  onApply: (
+    provider: string,
+    model: string,
+    runtime: { contextWindow?: number; maxOutputTokens?: number },
+  ) => void;
   onReset: (provider: string, model: string) => void;
   onLogin: () => void;
   onLogout: () => void;
@@ -194,10 +204,7 @@ function ProviderCard({
               const key = modelKey(m.provider, m.id);
               const open = expandedKey === key;
               return (
-                <div
-                  key={m.id}
-                  className={`pp-model${open ? " pp-model--open" : ""}`}
-                >
+                <div key={m.id} className={`pp-model${open ? " pp-model--open" : ""}`}>
                   <Button
                     variant="ghost"
                     type="button"
@@ -218,7 +225,9 @@ function ProviderCard({
                     <span className="pp-modelright">
                       <span className="pp-modelctx">
                         {m.contextWindow ? `${m.contextWindow.toLocaleString()} ctx` : ""}
-                        {m.contextWindow && m.maxOutputTokens ? ` · ${m.maxOutputTokens.toLocaleString()} out` : ""}
+                        {m.contextWindow && m.maxOutputTokens
+                          ? ` · ${m.maxOutputTokens.toLocaleString()} out`
+                          : ""}
                       </span>
                       <Chevron open={open} />
                     </span>
@@ -244,9 +253,16 @@ function ProviderCard({
 
       {provider.id === "ollama-cloud" ? (
         <div className="pp-starter">
-          <Text variant="micro" tone="accent" mono uppercase>Free starter model</Text>
-          <Text variant="label" weight="semibold">DeepSeek V4 Flash 0731</Text>
-          <Text variant="micro" tone="muted">Connect here once; Sophos selects this model automatically for new sessions. No settings file editing required.</Text>
+          <Text variant="micro" tone="accent" mono uppercase>
+            Free starter model
+          </Text>
+          <Text variant="label" weight="semibold">
+            DeepSeek V4 Flash 0731
+          </Text>
+          <Text variant="micro" tone="muted">
+            Connect here once; Sophos selects this model automatically for new sessions. No settings file
+            editing required.
+          </Text>
         </div>
       ) : null}
 
@@ -295,25 +311,21 @@ function ModelConfigEditor({
         <Text variant="micro" tone="dim" mono uppercase>
           Runtime config
         </Text>
-        <Button variant="ghost" size="sm" onClick={() => { setCtx(ceilCtx); setOut(ceilOut); onReset(); }}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setCtx(ceilCtx);
+            setOut(ceilOut);
+            onReset();
+          }}
+        >
           Reset to max
         </Button>
       </div>
 
-      <TokenField
-        label="Context window"
-        value={ctx}
-        max={ceilCtx}
-        min={MIN_TOKENS}
-        onChange={setCtx}
-      />
-      <TokenField
-        label="Max output tokens"
-        value={out}
-        max={ceilOut}
-        min={MIN_TOKENS}
-        onChange={setOut}
-      />
+      <TokenField label="Context window" value={ctx} max={ceilCtx} min={MIN_TOKENS} onChange={setCtx} />
+      <TokenField label="Max output tokens" value={out} max={ceilOut} min={MIN_TOKENS} onChange={setOut} />
 
       <div className="kp-runfoot">
         <Button variant="accent-soft" size="sm" onClick={apply}>
@@ -551,7 +563,12 @@ function LocalConnectModal({
         <Text variant="micro" tone="dim">
           Point Sophos at a local (self-hosted) model endpoint. The config is stored in your settings.
         </Text>
-        <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My Local Model" />
+        <Input
+          label="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="My Local Model"
+        />
         <Input
           label="Base URL"
           value={baseUrl}

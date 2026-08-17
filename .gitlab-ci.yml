@@ -46,6 +46,9 @@ type-check-and-test:
     - npm ci
   script:
     - npx tsc --noEmit
+    # Lint + format gate — BLOCKING (mirrors `npm run check` locally).
+    - npm run lint
+    - npm run format:check
     - npx vitest run
     # Updater harness — BLOCKING. Verifies the local updater wiring with no
     # network: tauri.conf.json updater config, capability + plugin

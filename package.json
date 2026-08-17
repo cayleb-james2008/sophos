@@ -1,7 +1,7 @@
 {
   "name": "sophos",
   "private": true,
-  "version": "0.7.2",
+  "version": "0.8.0",
   "type": "module",
   "description": "Sophos — a Windows-native port of Prime Intellect's Prime Agent. Credits: PrimeIntellect-ai/prime-agent (upstream).",
   "scripts": {
@@ -24,7 +24,12 @@
     "updater:build": "node scripts/build-signed-update.mjs",
     "test:updater": "node verify/updater-test.mjs",
     "test:live-feed": "node verify/live-feed.mjs",
-    "test:cua": "node verify/cua/run-all.mjs"
+    "test:cua": "node verify/cua/run-all.mjs",
+    "lint": "eslint src bridge/src --max-warnings 0",
+    "lint:fix": "eslint src bridge/src --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"bridge/src/**/*.ts\" \"*.{ts,mjs,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"bridge/src/**/*.ts\" \"*.{ts,mjs,json}\"",
+    "check": "npm run lint && npm run format:check && tsc --noEmit"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.3.0",
@@ -39,6 +44,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@tauri-apps/cli": "^2.0.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
@@ -46,11 +52,17 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "pixelmatch": "^7.2.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "jsdom": "^30.0.1",
+    "pixelmatch": "^7.2.0",
     "playwright-core": "^1.62.1",
     "pngjs": "^7.0.0",
+    "prettier": "^3.9.6",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.67.0",
     "vite": "^6.0.0",
     "vitest": "^4.1.10"
   }

@@ -60,8 +60,8 @@ function makeHook(overrides: Partial<Record<string, unknown>> = {}) {
 
 describe("AgentsView", () => {
   function telemetry(text: string) {
-    return screen.getAllByText((_c: string, el: Element | null) =>
-      el?.textContent?.replace(/\s+/g, " ").trim() === text,
+    return screen.getAllByText(
+      (_c: string, el: Element | null) => el?.textContent?.replace(/\s+/g, " ").trim() === text,
     );
   }
 

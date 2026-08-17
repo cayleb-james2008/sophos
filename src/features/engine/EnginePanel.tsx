@@ -81,20 +81,55 @@ function isInTauri(): boolean {
 // process graph live, and a clearly-labeled demo log stream — so the Engine
 // Terminal is fully demonstrable and testable without a live daemon.
 function isDemoShell(): boolean {
-  return typeof window !== "undefined" && (window as any).__SOPHOS_DEMO__ === true;
+  return typeof window !== "undefined" && window.__SOPHOS_DEMO__ === true;
 }
 
 /** Simulated engine log stream shown in demo mode (clearly labeled as a demo). */
 const DEMO_ENGINE_STATUS: EngineStatus = { daemon_alive: true, sidecar_alive: true };
 
 const DEMO_ENGINE_LOGS: EngineLogEntry[] = [
-  { proc: "daemon", stream: "stdout", line: "Sophos agent daemon starting (demo mode — simulated engine)", ts: new Date(Date.now() - 120000).toISOString() },
-  { proc: "sidecar", stream: "stdout", line: "IPC bridge connecting to daemon...", ts: new Date(Date.now() - 118000).toISOString() },
-  { proc: "daemon", stream: "stdout", line: "daemon listening on tcp://127.0.0.1", ts: new Date(Date.now() - 115000).toISOString() },
-  { proc: "sidecar", stream: "stdout", line: "bridge connected · session-0 ready", ts: new Date(Date.now() - 112000).toISOString() },
-  { proc: "daemon", stream: "stdout", line: "kernel: persistent IPython ready", ts: new Date(Date.now() - 110000).toISOString() },
-  { proc: "daemon", stream: "stdout", line: "free model: DeepSeek V4 Flash 0731 ready", ts: new Date(Date.now() - 108000).toISOString() },
-  { proc: "daemon", stream: "stderr", line: "(demo) engine log output is simulated — no real daemon is running", ts: new Date(Date.now() - 105000).toISOString() },
+  {
+    proc: "daemon",
+    stream: "stdout",
+    line: "Sophos agent daemon starting (demo mode — simulated engine)",
+    ts: new Date(Date.now() - 120000).toISOString(),
+  },
+  {
+    proc: "sidecar",
+    stream: "stdout",
+    line: "IPC bridge connecting to daemon...",
+    ts: new Date(Date.now() - 118000).toISOString(),
+  },
+  {
+    proc: "daemon",
+    stream: "stdout",
+    line: "daemon listening on tcp://127.0.0.1",
+    ts: new Date(Date.now() - 115000).toISOString(),
+  },
+  {
+    proc: "sidecar",
+    stream: "stdout",
+    line: "bridge connected · session-0 ready",
+    ts: new Date(Date.now() - 112000).toISOString(),
+  },
+  {
+    proc: "daemon",
+    stream: "stdout",
+    line: "kernel: persistent IPython ready",
+    ts: new Date(Date.now() - 110000).toISOString(),
+  },
+  {
+    proc: "daemon",
+    stream: "stdout",
+    line: "free model: DeepSeek V4 Flash 0731 ready",
+    ts: new Date(Date.now() - 108000).toISOString(),
+  },
+  {
+    proc: "daemon",
+    stream: "stderr",
+    line: "(demo) engine log output is simulated — no real daemon is running",
+    ts: new Date(Date.now() - 105000).toISOString(),
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -187,23 +222,27 @@ export function EnginePanel({ open }: { open: boolean }) {
     await invokeRestart();
     setTimeout(() => setRestarting(false), 500);
   }, []);
-  const handleStop = useCallback(async () => { await invokeStop(); }, []);
+  const handleStop = useCallback(async () => {
+    await invokeStop();
+  }, []);
 
-  const dotState: StatusDotState = !inTauri && !demo
-    ? "idle"
-    : status?.daemon_alive && status?.sidecar_alive
-    ? "connected"
-    : status && (!status.daemon_alive || !status.sidecar_alive)
-    ? "disconnected"
-    : "connecting";
+  const dotState: StatusDotState =
+    !inTauri && !demo
+      ? "idle"
+      : status?.daemon_alive && status?.sidecar_alive
+        ? "connected"
+        : status && (!status.daemon_alive || !status.sidecar_alive)
+          ? "disconnected"
+          : "connecting";
 
-  const statusLabel = !inTauri && !demo
-    ? "Browser Preview"
-    : status?.daemon_alive && status?.sidecar_alive
-    ? "Engine Running"
-    : status && !status.daemon_alive && !status.sidecar_alive
-    ? "Engine Stopped"
-    : "Engine Partial";
+  const statusLabel =
+    !inTauri && !demo
+      ? "Browser Preview"
+      : status?.daemon_alive && status?.sidecar_alive
+        ? "Engine Running"
+        : status && !status.daemon_alive && !status.sidecar_alive
+          ? "Engine Stopped"
+          : "Engine Partial";
 
   return (
     <div className={`engine-panel${open ? "" : " engine-panel--hidden"}`}>
@@ -214,18 +253,38 @@ export function EnginePanel({ open }: { open: boolean }) {
           <Text variant="micro" tone="dim" mono uppercase>
             Engine Terminal
           </Text>
-          <Badge tone={dotState === "connected" ? "success" : dotState === "disconnected" ? "danger" : dotState === "idle" ? "neutral" : "warning"}>
+          <Badge
+            tone={
+              dotState === "connected"
+                ? "success"
+                : dotState === "disconnected"
+                  ? "danger"
+                  : dotState === "idle"
+                    ? "neutral"
+                    : "warning"
+            }
+          >
             {statusLabel}
           </Badge>
           {inTauri && status && (
             <>
-              <Text variant="micro" tone="dim" mono>daemon {status.daemon_alive ? "●" : "○"}</Text>
-              <Text variant="micro" tone="dim" mono>sidecar {status.sidecar_alive ? "●" : "○"}</Text>
+              <Text variant="micro" tone="dim" mono>
+                daemon {status.daemon_alive ? "●" : "○"}
+              </Text>
+              <Text variant="micro" tone="dim" mono>
+                sidecar {status.sidecar_alive ? "●" : "○"}
+              </Text>
             </>
           )}
         </div>
         <div className="engine-panel__headright">
-          <Button variant="outline" size="sm" onClick={handleRestart} loading={restarting} disabled={!inTauri}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRestart}
+            loading={restarting}
+            disabled={!inTauri}
+          >
             Restart
           </Button>
           <Button variant="danger" size="sm" onClick={handleStop} disabled={!inTauri}>
@@ -248,11 +307,7 @@ export function EnginePanel({ open }: { open: boolean }) {
       </div>
 
       {/* Terminal body */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="engine-panel__body"
-      >
+      <div ref={scrollRef} onScroll={handleScroll} className="engine-panel__body">
         {!inTauri && !demo ? (
           <BrowserPreviewState />
         ) : logs.length === 0 ? (
@@ -263,14 +318,11 @@ export function EnginePanel({ open }: { open: boolean }) {
           </div>
         ) : (
           logs.map((entry, i) => (
-            <div
-              key={i}
-              className="engine-panel__line"
-            >
-              <span className="engine-panel__ts">
-                {entry.ts.slice(11, 19)}
-              </span>
-              <span className={`engine-panel__prefix${entry.stream === "stderr" ? " engine-panel__prefix--err" : entry.proc === "daemon" ? " engine-panel__prefix--daemon" : ""}`}>
+            <div key={i} className="engine-panel__line">
+              <span className="engine-panel__ts">{entry.ts.slice(11, 19)}</span>
+              <span
+                className={`engine-panel__prefix${entry.stream === "stderr" ? " engine-panel__prefix--err" : entry.proc === "daemon" ? " engine-panel__prefix--daemon" : ""}`}
+              >
                 {logPrefix(entry.proc, entry.stream)}
               </span>
               <span className="engine-panel__text">{entry.line}</span>
@@ -290,7 +342,16 @@ function BrowserPreviewState() {
   return (
     <div className="engine-panel__preview">
       <div className="engine-panel__previewicon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="4 17 10 11 4 5" />
           <line x1="12" y1="19" x2="20" y2="19" />
         </svg>
@@ -299,9 +360,8 @@ function BrowserPreviewState() {
         Engine not connected (browser preview)
       </Text>
       <Text variant="micro" tone="dim" mono className="engine-panel__previewdesc">
-        Run the app with `npm run tauri dev` to see live daemon + sidecar process
-        output streaming here. Restart and Stop controls are disabled in the
-        browser preview.
+        Run the app with `npm run tauri dev` to see live daemon + sidecar process output streaming here.
+        Restart and Stop controls are disabled in the browser preview.
       </Text>
     </div>
   );

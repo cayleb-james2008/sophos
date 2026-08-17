@@ -14,15 +14,7 @@ import "./primitives.css";
 // ---------------------------------------------------------------------------
 
 export type TextVariant = "display" | "title" | "subtitle" | "body" | "label" | "micro";
-export type TextTone =
-  | "default"
-  | "muted"
-  | "dim"
-  | "accent"
-  | "success"
-  | "warning"
-  | "danger"
-  | "info";
+export type TextTone = "default" | "muted" | "dim" | "accent" | "success" | "warning" | "danger" | "info";
 
 export interface TextProps {
   as?: React.ElementType;
@@ -145,7 +137,7 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, hint, error, prefix, suffix, style, className, id, ...rest },
+  { label, hint, error, prefix, suffix, style: _style, className, id, ...rest },
   ref,
 ) {
   const inputId = id ?? (label ? `pa-input-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
@@ -189,7 +181,7 @@ export interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextArea
 }
 
 export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(
-  { label, error, style, className, id, ...rest },
+  { label, error, style: _style, className, id, ...rest },
   ref,
 ) {
   const inputId = id ?? (label ? `pa-ta-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
@@ -203,7 +195,9 @@ export const TextArea = React.forwardRef<HTMLTextAreaElement, TextAreaProps>(fun
       <textarea
         id={inputId}
         ref={ref}
-        className={["pa-ta-textarea pa-focus-ring", error ? "pa-ta-textarea--error" : null, className].filter(Boolean).join(" ")}
+        className={["pa-ta-textarea pa-focus-ring", error ? "pa-ta-textarea--error" : null, className]
+          .filter(Boolean)
+          .join(" ")}
         {...rest}
       />
       {error ? (
@@ -226,7 +220,7 @@ export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElemen
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { label, options, placeholder, style, className, id, ...rest },
+  { label, options, placeholder, style: _style, className, id, ...rest },
   ref,
 ) {
   const selectId = id ?? (label ? `pa-select-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
@@ -266,11 +260,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function 
 // ---------------------------------------------------------------------------
 
 export function Kbd({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <kbd className={["pa-kbd", className].filter(Boolean).join(" ")}>
-      {children}
-    </kbd>
-  );
+  return <kbd className={["pa-kbd", className].filter(Boolean).join(" ")}>{children}</kbd>;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +388,13 @@ export function IconButton({
       aria-label={title}
       onClick={onClick}
       disabled={disabled}
-      className={["pa-icon-button", `pa-icon-button--${tone}`, `pa-icon-button--${size}`, "pa-focus-ring", className]
+      className={[
+        "pa-icon-button",
+        `pa-icon-button--${tone}`,
+        `pa-icon-button--${size}`,
+        "pa-focus-ring",
+        className,
+      ]
         .filter(Boolean)
         .join(" ")}
     >
@@ -426,11 +422,13 @@ export function Skeleton({
     <span
       aria-hidden
       className={["pa-skeleton", className].filter(Boolean).join(" ")}
-      style={{
-        "--pa-skeleton-w": typeof width === "number" ? `${width}px` : width,
-        "--pa-skeleton-h": typeof height === "number" ? `${height}px` : height,
-        "--pa-skeleton-r": typeof radius === "number" ? `${radius}px` : radius,
-      } as React.CSSProperties}
+      style={
+        {
+          "--pa-skeleton-w": typeof width === "number" ? `${width}px` : width,
+          "--pa-skeleton-h": typeof height === "number" ? `${height}px` : height,
+          "--pa-skeleton-r": typeof radius === "number" ? `${radius}px` : radius,
+        } as React.CSSProperties
+      }
     />
   );
 }

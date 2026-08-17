@@ -73,11 +73,7 @@ export function DaemonStatusBanner({ onRestartRequest }: { onRestartRequest?: ()
 
   return (
     <div className="dsb">
-      <Card
-        variant="raised"
-        padding="md"
-        className="dsb-card"
-      >
+      <Card variant="raised" padding="md" className="dsb-card">
         <div className="dsb-head">
           <StatusDot state={status.kind} />
           <Text variant="label" tone="danger">
@@ -91,8 +87,7 @@ export function DaemonStatusBanner({ onRestartRequest }: { onRestartRequest?: ()
 
         {tcpAlreadyOn ? (
           <Text variant="micro" tone="muted">
-            TCP mode is already enabled. Restart the app to relaunch the engine on the TCP-loopback
-            transport.
+            TCP mode is already enabled. Restart the app to relaunch the engine on the TCP-loopback transport.
           </Text>
         ) : (
           <div className="dsb-actions">

@@ -6,7 +6,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, Button, Spinner } from "../../design";
-import { describeImportOutcome, useProfile, PROFILES, MODES, compositionSummary, type ProfileMode } from "./profiles";
+import {
+  describeImportOutcome,
+  useProfile,
+  PROFILES,
+  MODES,
+  compositionSummary,
+  type ProfileMode,
+} from "./profiles";
 import { studioCompositionSummary } from "../studio/editor";
 import { exportProfileToFile, importProfileFromFile, parseCustomProfileFile } from "../studio/portable";
 import type { CustomProfile } from "../studio/store";
@@ -27,7 +34,9 @@ export function ProfileSelector() {
     importCustomProfile,
   } = useProfile();
   const [open, setOpen] = useState(false);
-  const [notice, setNotice] = useState<{ kind: "success" | "collision" | "error"; message: string } | null>(null);
+  const [notice, setNotice] = useState<{ kind: "success" | "collision" | "error"; message: string } | null>(
+    null,
+  );
   const rootRef = useRef<HTMLDivElement>(null);
 
   // A fresh notice whenever the dropdown opens — stale import/export results
@@ -99,17 +108,40 @@ export function ProfileSelector() {
       >
         {!loaded ? <Spinner size={12} /> : null}
         <span className="pr-glyph" aria-hidden="true">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="8" r="4" />
             <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" />
           </svg>
         </span>
         <span className="pr-triggermain">
-          <Text variant="micro" tone="dim" mono className="pr-label">Profile</Text>
-          <Text variant="label" weight="medium" className="pr-name">{profile.name}</Text>
+          <Text variant="micro" tone="dim" mono className="pr-label">
+            Profile
+          </Text>
+          <Text variant="label" weight="medium" className="pr-name">
+            {profile.name}
+          </Text>
         </span>
         <span className="pr-mode-chip">{composition.mode}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`pr-chevron${open ? " pr-chevron--open" : ""}`}>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`pr-chevron${open ? " pr-chevron--open" : ""}`}
+        >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </Button>
@@ -117,7 +149,9 @@ export function ProfileSelector() {
       {open ? (
         <div className="pr-panel" role="dialog" aria-label="Agent profile">
           <div className="pr-panelhead">
-            <Text variant="micro" tone="dim" mono uppercase>Agent profile</Text>
+            <Text variant="micro" tone="dim" mono uppercase>
+              Agent profile
+            </Text>
           </div>
 
           <div className="pr-list">
@@ -135,7 +169,17 @@ export function ProfileSelector() {
                   <div className="pr-card-head">
                     <span className="pr-card-name">{p.name}</span>
                     {isCurrent ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--pa-green-hover)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="var(--pa-green-hover)"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     ) : null}
@@ -144,7 +188,9 @@ export function ProfileSelector() {
                   <span className="pr-card-desc">{p.description}</span>
                   <span className="pr-card-chips">
                     {p.workingStyle.map((chip) => (
-                      <span key={chip} className="pr-chip">{chip}</span>
+                      <span key={chip} className="pr-chip">
+                        {chip}
+                      </span>
                     ))}
                   </span>
                 </button>
@@ -155,19 +201,46 @@ export function ProfileSelector() {
           {/* Custom profiles — built in the Profile Studio (v0.7.1) */}
           <div className="pr-custom">
             <div className="pr-custom-head">
-              <Text variant="micro" tone="dim" mono uppercase>Custom</Text>
+              <Text variant="micro" tone="dim" mono uppercase>
+                Custom
+              </Text>
               <div className="pr-custom-head-actions">
-                <Button variant="ghost" size="sm" type="button" onClick={handleImport} data-testid="picker-import" title="Import a custom profile from a .sophos-profile.json file">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={handleImport}
+                  data-testid="picker-import"
+                  title="Import a custom profile from a .sophos-profile.json file"
+                >
                   Import…
                 </Button>
-                <Button variant="ghost" size="sm" type="button" onClick={() => { setOpen(false); openStudioCreate(); }} title="Build a new custom profile in the Profile Studio">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    openStudioCreate();
+                  }}
+                  title="Build a new custom profile in the Profile Studio"
+                >
                   + New profile
                 </Button>
               </div>
             </div>
             {notice ? (
-              <div className={`pr-notice pr-notice--${notice.kind}`} role="status" data-testid="picker-port-notice">
-                <Text variant="micro" tone={notice.kind === "error" ? "danger" : notice.kind === "collision" ? "warning" : "success"}>
+              <div
+                className={`pr-notice pr-notice--${notice.kind}`}
+                role="status"
+                data-testid="picker-port-notice"
+              >
+                <Text
+                  variant="micro"
+                  tone={
+                    notice.kind === "error" ? "danger" : notice.kind === "collision" ? "warning" : "success"
+                  }
+                >
                   {notice.message}
                 </Text>
               </div>
@@ -187,11 +260,26 @@ export function ProfileSelector() {
                       aria-selected={isCurrent}
                       className={`pr-card pr-card--custom${isCurrent ? " pr-card--current" : ""}`}
                     >
-                      <button type="button" className="pr-custom-main" onClick={() => handleSelect(p.id)} aria-label={`Select ${p.name}`}>
+                      <button
+                        type="button"
+                        className="pr-custom-main"
+                        onClick={() => handleSelect(p.id)}
+                        aria-label={`Select ${p.name}`}
+                      >
                         <div className="pr-card-head">
                           <span className="pr-card-name">{p.name}</span>
                           {isCurrent ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--pa-green-hover)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="var(--pa-green-hover)"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
                           ) : null}
@@ -199,15 +287,41 @@ export function ProfileSelector() {
                         <span className="pr-card-tagline">{p.tagline || "Custom composition"}</span>
                         <span className="pr-card-chips">
                           {p.workingStyle.slice(0, 3).map((chip) => (
-                            <span key={chip} className="pr-chip">{chip}</span>
+                            <span key={chip} className="pr-chip">
+                              {chip}
+                            </span>
                           ))}
                         </span>
                         <span className="pr-card-compose">{studioCompositionSummary(p)}</span>
                       </button>
                       <div className="pr-custom-actions">
-                        <button type="button" className="pr-custom-action" onClick={() => { setOpen(false); openStudioEdit(p.id); }} aria-label={`Edit ${p.name}`}>Edit</button>
-                        <button type="button" className="pr-custom-action" onClick={() => void handleExportCard(p)} aria-label={`Export ${p.name}`}>Export</button>
-                        <button type="button" className="pr-custom-action pr-custom-action--danger" onClick={() => void deleteCustomProfile(p.id)} aria-label={`Delete ${p.name}`}>Delete</button>
+                        <button
+                          type="button"
+                          className="pr-custom-action"
+                          onClick={() => {
+                            setOpen(false);
+                            openStudioEdit(p.id);
+                          }}
+                          aria-label={`Edit ${p.name}`}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="pr-custom-action"
+                          onClick={() => void handleExportCard(p)}
+                          aria-label={`Export ${p.name}`}
+                        >
+                          Export
+                        </button>
+                        <button
+                          type="button"
+                          className="pr-custom-action pr-custom-action--danger"
+                          onClick={() => void deleteCustomProfile(p.id)}
+                          aria-label={`Delete ${p.name}`}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   );
@@ -218,11 +332,27 @@ export function ProfileSelector() {
 
           <div className="pr-compose">
             <div className="pr-compose-head">
-              <Text variant="micro" tone="dim" mono uppercase>Runtime mode</Text>
-              <Text variant="micro" tone="dim">composes model · tools · skills · safety</Text>
+              <Text variant="micro" tone="dim" mono uppercase>
+                Runtime mode
+              </Text>
+              <Text variant="micro" tone="dim">
+                composes model · tools · skills · safety
+              </Text>
             </div>
-            <Button variant="ghost" size="sm" type="button" className="pr-studio-entry" onClick={() => { setOpen(false); openStudioCreate(); }} title="Open the Profile Studio — build your own agent profile from the live runtime">
-              <span className="pr-studio-glyph" aria-hidden="true">✦</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              className="pr-studio-entry"
+              onClick={() => {
+                setOpen(false);
+                openStudioCreate();
+              }}
+              title="Open the Profile Studio — build your own agent profile from the live runtime"
+            >
+              <span className="pr-studio-glyph" aria-hidden="true">
+                ✦
+              </span>
               Profile Studio — build your own
             </Button>
             <div className="pr-modes">
@@ -240,7 +370,9 @@ export function ProfileSelector() {
               ))}
             </div>
             <div className="pr-compose-summary">
-              <Text variant="micro" tone="muted">{compositionSummary(composition)}</Text>
+              <Text variant="micro" tone="muted">
+                {compositionSummary(composition)}
+              </Text>
             </div>
           </div>
         </div>

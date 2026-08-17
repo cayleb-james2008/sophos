@@ -14,9 +14,7 @@ describe("ShortcutsOverlay", () => {
     },
     {
       title: "App",
-      shortcuts: [
-        { key: "?", description: "Show keyboard shortcuts", handler: () => {} },
-      ],
+      shortcuts: [{ key: "?", description: "Show keyboard shortcuts", handler: () => {} }],
     },
   ];
 

@@ -6,15 +6,7 @@
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  tokens,
-  applyTheme,
-  resolveTheme,
-  Text,
-  Button,
-  Fade,
-  ShortcutsOverlay,
-} from "@/design";
+import { tokens, applyTheme, resolveTheme, Text, Button, Fade, ShortcutsOverlay } from "@/design";
 
 function mockMatchMedia(matches: boolean) {
   const mql = {

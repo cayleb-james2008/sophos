@@ -22,20 +22,26 @@ export function UpdateBanner() {
     let cancelled = false;
     const unlisteners: Array<() => void> = [];
     (async () => {
-      const { listen } = await import("@tauri-apps/api/event");
+      // In browser-demo mode there is no Tauri runtime, so listen() throws;
+      // swallow it and simply never show the banner (the real app has the
+      // runtime and subscribes normally). Without the guard this was an
+      // unhandled rejection in every browser-preview session.
+      let listen;
+      try {
+        ({ listen } = await import("@tauri-apps/api/event"));
+      } catch {
+        return;
+      }
       if (cancelled) return;
-      const un1 = await listen<{ version: string; notes: string }>(
-        "update-available",
-        (event) => {
-          if (!cancelled) {
-            setNotice({
-              state: "available",
-              version: event.payload.version,
-              notes: event.payload.notes,
-            });
-          }
-        },
-      );
+      const un1 = await listen<{ version: string; notes: string }>("update-available", (event) => {
+        if (!cancelled) {
+          setNotice({
+            state: "available",
+            version: event.payload.version,
+            notes: event.payload.notes,
+          });
+        }
+      });
       unlisteners.push(un1);
       const un2 = await listen<string>("update-install-error", (event) => {
         if (!cancelled) setNotice({ state: "error", message: event.payload });

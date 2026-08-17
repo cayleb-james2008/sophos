@@ -33,7 +33,14 @@ describe("DiffView", () => {
   });
 
   it("renders the text of each line", () => {
-    render(<DiffView lines={[{ type: "ctx", text: "alpha" }, { type: "add", text: "beta" }]} />);
+    render(
+      <DiffView
+        lines={[
+          { type: "ctx", text: "alpha" },
+          { type: "add", text: "beta" },
+        ]}
+      />,
+    );
     expect(screen.getByText("alpha")).toBeInTheDocument();
     expect(screen.getByText("beta")).toBeInTheDocument();
   });

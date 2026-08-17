@@ -11,7 +11,12 @@ type IconProps = {
   style?: React.CSSProperties;
 };
 
-function base({ size = 16, color = "currentColor", strokeWidth = 1.5, style }: IconProps): React.SVGProps<SVGSVGElement> {
+function base({
+  size = 16,
+  color = "currentColor",
+  strokeWidth = 1.5,
+  style,
+}: IconProps): React.SVGProps<SVGSVGElement> {
   return {
     width: size,
     height: size,

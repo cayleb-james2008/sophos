@@ -11,12 +11,11 @@ export function DiffView({ lines }: { lines: DiffLine[] }) {
     <div className="lr-diff">
       {lines.map((l, i) => {
         const marker = l.type === "add" ? "+" : l.type === "del" ? "-" : " ";
-        const variant = l.type === "add" ? " lr-diff-line--add" : l.type === "del" ? " lr-diff-line--del" : "";
+        const variant =
+          l.type === "add" ? " lr-diff-line--add" : l.type === "del" ? " lr-diff-line--del" : "";
         return (
           <div key={i} className={`lr-diff-line${variant}`}>
-            <span className="lr-diff-marker">
-              {marker}
-            </span>
+            <span className="lr-diff-marker">{marker}</span>
             <span>{l.text || " "}</span>
           </div>
         );

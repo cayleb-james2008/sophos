@@ -28,7 +28,7 @@ export interface LocalEndpoint {
 
 /** Candidate ports for the known server families + generic OpenAI-compatible servers. */
 const CANDIDATES: Array<{ port: number; kind: LocalEndpointKind }> = [
-  { port: 11434, kind: "ollama" },   // Ollama default
+  { port: 11434, kind: "ollama" }, // Ollama default
   { port: 1234, kind: "lm-studio" }, // LM Studio default
   { port: 8080, kind: "llama.cpp" }, // llama.cpp / llama-server default
   { port: 4891, kind: "openai-compatible" }, // vLLM default
@@ -81,10 +81,12 @@ async function probeOllama(port: number): Promise<LocalDetectedModel[] | null> {
     const body = (await res.json()) as { models?: Array<{ name?: string; model?: string }> };
     const list = body.models ?? [];
     if (!Array.isArray(list) || list.length === 0) return [];
-    return list.map((m) => {
-      const id = m.name ?? m.model ?? "";
-      return id ? { id, name: friendlyModelName(id) } : null;
-    }).filter((m): m is LocalDetectedModel => m !== null);
+    return list
+      .map((m) => {
+        const id = m.name ?? m.model ?? "";
+        return id ? { id, name: friendlyModelName(id) } : null;
+      })
+      .filter((m): m is LocalDetectedModel => m !== null);
   } catch {
     return null;
   }
@@ -102,10 +104,12 @@ async function probeOpenAi(port: number): Promise<LocalDetectedModel[] | null> {
     const body = (await res.json()) as { data?: Array<{ id?: string }> };
     const list = body.data ?? [];
     if (!Array.isArray(list) || list.length === 0) return [];
-    return list.map((m) => {
-      const id = m.id ?? "";
-      return id ? { id, name: friendlyModelName(id) } : null;
-    }).filter((m): m is LocalDetectedModel => m !== null);
+    return list
+      .map((m) => {
+        const id = m.id ?? "";
+        return id ? { id, name: friendlyModelName(id) } : null;
+      })
+      .filter((m): m is LocalDetectedModel => m !== null);
   } catch {
     return null;
   }
@@ -115,18 +119,33 @@ async function probeOpenAi(port: number): Promise<LocalDetectedModel[] | null> {
 async function probePort(port: number, kind: LocalEndpointKind): Promise<LocalEndpoint | null> {
   const ollamaModels = await probeOllama(port);
   if (ollamaModels !== null) {
-    return { id: `local-${port}`, baseUrl: `http://127.0.0.1:${port}`, port, kind: "ollama", name: "Ollama", models: ollamaModels };
+    return {
+      id: `local-${port}`,
+      baseUrl: `http://127.0.0.1:${port}`,
+      port,
+      kind: "ollama",
+      name: "Ollama",
+      models: ollamaModels,
+    };
   }
   const openAiModels = await probeOpenAi(port);
   if (openAiModels !== null) {
     // Refine the label when the port matches a known family.
-    const kindLabel: LocalEndpointKind = kind === "llama.cpp" || kind === "lm-studio" ? kind : "openai-compatible";
+    const kindLabel: LocalEndpointKind =
+      kind === "llama.cpp" || kind === "lm-studio" ? kind : "openai-compatible";
     const names: Record<string, string> = {
       "llama.cpp": "llama.cpp",
       "lm-studio": "LM Studio",
       "openai-compatible": "OpenAI-compatible server",
     };
-    return { id: `local-${port}`, baseUrl: `http://127.0.0.1:${port}`, port, kind: kindLabel, name: names[kindLabel], models: openAiModels };
+    return {
+      id: `local-${port}`,
+      baseUrl: `http://127.0.0.1:${port}`,
+      port,
+      kind: kindLabel,
+      name: names[kindLabel],
+      models: openAiModels,
+    };
   }
   return null;
 }

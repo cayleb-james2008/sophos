@@ -67,11 +67,20 @@ export function NodeFrame({
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.3, ease: enterEase }}
     >
-      <div className={`pg-node ${selected ? "pg-node--sel" : ""}`} style={{ "--node-w": `${width}px`, ...style } as CSSProperties} onClick={onClick}>
+      <div
+        className={`pg-node ${selected ? "pg-node--sel" : ""}`}
+        style={{ "--node-w": `${width}px`, ...style } as CSSProperties}
+        onClick={onClick}
+      >
         <span className="pg-node__edge" style={{ "--node-color": color } as CSSProperties} />
         <div className="pg-node__head">
           <span className="pg-node__kind">{kind}</span>
-          {corner ?? <span className="pg-node__dot" style={{ "--node-color": color, "--node-wash": statusWash(status) } as CSSProperties} />}
+          {corner ?? (
+            <span
+              className="pg-node__dot"
+              style={{ "--node-color": color, "--node-wash": statusWash(status) } as CSSProperties}
+            />
+          )}
         </div>
         <div className="pg-node__title" title={title}>
           {title}
@@ -183,42 +192,50 @@ export function GraphFlow({
     <div className="pa-graph" data-nodes={nodes.length} data-edges={edges.length}>
       <div className="pa-graph__panel">
         <MotionConfig reducedMotion="user">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange as never}
-          onEdgesChange={onEdgesChange as never}
-          nodeTypes={nodeTypes as never}
-          edgeTypes={edgeTypes as never}
-          nodesConnectable={nodesConnectable}
-          nodesDraggable={nodesDraggable}
-          fitView={fitView}
-          fitViewOptions={{ padding: 0.18, maxZoom: 1.15 }}
-          minZoom={minZoom}
-          maxZoom={maxZoom}
-          proOptions={{ hideAttribution: true }}
-          onNodeClick={(_, n) => onNodeClick?.(n.id)}
-          colorMode="dark"
-        >
-          <Background gap={22} size={1.1} color={tokens.color.border} bgColor={tokens.color.bg} />
-          <Controls position="bottom-right" showInteractive={false} className="pa-graph__controls">
-            <ControlButton title="Zoom in" aria-label="Zoom in">
-              <PlusGlyph />
-            </ControlButton>
-            <ControlButton title="Zoom out" aria-label="Zoom out">
-              <MinusGlyph />
-            </ControlButton>
-            <ControlButton title="Fit view" aria-label="Fit view">
-              <FitGlyph />
-            </ControlButton>
-          </Controls>
-          {/* Minimap lives top-right so it never stacks on the zoom controls
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange as never}
+            onEdgesChange={onEdgesChange as never}
+            nodeTypes={nodeTypes as never}
+            edgeTypes={edgeTypes as never}
+            nodesConnectable={nodesConnectable}
+            nodesDraggable={nodesDraggable}
+            fitView={fitView}
+            fitViewOptions={{ padding: 0.18, maxZoom: 1.15 }}
+            minZoom={minZoom}
+            maxZoom={maxZoom}
+            proOptions={{ hideAttribution: true }}
+            onNodeClick={(_, n) => onNodeClick?.(n.id)}
+            colorMode="dark"
+          >
+            <Background gap={22} size={1.1} color={tokens.color.border} bgColor={tokens.color.bg} />
+            <Controls position="bottom-right" showInteractive={false} className="pa-graph__controls">
+              <ControlButton title="Zoom in" aria-label="Zoom in">
+                <PlusGlyph />
+              </ControlButton>
+              <ControlButton title="Zoom out" aria-label="Zoom out">
+                <MinusGlyph />
+              </ControlButton>
+              <ControlButton title="Fit view" aria-label="Fit view">
+                <FitGlyph />
+              </ControlButton>
+            </Controls>
+            {/* Minimap lives top-right so it never stacks on the zoom controls
               (bottom-right) — the D5 overlap fix. */}
-          {showMiniMap ? (
-            <MiniMap position="top-right" pannable zoomable nodeStrokeWidth={2} nodeColor={nodeColor} maskColor="rgba(14,14,14,0.6)" className="pa-graph__minimap" />
-          ) : null}
-          {children}
-        </ReactFlow>
+            {showMiniMap ? (
+              <MiniMap
+                position="top-right"
+                pannable
+                zoomable
+                nodeStrokeWidth={2}
+                nodeColor={nodeColor}
+                maskColor="rgba(14,14,14,0.6)"
+                className="pa-graph__minimap"
+              />
+            ) : null}
+            {children}
+          </ReactFlow>
         </MotionConfig>
       </div>
     </div>
@@ -248,7 +265,12 @@ function MinusGlyph() {
 function FitGlyph() {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-      <path d="M4 2H2v2M8 2h2v2M4 10H2V8M8 10h2V8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path
+        d="M4 2H2v2M8 2h2v2M4 10H2V8M8 10h2V8"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

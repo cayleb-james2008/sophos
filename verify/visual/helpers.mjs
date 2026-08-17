@@ -25,6 +25,25 @@ export const {
 const THIS = dirname(fileURLToPath(import.meta.url));
 
 export const VISUAL_DIR = THIS;
+
+/**
+ * Fixed wall-clock instant the visual harness pins the page clock to. Inbox
+ * renders wall-clock times (message clock, "last sync") from `Date.now()`;
+ * without a pin those change every minute and make the inbox baseline drift
+ * (0.13%+ diff) even with zero product change. Pin to a fixed instant so
+ * `Date.now()` / `new Date()` are deterministic while timers keep running.
+ */
+export const FIXED_TIME = new Date("2026-08-17T12:00:00Z");
+
+/**
+ * Pin the page clock to FIXED_TIME. Must be called after `launch()` and
+ * before `gotoApp()` so the app loads with a deterministic "now". Timers and
+ * `performance.now()` still run in real time (Playwright's `setFixedTime`
+ * freezes only wall-clock `Date`, not the timer loop).
+ */
+export async function freezeClock(page) {
+  await page.clock.setFixedTime(FIXED_TIME);
+}
 export const BASELINE_DIR = join(THIS, "baselines");
 export const DIFF_DIR = join(THIS, "diffs");
 export const REPORT_PATH = join(THIS, "visual-report.json");

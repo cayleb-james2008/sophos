@@ -127,7 +127,10 @@ describe("useTranscript", () => {
   });
 
   it("editAndResend replaces the message slice and re-prompts", async () => {
-    (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([userMsg("A"), asstMsg("B")]);
+    (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([
+      userMsg("A"),
+      asstMsg("B"),
+    ]);
     const { hook } = setup();
     await waitFor(() => expect(hook.result.current.loaded).toBe(true));
     await act(async () => {
@@ -138,7 +141,10 @@ describe("useTranscript", () => {
   });
 
   it("retry re-issues the preceding user prompt", async () => {
-    (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([userMsg("A"), asstMsg("B")]);
+    (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([
+      userMsg("A"),
+      asstMsg("B"),
+    ]);
     const { hook } = setup();
     await waitFor(() => expect(hook.result.current.loaded).toBe(true));
     const b = hook.result.current.messages[1];
@@ -190,14 +196,20 @@ describe("useTranscript", () => {
     });
     expect(hook.result.current.messages).toHaveLength(1);
     act(() => {
-      mockState.fire({ type: "session_event", event: { kind: "tool_call", name: "read_file", input: "{\"p\":1}" } });
+      mockState.fire({
+        type: "session_event",
+        event: { kind: "tool_call", name: "read_file", input: '{"p":1}' },
+      });
     });
     const tc = hook.result.current.messages[0].toolCalls![0];
     expect(tc.name).toBe("read_file");
     expect(tc.status).toBe("running");
 
     act(() => {
-      mockState.fire({ type: "session_event", event: { kind: "tool_result", name: "read_file", output: "42 lines" } });
+      mockState.fire({
+        type: "session_event",
+        event: { kind: "tool_result", name: "read_file", output: "42 lines" },
+      });
     });
     expect(hook.result.current.messages[0].toolCalls![0].status).toBe("complete");
     expect(hook.result.current.messages[0].toolCalls![0].output).toBe("42 lines");

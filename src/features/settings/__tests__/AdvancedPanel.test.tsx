@@ -61,15 +61,27 @@ const RUNTIME = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  (mockClient.getContextStats as ReturnType<typeof vi.fn>).mockResolvedValue({ tokens: 10, contextWindow: 100 });
-  (mockClient.getRuntimeInfo as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.parse(JSON.stringify(RUNTIME)));
+  (mockClient.getContextStats as ReturnType<typeof vi.fn>).mockResolvedValue({
+    tokens: 10,
+    contextWindow: 100,
+  });
+  (mockClient.getRuntimeInfo as ReturnType<typeof vi.fn>).mockResolvedValue(
+    JSON.parse(JSON.stringify(RUNTIME)),
+  );
   (mockClient.getRlmChildren as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   (mockClient.listAgents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   (mockClient.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({});
   (mockClient.getState as ReturnType<typeof vi.fn>).mockResolvedValue({ status: { kind: "connected" } });
   (mockClient.compact as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-  (mockClient.attachAgent as ReturnType<typeof vi.fn>).mockResolvedValue({ childId: "c", sessionId: "s", attached: true });
-  (mockClient.testMcpServer as ReturnType<typeof vi.fn>).mockResolvedValue({ serverName: "x", connected: true });
+  (mockClient.attachAgent as ReturnType<typeof vi.fn>).mockResolvedValue({
+    childId: "c",
+    sessionId: "s",
+    attached: true,
+  });
+  (mockClient.testMcpServer as ReturnType<typeof vi.fn>).mockResolvedValue({
+    serverName: "x",
+    connected: true,
+  });
   (mockClient.setSettings as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 });
 

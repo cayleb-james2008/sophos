@@ -148,39 +148,53 @@ export function ExtensionsPanel() {
             </div>
 
             <Text variant="body" tone="muted">
-              Extension discovery is managed by the daemon. This panel reads the live resource snapshot,
-              so the list below is what this session can actually load — not a browser-side catalog.
-              Configured extension paths remain editable here and are applied on the next daemon session.
-              Expand an extension to see the tools and slash commands it registers.
+              Extension discovery is managed by the daemon. This panel reads the live resource snapshot, so
+              the list below is what this session can actually load — not a browser-side catalog. Configured
+              extension paths remain editable here and are applied on the next daemon session. Expand an
+              extension to see the tools and slash commands it registers.
             </Text>
           </Card>
 
           <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-headrow">
-              <Text variant="label" weight="semibold">Live extensions</Text>
-              <Text variant="micro" tone="dim" mono>{runtime?.extensions.length ?? 0}</Text>
+              <Text variant="label" weight="semibold">
+                Live extensions
+              </Text>
+              <Text variant="micro" tone="dim" mono>
+                {runtime?.extensions.length ?? 0}
+              </Text>
               <Badge tone="info">live daemon</Badge>
             </div>
             {runtime?.extensions.length ? (
               <div className="sp-list">
                 {runtime.extensions.map((path) => (
                   <div key={path} className="ep-liverow">
-                    <Text variant="micro" tone="dim" mono className="ap-cwd">{path}</Text>
+                    <Text variant="micro" tone="dim" mono className="ap-cwd">
+                      {path}
+                    </Text>
                   </div>
                 ))}
               </div>
             ) : (
-              <Text variant="body" tone="dim">The live daemon reported no loaded extensions for this session.</Text>
+              <Text variant="body" tone="dim">
+                The live daemon reported no loaded extensions for this session.
+              </Text>
             )}
           </Card>
 
           <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-headrow">
-              <Text variant="label" weight="semibold">Configured extensions</Text>
-              <Text variant="micro" tone="dim" mono>{configured.length}</Text>
+              <Text variant="label" weight="semibold">
+                Configured extensions
+              </Text>
+              <Text variant="micro" tone="dim" mono>
+                {configured.length}
+              </Text>
             </div>
             {configured.length === 0 ? (
-              <Text variant="body" tone="dim">No extensions configured. Install an extension below.</Text>
+              <Text variant="body" tone="dim">
+                No extensions configured. Install an extension below.
+              </Text>
             ) : (
               <div className="sp-list">
                 {merged.map((e, idx) => {
@@ -208,7 +222,9 @@ export function ExtensionsPanel() {
                             onChange={(ev) => void toggleExtension(idx, ev.target.checked)}
                             className="sp-checkbox"
                           />
-                          <Text variant="micro" tone="muted">Enable</Text>
+                          <Text variant="micro" tone="muted">
+                            Enable
+                          </Text>
                         </label>
                         <Button
                           variant="ghost"
@@ -219,38 +235,64 @@ export function ExtensionsPanel() {
                         >
                           {isOpen ? "Hide" : "Details"}
                         </Button>
-                        <Button variant="ghost" size="sm" icon={<XIcon size={13} />} onClick={() => void removeExtension(e.path)} aria-label={`Remove ${e.name}`} />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={<XIcon size={13} />}
+                          onClick={() => void removeExtension(e.path)}
+                          aria-label={`Remove ${e.name}`}
+                        />
                       </div>
                       {isOpen ? (
                         <div className="ep-detail">
                           <div className="ep-detailcol">
-                            <Text variant="micro" tone="dim" className="ep-detailhead">Tools</Text>
+                            <Text variant="micro" tone="dim" className="ep-detailhead">
+                              Tools
+                            </Text>
                             {e.tools.length ? (
                               <div className="ep-itemlist">
                                 {e.tools.map((t) => (
                                   <div key={t.name} className="ep-item">
-                                    <Text variant="micro" mono className="ep-itemname">{t.name}</Text>
-                                    {t.description ? <Text variant="micro" tone="dim">{t.description}</Text> : null}
+                                    <Text variant="micro" mono className="ep-itemname">
+                                      {t.name}
+                                    </Text>
+                                    {t.description ? (
+                                      <Text variant="micro" tone="dim">
+                                        {t.description}
+                                      </Text>
+                                    ) : null}
                                   </div>
                                 ))}
                               </div>
                             ) : (
-                              <Text variant="micro" tone="dim">No tools registered</Text>
+                              <Text variant="micro" tone="dim">
+                                No tools registered
+                              </Text>
                             )}
                           </div>
                           <div className="ep-detailcol">
-                            <Text variant="micro" tone="dim" className="ep-detailhead">Slash commands</Text>
+                            <Text variant="micro" tone="dim" className="ep-detailhead">
+                              Slash commands
+                            </Text>
                             {e.slashCommands.length ? (
                               <div className="ep-itemlist">
                                 {e.slashCommands.map((c) => (
                                   <div key={c.name} className="ep-item">
-                                    <Text variant="micro" mono className="ep-itemname">/{c.name}</Text>
-                                    {c.description ? <Text variant="micro" tone="dim">{c.description}</Text> : null}
+                                    <Text variant="micro" mono className="ep-itemname">
+                                      /{c.name}
+                                    </Text>
+                                    {c.description ? (
+                                      <Text variant="micro" tone="dim">
+                                        {c.description}
+                                      </Text>
+                                    ) : null}
                                   </div>
                                 ))}
                               </div>
                             ) : (
-                              <Text variant="micro" tone="dim">No slash commands registered</Text>
+                              <Text variant="micro" tone="dim">
+                                No slash commands registered
+                              </Text>
                             )}
                           </div>
                         </div>
@@ -264,16 +306,39 @@ export function ExtensionsPanel() {
 
           <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-headrow">
-              <Text variant="label" weight="semibold">Install an extension</Text>
+              <Text variant="label" weight="semibold">
+                Install an extension
+              </Text>
             </div>
-            <Text variant="body" tone="muted">Add an extension directory or file path. The daemon reloads and picks it up on the next session.</Text>
-            {actionError ? <Text variant="micro" tone="danger">{actionError}</Text> : null}
-            {actionMessage ? <Text variant="micro" tone="success">{actionMessage}</Text> : null}
+            <Text variant="body" tone="muted">
+              Add an extension directory or file path. The daemon reloads and picks it up on the next session.
+            </Text>
+            {actionError ? (
+              <Text variant="micro" tone="danger">
+                {actionError}
+              </Text>
+            ) : null}
+            {actionMessage ? (
+              <Text variant="micro" tone="success">
+                {actionMessage}
+              </Text>
+            ) : null}
             <div className="ep-installrow">
               <div className="ep-installfield">
-                <Input label="Extension path" value={installPath} onChange={(e) => setInstallPath(e.target.value)} placeholder="C:\\work\\extensions\\my-extension" />
+                <Input
+                  label="Extension path"
+                  value={installPath}
+                  onChange={(e) => setInstallPath(e.target.value)}
+                  placeholder="C:\\work\\extensions\\my-extension"
+                />
               </div>
-              <Button variant="primary" onClick={() => void installExtension()} disabled={!installPath.trim()}>Install</Button>
+              <Button
+                variant="primary"
+                onClick={() => void installExtension()}
+                disabled={!installPath.trim()}
+              >
+                Install
+              </Button>
             </div>
           </Card>
 
@@ -284,12 +349,9 @@ export function ExtensionsPanel() {
               </Text>
               <Text variant="micro" tone="dim">
                 Extensions are discovered from:
-                <br />
-                • Global: <Text mono>~/.prime/agent/extensions/</Text>
-                <br />
-                • Project: <Text mono>.prime/agent/extensions/</Text>
-                <br />
-                • Settings: <Text mono>{"extensions: [{ name, path, enabled }]"}</Text>
+                <br />• Global: <Text mono>~/.prime/agent/extensions/</Text>
+                <br />• Project: <Text mono>.prime/agent/extensions/</Text>
+                <br />• Settings: <Text mono>{"extensions: [{ name, path, enabled }]"}</Text>
               </Text>
             </div>
           </Card>

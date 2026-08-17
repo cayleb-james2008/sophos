@@ -81,19 +81,42 @@ export function AgentDetail({
 
           {/* Telemetry grid */}
           <div className="ag-detail__body">
-            <Row icon={<PlugIcon size={14} />} label="Kind" value={agent.kind === "daemon" ? "Daemon-backed agent" : "RLM child subagent"} />
+            <Row
+              icon={<PlugIcon size={14} />}
+              label="Kind"
+              value={agent.kind === "daemon" ? "Daemon-backed agent" : "RLM child subagent"}
+            />
             <Row icon={<ClockIcon size={14} />} label="Status" value={statusLabel(agent.status)} />
             <Row icon={<LayersIcon size={14} />} label="Runtime model" value={model ?? "—"} />
-            {agent.sessionId ? <Row icon={<ClockIcon size={14} />} label="Session" value={agent.sessionId} /> : null}
-            {agent.parentId ? <Row icon={<LayersIcon size={14} />} label="Parent" value={agent.parentId} /> : null}
+            {agent.sessionId ? (
+              <Row icon={<ClockIcon size={14} />} label="Session" value={agent.sessionId} />
+            ) : null}
+            {agent.parentId ? (
+              <Row icon={<LayersIcon size={14} />} label="Parent" value={agent.parentId} />
+            ) : null}
             <Row icon={<ClockIcon size={14} />} label="Agent id" value={agent.id} mono />
-            {agent.summary ? <Row icon={<LayersIcon size={14} />} label="Summary" value={agent.summary} /> : null}
-            {sessionState ? <Row icon={<LayersIcon size={14} />} label="Child state" value={`${sessionState.status}${sessionState.activity ? ` · ${sessionState.activity}` : ""}${sessionState.tokenCount ? ` · ${sessionState.tokenCount} tokens` : ""}`} /> : null}
+            {agent.summary ? (
+              <Row icon={<LayersIcon size={14} />} label="Summary" value={agent.summary} />
+            ) : null}
+            {sessionState ? (
+              <Row
+                icon={<LayersIcon size={14} />}
+                label="Child state"
+                value={`${sessionState.status}${sessionState.activity ? ` · ${sessionState.activity}` : ""}${sessionState.tokenCount ? ` · ${sessionState.tokenCount} tokens` : ""}`}
+              />
+            ) : null}
           </div>
-          {sessionState ? <div className="ag-detail__state">
-            <small>LIVE SESSION STATE · {sessionState.transcript.length} messages</small>
-            {sessionState.transcript.slice(-3).map((message) => <div key={message.id}><b>{message.role}</b><span>{message.content || "(tool activity)"}</span></div>)}
-          </div> : null}
+          {sessionState ? (
+            <div className="ag-detail__state">
+              <small>LIVE SESSION STATE · {sessionState.transcript.length} messages</small>
+              {sessionState.transcript.slice(-3).map((message) => (
+                <div key={message.id}>
+                  <b>{message.role}</b>
+                  <span>{message.content || "(tool activity)"}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {/* Actions */}
           <div className="ag-detail__actions">
@@ -113,7 +136,8 @@ export function AgentDetail({
       {/* Coordination thread + composer (always present so the relay is usable) */}
       {deliveryReceipt ? (
         <div className="ag-detail__receipt" role="status">
-          Message {deliveryReceipt.deliveryStatus === "queued" ? "queued for delivery" : "delivered to the child"}
+          Message{" "}
+          {deliveryReceipt.deliveryStatus === "queued" ? "queued for delivery" : "delivered to the child"}
         </div>
       ) : null}
 
@@ -125,19 +149,23 @@ export function AgentDetail({
           onMarkRead={onMarkRead}
           onMarkAllRead={onMarkAllRead}
         />
-        <AgentComposer
-          agent={agent}
-          draft={draft}
-          setDraft={setDraft}
-          sending={sending}
-          onSend={onSend}
-        />
+        <AgentComposer agent={agent} draft={draft} setDraft={setDraft} sending={sending} onSend={onSend} />
       </div>
     </aside>
   );
 }
 
-function Row({ icon, label, value, mono }: { icon: ReactNode; label: string; value: string; mono?: boolean }) {
+function Row({
+  icon,
+  label,
+  value,
+  mono,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
   // Definition-list shape: label above value so long values get the full rail
   // width (the old 3-column icon|label|value row shredded words via break-all).
   // `title` keeps a full opaque id readable on hover without breaking it apart.
@@ -147,7 +175,10 @@ function Row({ icon, label, value, mono }: { icon: ReactNode; label: string; val
         <span className="ag-detail__rowicon">{icon}</span>
         <label>{label}</label>
       </span>
-      <span className={mono ? "ag-detail__rowvalue ag-detail__rowvalue--mono" : "ag-detail__rowvalue"} title={value}>
+      <span
+        className={mono ? "ag-detail__rowvalue ag-detail__rowvalue--mono" : "ag-detail__rowvalue"}
+        title={value}
+      >
         {value}
       </span>
     </div>

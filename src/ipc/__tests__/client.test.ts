@@ -53,16 +53,14 @@ describe("connection lifecycle", () => {
     client.onEvent((e) => events.push(e));
 
     // startSimulation emits connecting synchronously on first subscription.
-    expect(
-      events.some((e) => e.type === "connection_status" && e.status.kind === "connecting"),
-    ).toBe(true);
+    expect(events.some((e) => e.type === "connection_status" && e.status.kind === "connecting")).toBe(true);
 
     // The mock flips to connected after ~600ms (real timer).
     await waitFor(
       () =>
-        expect(
-          events.some((e) => e.type === "connection_status" && e.status.kind === "connected"),
-        ).toBe(true),
+        expect(events.some((e) => e.type === "connection_status" && e.status.kind === "connected")).toBe(
+          true,
+        ),
       { timeout: 5000 },
     );
     expect(events.some((e) => e.type === "snapshot")).toBe(true);
@@ -215,8 +213,6 @@ describe("React hooks", () => {
     renderHook(() => mod.useIpcEvent(cb));
     const client = mod.getIpcClient();
     await client.prompt("ping");
-    await waitFor(() =>
-      expect(cb.mock.calls.some((call) => call[0].type === "session_event")).toBe(true),
-    );
+    await waitFor(() => expect(cb.mock.calls.some((call) => call[0].type === "session_event")).toBe(true));
   });
 });

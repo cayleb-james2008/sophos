@@ -66,7 +66,13 @@ export function GeneralPanel() {
           <Text variant="label" weight="semibold">
             General preferences
           </Text>
-          {saved ? <Badge tone="success" dot>Saved</Badge> : <Badge tone="neutral">Local</Badge>}
+          {saved ? (
+            <Badge tone="success" dot>
+              Saved
+            </Badge>
+          ) : (
+            <Badge tone="neutral">Local</Badge>
+          )}
         </div>
 
         <div className="gp-grid">
@@ -128,7 +134,11 @@ export function GeneralPanel() {
           <Button variant="ghost" onClick={() => setDraft({})} disabled={!loaded}>
             Reset
           </Button>
-          <Button variant="ghost" onClick={runOnboardingAgain} title="Clear the first-run dismiss flag and relaunch the onboarding wizard">
+          <Button
+            variant="ghost"
+            onClick={runOnboardingAgain}
+            title="Clear the first-run dismiss flag and relaunch the onboarding wizard"
+          >
             Run onboarding again
           </Button>
           <Button variant="primary" onClick={save} loading={saving} disabled={!loaded}>

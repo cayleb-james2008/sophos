@@ -89,22 +89,26 @@ export function DaemonTransportCard() {
         <DaemonToggle checked={value} onChange={(n) => void onToggle(n)} disabled={!loaded || saving} />
       </div>
       <Text variant="body" tone="muted">
-        Uses the Windows named-pipe transport by default. If the engine fails to start (named-pipe
-        creation blocked), enable TCP loopback as a fallback. Takes effect after a restart.
+        Uses the Windows named-pipe transport by default. If the engine fails to start (named-pipe creation
+        blocked), enable TCP loopback as a fallback. Takes effect after a restart.
       </Text>
       {saved && (
         <Text variant="micro" tone="success">
           Saved. Restart the app to relaunch the engine on the selected transport.
         </Text>
       )}
-      {value && (
-        <Badge tone="info">TCP loopback fallback armed</Badge>
-      )}
+      {value && <Badge tone="info">TCP loopback fallback armed</Badge>}
     </Card>
   );
 }
 
-export function DaemonDiagnosticsCard({ status, onRefresh }: { status: { connected: boolean; tcpEnabled?: boolean; socketPath?: string }; onRefresh: () => void }) {
+export function DaemonDiagnosticsCard({
+  status,
+  onRefresh,
+}: {
+  status: { connected: boolean; tcpEnabled?: boolean; socketPath?: string };
+  onRefresh: () => void;
+}) {
   return (
     <Card variant="raised" padding="lg" className="card-stack">
       <div className="sp-head">
@@ -129,7 +133,12 @@ export function DaemonDiagnosticsCard({ status, onRefresh }: { status: { connect
           <Text variant="micro" tone="dim" uppercase>
             Daemon status
           </Text>
-          <Text variant="label" mono weight="medium" className={`dp-statval${status.connected ? " dp-statval--ok" : " dp-statval--err"}`}>
+          <Text
+            variant="label"
+            mono
+            weight="medium"
+            className={`dp-statval${status.connected ? " dp-statval--ok" : " dp-statval--err"}`}
+          >
             {status.connected ? "Connected" : "Disconnected"}
           </Text>
         </div>
@@ -152,7 +161,8 @@ export function DaemonDiagnosticsCard({ status, onRefresh }: { status: { connect
       </div>
 
       <Text variant="micro" tone="dim">
-        Daemon connection is managed by the Rust shell via the Node bridge. TCP toggle (P1) will appear here when available.
+        Daemon connection is managed by the Rust shell via the Node bridge. TCP toggle (P1) will appear here
+        when available.
       </Text>
     </Card>
   );

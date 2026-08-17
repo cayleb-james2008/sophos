@@ -67,7 +67,15 @@ function AppShell() {
     { key: "3", modifiers: ["cmd"], description: "Switch to Agents", handler: () => setView("agents") },
     { key: "4", modifiers: ["cmd"], description: "Switch to Inbox", handler: () => setView("inbox") },
     { key: "n", modifiers: ["cmd"], description: "Open new session", handler: () => setNewSessionOpen(true) },
-    { key: ",", modifiers: ["cmd"], description: "Open Settings", handler: () => { setSettingsTab("general"); setView("settings"); } },
+    {
+      key: ",",
+      modifiers: ["cmd"],
+      description: "Open Settings",
+      handler: () => {
+        setSettingsTab("general");
+        setView("settings");
+      },
+    },
   ]);
 
   return (

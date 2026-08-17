@@ -14,6 +14,7 @@ mod contract;
 mod daemon;
 mod engine_log;
 mod job;
+mod lease;
 mod native;
 mod settings;
 mod sidecar;
@@ -23,7 +24,7 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent};
 
-use contract::{ConnectionStatus, IpcCommand, IpcEvent, SessionInfo, TokenEstimate, TranscriptMessage};
+use contract::{ConnectionStatus, IpcEvent, SessionInfo, TokenEstimate, TranscriptMessage};
 use daemon::DaemonManager;
 use engine_log::{EngineLogEntry, EngineLogSink};
 use job::Job;
@@ -332,6 +333,23 @@ pub fn run() {
             if demo_mode {
                 eprintln!("[sophos] DEMO MODE — daemon/sidecar skipped, using mock IPC");
             } else {
+                // Conservative startup recovery: clear crash-leftover lease
+                // debris and reclaim stale session leases (dead owner + past
+                // grace) BEFORE the daemon spawns, so a previously-crashed
+                // host never bricks every resume (upstream #667/#841/D39b).
+                let lease_summary = lease::sweep_stale_leases(
+                    &settings::agent_dir(),
+                    lease::DEFAULT_LEASE_GRACE_MS,
+                    &lease::pid_alive,
+                );
+                if lease_summary.leftovers_removed > 0 || lease_summary.stale_leases_removed > 0 {
+                    eprintln!(
+                        "[lease] startup sweep removed {} leftover dirs and {} stale leases ({} kept)",
+                        lease_summary.leftovers_removed,
+                        lease_summary.stale_leases_removed,
+                        lease_summary.kept,
+                    );
+                }
                 daemon.start(&node_path, &daemon_path, daemon_tcp);
                 sidecar.start();
             }

@@ -57,7 +57,13 @@ const TREE = {
       timestamp: "2026-01-15T10:00:00.000Z",
       parentId: null,
       children: [
-        { id: "entry-2", type: "message", label: "Agent reply", timestamp: "2026-01-15T10:01:00.000Z", parentId: "entry-1" },
+        {
+          id: "entry-2",
+          type: "message",
+          label: "Agent reply",
+          timestamp: "2026-01-15T10:01:00.000Z",
+          parentId: "entry-1",
+        },
         {
           id: "entry-3",
           type: "tool",

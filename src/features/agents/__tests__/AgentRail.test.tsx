@@ -8,8 +8,22 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentRail } from "../AgentRail";
 import type { AgentRow } from "../useAgents";
 
-const daemon: AgentRow = { id: "a-1", name: "Reviewer", kind: "daemon", status: "running", summary: "Checking PRs", model: "deepseek" };
-const rlm: AgentRow = { id: "r-1", name: "critic", kind: "rlm", status: "done", parentId: "a-1", summary: "reviewed" };
+const daemon: AgentRow = {
+  id: "a-1",
+  name: "Reviewer",
+  kind: "daemon",
+  status: "running",
+  summary: "Checking PRs",
+  model: "deepseek",
+};
+const rlm: AgentRow = {
+  id: "r-1",
+  name: "critic",
+  kind: "rlm",
+  status: "done",
+  parentId: "a-1",
+  summary: "reviewed",
+};
 
 function renderRail({
   agents = [daemon, rlm],

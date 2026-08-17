@@ -40,7 +40,13 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
   // heartbeat list arrives.
   useEffect(() => {
     if (connection.heartbeats) {
-      setHeartbeats(connection.heartbeats.map((h) => ({ id: h.id, interval: h.interval, status: h.active ? "active" : "paused" })));
+      setHeartbeats(
+        connection.heartbeats.map((h) => ({
+          id: h.id,
+          interval: h.interval,
+          status: h.active ? "active" : "paused",
+        })),
+      );
     }
   }, [connection.heartbeats, connection.activeSessionId]);
   const [interval, setInterval] = useState("");
@@ -59,13 +65,23 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
       if (result) {
         setHeartbeats((prev) => [
           ...prev,
-          { id: result.id, interval: result.cron, prompt: result.prompt || undefined, status: result.active ? "active" : "paused" },
+          {
+            id: result.id,
+            interval: result.cron,
+            prompt: result.prompt || undefined,
+            status: result.active ? "active" : "paused",
+          },
         ]);
       } else {
         // Fallback: daemon returned undefined, use local values.
         setHeartbeats((prev) => [
           ...prev,
-          { id: `heartbeat-${Date.now()}`, interval: iv, prompt: prompt.trim() || undefined, status: "active" },
+          {
+            id: `heartbeat-${Date.now()}`,
+            interval: iv,
+            prompt: prompt.trim() || undefined,
+            status: "active",
+          },
         ]);
       }
       setInterval("");
@@ -122,7 +138,13 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
                 disabled={busy}
               />
             </div>
-            <Button size="md" icon={<PlusIcon size={13} />} onClick={() => void add()} loading={busy} disabled={!interval.trim()}>
+            <Button
+              size="md"
+              icon={<PlusIcon size={13} />}
+              onClick={() => void add()}
+              loading={busy}
+              disabled={!interval.trim()}
+            >
               Set heartbeat
             </Button>
           </div>
@@ -155,13 +177,8 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
         ) : (
           <div className="lr-hb-list">
             {heartbeats.map((h) => (
-              <div
-                key={h.id}
-                className="lr-hb-item"
-              >
-                <span
-                  className={`lr-hb-dot${h.status === "active" ? " lr-hb-dot--active" : ""}`}
-                />
+              <div key={h.id} className="lr-hb-item">
+                <span className={`lr-hb-dot${h.status === "active" ? " lr-hb-dot--active" : ""}`} />
                 <div className="lr-hb-itemmain">
                   <Text variant="label" weight="medium" mono>
                     {h.interval}
@@ -178,7 +195,13 @@ export function HeartbeatsPanel({ initial = [] }: HeartbeatsPanelProps) {
                 <Badge tone={h.status === "active" ? "success" : "warning"} dot>
                   {h.status === "active" ? "Active" : "Paused"}
                 </Badge>
-                <IconButton title="Remove heartbeat" onClick={() => void remove(h.id)} tone="danger" size="sm" disabled={busy}>
+                <IconButton
+                  title="Remove heartbeat"
+                  onClick={() => void remove(h.id)}
+                  tone="danger"
+                  size="sm"
+                  disabled={busy}
+                >
                   <XIcon size={13} />
                 </IconButton>
               </div>

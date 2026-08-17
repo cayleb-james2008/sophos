@@ -75,13 +75,39 @@ export async function waitForWindow(pid, timeoutMs = 15000) {
  * surface), which is inert.
  */
 export async function enableWebContentAccessibility(pid, windowId) {
-  const state = getWindowState(pid, windowId, { include_screenshot: false });
+  // Retry the initial tree read — the UIA provider is briefly unresponsive
+  // right after a launch (especially under multi-instance contention), and a
+  // single 4s provider timeout must not sink the whole launch.
+  let state;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      state = getWindowState(pid, windowId, { include_screenshot: false });
+      break;
+    } catch (err) {
+      if (attempt < 4 && /timed out|unresponsive/i.test(err.message)) {
+        await sleep(2000);
+        continue;
+      }
+      throw err;
+    }
+  }
   const sw = state.screenshot_width || 1200;
   const sh = state.screenshot_height || 800;
   // Click near the centre of the content area.
   click(pid, Math.round(sw / 2), Math.round(sh / 2), windowId);
   await sleep(400);
-  return getWindowState(pid, windowId, { include_screenshot: false });
+  // Retry the post-click read too (same UIA contention risk).
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return getWindowState(pid, windowId, { include_screenshot: false });
+    } catch (err) {
+      if (attempt < 2 && /timed out|unresponsive/i.test(err.message)) {
+        await sleep(2000);
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 /**

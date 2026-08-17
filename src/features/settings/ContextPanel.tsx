@@ -38,17 +38,21 @@ export function ContextPanel({ context, onCompact }: { context: ContextStats; on
           </Text>
         </div>
         <div className="sp-meter">
-          <div
-            className="sp-meterfill"
-            style={{ "--w": `${pct}%` } as CSSProperties}
-          />
+          <div className="sp-meterfill" style={{ "--w": `${pct}%` } as CSSProperties} />
         </div>
       </div>
 
       {/* Stats */}
       <div className="sp-grid3">
         <Stat label="Messages" value={context.messages !== undefined ? `${context.messages}` : "—"} />
-        <Stat label="Last compacted" value={context.compaction?.lastCompactedAt ? new Date(context.compaction.lastCompactedAt).toLocaleString() : "Never"} />
+        <Stat
+          label="Last compacted"
+          value={
+            context.compaction?.lastCompactedAt
+              ? new Date(context.compaction.lastCompactedAt).toLocaleString()
+              : "Never"
+          }
+        />
         <Stat label="Compaction reason" value={context.compaction?.reason ?? "—"} />
       </div>
     </Card>

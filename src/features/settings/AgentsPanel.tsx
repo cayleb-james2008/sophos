@@ -67,7 +67,12 @@ export function AgentsPanel({
                 <Badge tone={b.tone} dot>
                   {b.label}
                 </Badge>
-                <Button variant="accent-soft" size="sm" icon={<PlugIcon size={12} />} onClick={() => onAttach(a.id)}>
+                <Button
+                  variant="accent-soft"
+                  size="sm"
+                  icon={<PlugIcon size={12} />}
+                  onClick={() => onAttach(a.id)}
+                >
                   Attach
                 </Button>
               </div>

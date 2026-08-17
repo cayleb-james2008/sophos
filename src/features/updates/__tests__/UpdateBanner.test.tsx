@@ -14,12 +14,10 @@ const { eventListeners, mockEvent, invoke } = vi.hoisted(() => {
   return {
     eventListeners,
     mockEvent: {
-      listen: vi.fn(
-        async (event: string, handler: (e: { payload: unknown }) => void) => {
-          eventListeners[event] = (payload: unknown) => handler({ payload });
-          return vi.fn();
-        },
-      ),
+      listen: vi.fn(async (event: string, handler: (e: { payload: unknown }) => void) => {
+        eventListeners[event] = (payload: unknown) => handler({ payload });
+        return vi.fn();
+      }),
     },
     invoke: vi.fn(async () => {}),
   };
@@ -51,14 +49,8 @@ describe("UpdateBanner", () => {
   it("listens for update-available and update-install-error", async () => {
     render(<UpdateBanner />);
     await vi.waitFor(() => expect(mockEvent.listen).toHaveBeenCalled());
-    expect(mockEvent.listen).toHaveBeenCalledWith(
-      "update-available",
-      expect.any(Function),
-    );
-    expect(mockEvent.listen).toHaveBeenCalledWith(
-      "update-install-error",
-      expect.any(Function),
-    );
+    expect(mockEvent.listen).toHaveBeenCalledWith("update-available", expect.any(Function));
+    expect(mockEvent.listen).toHaveBeenCalledWith("update-install-error", expect.any(Function));
   });
 
   it("shows the announced version and installs on click", async () => {
@@ -74,9 +66,7 @@ describe("UpdateBanner", () => {
 
     await user.click(screen.getByRole("button", { name: /install/i }));
     expect(invoke).toHaveBeenCalledWith("install_update");
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      /downloading update/i,
-    );
+    expect(await screen.findByRole("status")).toHaveTextContent(/downloading update/i);
   });
 
   it("surfaces a visible error when the install fails", async () => {

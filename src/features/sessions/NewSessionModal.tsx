@@ -16,7 +16,6 @@ async function pickFolder(): Promise<string | null> {
     const selected = await openDialog({ directory: true, multiple: false });
     return typeof selected === "string" ? selected : null;
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error("[new-session] folder picker failed:", err);
     return null;
   }
@@ -115,7 +114,11 @@ export function NewSessionModal({
             value={cwd}
             onChange={(e) => setCwd(e.target.value)}
             placeholder="C:\work\project"
-            hint={browseHint ? "Folder picker unavailable — type the full path instead." : "Where should this session work?"}
+            hint={
+              browseHint
+                ? "Folder picker unavailable — type the full path instead."
+                : "Where should this session work?"
+            }
           />
           <div className="ns-row">
             <Button variant="outline" size="sm" onClick={browse}>
@@ -141,7 +144,8 @@ export function NewSessionModal({
           placeholder="What should this session accomplish?"
         />
         <Text variant="micro" tone="dim">
-          The session starts fresh in the chosen folder and can be resumed or forked later from the session manager.
+          The session starts fresh in the chosen folder and can be resumed or forked later from the session
+          manager.
         </Text>
       </div>
     </Modal>

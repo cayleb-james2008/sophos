@@ -456,8 +456,9 @@ const tests = [
 
 // --- Runner ----------------------------------------------------------------
 // Launches a dedicated DEMO-MODE build and runs the suite. Uses a standalone
-// build path (prefer the debug build, which is not contended by sibling workers
-// building the release exe) so the e2e is stable.
+// build path (spawn the exe directly so the suite is stable under contention)
+// and targets the RELEASE build — the same exe the release process ships —
+// falling back to debug only when the release exe is absent.
 
 import { existsSync } from "node:fs";
 
@@ -495,9 +496,9 @@ async function runChatSuite(name, tests) {
   console.log(`\n=== ${name} ===`);
   const daemon = startDaemon();
   const daemonStarted = !daemon.alreadyRunning;
-  // Prefer the debug build (has the busy-clearing fix; the release exe is stale
-  // and contended by siblings); fall back to release.
-  const appPath = existsSync(DEBUG_APP) ? DEBUG_APP : RELEASE_APP;
+  // Prefer the release build (the shipped exe); fall back to debug only if the
+  // release exe is absent.
+  const appPath = existsSync(RELEASE_APP) ? RELEASE_APP : DEBUG_APP;
   console.log(`launching demo app: ${appPath}`);
   const { pid, windowId } = await launchAppPath(appPath);
   const app = { pid, windowId };

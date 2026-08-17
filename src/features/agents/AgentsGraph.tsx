@@ -12,14 +12,7 @@
 // occurred when nodes/edges changed mid-flight is avoided).
 
 import { useEffect, useMemo } from "react";
-import {
-  Handle,
-  Position,
-  useNodesState,
-  type Edge,
-  type Node,
-  type NodeProps,
-} from "@xyflow/react";
+import { Handle, Position, useNodesState, type Edge, type Node, type NodeProps } from "@xyflow/react";
 import { GraphFlow, NodeFrame, PulseEdge, statusColor, dagreLayout, type PulseEdgeData } from "../graph";
 import { tokens } from "../../design/tokens";
 import { Button } from "../../design";
@@ -73,7 +66,15 @@ function AgentNode({ data }: NodeProps<AgentGraphNode>) {
     data.kind === "agent" || data.kind === "rlm" ? (
       <>
         {data.attached ? (
-          <Button variant="danger" className="pg-btn pg-btn--danger" onClick={(e) => { e.stopPropagation(); data.onDetach?.(); }} title="Stop monitoring">
+          <Button
+            variant="danger"
+            className="pg-btn pg-btn--danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onDetach?.();
+            }}
+            title="Stop monitoring"
+          >
             <DetachIcon size={11} /> Detach
           </Button>
         ) : (
@@ -82,11 +83,27 @@ function AgentNode({ data }: NodeProps<AgentGraphNode>) {
           // with the left-border selection marker that actually encodes state
           // (vision-critic D4). Green stays on the *attached* indicator and the
           // node's own status, where it means something.
-          <Button variant="outline" className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onAttach?.(); }} title="Attach to relay">
+          <Button
+            variant="outline"
+            className="pg-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onAttach?.();
+            }}
+            title="Attach to relay"
+          >
             <AttachIcon size={11} /> Attach
           </Button>
         )}
-        <Button variant="outline" className="pg-btn" onClick={(e) => { e.stopPropagation(); data.onMessage?.(); }} title="Open coordination thread">
+        <Button
+          variant="outline"
+          className="pg-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onMessage?.();
+          }}
+          title="Open coordination thread"
+        >
           <MessageIcon size={11} /> Message
         </Button>
       </>
@@ -163,7 +180,12 @@ export function AgentsGraph({
     const operator: AgentGraphNode = {
       id: "operator",
       type: "agent",
-      data: { kind: "operator", label: "Operator", status: conn, subtitle: daemonDown ? "Relay unreachable" : "Command center" },
+      data: {
+        kind: "operator",
+        label: "Operator",
+        status: conn,
+        subtitle: daemonDown ? "Relay unreachable" : "Command center",
+      },
       position: { x: 0, y: 0 },
       width: WIDTH,
       height: NODE_HEIGHT.operator,
@@ -192,7 +214,9 @@ export function AgentsGraph({
         kind: "agent",
         label: a.name ?? a.id,
         status: a.status,
-        subtitle: a.summary ?? (a.sessionId ? `session ${a.sessionId.slice(0, 8)}` : `${a.id.slice(0, 8).toUpperCase()}`),
+        subtitle:
+          a.summary ??
+          (a.sessionId ? `session ${a.sessionId.slice(0, 8)}` : `${a.id.slice(0, 8).toUpperCase()}`),
         mono: `${a.id.slice(0, 10).toUpperCase()} · ${a.status}`,
         attached: attachedIds.includes(a.id),
         unread: unreadByAgent(a.id),
@@ -230,7 +254,8 @@ export function AgentsGraph({
     const all = [operator, daemon, ...agentNodes, ...rlmNodes];
 
     const edges: Edge[] = [];
-    const pulseFor = (status: string) => status === "running" || status === "connected" || status === "active";
+    const pulseFor = (status: string) =>
+      status === "running" || status === "connected" || status === "active";
     const connPulse = connectionStatus.kind === "connected";
 
     edges.push({
@@ -238,7 +263,11 @@ export function AgentsGraph({
       source: "operator",
       target: "daemon",
       type: "pulse",
-      data: { pulse: connPulse, color: pulseFor(conn) ? tokens.color.ok : statusColor(conn), animated: connPulse } as PulseEdgeData,
+      data: {
+        pulse: connPulse,
+        color: pulseFor(conn) ? tokens.color.ok : statusColor(conn),
+        animated: connPulse,
+      } as PulseEdgeData,
     });
     for (const a of daemonAgents) {
       edges.push({
@@ -246,7 +275,11 @@ export function AgentsGraph({
         source: "daemon",
         target: a.id,
         type: "pulse",
-        data: { pulse: pulseFor(a.status), color: pulseFor(a.status) ? tokens.color.ok : tokens.color.line, animated: pulseFor(a.status) } as PulseEdgeData,
+        data: {
+          pulse: pulseFor(a.status),
+          color: pulseFor(a.status) ? tokens.color.ok : tokens.color.line,
+          animated: pulseFor(a.status),
+        } as PulseEdgeData,
       });
     }
     for (const c of rlm) {
@@ -256,13 +289,21 @@ export function AgentsGraph({
         source: parent,
         target: c.id,
         type: "pulse",
-        data: { pulse: pulseFor(c.status), color: pulseFor(c.status) ? tokens.color.ok : tokens.color.line, animated: pulseFor(c.status) } as PulseEdgeData,
+        data: {
+          pulse: pulseFor(c.status),
+          color: pulseFor(c.status) ? tokens.color.ok : tokens.color.line,
+          animated: pulseFor(c.status),
+        } as PulseEdgeData,
       });
     }
 
     // Position with dagre, return positioned nodes + edges together.
     const pos = dagreLayout(
-      all.map((n) => ({ id: n.id, width: n.width ?? WIDTH, height: n.height ?? NODE_HEIGHT[(n.data as AgentNodeData).kind] })),
+      all.map((n) => ({
+        id: n.id,
+        width: n.width ?? WIDTH,
+        height: n.height ?? NODE_HEIGHT[(n.data as AgentNodeData).kind],
+      })),
       edges.map((e) => ({ source: e.source, target: e.target })),
       { rankdir: "TB", nodesep: 72, ranksep: 96 },
     );
@@ -271,7 +312,7 @@ export function AgentsGraph({
       return p ? { ...n, position: { x: p.x, y: p.y } } : n;
     });
     return { positioned, edges };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- layout is keyed on the listed data identities; the dagre node/edge arrays are derived from them and would thrash the layout if rebuilt each render.
   }, [rows, attachedIds, conn, connectionStatus.kind]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<AgentGraphNode>([]);

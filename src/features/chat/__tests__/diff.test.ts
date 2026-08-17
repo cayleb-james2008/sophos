@@ -4,12 +4,7 @@
 // malformed inputs and the large-input whole-file fallback.
 
 import { describe, expect, it } from "vitest";
-import {
-  diffLines,
-  formatUnified,
-  isEditToolName,
-  parseFileEdit,
-} from "../diff";
+import { diffLines, formatUnified, isEditToolName, parseFileEdit } from "../diff";
 
 describe("isEditToolName", () => {
   it("recognizes the conventional edit tool names", () => {

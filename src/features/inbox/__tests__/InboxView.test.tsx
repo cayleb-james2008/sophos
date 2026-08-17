@@ -71,13 +71,25 @@ const AGENTS = [
 ];
 
 const INBOX = [
-  { id: "i1", fromAgentId: "a-1", fromAgentName: "Worker", toAgentId: "self", toAgentName: "You", text: "hello", timestamp: "2026-01-15T10:00:00.000Z", read: false },
+  {
+    id: "i1",
+    fromAgentId: "a-1",
+    fromAgentName: "Worker",
+    toAgentId: "self",
+    toAgentName: "You",
+    text: "hello",
+    timestamp: "2026-01-15T10:00:00.000Z",
+    read: false,
+  },
 ];
 
 function makeClient() {
   (mockState.client.listAgents as ReturnType<typeof vi.fn>).mockResolvedValue(AGENTS);
   (mockState.client.listInbox as ReturnType<typeof vi.fn>).mockResolvedValue(INBOX);
-  (mockState.client.sendAgentMessage as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "rcpt", deliveryStatus: "delivered" });
+  (mockState.client.sendAgentMessage as ReturnType<typeof vi.fn>).mockResolvedValue({
+    id: "rcpt",
+    deliveryStatus: "delivered",
+  });
   (mockState.client.markMessageRead as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 }
 
@@ -92,7 +104,9 @@ describe("InboxView", () => {
     render(<InboxView />);
     await waitFor(() => expect(screen.getByText("Inbox")).toBeInTheDocument());
 
-    await waitFor(() => expect(screen.getByTestId("inbox-graph")).toHaveAttribute("data-peer", "a-1"), { timeout: LOAD_TIMEOUT });
+    await waitFor(() => expect(screen.getByTestId("inbox-graph")).toHaveAttribute("data-peer", "a-1"), {
+      timeout: LOAD_TIMEOUT,
+    });
     // The live/unread counts sit inside <b>, which getByText ignores, so match
     // against the element's full textContent.
     expect(screen.getByText((_, el) => el?.textContent === "1 live")).toBeInTheDocument();
@@ -132,7 +146,9 @@ describe("InboxView", () => {
     await userEvent.type(textarea, "do the thing");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
 
-    await waitFor(() => expect(mockState.client.sendAgentMessage).toHaveBeenCalledWith("a-1", "do the thing"));
+    await waitFor(() =>
+      expect(mockState.client.sendAgentMessage).toHaveBeenCalledWith("a-1", "do the thing"),
+    );
     await waitFor(() => expect(textarea).toHaveValue(""));
     // Local message appended → the graph now holds 2 messages in the thread.
     await waitFor(() => expect(screen.getByTestId("inbox-graph")).toHaveAttribute("data-thread", "2"));
@@ -156,10 +172,14 @@ describe("InboxView", () => {
 
     render(<InboxView />);
     // The message appears in both the banner and the graph canvas empty card.
-    await waitFor(() => expect(screen.getAllByText(/relay down/).length).toBeGreaterThan(0), { timeout: LOAD_TIMEOUT });
+    await waitFor(() => expect(screen.getAllByText(/relay down/).length).toBeGreaterThan(0), {
+      timeout: LOAD_TIMEOUT,
+    });
 
     await userEvent.click(screen.getAllByRole("button", { name: /retry/i })[0]);
-    await waitFor(() => expect(screen.queryByText(/relay down/)).not.toBeInTheDocument(), { timeout: LOAD_TIMEOUT });
+    await waitFor(() => expect(screen.queryByText(/relay down/)).not.toBeInTheDocument(), {
+      timeout: LOAD_TIMEOUT,
+    });
     expect(screen.getByTestId("inbox-graph")).toHaveAttribute("data-peer", "a-1");
   });
 
@@ -168,7 +188,9 @@ describe("InboxView", () => {
     (mockState.client.listInbox as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     render(<InboxView />);
-    await waitFor(() => expect(screen.getByText("No relay traffic yet")).toBeInTheDocument(), { timeout: LOAD_TIMEOUT });
+    await waitFor(() => expect(screen.getByText("No relay traffic yet")).toBeInTheDocument(), {
+      timeout: LOAD_TIMEOUT,
+    });
     expect(screen.queryByTestId("inbox-graph")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Message agent")).not.toBeInTheDocument();
   });
@@ -180,7 +202,14 @@ describe("InboxView", () => {
     act(() =>
       mockState.fire({
         type: "agent_message",
-        message: { id: "i2", fromAgentId: "a-1", toAgentId: "self", text: "fresh", timestamp: "2026-01-15T10:02:00.000Z", read: false },
+        message: {
+          id: "i2",
+          fromAgentId: "a-1",
+          toAgentId: "self",
+          text: "fresh",
+          timestamp: "2026-01-15T10:02:00.000Z",
+          read: false,
+        },
       }),
     );
 

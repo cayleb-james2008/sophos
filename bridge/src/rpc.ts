@@ -19,13 +19,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Readable, Writable } from "node:stream";
 
-import type {
-  AgentInfo,
-  AgentMessage,
-  ConnectionState,
-  IpcEvent,
-  Settings,
-} from "../../src/ipc/contract.js";
+import type { AgentInfo, ConnectionState, IpcEvent, Settings } from "../../src/ipc/contract.js";
 import {
   ConnectionHolder,
   enrichConnectionState,
@@ -37,7 +31,6 @@ import {
   listSessions as connListSessions,
   mapConnectionState,
   mapContextTree,
-  mapAgentMessage,
   mapCronJobToSchedule,
   mapSessionTree,
   writeAuthKey,
@@ -60,10 +53,6 @@ interface RpcResponse {
   id: string | number | null;
   result?: unknown;
   error?: { code: number; message: string; data?: unknown };
-}
-
-interface RpcEventEnvelope {
-  event: IpcEvent;
 }
 
 const JSON_RPC_ERROR = {
@@ -156,7 +145,17 @@ export class RpcServer {
     // params and returns either void or a typed shape.
     switch (method) {
       case "prompt": {
-        const p = requireParams<{ text: string; options?: { thinking?: string; streamingBehavior?: "steer" | "followUp"; queueIfBusy?: boolean; serviceTier?: string; transport?: string; goal?: string } }>(params, ["text"]);
+        const p = requireParams<{
+          text: string;
+          options?: {
+            thinking?: string;
+            streamingBehavior?: "steer" | "followUp";
+            queueIfBusy?: boolean;
+            serviceTier?: string;
+            transport?: string;
+            goal?: string;
+          };
+        }>(params, ["text"]);
         const conn = this.requireConn();
         const opts = p.options
           ? {
@@ -182,7 +181,15 @@ export class RpcServer {
       }
 
       case "setModel": {
-        const p = requireParams<{ provider: string; model: string; thinking?: string; serviceTier?: string; transport?: string; contextWindow?: number; maxOutputTokens?: number }>(params, ["provider", "model"]);
+        const p = requireParams<{
+          provider: string;
+          model: string;
+          thinking?: string;
+          serviceTier?: string;
+          transport?: string;
+          contextWindow?: number;
+          maxOutputTokens?: number;
+        }>(params, ["provider", "model"]);
         const conn = this.requireConn();
         // Apply runtime overrides (context window / max output tokens) to the
         // ENGINE, not just settings. The daemon re-reads ~/.prime/agent/models.json
@@ -298,7 +305,7 @@ export class RpcServer {
         const agents: AgentInfo[] = children.map((c: AgentConnectionRlmChild) => ({
           id: c.id,
           name: c.sessionName ?? c.label,
-          status: (c.status === "queued" || c.status === "running") ? "running" : "saved",
+          status: c.status === "queued" || c.status === "running" ? "running" : "saved",
           sessionId: c.activeSessionId,
         }));
         return agents;
@@ -306,7 +313,9 @@ export class RpcServer {
 
       case "attachAgent": {
         const p = requireParams<{ id: string }>(params, ["id"]);
-        const child = this.holder.getSnapshot()?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
+        const child = this.holder
+          .getSnapshot()
+          ?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
         if (!child?.activeSessionId) {
           throw rpcError(JSON_RPC_ERROR.invalidParams, `agent not found or not attachable: ${p.id}`);
         }
@@ -405,9 +414,8 @@ export class RpcServer {
         // the Tauri shell API; the daemon treats it as a transient bash run.
         const p = requireParams<{ command: string; args?: string[] }>(params, ["command"]);
         const conn = this.requireConn();
-        const full = p.args && p.args.length > 0
-          ? `${p.command} ${p.args.map(shellQuote).join(" ")}`
-          : p.command;
+        const full =
+          p.args && p.args.length > 0 ? `${p.command} ${p.args.map(shellQuote).join(" ")}` : p.command;
         await conn.executeBash(full, { transient: true });
         return undefined;
       }
@@ -435,13 +443,14 @@ export class RpcServer {
           id: c.id,
           sessionId: c.activeSessionId,
           name: c.sessionName ?? c.label,
-          status: (c.status === "queued" || c.status === "running")
-            ? "running"
-            : c.status === "done"
-              ? "done"
-              : c.status === "error" || c.status === "cancelled"
-                ? "error"
-                : "idle",
+          status:
+            c.status === "queued" || c.status === "running"
+              ? "running"
+              : c.status === "done"
+                ? "done"
+                : c.status === "error" || c.status === "cancelled"
+                  ? "error"
+                  : "idle",
           parentId: c.parentId,
           summary: c.answerPreview,
         }));
@@ -450,7 +459,9 @@ export class RpcServer {
       case "sendAgentMessage": {
         const p = requireParams<{ agentId: string; message: string }>(params, ["agentId", "message"]);
         const conn = this.requireConn();
-        const child = this.holder.getSnapshot()?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.agentId);
+        const child = this.holder
+          .getSnapshot()
+          ?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.agentId);
         const target = child?.activeSessionId;
         if (!target) {
           throw rpcError(JSON_RPC_ERROR.invalidParams, `agent ${p.agentId} not found`);
@@ -492,19 +503,14 @@ export class RpcServer {
         const p = optionalParams<{ format?: string }>(params) ?? {};
         const format = p.format === "jsonl" ? "jsonl" : "html";
         const conn = this.requireConn();
-        const exportedPath = format === "jsonl"
-          ? await conn.exportToJsonl()
-          : await conn.exportToHtml();
+        const exportedPath = format === "jsonl" ? await conn.exportToJsonl() : await conn.exportToHtml();
         return { format, exportedPath };
       }
 
       case "shareSession": {
         // The daemon has no share/upload surface. Report it gracefully so the
         // frontend can disable/explain the action rather than hard-fail.
-        throw rpcError(
-          JSON_RPC_ERROR.methodNotFound,
-          "shareSession is not yet supported by the daemon",
-        );
+        throw rpcError(JSON_RPC_ERROR.methodNotFound, "shareSession is not yet supported by the daemon");
       }
 
       case "getSessionTree": {
@@ -536,10 +542,7 @@ export class RpcServer {
             // fall through to unsupported below
           }
         }
-        throw rpcError(
-          JSON_RPC_ERROR.methodNotFound,
-          "cloneSession is not yet supported by the daemon",
-        );
+        throw rpcError(JSON_RPC_ERROR.methodNotFound, "cloneSession is not yet supported by the daemon");
       }
 
       case "nameSession": {
@@ -669,23 +672,35 @@ export class RpcServer {
 
       case "getAgentState": {
         const p = requireParams<{ id: string }>(params, ["id"]);
-        const child = this.holder.getSnapshot()?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
+        const child = this.holder
+          .getSnapshot()
+          ?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
         if (!child) throw rpcError(JSON_RPC_ERROR.invalidParams, `agent not found: ${p.id}`);
-        return this.holder.getAttachedChildState(p.id) ?? {
-          id: child.id,
-          status: child.status,
-          sessionId: child.activeSessionId,
-          model: child.model,
-          summary: child.recap ?? child.answerPreview,
-          activity: child.activity && typeof child.activity === "object" ? (child.activity as { kind?: string }).kind : undefined,
-          tokenCount: child.tokenCount,
-          toolUseCount: child.toolUseCount,
-          transcript: [],
-        };
+        return (
+          this.holder.getAttachedChildState(p.id) ?? {
+            id: child.id,
+            status: child.status,
+            sessionId: child.activeSessionId,
+            model: child.model,
+            summary: child.recap ?? child.answerPreview,
+            activity:
+              child.activity && typeof child.activity === "object"
+                ? (child.activity as { kind?: string }).kind
+                : undefined,
+            tokenCount: child.tokenCount,
+            toolUseCount: child.toolUseCount,
+            transcript: [],
+          }
+        );
       }
 
       case "createSkill": {
-        const p = requireParams<{ name: string; description: string; content: string; pythonImport?: string }>(params, ["name", "description", "content"]);
+        const p = requireParams<{
+          name: string;
+          description: string;
+          content: string;
+          pythonImport?: string;
+        }>(params, ["name", "description", "content"]);
         const conn = this.requireConn();
         const name = p.name.trim();
         if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) {
@@ -702,13 +717,22 @@ export class RpcServer {
             throw rpcError(JSON_RPC_ERROR.invalidParams, "python import must be a valid module name");
           }
           mkdirSync(resolve(root, "src", importName), { recursive: true });
-          writeFileSync(resolve(root, "src", importName, "__init__.py"), "\\nasync def run(*args, **kwargs):\\n    \\\"\\\"\\\"Implement this skill's callable here.\\\"\\\"\\\"\\n    raise NotImplementedError(\\\"Skill callable is not implemented yet\\\")\\n", "utf8");
+          writeFileSync(
+            resolve(root, "src", importName, "__init__.py"),
+            '\\nasync def run(*args, **kwargs):\\n    \\"\\"\\"Implement this skill\'s callable here.\\"\\"\\"\\n    raise NotImplementedError(\\"Skill callable is not implemented yet\\")\\n',
+            "utf8",
+          );
         }
         const settings = this.holder.getSettingsStore().get() as Settings & { skills?: string[] };
         const skills = [...new Set([...(settings.skills ?? []), root])];
         this.holder.getSettingsStore().update({ skills } as Partial<Settings>);
         await conn.reload();
-        return { name, description: p.description.trim(), filePath: resolve(root, "SKILL.md"), source: "project" };
+        return {
+          name,
+          description: p.description.trim(),
+          filePath: resolve(root, "SKILL.md"),
+          source: "project",
+        };
       }
 
       case "installSkill": {
@@ -733,7 +757,9 @@ export class RpcServer {
         const conn = this.requireConn();
         const path = resolve(p.path);
         const name = path.split(/[/\\]/).pop() ?? path;
-        const settings = this.holder.getSettingsStore().get() as Settings & { extensions?: Array<{ name: string; path: string; enabled: boolean }> };
+        const settings = this.holder.getSettingsStore().get() as Settings & {
+          extensions?: Array<{ name: string; path: string; enabled: boolean }>;
+        };
         // Dedupe by path — installing the same path twice should not create a duplicate entry (matches installSkill's `new Set` pattern).
         const existing = new Map((settings.extensions ?? []).map((e) => [e.path, e] as const));
         existing.set(path, { name, path, enabled: true });
@@ -747,7 +773,9 @@ export class RpcServer {
         const p = requireParams<{ path: string }>(params, ["path"]);
         const conn = this.requireConn();
         const path = resolve(p.path);
-        const settings = this.holder.getSettingsStore().get() as Settings & { extensions?: Array<{ name: string; path: string; enabled: boolean }> };
+        const settings = this.holder.getSettingsStore().get() as Settings & {
+          extensions?: Array<{ name: string; path: string; enabled: boolean }>;
+        };
         const extensions = (settings.extensions ?? []).filter((e) => e.path !== path);
         this.holder.getSettingsStore().update({ extensions } as Partial<Settings>);
         await conn.reload();

@@ -5,6 +5,28 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-08-17 (Beta)
+
+### Added
+- **Enforced lint + format gate** — ESLint 9 (flat config) with `typescript-eslint`, `react`, and `react-hooks`, plus Prettier. `npm run lint` (zero warnings), `npm run format:check`, and `npm run check` (lint + format + `tsc --noEmit`) now gate the codebase; wired so a dirty tree fails locally. No new cloud dependency — all local devDependencies.
+- **Stale session-lease recovery (v0.8.0)** — a conservative Rust startup sweep (`src-tauri/src/lease.rs`) that runs before the daemon spawns: it clears crash-leftover lease debris (`*.lock.stale-*` / `*.lock.candidate-*`) and reclaims full `*.lock` lease directories only when the `owner.json` PID is provably dead **and** past a 1-hour grace window. Missing/malformed owner data or an undeterminable PID liveness always means *keep* — the sweep never deletes on uncertainty. 6 Rust unit tests pin the classification.
+- **Reliability dispositions record** — `docs/reliability-0.8.0.md` documents, for each of the five named reliability bugs (goal-loop watchdog, dead-kernel detection, spend/iteration circuit-breaker, stale session-lease recovery, console-window recovery), whether it is FIXED-with-a-test or REFUTED as an upstream daemon/bridge seam — with evidence, never silently open.
+
+### Changed
+- **Version** — 0.7.2 → 0.8.0 (package.json, tauri.conf.json, Cargo.toml, Cargo.lock, README badges/installer paths, and the sidebar release literal `v0.8.0-beta`). README version strings now match the real release instead of drifting at 0.5.0.
+
+### Fixed
+- **No untyped `any` left in production code** — the three `window as any` casts (demo-mode flag + debug IPC handle) are replaced by a typed global augmentation in `src/vite-env.d.ts`.
+- **Two real React Rules-of-Hooks violations** — `useProfile()` called `useProfileState()` conditionally (`src/features/profiles/profiles.ts`) and `SessionTree` called `useMemo` after an early return (`src/features/sessions/SessionTree.tsx`); both now call hooks unconditionally, so hook order can never desynchronize across renders.
+- **Dead code removed** — unused imports and the unused `RpcEventEnvelope` type in `bridge/src/rpc.ts`, unused `resolve`/`AgentInfo` imports in `bridge/src/connection.ts`, and an unused `IpcCommand` import in the Rust shell. The `Rust contract.rs` typed mirror (`IpcCommand`/`PromptOptions`) is now explicitly documented as test-only, not a silent dead surface.
+- **Hook-dependency drift** — `useAgents` (unread refresh), `FirstRunBanner` (demo flag + stable `dismiss`), and `TrajectoryProvider` (stable `record`/`clearAll`) now declare their real dependencies; the `useVirtualList` cache-buster `version` dependency is documented rather than left unexplained.
+- **Goal-loop watchdog, dead-kernel detection, and the spend/iteration circuit-breaker** were already shipped client-side in 0.7.x (`useStall`, `useRunGuard`, `RunGuardBanner`); this release verifies each against its regression tests and records the disposition explicitly (see `docs/reliability-0.8.0.md`). The console-window story (`CREATE_NO_WINDOW` + `no-window-preload.cjs` + the kill-on-close Job Object) is likewise verified and recorded.
+
+### Tests
+- Unit — 1119 pass (up from 1118), `tsc --noEmit` clean (frontend + bridge), `eslint --max-warnings 0` clean, `prettier --check` clean. No skips, no new suppressions.
+- Rust — `cargo test` 25 pass (6 new `lease.rs` tests + the existing sidecar-recovery and native-session tests), zero warnings.
+- cua-driver e2e — **8/8 suites green** against the rebuilt release exe (SMOKE 6/6, SESSIONS 8/8, AGENTS 6/6, CHAT 11 passed, INBOX 5/5, SETTINGS 10/10, SHELL 6/6, STUDIO 7/7), fresh screenshots + run record committed (see `verify/cua/e2e-run-0.8.0.md`). The CHAT suite now drives the release build (not the debug build), and the per-suite timeout was raised 5→10 minutes because CHAT and STUDIO legitimately run ~5 minutes and a single WebView2 timing-flake retry could previously redden a passing run. Three triggers stay labelled SKIPs (CHAT steering indicator + slash click-select, SHELL keyboard-shortcuts overlay) — documented background-WebView2 input limitations, each covered by unit tests.
+
 ## [0.7.2] — 2026-08-16 (Beta)
 
 ### Added

@@ -20,14 +20,30 @@ const noop = vi.fn();
 
 describe("MessageRow", () => {
   it("renders a user message with the You header and edit action", () => {
-    render(<MessageRow message={msg({ role: "user", content: "my question" })} canEdit canRetry={false} onEdit={noop} onRetry={noop} />);
+    render(
+      <MessageRow
+        message={msg({ role: "user", content: "my question" })}
+        canEdit
+        canRetry={false}
+        onEdit={noop}
+        onRetry={noop}
+      />,
+    );
     expect(screen.getByText("You")).toBeInTheDocument();
     expect(screen.getByText("my question")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /edit and resend/i })).toBeInTheDocument();
   });
 
   it("renders an assistant message with the Sophos header and retry action", () => {
-    render(<MessageRow message={msg({ role: "assistant", content: "answer" })} canEdit={false} canRetry onEdit={noop} onRetry={noop} />);
+    render(
+      <MessageRow
+        message={msg({ role: "assistant", content: "answer" })}
+        canEdit={false}
+        canRetry
+        onEdit={noop}
+        onRetry={noop}
+      />,
+    );
     expect(screen.getByText("Sophos")).toBeInTheDocument();
     expect(screen.getByText("answer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
@@ -46,27 +62,67 @@ describe("MessageRow", () => {
   });
 
   it("shows a streaming caret while streaming with content", () => {
-    render(<MessageRow message={msg({ role: "assistant", content: "partial", status: "streaming" })} canEdit={false} canRetry={false} onEdit={noop} onRetry={noop} />);
+    render(
+      <MessageRow
+        message={msg({ role: "assistant", content: "partial", status: "streaming" })}
+        canEdit={false}
+        canRetry={false}
+        onEdit={noop}
+        onRetry={noop}
+      />,
+    );
     expect(document.querySelector(".message-row__streaming-caret")).toBeInTheDocument();
   });
 
   it("shows Working… for a streaming assistant with no content", () => {
-    render(<MessageRow message={msg({ role: "assistant", content: "", status: "streaming" })} canEdit={false} canRetry={false} onEdit={noop} onRetry={noop} />);
+    render(
+      <MessageRow
+        message={msg({ role: "assistant", content: "", status: "streaming" })}
+        canEdit={false}
+        canRetry={false}
+        onEdit={noop}
+        onRetry={noop}
+      />,
+    );
     expect(screen.getByText("Working…")).toBeInTheDocument();
   });
 
   it("marks an assistant error message with an error label", () => {
-    render(<MessageRow message={msg({ role: "assistant", content: "bad", status: "error" })} canEdit={false} canRetry onEdit={noop} onRetry={noop} />);
+    render(
+      <MessageRow
+        message={msg({ role: "assistant", content: "bad", status: "error" })}
+        canEdit={false}
+        canRetry
+        onEdit={noop}
+        onRetry={noop}
+      />,
+    );
     expect(screen.getByText("error")).toBeInTheDocument();
   });
 
   it("renders a system pill", () => {
-    render(<MessageRow message={msg({ role: "system", content: "checkpoint" })} canEdit={false} canRetry={false} onEdit={noop} onRetry={noop} />);
+    render(
+      <MessageRow
+        message={msg({ role: "system", content: "checkpoint" })}
+        canEdit={false}
+        canRetry={false}
+        onEdit={noop}
+        onRetry={noop}
+      />,
+    );
     expect(screen.getByText("checkpoint")).toBeInTheDocument();
   });
 
   it("renders a standalone tool row as a tool call card", () => {
-    render(<MessageRow message={msg({ role: "tool", content: '{"path": "a"}' })} canEdit={false} canRetry={false} onEdit={noop} onRetry={noop} />);
+    render(
+      <MessageRow
+        message={msg({ role: "tool", content: '{"path": "a"}' })}
+        canEdit={false}
+        canRetry={false}
+        onEdit={noop}
+        onRetry={noop}
+      />,
+    );
     expect(document.querySelector(".tool-call-card")).toBeInTheDocument();
   });
 });

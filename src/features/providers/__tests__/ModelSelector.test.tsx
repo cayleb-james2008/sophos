@@ -19,8 +19,20 @@ const mockModels = vi.hoisted(() => {
   return {
     providers,
     models: [
-      { id: "deepseek-v4-flash:0731-cloud", name: "DeepSeek V4 Flash", provider: "ollama-cloud", contextWindow: 1000000, supportsThinking: true },
-      { id: "minimax-m3", name: "MiniMax M3", provider: "minimax", contextWindow: 524288, supportsThinking: false },
+      {
+        id: "deepseek-v4-flash:0731-cloud",
+        name: "DeepSeek V4 Flash",
+        provider: "ollama-cloud",
+        contextWindow: 1000000,
+        supportsThinking: true,
+      },
+      {
+        id: "minimax-m3",
+        name: "MiniMax M3",
+        provider: "minimax",
+        contextWindow: 524288,
+        supportsThinking: false,
+      },
     ],
     loading: false,
     error: null as string | null,
@@ -51,8 +63,20 @@ const DEFAULT_PROVIDERS = [
 ];
 
 const DEFAULT_MODELS = [
-  { id: "deepseek-v4-flash:0731-cloud", name: "DeepSeek V4 Flash", provider: "ollama-cloud", contextWindow: 1000000, supportsThinking: true },
-  { id: "minimax-m3", name: "MiniMax M3", provider: "minimax", contextWindow: 524288, supportsThinking: false },
+  {
+    id: "deepseek-v4-flash:0731-cloud",
+    name: "DeepSeek V4 Flash",
+    provider: "ollama-cloud",
+    contextWindow: 1000000,
+    supportsThinking: true,
+  },
+  {
+    id: "minimax-m3",
+    name: "MiniMax M3",
+    provider: "minimax",
+    contextWindow: 524288,
+    supportsThinking: false,
+  },
 ];
 
 beforeEach(() => {
@@ -71,7 +95,10 @@ describe("ModelSelector", () => {
     render(<ModelSelector />);
     expect(screen.getByText("ollama-cloud")).toBeInTheDocument();
     expect(screen.getByText("DeepSeek V4 Flash")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /deepseek v4 flash/i })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: /deepseek v4 flash/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
   });
 
   it("opens the listbox and groups models by provider", async () => {
@@ -139,7 +166,9 @@ describe("ModelSelector", () => {
     const select = screen.getByDisplayValue("High");
     await user.selectOptions(select, "low");
     expect(mockModels.setThinking).toHaveBeenCalledWith("low");
-    await waitFor(() => expect(mockModels.setModel).toHaveBeenCalledWith("ollama-cloud", "deepseek-v4-flash:0731-cloud", "low"));
+    await waitFor(() =>
+      expect(mockModels.setModel).toHaveBeenCalledWith("ollama-cloud", "deepseek-v4-flash:0731-cloud", "low"),
+    );
   });
 
   it("falls back to defaults when connection state reports no model", () => {

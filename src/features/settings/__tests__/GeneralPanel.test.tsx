@@ -73,7 +73,9 @@ describe("GeneralPanel", () => {
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
-      expect(mockClient.setSettings).toHaveBeenCalledWith(expect.objectContaining({ defaultModel: "gpt-4o" }));
+      expect(mockClient.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ defaultModel: "gpt-4o" }),
+      );
     });
   });
 

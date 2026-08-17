@@ -16,12 +16,12 @@
   color-scheme: dark;
 
   /* ---- Surfaces (warm neutral scale) ---- */
-  --pa-ink: #1a1a18;            /* app background */
-  --pa-paper: #ece9e2;          /* primary text */
-  --pa-card: #232320;           /* card surface */
-  --pa-secondary: #2c2c28;     /* secondary surface */
-  --pa-overlay: #20201d;       /* popover / raised */
-  --pa-muted: #262623;         /* muted surface */
+  --pa-ink: #1a1a18; /* app background */
+  --pa-paper: #ece9e2; /* primary text */
+  --pa-card: #232320; /* card surface */
+  --pa-secondary: #2c2c28; /* secondary surface */
+  --pa-overlay: #20201d; /* popover / raised */
+  --pa-muted: #262623; /* muted surface */
   --pa-accent-surface: #33332e; /* accent surface / strong border */
 
   /* ---- RGB channels (for rgba(var(--pa-X-rgb), A) alpha variants) ---- */
@@ -40,7 +40,7 @@
   /* ---- Borders (soft hairlines) ---- */
   --pa-line: rgba(236, 233, 226, 0.09); /* subtle divider */
   --pa-line-strong: rgba(236, 233, 226, 0.16); /* stronger divider */
-  --pa-border: #3f3d38;        /* hairline border */
+  --pa-border: #3f3d38; /* hairline border */
   --pa-border-strong: #4a4842; /* hover / strong border */
 
   /* ---- Text hierarchy (opacity on paper) ---- */
@@ -171,9 +171,7 @@ body,
 }
 
 body {
-  background:
-    radial-gradient(circle at 80% -10%, var(--pa-glow), transparent 28rem),
-    var(--pa-ink);
+  background: radial-gradient(circle at 80% -10%, var(--pa-glow), transparent 28rem), var(--pa-ink);
   color: var(--pa-paper);
   font-family: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -212,7 +210,9 @@ body {
   outline: none;
 }
 .pa-focus-ring:focus-visible {
-  box-shadow: 0 0 0 1px var(--pa-ink), 0 0 0 2px var(--pa-focus-ring);
+  box-shadow:
+    0 0 0 1px var(--pa-ink),
+    0 0 0 2px var(--pa-focus-ring);
 }
 
 /* ---- Motion keyframes ---- */

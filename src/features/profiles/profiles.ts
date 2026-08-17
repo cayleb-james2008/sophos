@@ -18,7 +18,16 @@
 // composer reflects its working style, and (in demo mode) the simulated agent
 // answers in the profile's style while keeping every existing anchor string.
 
-import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useIpc } from "../../ipc/client";
 import type { Settings } from "../../ipc/contract";
 import { CODE_MODE_TOOLS } from "../code/toolRegistry";
@@ -62,7 +71,16 @@ export interface AgentProfile {
 const MODE_TOOLS: Record<ProfileMode, string[]> = {
   standard: ["shell", "file editor", "file search", "web search", "kernel", "refine"],
   minimal: ["shell", "file editor"],
-  creator: ["shell", "file editor", "file search", "web search", "kernel", "refine", "runtime inspect", "plugin experiments"],
+  creator: [
+    "shell",
+    "file editor",
+    "file search",
+    "web search",
+    "kernel",
+    "refine",
+    "runtime inspect",
+    "plugin experiments",
+  ],
   // Code mode exposes the agent's tools as a typed TypeScript SDK — the tool
   // names here mirror the built-in registry the SDK renderer emits stubs for.
   code: CODE_MODE_TOOLS,
@@ -91,7 +109,12 @@ export function compositionFor(profile: AgentProfile): ProfileComposition {
   // built-ins derive it from the runtime mode. Built-in compositions stay
   // byte-identical to v0.7.
   const custom = profile as AgentProfile & Partial<CustomProfile>;
-  if (Array.isArray(custom.tools) && Array.isArray(custom.skills) && custom.safety && typeof custom.safety.autoApprove === "boolean") {
+  if (
+    Array.isArray(custom.tools) &&
+    Array.isArray(custom.skills) &&
+    custom.safety &&
+    typeof custom.safety.autoApprove === "boolean"
+  ) {
     return {
       mode: profile.mode,
       tools: [...custom.tools],
@@ -168,13 +191,24 @@ export const CODE_PROFILE: AgentProfile = {
   tagline: "One program, many tool calls — SDK-driven",
   description:
     "The DeepSeek Harness Code mode: the agent's tools are exposed as a typed TypeScript SDK, so the agent writes one program that calls many tools in a single step instead of dozens of separate tool round-trips. The SDK renders deterministically from the live tool registry (built-ins + extension/MCP tools + skills); each run_code program decomposes into its individual tool-call cards and Trajectory entries.",
-  workingStyle: ["Typed TS SDK", "One program, many calls", "Deterministic renderer", "run_code decomposition"],
+  workingStyle: [
+    "Typed TS SDK",
+    "One program, many calls",
+    "Deterministic renderer",
+    "run_code decomposition",
+  ],
   systemPrompt:
     "You run in Code mode: every registered tool is exposed to you as a typed TypeScript SDK function. Write ONE program that calls many tools in a single step, then run it with run_code. Prefer composing tools in one program over many separate round-trips. Verify tool availability from the SDK before building, and keep the program deterministic. In demo mode, programs are simulated and decomposed into tool-call cards — never claim a live tool ran.",
   mode: "code",
 };
 
-export const PROFILES: AgentProfile[] = [GAUNTLET_PROFILE, STANDARD_PROFILE, MINIMAL_PROFILE, CREATOR_PROFILE, CODE_PROFILE];
+export const PROFILES: AgentProfile[] = [
+  GAUNTLET_PROFILE,
+  STANDARD_PROFILE,
+  MINIMAL_PROFILE,
+  CREATOR_PROFILE,
+  CODE_PROFILE,
+];
 
 export const MODES: Array<{ id: ProfileMode; label: string }> = [
   { id: "standard", label: "Standard" },
@@ -198,7 +232,12 @@ function asSelection(value: unknown): ProfileSelection {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const v = value as Record<string, unknown>;
     const id = typeof v.id === "string" ? v.id : undefined;
-    const mode = v.mode === "minimal" || v.mode === "creator" || v.mode === "code" ? v.mode : v.mode === "standard" ? "standard" : undefined;
+    const mode =
+      v.mode === "minimal" || v.mode === "creator" || v.mode === "code"
+        ? v.mode
+        : v.mode === "standard"
+          ? "standard"
+          : undefined;
     if (id && mode) return { id, mode };
   }
   return DEFAULT_SELECTION;
@@ -255,7 +294,10 @@ export interface CustomProfileImportResult {
 }
 
 /** Human phrasing of an import outcome for a VISIBLE notice (never silent). */
-export function describeImportOutcome(outcome: CustomProfileImportResult): { kind: "success" | "collision"; message: string } {
+export function describeImportOutcome(outcome: CustomProfileImportResult): {
+  kind: "success" | "collision";
+  message: string;
+} {
   const r = outcome.resolution;
   if (r) {
     return {
@@ -271,7 +313,11 @@ function useProfileState(): ProfileApi {
   const [selection, setSelection] = useState<ProfileSelection>(DEFAULT_SELECTION);
   const [loaded, setLoaded] = useState(false);
   const [customProfiles, setCustomProfiles] = useState<CustomProfile[]>([]);
-  const [studio, setStudio] = useState<{ open: boolean; editingId: string | null; draft: CustomProfile | null }>({
+  const [studio, setStudio] = useState<{
+    open: boolean;
+    editingId: string | null;
+    draft: CustomProfile | null;
+  }>({
     open: false,
     editingId: null,
     draft: null,
@@ -335,7 +381,9 @@ function useProfileState(): ProfileApi {
       if (typeof ipc.getSettings !== "function" || typeof ipc.setSettings !== "function") return;
       try {
         const settings = await ipc.getSettings().catch(() => ({}));
-        await ipc.setSettings({ ...settings, [CUSTOM_PROFILES_SETTINGS_KEY]: next } as Settings).catch(() => undefined);
+        await ipc
+          .setSettings({ ...settings, [CUSTOM_PROFILES_SETTINGS_KEY]: next } as Settings)
+          .catch(() => undefined);
       } catch {
         // Persistence is best-effort; the in-memory store still applies.
       }
@@ -352,16 +400,17 @@ function useProfileState(): ProfileApi {
     [apply],
   );
 
-  const setMode = useCallback(
-    (mode: ProfileMode) => apply({ ...selection, mode }),
-    [apply, selection],
-  );
+  const setMode = useCallback((mode: ProfileMode) => apply({ ...selection, mode }), [apply, selection]);
 
   // --- Profile Studio actions (v0.7.1) ---
 
   const openStudioCreate = useCallback(() => {
     // Seed from the current runtime mode so the studio starts where you are.
-    setStudio({ open: true, editingId: null, draft: createCustomProfileDraft({ mode: selectionRef.current.mode }) });
+    setStudio({
+      open: true,
+      editingId: null,
+      draft: createCustomProfileDraft({ mode: selectionRef.current.mode }),
+    });
   }, []);
 
   const openStudioEdit = useCallback((id: string) => {
@@ -475,14 +524,23 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
 export function useProfile(): ProfileApi {
   const ctx = useContext(ProfileContext);
-  return ctx ?? useProfileState();
+  // Rules of Hooks: call useProfileState() unconditionally, then only *use*
+  // the standalone instance when no <ProfileProvider> is mounted above. The
+  // fallback state is created either way but discarded when a provider exists.
+  const standalone = useProfileState();
+  return ctx ?? standalone;
 }
 
 /** Compact human summary of a profile's composition (shown in the picker). */
 export function compositionSummary(composition: ProfileComposition): string {
   const tools = composition.tools.length ? composition.tools.join(", ") : "no tools";
   const skills = composition.skills.length ? composition.skills.join(", ") : "no skills";
-  const safety = composition.safety.autoApprove ? "safe tools auto-approved" : `confirms: ${composition.safety.confirm.join(", ") || "nothing"}`;
-  const sdk = composition.mode === "code" ? ` · SDK: ${composition.tools.length} tools rendered as typed TypeScript stubs` : "";
+  const safety = composition.safety.autoApprove
+    ? "safe tools auto-approved"
+    : `confirms: ${composition.safety.confirm.join(", ") || "nothing"}`;
+  const sdk =
+    composition.mode === "code"
+      ? ` · SDK: ${composition.tools.length} tools rendered as typed TypeScript stubs`
+      : "";
   return `Tools: ${tools} · Skills: ${skills} · Safety: ${safety}${sdk}`;
 }
