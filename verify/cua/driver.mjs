@@ -17,10 +17,48 @@
 
 import { spawnSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import path from "node:path";
 
-/** Path to the cua-driver binary. Override with the CUA_DRIVER_BIN env var. */
-export const DRIVER_BIN =
-  process.env.CUA_DRIVER_BIN || "C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe";
+/**
+ * Resolve the cua-driver binary portably, in order:
+ *   1. CUA_DRIVER_BIN env override (explicit absolute path)
+ *   2. `where.exe cua-driver` — PATH lookup (the official installer adds the
+ *      bin dir to the user PATH, so this resolves for any Windows user)
+ *   3. The default per-user install location under %LOCALAPPDATA%
+ * Falls back to the bare `cua-driver` name so spawns surface a clear ENOENT
+ * instead of a path that only exists for one local user (the previous
+ * hardcoded C:/Users/Cayleb default broke the suite on the GitLab runner).
+ */
+function resolveDriverBin() {
+  if (process.env.CUA_DRIVER_BIN) {
+    return process.env.CUA_DRIVER_BIN;
+  }
+
+  const onPath = spawnSync("where.exe", ["cua-driver"], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  if (onPath.status === 0 && onPath.stdout.trim()) {
+    return onPath.stdout.trim().split(/\r?\n/)[0];
+  }
+
+  const defaultInstall = path.join(
+    process.env.LOCALAPPDATA || "",
+    "Programs",
+    "Cua",
+    "cua-driver",
+    "bin",
+    "cua-driver.exe",
+  );
+  if (existsSync(defaultInstall)) {
+    return defaultInstall;
+  }
+
+  return "cua-driver";
+}
+
+/** Path to the cua-driver binary (resolution order: see resolveDriverBin). */
+export const DRIVER_BIN = resolveDriverBin();
 
 /** Hard cap on any single `cua-driver` CLI call. The CLI has its own short
  * internal timeouts, but a wedged daemon/named-pipe must never be able to block

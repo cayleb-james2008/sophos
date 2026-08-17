@@ -20,9 +20,9 @@ Exit code `0` = all tests passed. Exit code `1` = at least one test failed.
 
 ## Prerequisites
 
-- The cua-driver binary at
-  `C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe`
-  (override with the `CUA_DRIVER_BIN` env var).
+- The cua-driver binary, resolved in order: `CUA_DRIVER_BIN` env override,
+  `where.exe cua-driver` (PATH), then
+  `%LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe`.
 - The Sophos desktop app release build at
   `src-tauri/target/release/prime-agent-windows.exe`.
 - Node.js (ESM `.mjs` modules).
