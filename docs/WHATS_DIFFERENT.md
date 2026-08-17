@@ -126,11 +126,7 @@ screenshot or a worker's say-so.
 | `verify/live-safety-controls.mjs` | The same, against a fresh real daemon + bridge. |
 | `verify/ipc-roundtrip.mjs` | 56/56 IPC commands round-trip over the real bridge. |
 | `verify/e2e-browser.mjs` | 36/36 browser-driven tests on the live dev server. |
-| `verify/v1-visual-match.py` + `verify/v1-reference-compare.py` | Per-view computed-style sweep + live-reference token diff. |
 | `verify/e2e-isolate.mjs` | Runs named tests in a **fresh browser each, repeated N times** to distinguish real regressions from environment flakes. |
-| `verify/v2-details-toggle.py` | 16/16 behavioural checks on the SystemBar Details panel. |
-| `verify/v3-gate-behaviour.py` | 10/10 approve-gate property checks. |
-| `verify/v3-capture-states.py` | 13/13 captures of the two UI states the default screenshots never reached. |
 
 ---
 
