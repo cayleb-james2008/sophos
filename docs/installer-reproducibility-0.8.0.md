@@ -17,6 +17,33 @@ machine-local sources that a hosted runner does not have:
 | `resources/node_modules` (external deps) | `%LOCALAPPDATA%\Prime Agent\node_modules` | ~500 MB (native `zeromq`) | ✗ machine-local |
 | `resources/node/…/node.exe` | tracked runtime dir, exe gitignored | ~90 MB | ✗ `.exe` gitignored |
 
+## The same bundle blocks the cua-e2e Rust build on SaaS runners
+
+**Date:** 2026-08-17 (pipeline #2767333331, job `cua-e2e` `15945772052`)
+
+`resources/bridge/dist` is not only an installer input — the Tauri build script
+embeds it, so the plain Rust build fails on a fresh checkout:
+
+```
+error: failed to run custom build command for `prime-agent-windows v0.8.0`
+  process didn't exit successfully: `...\src-tauri\target\debug\build\prime-agent-windows-...\build-script-build` (exit code: 1)
+  resource path `..\resources\bridge\dist` doesn't exist
+```
+
+The error appears twice in the same job, once per profile: `cargo test`
+(debug, before the 25 Rust unit tests can run) and `cargo build --release`
+(release). Because the exe never builds, the cua-driver e2e suite cannot run on
+a hosted runner at all — the job dies before the app exists.
+
+This is the same root cause as the installer blocker: `resources/bridge/dist`
+is gitignored and assembled only by `node scripts/bundle.mjs` from the
+machine-local `prime-agent-ref` checkout + AppData node_modules (see the input
+table above). The three operator steps below therefore unblock **both** the
+NSIS installer **and** the cua-e2e job. Until they land, cua-e2e can only run
+where the bundle is assembled (e.g. the local dev machine), and every
+SaaS-runner invocation of `cargo test`/`cargo build --release` in that job will
+red on this line.
+
 ## Why the daemon isn't reproducible
 
 The daemon + bridge source lives in the sibling `prime-agent-ref` checkout, and
