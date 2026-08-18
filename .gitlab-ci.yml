@@ -83,6 +83,18 @@ cua-e2e:
         exit 0
       }
     - |
+      # The gitignored runtime bundle (resources/*) is assembled on this
+      # machine's dev checkout by scripts/bundle.mjs (prime-agent-ref + AppData
+      # node_modules). The CI clone is fresh, so bootstrap its resources/ from
+      # the machine checkout — keep the dev checkout on master for the bundle
+      # to match the pushed code. robocopy exit codes 0-7 are success, >=8 real.
+      robocopy "C:\Users\Cayleb\Desktop\workspace\sophos\resources" "$CI_PROJECT_DIR\resources" /E /NFL /NDL /NJH /NJS /NP | Out-Null
+      if ($LASTEXITCODE -ge 8) {
+        Write-Host "bundle bootstrap FAILED (robocopy exit $LASTEXITCODE)"
+        exit $LASTEXITCODE
+      }
+      Write-Host "bundle bootstrapped from the machine dev checkout"
+    - |
       # Install a hermetic Rust toolchain for this job (project-local, cached).
       $env:RUSTUP_HOME = "$env:CI_PROJECT_DIR\.rustup"
       $env:CARGO_HOME = "$env:CI_PROJECT_DIR\.cargo"
