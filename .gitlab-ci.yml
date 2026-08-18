@@ -60,6 +60,10 @@ type-check-and-test:
 # machine, so cargo builds the exe for real.
 cua-e2e:
   stage: e2e
+  # Cold compile (~25 min) + 8-suite run (~18 min) + the multi-GB cargo
+  # cache archive (~30 min) routinely exceed GitLab's 1h default; the job was
+  # red twice on the archive step despite 8/8 suites passing.
+  timeout: 2h
   tags:
     - sophos-win-e2e
   variables:
