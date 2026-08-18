@@ -461,8 +461,24 @@ const tests = [
 // falling back to debug only when the release exe is absent.
 
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 
-const WORKSPACE = "C:/Users/Cayleb/Desktop/workspace/sophos";
+/** SOPHOS_REPO_DIR points at the Sophos repo root (the demo app exe lives under
+ * src-tauri/target). Throws a clear error when the path is missing so a wrong
+ * value surfaces the fix instead of a confusing ENOENT at spawn time. */
+function resolveWorkspace() {
+  const ws = process.env.SOPHOS_REPO_DIR || "C:/Users/Cayleb/Desktop/workspace/sophos";
+  if (!existsSync(ws) || !existsSync(join(ws, "src-tauri", "target"))) {
+    throw new Error(
+      `SOPHOS_REPO_DIR is not a Sophos repo with a build output: ${ws}\n` +
+        `(expected src-tauri/target under it). Set SOPHOS_REPO_DIR to the repo ` +
+        `root, or restore the default C:/Users/Cayleb/Desktop/workspace/sophos.`,
+    );
+  }
+  return ws;
+}
+
+const WORKSPACE = resolveWorkspace();
 const DEBUG_APP = `${WORKSPACE}/src-tauri/target/debug/prime-agent-windows.exe`;
 const RELEASE_APP = `${WORKSPACE}/src-tauri/target/release/prime-agent-windows.exe`;
 

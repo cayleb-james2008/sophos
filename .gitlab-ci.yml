@@ -62,6 +62,11 @@ cua-e2e:
   stage: e2e
   tags:
     - sophos-win-e2e
+  variables:
+    # CHAT suite resolves its demo-app exe via SOPHOS_REPO_DIR; point it at the
+    # CI clone so the suite tests the freshly-built exe, not the machine dev
+    # checkout (the old hardcoded default silently tested the dev checkout).
+    SOPHOS_REPO_DIR: "$CI_PROJECT_DIR"
   before_script:
     - npm ci
   script:

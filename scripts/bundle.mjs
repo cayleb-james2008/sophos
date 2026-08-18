@@ -34,6 +34,7 @@
  *
  * Env / flags:
  *   PRIME_AGENT_REF=<path>      daemon source checkout (default: Desktop\...\prime-agent-ref)
+ *   PRIME_APPDATA_ROOT=<path>   base Prime Agent portable install root (default: AppData\...\Prime Agent)
  *   PRIME_NODE_MODULES=<path>   source for the shared node_modules (default: AppData\...\Prime Agent\node_modules)
  *   PRIME_NODE_RUNTIME=<path>   source node.zip or node dir (default: tracked resources/node)
  *   --no-frontend               skip the frontend build (reuse existing dist/)
@@ -63,7 +64,9 @@ const WORKTREE_PARENT = dirname(WORKTREE);
 const PRIME_AGENT_REF_JUNCTION = join(WORKTREE_PARENT, "prime-agent-ref");
 
 // Portable sources (ships with the machine / existing install).
-const APPDATA_ROOT = "C:/Users/Cayleb/AppData/Local/Prime Agent";
+// PRIME_APPDATA_ROOT overrides the base install root; PRIME_NODE_MODULES /
+// PRIME_NODE_RUNTIME override the two sources derived from it individually.
+const APPDATA_ROOT = process.env.PRIME_APPDATA_ROOT || "C:/Users/Cayleb/AppData/Local/Prime Agent";
 const DEFAULT_NODE_MODULES_SRC = process.env.PRIME_NODE_MODULES ||
   join(APPDATA_ROOT, "node_modules");
 const DEFAULT_NODE_RUNTIME_SRC = process.env.PRIME_NODE_RUNTIME ||
@@ -194,6 +197,14 @@ async function main() {
     log("yellow", "⚙ skipping node_modules staging (--no-node-modules)");
   } else {
     if (!existsSync(resNm)) {
+      if (!existsSync(DEFAULT_NODE_MODULES_SRC)) {
+        throw new Error(
+          `node_modules source not found: ${DEFAULT_NODE_MODULES_SRC}\n` +
+            `(expected a Prime Agent portable install's node_modules). Set ` +
+            `PRIME_NODE_MODULES to a node_modules dir, PRIME_APPDATA_ROOT to the ` +
+            `install root, or restore the default C:/Users/Cayleb/AppData/Local/Prime Agent.`,
+        );
+      }
       log("yellow", "⚡ copying shared node_modules from", DEFAULT_NODE_MODULES_SRC, "(~500 MB, one-time)");
       // Non-dereferenced copy: AppData ship is real dirs (portable).
       await cp(DEFAULT_NODE_MODULES_SRC, resNm, { recursive: true });
