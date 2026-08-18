@@ -111,8 +111,14 @@ cua-e2e:
       cargo test
       cargo build --release
       Pop-Location
-      # Install cua-driver (binary at %LOCALAPPDATA%\Programs\Cua\cua-driver\bin\).
-      irm https://cua.ai/driver/install.ps1 | iex
+      # cua-driver is already installed on this machine; only run the
+      # installer if it is missing. (The installer prompts interactively when
+      # it finds a stale daemon, which cannot work in CI — Read-Host fails.)
+      if (-not (Get-Command cua-driver -ErrorAction SilentlyContinue)) {
+        irm https://cua.ai/driver/install.ps1 | iex
+      } else {
+        Write-Host "cua-driver already installed: $((Get-Command cua-driver).Source)"
+      }
       # Run all cua-driver e2e test suites. Exits 0 on all-pass, 1 on any fail.
       node verify/cua/run-all.mjs
   # NO allow_failure — failures block the pipeline.
