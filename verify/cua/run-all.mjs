@@ -15,10 +15,11 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { killLingeringAppInstances, restartDaemon } from "./cleanup.mjs";
+import { killLingeringAppInstances, restartDaemon, checkDrift } from "./cleanup.mjs";
+import { stopDaemon } from "./driver.mjs";
 
 /** Ordered suites, in the order they must run. */
-const SUITES = [
+const ALL_SUITES = [
   { file: "smoke.mjs", label: "SMOKE" },
   { file: "sessions.test.mjs", label: "SESSIONS" },
   { file: "agents.test.mjs", label: "AGENTS" },
@@ -28,6 +29,18 @@ const SUITES = [
   { file: "shell.test.mjs", label: "SHELL" },
   { file: "studio.test.mjs", label: "STUDIO" },
 ];
+
+/**
+ * Optional suite filter for focused runs: a comma-separated list of suite
+ * labels (case-insensitive), e.g. `CUA_SUITE_FILTER=SMOKE,STUDIO`. When set,
+ * only the named suites run (still in canonical order) and the final teardown
+ * still runs, so a slice exercises the same cleanup path as a full run.
+ */
+const SUITE_FILTER = (process.env.CUA_SUITE_FILTER || "")
+  .split(",")
+  .map((s) => s.trim().toUpperCase())
+  .filter(Boolean);
+const SUITES = SUITE_FILTER.length ? ALL_SUITES.filter((s) => SUITE_FILTER.includes(s.label)) : ALL_SUITES;
 
 /** Hard per-suite timeout (ms). The slowest suites legitimately take ~5 minutes
  * (CHAT ~4.5min, STUDIO ~5min, SHELL's theme retry loop under WebView2 timing
@@ -172,7 +185,16 @@ async function main() {
   console.log("================================================");
   console.log("  cua-driver e2e — run-all");
   console.log(`  ${SUITES.length} suites, ${SUITE_TIMEOUT_MS / 1000}s timeout each`);
+  if (SUITE_FILTER.length) {
+    console.log(`  filter: ${SUITE_FILTER.join(", ")} (subset of ${ALL_SUITES.length})`);
+  }
   console.log("================================================");
+
+  if (SUITES.length === 0) {
+    console.error(`  ! CUA_SUITE_FILTER matched no suites (got: ${SUITE_FILTER.join(", ")})`);
+    process.exitCode = 1;
+    return;
+  }
 
   const results = [];
   for (const suite of SUITES) {
@@ -185,6 +207,27 @@ async function main() {
       `<<< ${suite.label}: ${result.ok ? "PASS" : "FAIL"} (${result.reason}, ${result.elapsedMs}ms)`,
     );
   }
+
+  // Final teardown after the LAST suite: unlike the per-suite teardown (which
+  // restarts the daemon for isolation), this stops the daemon the run started
+  // and re-sweeps the app + Sophos WebView2, so a finished run leaves no
+  // Sophos process behind. The drift line makes any leftover (e.g. an
+  // elevated instance Stop-Process cannot touch) visible in the run output
+  // instead of silently accumulating between runs.
+  console.log("\n  … final teardown: killing app + WebView2 children, stopping daemon");
+  try {
+    await killLingeringAppInstances();
+    stopDaemon();
+  } catch (err) {
+    console.error(`  ! final teardown failed (non-fatal): ${err.message}`);
+  }
+  const drift = checkDrift();
+  const driftClean = drift.apps === 0 && drift.webviews === 0 && !drift.daemonRunning;
+  console.log(
+    driftClean
+      ? `  drift: clean (app ${drift.apps}, Sophos WebView2 ${drift.webviews}, daemon stopped)`
+      : `  drift: LEFTOVER (app ${drift.apps}, Sophos WebView2 ${drift.webviews}, daemon ${drift.daemonRunning ? "RUNNING" : "stopped"})`,
+  );
 
   const totalMs = Date.now() - startedAt;
   const passed = results.filter((r) => r.ok).length;

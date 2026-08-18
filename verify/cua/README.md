@@ -113,6 +113,16 @@ handles launch/teardown and reports pass/fail per test.
 - `node verify/cua/shell.test.mjs` — cua-driver e2e for ALL shell / global features.
 - `node verify/cua/run-all.mjs` — runs all 8 suites in sequence, exits 0 on all-pass / 1 on any fail.
 - `npm run test:cua` — same as above (npm script alias).
+- `CUA_SUITE_FILTER=SMOKE,STUDIO node verify/cua/run-all.mjs` — runs only the
+  named suites (comma-separated labels, case-insensitive) for focused
+  re-verification; the same per-suite + final teardown runs, so a slice
+  exercises the identical cleanup path as a full run.
+- Teardown: after **every** suite run-all kills the app + Sophos WebView2
+  (matched by the `com.sophos.app` Tauri identifier) and restarts the daemon;
+  after the **last** suite it stops the daemon and prints a `drift:` line
+  (clean when app 0 / Sophos WebView2 0 / daemon stopped). An elevated
+  instance that cannot be force-stopped is reported loudly rather than
+  silently dropped.
 - `npx vitest run` — 1113 unit tests pass (no regressions).
 - `npx tsc --noEmit` — clean.
 
