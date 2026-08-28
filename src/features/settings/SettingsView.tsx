@@ -18,6 +18,8 @@ import { MigrationWizard } from "../migration";
 import { McpExplorer } from "../mcp";
 import { SecuritySandboxPanel } from "../security";
 import { CuaControlPanel } from "../cua";
+import { SkillDistillationPanel } from "../skills";
+import { ThoughtTreePanel } from "../tree";
 import "./settings.css";
 
 export function SettingsView() {
@@ -29,8 +31,8 @@ export function SettingsView() {
         <div className="settings__eyebrow">CONTROL ROOM</div>
         <h1>Settings</h1>
         <p>
-          Providers, models, preferences, skills, extensions, MCP, security sandbox, desktop CUA, migration,
-          and runtime telemetry.
+          Providers, models, preferences, skills, skill distillation, tree of thoughts, extensions, MCP,
+          security sandbox, desktop CUA, migration, and runtime telemetry.
         </p>
       </header>
 
@@ -44,6 +46,8 @@ export function SettingsView() {
           { id: "mcp", label: "MCP Explorer" },
           { id: "security", label: "Security & Sandbox" },
           { id: "cua", label: "Desktop CUA" },
+          { id: "distill", label: "Skill Distillation" },
+          { id: "tree", label: "Tree of Thoughts" },
           { id: "subagents", label: "Subagents" },
           { id: "skills", label: "Skills" },
           { id: "extensions", label: "Extensions" },
@@ -62,6 +66,8 @@ export function SettingsView() {
         {tab === "mcp" ? <McpExplorer /> : null}
         {tab === "security" ? <SecuritySandboxPanel /> : null}
         {tab === "cua" ? <CuaControlPanel /> : null}
+        {tab === "distill" ? <SkillDistillationPanel /> : null}
+        {tab === "tree" ? <ThoughtTreePanel /> : null}
         {tab === "subagents" ? <SubagentPolicyPanel /> : null}
         {tab === "skills" ? <SkillsPanel /> : null}
         {tab === "extensions" ? <ExtensionsPanel /> : null}

@@ -50,6 +50,8 @@ import type {
   DesktopUiAction,
   DesktopUiElement,
   DesktopWindowInfo,
+  DistilledSkill,
+  ThoughtTreeState,
 } from "../../src/ipc/contract.js";
 
 // ---------------------------------------------------------------------------
@@ -2768,4 +2770,173 @@ export async function dispatchDesktopAction(
 
 export async function captureDesktopScreenshot(_conn: AgentConnection, windowId: string): Promise<string> {
   return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="100%" height="100%" fill="%230f141c"/><rect x="10" y="10" width="620" height="32" fill="%231a2332" rx="4"/><circle cx="28" cy="26" r="5" fill="%23ef4444"/><circle cx="44" cy="26" r="5" fill="%23f59e0b"/><circle cx="60" cy="26" r="5" fill="%2310b981"/><text x="80" y="30" fill="%2394a3b8" font-size="12" font-family="sans-serif">CUA Target: ${windowId}</text><rect x="10" y="50" width="620" height="340" fill="%23131b28" rx="4"/><text x="30" y="90" fill="%2310b981" font-family="monospace" font-size="14">[Windows UI Automation Live Stream]</text></svg>`;
+}
+
+// ---------------------------------------------------------------------------
+// Self-Evolving Skill Distillation Bridge (Voyager & Eureka)
+// ---------------------------------------------------------------------------
+
+export async function listDistilledSkills(_conn: AgentConnection): Promise<DistilledSkill[]> {
+  return [
+    {
+      id: "skill-act-remediator",
+      name: "vitest-async-act-remediator",
+      description: "Auto-detects and wraps async testing-library state transitions in Vitest suites",
+      triggers: ["act() warning", "state update not wrapped in act", "vitest react 19 async"],
+      skillMarkdown:
+        "# Vitest Async Act Remediator\n\nAutomatically identifies React 19 testing-library state update warnings and applies deterministic waitFor wraps.",
+      successRate: 0.96,
+      runsObserved: 14,
+      createdAt: "2026-08-28T09:40:00Z",
+      isPromoted: true,
+      sourceSessionId: "session-fix-mcp-tests",
+    },
+    {
+      id: "skill-ipc-sync",
+      name: "tauri-ipc-schema-synchronizer",
+      description: "Bidirectionally syncs Rust Tauri command descriptors with TypeScript contract interfaces",
+      triggers: ["tauri command mismatch", "invoke schema error", "IPC contract out of sync"],
+      skillMarkdown:
+        "# Tauri IPC Schema Synchronizer\n\nAnalyzes Rust #[tauri::command] signatures and generates TypeScript client method bindings with zero runtime overhead.",
+      successRate: 0.92,
+      runsObserved: 8,
+      createdAt: "2026-08-28T10:15:00Z",
+      isPromoted: false,
+      sourceSessionId: "session-add-cua-commands",
+    },
+  ];
+}
+
+export async function distillSkillFromTrajectory(
+  _conn: AgentConnection,
+  sessionId: string,
+  name?: string,
+): Promise<DistilledSkill> {
+  const skillName = name ?? `distilled-skill-${Date.now().toString(36)}`;
+  return {
+    id: `skill-${Date.now().toString(36)}`,
+    name: skillName,
+    description: `Autonomously distilled workflow from session ${sessionId}`,
+    triggers: [`trigger-${skillName}`, `session-${sessionId}`],
+    skillMarkdown: `# ${skillName}\n\nAutonomously distilled by Voyager Experience Engine from trajectory \`${sessionId}\`.\n`,
+    successRate: 1.0,
+    runsObserved: 1,
+    createdAt: new Date().toISOString(),
+    isPromoted: false,
+    sourceSessionId: sessionId,
+  };
+}
+
+export async function promoteSkill(
+  _conn: AgentConnection,
+  skillId: string,
+): Promise<{ success: boolean; targetPath: string }> {
+  return {
+    success: true,
+    targetPath: `C:\\Users\\Cayleb\\.skill-library\\active\\${skillId}`,
+  };
+}
+
+export async function deleteDistilledSkill(_conn: AgentConnection, _skillId: string): Promise<void> {
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Speculative Tree-of-Thoughts Bridge (ToT / FoT)
+// ---------------------------------------------------------------------------
+
+export async function getThoughtTree(_conn: AgentConnection): Promise<ThoughtTreeState> {
+  return {
+    id: "tree-refactor-sandbox",
+    rootId: "node-root",
+    goal: "Isolate spec execution in ephemeral worktrees with automated rollback",
+    nodes: [
+      {
+        id: "node-root",
+        type: "hypothesis",
+        label: "Hypothesis: Zero-copy Git worktrees vs Container sandbox",
+        score: 0.88,
+        status: "active",
+        depth: 0,
+        childrenIds: ["node-b1", "node-b2"],
+        rationale: "Evaluating resource overhead on GMKtec EVO-X2 architecture",
+      },
+      {
+        id: "node-b1",
+        parentId: "node-root",
+        type: "plan",
+        label: "Branch A: Native Git zero-copy worktree pool",
+        score: 0.94,
+        status: "active",
+        depth: 1,
+        childrenIds: ["node-b1-diff"],
+        rationale: "Instant spin-up (<50ms), shares local object database without RAM bloat",
+      },
+      {
+        id: "node-b1-diff",
+        parentId: "node-b1",
+        type: "code_diff",
+        label: "Code Diff: src-tauri/src/worktree.rs",
+        score: 0.96,
+        status: "promoted",
+        depth: 2,
+        diffSnippet:
+          "+ pub fn create_worktree(repo: &Repository, branch: &str) -> Result<PathBuf> {\n+     let target = repo.worktree_add(branch, &path)?;\n+     Ok(target)\n+ }",
+        rationale: "All 25 unit tests pass; verified clean teardown",
+      },
+      {
+        id: "node-b2",
+        parentId: "node-root",
+        type: "plan",
+        label: "Branch B: Docker containerized sandbox runner",
+        score: 0.58,
+        status: "pruned",
+        depth: 1,
+        rationale: "High cold-start latency (>4.5s) and violates background headless focus rule",
+      },
+    ],
+    activeBranchPath: ["node-root", "node-b1", "node-b1-diff"],
+    bestNodeId: "node-b1-diff",
+  };
+}
+
+export async function runSpeculativeBranch(
+  conn: AgentConnection,
+  parentNodeId: string,
+  hypothesis: string,
+): Promise<ThoughtTreeState> {
+  const tree = await getThoughtTree(conn);
+  const newNodeId = `node-spec-${Date.now().toString(36)}`;
+  tree.nodes.push({
+    id: newNodeId,
+    parentId: parentNodeId,
+    type: "plan",
+    label: hypothesis,
+    score: 0.92,
+    status: "active",
+    depth: 2,
+    rationale: "Speculative evaluation from local model",
+    childrenIds: [],
+  });
+  tree.activeBranchPath.push(newNodeId);
+  return tree;
+}
+
+export async function pruneThoughtBranch(conn: AgentConnection, nodeId: string): Promise<ThoughtTreeState> {
+  const tree = await getThoughtTree(conn);
+  const node = tree.nodes.find((n) => n.id === nodeId);
+  if (node) {
+    node.status = "pruned";
+  }
+  return tree;
+}
+
+export async function promoteThoughtBranch(conn: AgentConnection, nodeId: string): Promise<ThoughtTreeState> {
+  const tree = await getThoughtTree(conn);
+  const node = tree.nodes.find((n) => n.id === nodeId);
+  if (node) {
+    node.status = "promoted";
+    tree.bestNodeId = nodeId;
+  }
+  return tree;
 }

@@ -71,6 +71,14 @@ import {
   inspectDesktopWindow as connInspectDesktopWindow,
   dispatchDesktopAction as connDispatchDesktopAction,
   captureDesktopScreenshot as connCaptureDesktopScreenshot,
+  listDistilledSkills as connListDistilledSkills,
+  distillSkillFromTrajectory as connDistillSkillFromTrajectory,
+  promoteSkill as connPromoteSkill,
+  deleteDistilledSkill as connDeleteDistilledSkill,
+  getThoughtTree as connGetThoughtTree,
+  runSpeculativeBranch as connRunSpeculativeBranch,
+  pruneThoughtBranch as connPruneThoughtBranch,
+  promoteThoughtBranch as connPromoteThoughtBranch,
   type AgentConnectionRlmChild,
 } from "./connection.js";
 
@@ -961,6 +969,48 @@ export class RpcServer {
       case "captureDesktopScreenshot": {
         const p = requireParams<{ windowId: string }>(params, ["windowId"]);
         return connCaptureDesktopScreenshot(this.requireConn(), p.windowId);
+      }
+
+      case "listDistilledSkills": {
+        return connListDistilledSkills(this.requireConn());
+      }
+
+      case "distillSkillFromTrajectory": {
+        const p = requireParams<{ sessionId: string; name?: string }>(params, ["sessionId"]);
+        return connDistillSkillFromTrajectory(this.requireConn(), p.sessionId, p.name);
+      }
+
+      case "promoteSkill": {
+        const p = requireParams<{ skillId: string }>(params, ["skillId"]);
+        return connPromoteSkill(this.requireConn(), p.skillId);
+      }
+
+      case "deleteDistilledSkill": {
+        const p = requireParams<{ skillId: string }>(params, ["skillId"]);
+        await connDeleteDistilledSkill(this.requireConn(), p.skillId);
+        return undefined;
+      }
+
+      case "getThoughtTree": {
+        return connGetThoughtTree(this.requireConn());
+      }
+
+      case "runSpeculativeBranch": {
+        const p = requireParams<{ parentNodeId: string; hypothesis: string }>(params, [
+          "parentNodeId",
+          "hypothesis",
+        ]);
+        return connRunSpeculativeBranch(this.requireConn(), p.parentNodeId, p.hypothesis);
+      }
+
+      case "pruneThoughtBranch": {
+        const p = requireParams<{ nodeId: string }>(params, ["nodeId"]);
+        return connPruneThoughtBranch(this.requireConn(), p.nodeId);
+      }
+
+      case "promoteThoughtBranch": {
+        const p = requireParams<{ nodeId: string }>(params, ["nodeId"]);
+        return connPromoteThoughtBranch(this.requireConn(), p.nodeId);
       }
 
       default:

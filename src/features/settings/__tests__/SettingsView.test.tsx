@@ -24,6 +24,11 @@ vi.mock("../ExtensionsPanel", async () => ({ ExtensionsPanel: () => <div>extensi
 vi.mock("../AdvancedPanel", async () => ({ AdvancedPanel: () => <div>advanced-stub</div> }));
 vi.mock("../LongRunningPanel", async () => ({ LongRunningPanel: () => <div>longrunning-stub</div> }));
 vi.mock("../AboutPanel", async () => ({ AboutPanel: () => <div>about-stub</div> }));
+vi.mock("../../mcp", async () => ({ McpExplorer: () => <div>mcp-stub</div> }));
+vi.mock("../../security", async () => ({ SecuritySandboxPanel: () => <div>security-stub</div> }));
+vi.mock("../../cua", async () => ({ CuaControlPanel: () => <div>cua-stub</div> }));
+vi.mock("../../skills", async () => ({ SkillDistillationPanel: () => <div>distill-stub</div> }));
+vi.mock("../../tree", async () => ({ ThoughtTreePanel: () => <div>tree-stub</div> }));
 
 describe("SettingsView", () => {
   beforeEach(() => {
@@ -59,11 +64,17 @@ describe("SettingsView", () => {
     for (const label of [
       "General",
       "Providers",
+      "MCP Explorer",
+      "Security & Sandbox",
+      "Desktop CUA",
+      "Skill Distillation",
+      "Tree of Thoughts",
       "Subagents",
       "Skills",
       "Extensions",
       "Advanced",
       "Long-running",
+      "Import",
       "About",
     ]) {
       expect(screen.getByRole("tab", { name: new RegExp(label, "i") })).toBeInTheDocument();

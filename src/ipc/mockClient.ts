@@ -55,6 +55,9 @@ import type {
   DesktopUiAction,
   DesktopUiElement,
   DesktopWindowInfo,
+  DistilledSkill,
+  ThoughtNode,
+  ThoughtTreeState,
 } from "./contract";
 
 // ---------------------------------------------------------------------------
@@ -2043,5 +2046,179 @@ export class MockIpcClient implements IpcClient {
   async captureDesktopScreenshot(windowId: string): Promise<string> {
     const win = this.mockWindows.find((w) => w.id === windowId) ?? this.mockWindows[0];
     return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="100%" height="100%" fill="%230f141c"/><rect x="10" y="10" width="620" height="32" fill="%231a2332" rx="4"/><circle cx="28" cy="26" r="5" fill="%23ef4444"/><circle cx="44" cy="26" r="5" fill="%23f59e0b"/><circle cx="60" cy="26" r="5" fill="%2310b981"/><text x="80" y="30" fill="%2394a3b8" font-size="12" font-family="sans-serif">${win.title}</text><rect x="10" y="50" width="160" height="340" fill="%23161f2e" rx="4"/><rect x="180" y="50" width="450" height="340" fill="%23131b28" rx="4"/><text x="200" y="80" fill="%2310b981" font-family="monospace" font-size="12">[UIA Scanner Active]</text><text x="200" y="110" fill="%23e2e8f0" font-family="monospace" font-size="14">${win.processName} (PID: ${win.pid})</text></svg>`;
+  }
+
+  // -------------------------------------------------------------------------
+  // Self-Evolving Skill Distillation Mock (Voyager & Eureka)
+  // -------------------------------------------------------------------------
+
+  private mockDistilledSkills: DistilledSkill[] = [
+    {
+      id: "skill-act-remediator",
+      name: "vitest-async-act-remediator",
+      description: "Auto-detects and wraps async testing-library state transitions in Vitest suites",
+      triggers: ["act() warning", "state update not wrapped in act", "vitest react 19 async"],
+      skillMarkdown:
+        "# Vitest Async Act Remediator\n\nAutomatically identifies React 19 testing-library state update warnings and applies deterministic waitFor wraps.",
+      successRate: 0.96,
+      runsObserved: 14,
+      createdAt: "2026-08-28T09:40:00Z",
+      isPromoted: true,
+      sourceSessionId: "session-fix-mcp-tests",
+    },
+    {
+      id: "skill-ipc-sync",
+      name: "tauri-ipc-schema-synchronizer",
+      description: "Bidirectionally syncs Rust Tauri command descriptors with TypeScript contract interfaces",
+      triggers: ["tauri command mismatch", "invoke schema error", "IPC contract out of sync"],
+      skillMarkdown:
+        "# Tauri IPC Schema Synchronizer\n\nAnalyzes Rust #[tauri::command] signatures and generates TypeScript client method bindings with zero runtime overhead.",
+      successRate: 0.92,
+      runsObserved: 8,
+      createdAt: "2026-08-28T10:15:00Z",
+      isPromoted: false,
+      sourceSessionId: "session-add-cua-commands",
+    },
+  ];
+
+  async listDistilledSkills(): Promise<DistilledSkill[]> {
+    return this.mockDistilledSkills;
+  }
+
+  async distillSkillFromTrajectory(sessionId: string, name?: string): Promise<DistilledSkill> {
+    const skillName = name ?? `distilled-skill-${Date.now().toString(36)}`;
+    const newSkill: DistilledSkill = {
+      id: `skill-${Date.now().toString(36)}`,
+      name: skillName,
+      description: `Autonomously distilled workflow from session ${sessionId}`,
+      triggers: [`trigger-${skillName}`, `session-${sessionId}`],
+      skillMarkdown: `# ${skillName}\n\nAutonomously distilled by Voyager Experience Engine from trajectory \`${sessionId}\`.\n\n## Verified Steps\n1. Inspect AST\n2. Run targeted test\n3. Apply verified patch\n`,
+      successRate: 1.0,
+      runsObserved: 1,
+      createdAt: new Date().toISOString(),
+      isPromoted: false,
+      sourceSessionId: sessionId,
+    };
+    this.mockDistilledSkills.unshift(newSkill);
+    return newSkill;
+  }
+
+  async promoteSkill(skillId: string): Promise<{ success: boolean; targetPath: string }> {
+    const target = this.mockDistilledSkills.find((s) => s.id === skillId);
+    if (target) {
+      target.isPromoted = true;
+    }
+    return {
+      success: true,
+      targetPath: `C:\\Users\\Cayleb\\.skill-library\\active\\${target?.name ?? "distilled-skill"}`,
+    };
+  }
+
+  async deleteDistilledSkill(skillId: string): Promise<void> {
+    this.mockDistilledSkills = this.mockDistilledSkills.filter((s) => s.id !== skillId);
+  }
+
+  // -------------------------------------------------------------------------
+  // Speculative Tree-of-Thoughts Mock (ToT / FoT)
+  // -------------------------------------------------------------------------
+
+  private mockThoughtTree: ThoughtTreeState = {
+    id: "tree-refactor-sandbox",
+    rootId: "node-root",
+    goal: "Isolate spec execution in ephemeral worktrees with automated rollback",
+    nodes: [
+      {
+        id: "node-root",
+        type: "hypothesis",
+        label: "Hypothesis: Zero-copy Git worktrees vs Container sandbox",
+        score: 0.88,
+        status: "active",
+        depth: 0,
+        childrenIds: ["node-b1", "node-b2"],
+        rationale: "Evaluating resource overhead on GMKtec EVO-X2 architecture",
+      },
+      {
+        id: "node-b1",
+        parentId: "node-root",
+        type: "plan",
+        label: "Branch A: Native Git zero-copy worktree pool",
+        score: 0.94,
+        status: "active",
+        depth: 1,
+        childrenIds: ["node-b1-diff"],
+        rationale: "Instant spin-up (<50ms), shares local object database without RAM bloat",
+      },
+      {
+        id: "node-b1-diff",
+        parentId: "node-b1",
+        type: "code_diff",
+        label: "Code Diff: src-tauri/src/worktree.rs",
+        score: 0.96,
+        status: "promoted",
+        depth: 2,
+        diffSnippet:
+          "+ pub fn create_worktree(repo: &Repository, branch: &str) -> Result<PathBuf> {\n+     let target = repo.worktree_add(branch, &path)?;\n+     Ok(target)\n+ }",
+        rationale: "All 25 unit tests pass; verified clean teardown",
+      },
+      {
+        id: "node-b2",
+        parentId: "node-root",
+        type: "plan",
+        label: "Branch B: Docker containerized sandbox runner",
+        score: 0.58,
+        status: "pruned",
+        depth: 1,
+        rationale: "High cold-start latency (>4.5s) and violates background headless focus rule",
+      },
+    ],
+    activeBranchPath: ["node-root", "node-b1", "node-b1-diff"],
+    bestNodeId: "node-b1-diff",
+  };
+
+  async getThoughtTree(): Promise<ThoughtTreeState> {
+    return this.mockThoughtTree;
+  }
+
+  async runSpeculativeBranch(parentNodeId: string, hypothesis: string): Promise<ThoughtTreeState> {
+    const parent = this.mockThoughtTree.nodes.find((n) => n.id === parentNodeId);
+    const newNodeId = `node-spec-${Date.now().toString(36)}`;
+    const newNode: ThoughtNode = {
+      id: newNodeId,
+      parentId: parentNodeId,
+      type: "plan",
+      label: hypothesis,
+      score: 0.91,
+      status: "active",
+      depth: (parent?.depth ?? 0) + 1,
+      rationale: "Speculative candidate generated by local model brain",
+      childrenIds: [],
+    };
+    if (parent) {
+      parent.childrenIds = [...(parent.childrenIds ?? []), newNodeId];
+    }
+    this.mockThoughtTree.nodes.push(newNode);
+    this.mockThoughtTree.activeBranchPath = [...this.mockThoughtTree.activeBranchPath, newNodeId];
+    return this.mockThoughtTree;
+  }
+
+  async pruneThoughtBranch(nodeId: string): Promise<ThoughtTreeState> {
+    const markPruned = (id: string) => {
+      const node = this.mockThoughtTree.nodes.find((n) => n.id === id);
+      if (node) {
+        node.status = "pruned";
+        node.childrenIds?.forEach(markPruned);
+      }
+    };
+    markPruned(nodeId);
+    return this.mockThoughtTree;
+  }
+
+  async promoteThoughtBranch(nodeId: string): Promise<ThoughtTreeState> {
+    const node = this.mockThoughtTree.nodes.find((n) => n.id === nodeId);
+    if (node) {
+      node.status = "promoted";
+      this.mockThoughtTree.bestNodeId = nodeId;
+    }
+    return this.mockThoughtTree;
   }
 }

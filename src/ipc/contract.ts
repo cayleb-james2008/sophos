@@ -111,7 +111,15 @@ export type IpcCommand =
   | { method: "listDesktopWindows"; params: Record<string, never> }
   | { method: "inspectDesktopWindow"; params: { windowId: string } }
   | { method: "dispatchDesktopAction"; params: { windowId: string; action: DesktopUiAction } }
-  | { method: "captureDesktopScreenshot"; params: { windowId: string } };
+  | { method: "captureDesktopScreenshot"; params: { windowId: string } }
+  | { method: "listDistilledSkills"; params: Record<string, never> }
+  | { method: "distillSkillFromTrajectory"; params: { sessionId: string; name?: string } }
+  | { method: "promoteSkill"; params: { skillId: string } }
+  | { method: "deleteDistilledSkill"; params: { skillId: string } }
+  | { method: "getThoughtTree"; params: Record<string, never> }
+  | { method: "runSpeculativeBranch"; params: { parentNodeId: string; hypothesis: string } }
+  | { method: "pruneThoughtBranch"; params: { nodeId: string } }
+  | { method: "promoteThoughtBranch"; params: { nodeId: string } };
 
 export interface PromptOptions {
   thinking?: string;
@@ -883,4 +891,49 @@ export interface DesktopActionResult {
   durationMs: number;
   message: string;
   screenshot?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Self-Evolving Skill Distillation Engine (Voyager & Eureka)
+// ---------------------------------------------------------------------------
+
+export interface DistilledSkill {
+  id: string;
+  name: string;
+  description: string;
+  triggers: string[];
+  skillMarkdown: string;
+  successRate: number;
+  runsObserved: number;
+  createdAt: string;
+  isPromoted: boolean;
+  sourceSessionId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Speculative Tree-of-Thoughts Execution Engine (ToT / FoT)
+// ---------------------------------------------------------------------------
+
+export type ThoughtNodeType = "hypothesis" | "plan" | "code_diff" | "test_run" | "eval_verdict";
+
+export interface ThoughtNode {
+  id: string;
+  parentId?: string;
+  type: ThoughtNodeType;
+  label: string;
+  score: number;
+  status: "exploring" | "active" | "pruned" | "promoted";
+  diffSnippet?: string;
+  rationale?: string;
+  depth: number;
+  childrenIds?: string[];
+}
+
+export interface ThoughtTreeState {
+  id: string;
+  rootId: string;
+  goal: string;
+  nodes: ThoughtNode[];
+  activeBranchPath: string[];
+  bestNodeId?: string;
 }

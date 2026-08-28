@@ -86,4 +86,38 @@ describe("Modern Harness Features (MCP, Security Sandbox, Squad Workflows, Token
     const snap = await client.captureDesktopScreenshot("win-sophos");
     expect(snap).toContain("data:image/svg+xml");
   });
+
+  it("distills skills from trajectories and promotes to canonical library", async () => {
+    const skills = await client.listDistilledSkills();
+    expect(skills.length).toBeGreaterThanOrEqual(2);
+    expect(skills.some((s) => s.name === "vitest-async-act-remediator")).toBe(true);
+
+    const distilled = await client.distillSkillFromTrajectory("session-test-run", "new-auto-skill");
+    expect(distilled.name).toBe("new-auto-skill");
+    expect(distilled.isPromoted).toBe(false);
+
+    const promotion = await client.promoteSkill(distilled.id);
+    expect(promotion.success).toBe(true);
+    expect(promotion.targetPath).toContain(".skill-library");
+
+    await client.deleteDistilledSkill(distilled.id);
+    const updated = await client.listDistilledSkills();
+    expect(updated.some((s) => s.id === distilled.id)).toBe(false);
+  });
+
+  it("navigates speculative thought trees, explores branches, and promotes winner", async () => {
+    const tree = await client.getThoughtTree();
+    expect(tree.nodes.length).toBeGreaterThanOrEqual(3);
+    expect(tree.rootId).toBe("node-root");
+
+    const branched = await client.runSpeculativeBranch("node-root", "Hypothesis: In-memory cache layer");
+    expect(branched.nodes.some((n) => n.label.includes("In-memory cache"))).toBe(true);
+
+    const pruned = await client.pruneThoughtBranch("node-b2");
+    const prunedNode = pruned.nodes.find((n) => n.id === "node-b2");
+    expect(prunedNode?.status).toBe("pruned");
+
+    const promoted = await client.promoteThoughtBranch("node-b1-diff");
+    expect(promoted.bestNodeId).toBe("node-b1-diff");
+  });
 });

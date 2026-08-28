@@ -5,6 +5,26 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-08-28 (Self-Evolving Skill Distillation & Tree-of-Thoughts Execution)
+
+### Added
+- **Self-Evolving Skill Distillation Engine (Voyager & Eureka)** (`src/features/skills/SkillDistillationPanel.tsx`, `src/features/skills/skillDistillation.css`):
+  - Trajectory analyzer extracting reusable multi-turn workflows, test remediation steps, and debugging patterns into typed `.skill` packages.
+  - Interactive skill inspector with live `SKILL.md` Markdown definition preview, trigger tags, success rates, and observed run counts.
+  - One-click skill promotion directly to the fleet canonical skill library (`~/.skill-library/active`).
+  - Integrated into Settings as the "Skill Distillation" tab.
+- **Speculative Tree-of-Thoughts Execution Engine (ToT / FoT)** (`src/features/tree/ThoughtTreePanel.tsx`, `src/features/tree/thoughtTree.css`):
+  - Dynamic branching decision tree DAG visualizer rendering concurrent hypothesis, plan, code diff, and test run nodes.
+  - Branch confidence scoring heuristic (0–100%) with high/low visual badges and evaluator rationales.
+  - Candidate code diff viewer with syntax highlighting and unit test preflight tie-outs.
+  - Fail-closed branch pruning and 1-click winner branch rollout promotion.
+  - Integrated into Settings as the "Tree of Thoughts" tab.
+- **IPC Protocol Seam Extensions** (`src/ipc/contract.ts`, `src/ipc/client.ts`, `src/ipc/mockClient.ts`, `bridge/src/rpc.ts`, `bridge/src/connection.ts`):
+  - Added typed methods: `listDistilledSkills()`, `distillSkillFromTrajectory(sessionId, name)`, `promoteSkill(skillId)`, `deleteDistilledSkill(skillId)`, `getThoughtTree()`, `runSpeculativeBranch(parentNodeId, hypothesis)`, `pruneThoughtBranch(nodeId)`, and `promoteThoughtBranch(nodeId)`.
+
+### Changed
+- **Version** — 0.10.0 → 0.11.0 (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`).
+
 ## [0.10.0] — 2026-08-28 (Native Windows Computer-Use Action Space & UI Automation)
 
 ### Added

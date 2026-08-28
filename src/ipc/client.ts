@@ -52,6 +52,8 @@ import type {
   DesktopUiAction,
   DesktopUiElement,
   DesktopWindowInfo,
+  DistilledSkill,
+  ThoughtTreeState,
 } from "./contract";
 
 /** True when running inside the Tauri shell (real IPC); false in the browser preview. */
@@ -203,6 +205,18 @@ export interface IpcClient {
   inspectDesktopWindow(windowId: string): Promise<DesktopUiElement>;
   dispatchDesktopAction(windowId: string, action: DesktopUiAction): Promise<DesktopActionResult>;
   captureDesktopScreenshot(windowId: string): Promise<string>;
+
+  // Self-Evolving Skill Distillation Engine (Voyager / Eureka)
+  listDistilledSkills(): Promise<DistilledSkill[]>;
+  distillSkillFromTrajectory(sessionId: string, name?: string): Promise<DistilledSkill>;
+  promoteSkill(skillId: string): Promise<{ success: boolean; targetPath: string }>;
+  deleteDistilledSkill(skillId: string): Promise<void>;
+
+  // Speculative Tree-of-Thoughts Engine (ToT / FoT)
+  getThoughtTree(): Promise<ThoughtTreeState>;
+  runSpeculativeBranch(parentNodeId: string, hypothesis: string): Promise<ThoughtTreeState>;
+  pruneThoughtBranch(nodeId: string): Promise<ThoughtTreeState>;
+  promoteThoughtBranch(nodeId: string): Promise<ThoughtTreeState>;
 
   // Events
   onEvent(cb: (event: IpcEvent) => void): () => void;
@@ -597,6 +611,30 @@ export class TauriIpcClient implements IpcClient {
   }
   captureDesktopScreenshot(windowId: string): Promise<string> {
     return this.send("captureDesktopScreenshot", { windowId }) as Promise<string>;
+  }
+  listDistilledSkills(): Promise<DistilledSkill[]> {
+    return this.send("listDistilledSkills", {}) as Promise<DistilledSkill[]>;
+  }
+  distillSkillFromTrajectory(sessionId: string, name?: string): Promise<DistilledSkill> {
+    return this.send("distillSkillFromTrajectory", { sessionId, name }) as Promise<DistilledSkill>;
+  }
+  promoteSkill(skillId: string): Promise<{ success: boolean; targetPath: string }> {
+    return this.send("promoteSkill", { skillId }) as Promise<{ success: boolean; targetPath: string }>;
+  }
+  deleteDistilledSkill(skillId: string): Promise<void> {
+    return this.send("deleteDistilledSkill", { skillId }) as Promise<void>;
+  }
+  getThoughtTree(): Promise<ThoughtTreeState> {
+    return this.send("getThoughtTree", {}) as Promise<ThoughtTreeState>;
+  }
+  runSpeculativeBranch(parentNodeId: string, hypothesis: string): Promise<ThoughtTreeState> {
+    return this.send("runSpeculativeBranch", { parentNodeId, hypothesis }) as Promise<ThoughtTreeState>;
+  }
+  pruneThoughtBranch(nodeId: string): Promise<ThoughtTreeState> {
+    return this.send("pruneThoughtBranch", { nodeId }) as Promise<ThoughtTreeState>;
+  }
+  promoteThoughtBranch(nodeId: string): Promise<ThoughtTreeState> {
+    return this.send("promoteThoughtBranch", { nodeId }) as Promise<ThoughtTreeState>;
   }
 }
 

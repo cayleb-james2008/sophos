@@ -1,0 +1,150 @@
+.skill-distill-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+  gap: 1.25rem;
+  color: var(--text-primary, #e2e8f0);
+}
+
+.skill-distill-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-color, #334155);
+  padding-bottom: 1rem;
+}
+
+.skill-distill-header-info h2 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary, #f8fafc);
+}
+
+.skill-distill-header-info p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.skill-distill-badges {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.skill-distill-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 1.25rem;
+  min-height: 480px;
+}
+
+.skill-distill-left,
+.skill-distill-right {
+  background: var(--surface-primary, #0f172a);
+  border: 1px solid var(--border-color, #1e293b);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.skill-distill-card {
+  padding: 0.75rem 0.9rem;
+  background: var(--surface-secondary, #1e293b);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.skill-distill-card:hover {
+  border-color: #3b82f6;
+}
+
+.skill-distill-card.selected {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: #3b82f6;
+}
+
+.skill-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.skill-card-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f8fafc;
+  font-family: var(--font-mono, monospace);
+}
+
+.skill-card-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.skill-triggers-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.skill-trigger-tag {
+  font-size: 0.7rem;
+  background: #090d16;
+  border: 1px solid #1e293b;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  color: #38bdf8;
+  font-family: var(--font-mono, monospace);
+}
+
+.skill-editor-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #090d16;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.skill-markdown-preview {
+  flex: 1;
+  background: #050810;
+  border: 1px solid #1e293b;
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  min-height: 240px;
+}
+
+.skill-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #1e293b;
+  padding-top: 0.75rem;
+}
+
+.skill-stats-badge {
+  font-size: 0.75rem;
+  color: #10b981;
+  font-family: var(--font-mono, monospace);
+}
