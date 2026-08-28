@@ -107,7 +107,11 @@ export type IpcCommand =
   | {
       method: "compactContext";
       params: { strategy: "semantic-summarize" | "prune-oldest" | "evict-tools" };
-    };
+    }
+  | { method: "listDesktopWindows"; params: Record<string, never> }
+  | { method: "inspectDesktopWindow"; params: { windowId: string } }
+  | { method: "dispatchDesktopAction"; params: { windowId: string; action: DesktopUiAction } }
+  | { method: "captureDesktopScreenshot"; params: { windowId: string } };
 
 export interface PromptOptions {
   thinking?: string;
@@ -832,4 +836,51 @@ export interface TokenBudgetBreakdown {
   tiers: TokenBudgetTiers;
   autoCompactionThreshold: number;
   compactionSavingsTokens?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Native Windows Computer-Use Action Space (CUA & UIA)
+// ---------------------------------------------------------------------------
+
+export interface DesktopWindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface DesktopWindowInfo {
+  id: string;
+  title: string;
+  processName: string;
+  pid: number;
+  bounds: DesktopWindowBounds;
+  isMinimized: boolean;
+  isVisible: boolean;
+}
+
+export interface DesktopUiElement {
+  id: string;
+  name: string;
+  role: string;
+  bounds: DesktopWindowBounds;
+  isEnabled: boolean;
+  isFocused: boolean;
+  children?: DesktopUiElement[];
+}
+
+export interface DesktopUiAction {
+  kind: "click" | "type" | "keypress" | "hover" | "scroll";
+  targetElementId?: string;
+  x?: number;
+  y?: number;
+  text?: string;
+  key?: string;
+}
+
+export interface DesktopActionResult {
+  success: boolean;
+  durationMs: number;
+  message: string;
+  screenshot?: string;
 }

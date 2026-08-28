@@ -65,4 +65,25 @@ describe("Modern Harness Features (MCP, Security Sandbox, Squad Workflows, Token
     const updated = await client.getTokenBudget();
     expect(updated.totalTokens).toBe(22700);
   });
+
+  it("lists desktop windows, inspects UIA trees, and executes background actions", async () => {
+    const windows = await client.listDesktopWindows();
+    expect(windows.length).toBeGreaterThanOrEqual(2);
+    expect(windows.some((w) => w.id === "win-sophos")).toBe(true);
+
+    const tree = await client.inspectDesktopWindow("win-sophos");
+    expect(tree.role).toBe("window");
+    expect(tree.children?.length).toBeGreaterThan(0);
+
+    const actionResult = await client.dispatchDesktopAction("win-sophos", {
+      kind: "click",
+      x: 300,
+      y: 200,
+    });
+    expect(actionResult.success).toBe(true);
+    expect(actionResult.durationMs).toBeGreaterThan(0);
+
+    const snap = await client.captureDesktopScreenshot("win-sophos");
+    expect(snap).toContain("data:image/svg+xml");
+  });
 });

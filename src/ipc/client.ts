@@ -48,6 +48,10 @@ import type {
   TranscriptMessage,
   WorkspaceSecurityPolicy,
   BlastRadiusReport,
+  DesktopActionResult,
+  DesktopUiAction,
+  DesktopUiElement,
+  DesktopWindowInfo,
 } from "./contract";
 
 /** True when running inside the Tauri shell (real IPC); false in the browser preview. */
@@ -193,6 +197,12 @@ export interface IpcClient {
   compactContext(
     strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
   ): Promise<{ beforeTokens: number; afterTokens: number; savedTokens: number }>;
+
+  // Native Windows Computer-Use Action Space (CUA & UIA)
+  listDesktopWindows(): Promise<DesktopWindowInfo[]>;
+  inspectDesktopWindow(windowId: string): Promise<DesktopUiElement>;
+  dispatchDesktopAction(windowId: string, action: DesktopUiAction): Promise<DesktopActionResult>;
+  captureDesktopScreenshot(windowId: string): Promise<string>;
 
   // Events
   onEvent(cb: (event: IpcEvent) => void): () => void;
@@ -575,6 +585,18 @@ export class TauriIpcClient implements IpcClient {
       afterTokens: number;
       savedTokens: number;
     }>;
+  }
+  listDesktopWindows(): Promise<DesktopWindowInfo[]> {
+    return this.send("listDesktopWindows", {}) as Promise<DesktopWindowInfo[]>;
+  }
+  inspectDesktopWindow(windowId: string): Promise<DesktopUiElement> {
+    return this.send("inspectDesktopWindow", { windowId }) as Promise<DesktopUiElement>;
+  }
+  dispatchDesktopAction(windowId: string, action: DesktopUiAction): Promise<DesktopActionResult> {
+    return this.send("dispatchDesktopAction", { windowId, action }) as Promise<DesktopActionResult>;
+  }
+  captureDesktopScreenshot(windowId: string): Promise<string> {
+    return this.send("captureDesktopScreenshot", { windowId }) as Promise<string>;
   }
 }
 

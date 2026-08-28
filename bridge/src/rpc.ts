@@ -28,6 +28,7 @@ import type {
   Settings,
   SquadWorkflowType,
   WorkspaceSecurityPolicy,
+  DesktopUiAction,
 } from "../../src/ipc/contract.js";
 import {
   ConnectionHolder,
@@ -66,6 +67,10 @@ import {
   writeModelOverrideToModelsJson,
   analyzeBlastRadius as connAnalyzeBlastRadius,
   compactContext as connCompactContext,
+  listDesktopWindows as connListDesktopWindows,
+  inspectDesktopWindow as connInspectDesktopWindow,
+  dispatchDesktopAction as connDispatchDesktopAction,
+  captureDesktopScreenshot as connCaptureDesktopScreenshot,
   type AgentConnectionRlmChild,
 } from "./connection.js";
 
@@ -934,6 +939,28 @@ export class RpcServer {
           "strategy",
         ]);
         return connCompactContext(this.requireConn(), p.strategy);
+      }
+
+      case "listDesktopWindows": {
+        return connListDesktopWindows(this.requireConn());
+      }
+
+      case "inspectDesktopWindow": {
+        const p = requireParams<{ windowId: string }>(params, ["windowId"]);
+        return connInspectDesktopWindow(this.requireConn(), p.windowId);
+      }
+
+      case "dispatchDesktopAction": {
+        const p = requireParams<{ windowId: string; action: DesktopUiAction }>(params, [
+          "windowId",
+          "action",
+        ]);
+        return connDispatchDesktopAction(this.requireConn(), p.windowId, p.action);
+      }
+
+      case "captureDesktopScreenshot": {
+        const p = requireParams<{ windowId: string }>(params, ["windowId"]);
+        return connCaptureDesktopScreenshot(this.requireConn(), p.windowId);
       }
 
       default:

@@ -31,15 +31,13 @@ export function McpExplorer({ onInjectPrompt }: { onInjectPrompt?: (text: string
     try {
       const list = await client.getMcpServers();
       setServers(list);
-      if (list.length > 0 && !selectedServerName) {
-        setSelectedServerName(list[0].name);
-      }
+      setSelectedServerName((prev) => prev ?? (list.length > 0 ? list[0].name : null));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load MCP servers");
     } finally {
       setLoading(false);
     }
-  }, [client, selectedServerName]);
+  }, [client]);
 
   useEffect(() => {
     void loadServers();

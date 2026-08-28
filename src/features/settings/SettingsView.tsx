@@ -17,6 +17,7 @@ import { FleetStrip } from "./FleetStrip";
 import { MigrationWizard } from "../migration";
 import { McpExplorer } from "../mcp";
 import { SecuritySandboxPanel } from "../security";
+import { CuaControlPanel } from "../cua";
 import "./settings.css";
 
 export function SettingsView() {
@@ -28,8 +29,8 @@ export function SettingsView() {
         <div className="settings__eyebrow">CONTROL ROOM</div>
         <h1>Settings</h1>
         <p>
-          Providers, models, preferences, skills, extensions, MCP, security sandbox, migration, and runtime
-          telemetry.
+          Providers, models, preferences, skills, extensions, MCP, security sandbox, desktop CUA, migration,
+          and runtime telemetry.
         </p>
       </header>
 
@@ -42,6 +43,7 @@ export function SettingsView() {
           { id: "providers", label: "Providers" },
           { id: "mcp", label: "MCP Explorer" },
           { id: "security", label: "Security & Sandbox" },
+          { id: "cua", label: "Desktop CUA" },
           { id: "subagents", label: "Subagents" },
           { id: "skills", label: "Skills" },
           { id: "extensions", label: "Extensions" },
@@ -59,6 +61,7 @@ export function SettingsView() {
         {tab === "providers" ? <ProvidersPanel /> : null}
         {tab === "mcp" ? <McpExplorer /> : null}
         {tab === "security" ? <SecuritySandboxPanel /> : null}
+        {tab === "cua" ? <CuaControlPanel /> : null}
         {tab === "subagents" ? <SubagentPolicyPanel /> : null}
         {tab === "skills" ? <SkillsPanel /> : null}
         {tab === "extensions" ? <ExtensionsPanel /> : null}

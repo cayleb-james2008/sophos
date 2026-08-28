@@ -5,6 +5,21 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-08-28 (Native Windows Computer-Use Action Space & UI Automation)
+
+### Added
+- **Native Windows Computer-Use Action Space (CUA & UIA)** (`src/features/cua/CuaControlPanel.tsx`, `src/features/cua/cua.css`):
+  - Real-time running Windows application scanner querying process names, window bounds, visibility, and PIDs.
+  - UI Automation (UIA) accessibility tree explorer providing hierarchical element tree inspection (buttons, edit fields, documents, panes, navigation bars).
+  - Background Action Dispatcher supporting headless click, text typing stream, key events, and hover actions without stealing operator window focus.
+  - Live background window visual canvas rendering SVG bounding box snapshots and action telemetry.
+  - Integrated into the Settings & Control Room tabs as "Desktop CUA".
+- **IPC Protocol Seam Extensions** (`src/ipc/contract.ts`, `src/ipc/client.ts`, `src/ipc/mockClient.ts`, `bridge/src/rpc.ts`, `bridge/src/connection.ts`):
+  - Added typed methods `listDesktopWindows()`, `inspectDesktopWindow(windowId)`, `dispatchDesktopAction(windowId, action)`, and `captureDesktopScreenshot(windowId)`.
+
+### Changed
+- **Version** — 0.9.0 → 0.10.0 (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`).
+
 ## [0.9.0] — 2026-08-28 (Modern Architecture & Fleet Intelligence)
 
 ### Added

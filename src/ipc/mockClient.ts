@@ -51,6 +51,10 @@ import type {
   TranscriptMessage,
   WorkspaceSecurityPolicy,
   BlastRadiusReport,
+  DesktopActionResult,
+  DesktopUiAction,
+  DesktopUiElement,
+  DesktopWindowInfo,
 } from "./contract";
 
 // ---------------------------------------------------------------------------
@@ -1877,5 +1881,167 @@ export class MockIpcClient implements IpcClient {
       afterTokens: this.mockTokenBudget.totalTokens,
       savedTokens: saved,
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // Native Windows Computer-Use Action Space Mock (CUA & UIA)
+  // -------------------------------------------------------------------------
+
+  private mockWindows: DesktopWindowInfo[] = [
+    {
+      id: "win-sophos",
+      title: "Sophos — Desktop AI Coding Harness",
+      processName: "sophos.exe",
+      pid: 4820,
+      bounds: { x: 120, y: 80, width: 1280, height: 820 },
+      isMinimized: false,
+      isVisible: true,
+    },
+    {
+      id: "win-vscode",
+      title: "Visual Studio Code — sophos [WSL: Ubuntu]",
+      processName: "code.exe",
+      pid: 8940,
+      bounds: { x: 40, y: 40, width: 1440, height: 920 },
+      isMinimized: false,
+      isVisible: true,
+    },
+    {
+      id: "win-browser",
+      title: "Anthropic MCP v1.2 Documentation — Google Chrome",
+      processName: "chrome.exe",
+      pid: 11200,
+      bounds: { x: 180, y: 120, width: 1160, height: 780 },
+      isMinimized: false,
+      isVisible: true,
+    },
+  ];
+
+  async listDesktopWindows(): Promise<DesktopWindowInfo[]> {
+    return this.mockWindows;
+  }
+
+  async inspectDesktopWindow(windowId: string): Promise<DesktopUiElement> {
+    const win = this.mockWindows.find((w) => w.id === windowId) ?? this.mockWindows[0];
+    return {
+      id: `root-${win.id}`,
+      name: win.title,
+      role: "window",
+      bounds: win.bounds,
+      isEnabled: true,
+      isFocused: true,
+      children: [
+        {
+          id: `titlebar-${win.id}`,
+          name: "TitleBar",
+          role: "titlebar",
+          bounds: { x: win.bounds.x, y: win.bounds.y, width: win.bounds.width, height: 32 },
+          isEnabled: true,
+          isFocused: false,
+          children: [
+            {
+              id: "btn-minimize",
+              name: "Minimize",
+              role: "button",
+              bounds: { x: win.bounds.x + win.bounds.width - 90, y: win.bounds.y, width: 30, height: 32 },
+              isEnabled: true,
+              isFocused: false,
+            },
+            {
+              id: "btn-maximize",
+              name: "Maximize",
+              role: "button",
+              bounds: { x: win.bounds.x + win.bounds.width - 60, y: win.bounds.y, width: 30, height: 32 },
+              isEnabled: true,
+              isFocused: false,
+            },
+            {
+              id: "btn-close",
+              name: "Close",
+              role: "button",
+              bounds: { x: win.bounds.x + win.bounds.width - 30, y: win.bounds.y, width: 30, height: 32 },
+              isEnabled: true,
+              isFocused: false,
+            },
+          ],
+        },
+        {
+          id: `content-${win.id}`,
+          name: "Main Client Area",
+          role: "pane",
+          bounds: {
+            x: win.bounds.x,
+            y: win.bounds.y + 32,
+            width: win.bounds.width,
+            height: win.bounds.height - 32,
+          },
+          isEnabled: true,
+          isFocused: true,
+          children: [
+            {
+              id: "elem-nav-sidebar",
+              name: "Navigation Sidebar",
+              role: "navigation",
+              bounds: { x: win.bounds.x, y: win.bounds.y + 32, width: 220, height: win.bounds.height - 32 },
+              isEnabled: true,
+              isFocused: false,
+            },
+            {
+              id: "elem-search-input",
+              name: "Command Palette / Search",
+              role: "edit",
+              bounds: { x: win.bounds.x + 240, y: win.bounds.y + 48, width: 400, height: 36 },
+              isEnabled: true,
+              isFocused: false,
+            },
+            {
+              id: "elem-action-btn",
+              name: "Run Test Suite",
+              role: "button",
+              bounds: { x: win.bounds.x + 660, y: win.bounds.y + 48, width: 140, height: 36 },
+              isEnabled: true,
+              isFocused: false,
+            },
+            {
+              id: "elem-editor-viewport",
+              name: "Code Editor Viewport",
+              role: "document",
+              bounds: {
+                x: win.bounds.x + 240,
+                y: win.bounds.y + 100,
+                width: win.bounds.width - 260,
+                height: win.bounds.height - 120,
+              },
+              isEnabled: true,
+              isFocused: true,
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  async dispatchDesktopAction(windowId: string, action: DesktopUiAction): Promise<DesktopActionResult> {
+    const win = this.mockWindows.find((w) => w.id === windowId) ?? this.mockWindows[0];
+    const actionDesc =
+      action.kind === "click"
+        ? `Clicked at (${action.x ?? 100}, ${action.y ?? 100})`
+        : action.kind === "type"
+          ? `Typed "${action.text ?? ""}"`
+          : action.kind === "keypress"
+            ? `Pressed key [${action.key ?? "Enter"}]`
+            : `Hovered element`;
+
+    return {
+      success: true,
+      durationMs: 38,
+      message: `Successfully executed ${action.kind} on "${win.title}": ${actionDesc}`,
+      screenshot: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" fill="%231a1a1a"><rect width="100%" height="100%" fill="%23121212"/><text x="20" y="40" fill="%2310b981" font-family="monospace">Action: ${action.kind} on ${win.processName}</text></svg>`,
+    };
+  }
+
+  async captureDesktopScreenshot(windowId: string): Promise<string> {
+    const win = this.mockWindows.find((w) => w.id === windowId) ?? this.mockWindows[0];
+    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="100%" height="100%" fill="%230f141c"/><rect x="10" y="10" width="620" height="32" fill="%231a2332" rx="4"/><circle cx="28" cy="26" r="5" fill="%23ef4444"/><circle cx="44" cy="26" r="5" fill="%23f59e0b"/><circle cx="60" cy="26" r="5" fill="%2310b981"/><text x="80" y="30" fill="%2394a3b8" font-size="12" font-family="sans-serif">${win.title}</text><rect x="10" y="50" width="160" height="340" fill="%23161f2e" rx="4"/><rect x="180" y="50" width="450" height="340" fill="%23131b28" rx="4"/><text x="200" y="80" fill="%2310b981" font-family="monospace" font-size="12">[UIA Scanner Active]</text><text x="200" y="110" fill="%23e2e8f0" font-family="monospace" font-size="14">${win.processName} (PID: ${win.pid})</text></svg>`;
   }
 }
