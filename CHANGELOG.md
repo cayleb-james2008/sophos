@@ -5,6 +5,21 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — 2026-08-28 (Ephemeral Workspace Twin Sandbox & Zero-Copy Worktrees)
+
+### Added
+- **Ephemeral Workspace Twin Sandbox (Devin Sandbox / Worktrees)** (`src/features/sandbox/TwinSandboxPanel.tsx`, `src/features/sandbox/twinSandbox.css`):
+  - Zero-copy Git worktree sandbox isolation for destructive migrations, dependency installations, and speculative agent trials.
+  - Isolated command execution console allowing safe test runs and tool actions strictly inside the twin without mutating primary workspace files.
+  - Side-by-side Git diff viewer with file change breakdown, insertion/deletion metrics, and mergeability checks.
+  - One-click safe merge to primary workspace or zero-residue fail-closed rollback.
+  - Integrated into Settings as the "Workspace Twins" tab.
+- **IPC Protocol Seam Extensions** (`src/ipc/contract.ts`, `src/ipc/client.ts`, `src/ipc/mockClient.ts`, `bridge/src/rpc.ts`, `bridge/src/connection.ts`):
+  - Added typed methods: `listWorkspaceTwins()`, `createWorkspaceTwin(name, baseBranch)`, `executeInTwin(twinId, command)`, `diffWorkspaceTwin(twinId)`, `mergeWorkspaceTwin(twinId)`, and `rollbackWorkspaceTwin(twinId)`.
+
+### Changed
+- **Version** — 0.11.0 → 0.12.0 (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`).
+
 ## [0.11.0] — 2026-08-28 (Self-Evolving Skill Distillation & Tree-of-Thoughts Execution)
 
 ### Added

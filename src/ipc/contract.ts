@@ -119,7 +119,13 @@ export type IpcCommand =
   | { method: "getThoughtTree"; params: Record<string, never> }
   | { method: "runSpeculativeBranch"; params: { parentNodeId: string; hypothesis: string } }
   | { method: "pruneThoughtBranch"; params: { nodeId: string } }
-  | { method: "promoteThoughtBranch"; params: { nodeId: string } };
+  | { method: "promoteThoughtBranch"; params: { nodeId: string } }
+  | { method: "listWorkspaceTwins"; params: Record<string, never> }
+  | { method: "createWorkspaceTwin"; params: { name: string; baseBranch?: string } }
+  | { method: "executeInTwin"; params: { twinId: string; command: string } }
+  | { method: "diffWorkspaceTwin"; params: { twinId: string } }
+  | { method: "mergeWorkspaceTwin"; params: { twinId: string } }
+  | { method: "rollbackWorkspaceTwin"; params: { twinId: string } };
 
 export interface PromptOptions {
   thinking?: string;
@@ -936,4 +942,40 @@ export interface ThoughtTreeState {
   nodes: ThoughtNode[];
   activeBranchPath: string[];
   bestNodeId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Ephemeral Workspace Twin Sandbox (Devin Sandbox / Worktrees)
+// ---------------------------------------------------------------------------
+
+export type TwinStatus = "clean" | "dirty" | "executing" | "merged" | "rolled_back";
+
+export interface WorkspaceTwin {
+  id: string;
+  name: string;
+  branch: string;
+  worktreePath: string;
+  status: TwinStatus;
+  modifiedFilesCount: number;
+  createdAt: string;
+  lastActiveAt: string;
+  baseCommit: string;
+}
+
+export interface TwinDiffReport {
+  twinId: string;
+  filesChanged: string[];
+  insertions: number;
+  deletions: number;
+  diffText: string;
+  isMergeable: boolean;
+}
+
+export interface TwinExecResult {
+  twinId: string;
+  command: string;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
 }

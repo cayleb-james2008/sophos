@@ -120,4 +120,28 @@ describe("Modern Harness Features (MCP, Security Sandbox, Squad Workflows, Token
     const promoted = await client.promoteThoughtBranch("node-b1-diff");
     expect(promoted.bestNodeId).toBe("node-b1-diff");
   });
+
+  it("spawns zero-copy workspace twins, executes commands, diffs, and rolls back cleanly", async () => {
+    const twins = await client.listWorkspaceTwins();
+    expect(twins.length).toBeGreaterThanOrEqual(2);
+    expect(twins.some((t) => t.name === "twin-refactor-security")).toBe(true);
+
+    const created = await client.createWorkspaceTwin("auto-audit-twin");
+    expect(created.name).toBe("auto-audit-twin");
+    expect(created.status).toBe("clean");
+
+    const exec = await client.executeInTwin(created.id, "cargo test");
+    expect(exec.exitCode).toBe(0);
+    expect(exec.stdout).toContain("TWIN WORKTREE ISOLATION");
+
+    const diff = await client.diffWorkspaceTwin(created.id);
+    expect(diff.filesChanged.length).toBeGreaterThan(0);
+    expect(diff.diffText).toContain("diff --git");
+
+    const merged = await client.mergeWorkspaceTwin(created.id);
+    expect(merged.success).toBe(true);
+
+    const rollback = await client.rollbackWorkspaceTwin("twin-vitest-migration");
+    expect(rollback.success).toBe(true);
+  });
 });

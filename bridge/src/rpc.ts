@@ -79,6 +79,12 @@ import {
   runSpeculativeBranch as connRunSpeculativeBranch,
   pruneThoughtBranch as connPruneThoughtBranch,
   promoteThoughtBranch as connPromoteThoughtBranch,
+  listWorkspaceTwins as connListWorkspaceTwins,
+  createWorkspaceTwin as connCreateWorkspaceTwin,
+  executeInTwin as connExecuteInTwin,
+  diffWorkspaceTwin as connDiffWorkspaceTwin,
+  mergeWorkspaceTwin as connMergeWorkspaceTwin,
+  rollbackWorkspaceTwin as connRollbackWorkspaceTwin,
   type AgentConnectionRlmChild,
 } from "./connection.js";
 
@@ -1011,6 +1017,35 @@ export class RpcServer {
       case "promoteThoughtBranch": {
         const p = requireParams<{ nodeId: string }>(params, ["nodeId"]);
         return connPromoteThoughtBranch(this.requireConn(), p.nodeId);
+      }
+
+      case "listWorkspaceTwins": {
+        return connListWorkspaceTwins(this.requireConn());
+      }
+
+      case "createWorkspaceTwin": {
+        const p = requireParams<{ name: string; baseBranch?: string }>(params, ["name"]);
+        return connCreateWorkspaceTwin(this.requireConn(), p.name, p.baseBranch);
+      }
+
+      case "executeInTwin": {
+        const p = requireParams<{ twinId: string; command: string }>(params, ["twinId", "command"]);
+        return connExecuteInTwin(this.requireConn(), p.twinId, p.command);
+      }
+
+      case "diffWorkspaceTwin": {
+        const p = requireParams<{ twinId: string }>(params, ["twinId"]);
+        return connDiffWorkspaceTwin(this.requireConn(), p.twinId);
+      }
+
+      case "mergeWorkspaceTwin": {
+        const p = requireParams<{ twinId: string }>(params, ["twinId"]);
+        return connMergeWorkspaceTwin(this.requireConn(), p.twinId);
+      }
+
+      case "rollbackWorkspaceTwin": {
+        const p = requireParams<{ twinId: string }>(params, ["twinId"]);
+        return connRollbackWorkspaceTwin(this.requireConn(), p.twinId);
       }
 
       default:

@@ -29,6 +29,7 @@ vi.mock("../../security", async () => ({ SecuritySandboxPanel: () => <div>securi
 vi.mock("../../cua", async () => ({ CuaControlPanel: () => <div>cua-stub</div> }));
 vi.mock("../../skills", async () => ({ SkillDistillationPanel: () => <div>distill-stub</div> }));
 vi.mock("../../tree", async () => ({ ThoughtTreePanel: () => <div>tree-stub</div> }));
+vi.mock("../../sandbox", async () => ({ TwinSandboxPanel: () => <div>twins-stub</div> }));
 
 describe("SettingsView", () => {
   beforeEach(() => {
@@ -67,6 +68,7 @@ describe("SettingsView", () => {
       "MCP Explorer",
       "Security & Sandbox",
       "Desktop CUA",
+      "Workspace Twins",
       "Skill Distillation",
       "Tree of Thoughts",
       "Subagents",

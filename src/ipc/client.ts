@@ -54,6 +54,9 @@ import type {
   DesktopWindowInfo,
   DistilledSkill,
   ThoughtTreeState,
+  WorkspaceTwin,
+  TwinDiffReport,
+  TwinExecResult,
 } from "./contract";
 
 /** True when running inside the Tauri shell (real IPC); false in the browser preview. */
@@ -217,6 +220,14 @@ export interface IpcClient {
   runSpeculativeBranch(parentNodeId: string, hypothesis: string): Promise<ThoughtTreeState>;
   pruneThoughtBranch(nodeId: string): Promise<ThoughtTreeState>;
   promoteThoughtBranch(nodeId: string): Promise<ThoughtTreeState>;
+
+  // Ephemeral Workspace Twin Sandbox (Devin Sandbox / Worktrees)
+  listWorkspaceTwins(): Promise<WorkspaceTwin[]>;
+  createWorkspaceTwin(name: string, baseBranch?: string): Promise<WorkspaceTwin>;
+  executeInTwin(twinId: string, command: string): Promise<TwinExecResult>;
+  diffWorkspaceTwin(twinId: string): Promise<TwinDiffReport>;
+  mergeWorkspaceTwin(twinId: string): Promise<{ success: boolean; mergedCommit: string }>;
+  rollbackWorkspaceTwin(twinId: string): Promise<{ success: boolean; message: string }>;
 
   // Events
   onEvent(cb: (event: IpcEvent) => void): () => void;
@@ -635,6 +646,24 @@ export class TauriIpcClient implements IpcClient {
   }
   promoteThoughtBranch(nodeId: string): Promise<ThoughtTreeState> {
     return this.send("promoteThoughtBranch", { nodeId }) as Promise<ThoughtTreeState>;
+  }
+  listWorkspaceTwins(): Promise<WorkspaceTwin[]> {
+    return this.send("listWorkspaceTwins", {}) as Promise<WorkspaceTwin[]>;
+  }
+  createWorkspaceTwin(name: string, baseBranch?: string): Promise<WorkspaceTwin> {
+    return this.send("createWorkspaceTwin", { name, baseBranch }) as Promise<WorkspaceTwin>;
+  }
+  executeInTwin(twinId: string, command: string): Promise<TwinExecResult> {
+    return this.send("executeInTwin", { twinId, command }) as Promise<TwinExecResult>;
+  }
+  diffWorkspaceTwin(twinId: string): Promise<TwinDiffReport> {
+    return this.send("diffWorkspaceTwin", { twinId }) as Promise<TwinDiffReport>;
+  }
+  mergeWorkspaceTwin(twinId: string): Promise<{ success: boolean; mergedCommit: string }> {
+    return this.send("mergeWorkspaceTwin", { twinId }) as Promise<{ success: boolean; mergedCommit: string }>;
+  }
+  rollbackWorkspaceTwin(twinId: string): Promise<{ success: boolean; message: string }> {
+    return this.send("rollbackWorkspaceTwin", { twinId }) as Promise<{ success: boolean; message: string }>;
   }
 }
 

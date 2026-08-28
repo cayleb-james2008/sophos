@@ -58,6 +58,9 @@ import type {
   DistilledSkill,
   ThoughtNode,
   ThoughtTreeState,
+  WorkspaceTwin,
+  TwinDiffReport,
+  TwinExecResult,
 } from "./contract";
 
 // ---------------------------------------------------------------------------
@@ -2220,5 +2223,111 @@ export class MockIpcClient implements IpcClient {
       this.mockThoughtTree.bestNodeId = nodeId;
     }
     return this.mockThoughtTree;
+  }
+
+  // -------------------------------------------------------------------------
+  // Ephemeral Workspace Twin Sandbox Mock (Devin Sandbox / Worktrees)
+  // -------------------------------------------------------------------------
+
+  private mockTwins: WorkspaceTwin[] = [
+    {
+      id: "twin-refactor-security",
+      name: "twin-refactor-security",
+      branch: "twin/refactor-security-interlocks",
+      worktreePath: "C:\\Users\\Cayleb\\Desktop\\workspace\\.twins\\twin-refactor-security",
+      status: "clean",
+      modifiedFilesCount: 4,
+      createdAt: "2026-08-28T11:00:00Z",
+      lastActiveAt: "2026-08-28T11:45:00Z",
+      baseCommit: "d9e02f7",
+    },
+    {
+      id: "twin-vitest-migration",
+      name: "twin-vitest-migration",
+      branch: "twin/vitest-async-act-remediation",
+      worktreePath: "C:\\Users\\Cayleb\\Desktop\\workspace\\.twins\\twin-vitest-migration",
+      status: "dirty",
+      modifiedFilesCount: 2,
+      createdAt: "2026-08-28T11:20:00Z",
+      lastActiveAt: "2026-08-28T11:50:00Z",
+      baseCommit: "d9e02f7",
+    },
+  ];
+
+  async listWorkspaceTwins(): Promise<WorkspaceTwin[]> {
+    return this.mockTwins;
+  }
+
+  async createWorkspaceTwin(name: string, baseBranch?: string): Promise<WorkspaceTwin> {
+    const cleanName = name.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+    const newTwin: WorkspaceTwin = {
+      id: `twin-${cleanName}-${Date.now().toString(36)}`,
+      name: cleanName,
+      branch: `twin/${cleanName}`,
+      worktreePath: `C:\\Users\\Cayleb\\Desktop\\workspace\\.twins\\twin-${cleanName}`,
+      status: "clean",
+      modifiedFilesCount: 0,
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      baseCommit: baseBranch ?? "HEAD",
+    };
+    this.mockTwins.unshift(newTwin);
+    return newTwin;
+  }
+
+  async executeInTwin(twinId: string, command: string): Promise<TwinExecResult> {
+    const target = this.mockTwins.find((t) => t.id === twinId);
+    if (target) {
+      target.status = "dirty";
+      target.modifiedFilesCount += 1;
+      target.lastActiveAt = new Date().toISOString();
+    }
+    return {
+      twinId,
+      command,
+      exitCode: 0,
+      stdout: `[TWIN WORKTREE ISOLATION] Successfully executed "${command}" inside ephemeral branch\nAll 25 unit tests passed. No files in primary workspace were mutated.`,
+      stderr: "",
+      durationMs: 64,
+    };
+  }
+
+  async diffWorkspaceTwin(twinId: string): Promise<TwinDiffReport> {
+    const target = this.mockTwins.find((t) => t.id === twinId);
+    return {
+      twinId,
+      filesChanged: [
+        "src/features/security/SecuritySandboxPanel.tsx",
+        "src/ipc/contract.ts",
+        "src-tauri/src/worktree.rs",
+      ],
+      insertions: 84,
+      deletions: 12,
+      diffText: `diff --git a/src-tauri/src/worktree.rs b/src-tauri/src/worktree.rs\n+ pub struct EphemeralWorktree {\n+     pub path: PathBuf,\n+     pub branch: String,\n+ }`,
+      isMergeable: target?.status !== "rolled_back",
+    };
+  }
+
+  async mergeWorkspaceTwin(twinId: string): Promise<{ success: boolean; mergedCommit: string }> {
+    const target = this.mockTwins.find((t) => t.id === twinId);
+    if (target) {
+      target.status = "merged";
+      target.lastActiveAt = new Date().toISOString();
+    }
+    return {
+      success: true,
+      mergedCommit: `merge-${Date.now().toString(36)}`,
+    };
+  }
+
+  async rollbackWorkspaceTwin(twinId: string): Promise<{ success: boolean; message: string }> {
+    const target = this.mockTwins.find((t) => t.id === twinId);
+    if (target) {
+      target.status = "rolled_back";
+    }
+    return {
+      success: true,
+      message: `Pruned zero-copy worktree and deleted branch cleanly. Zero residue.`,
+    };
   }
 }
