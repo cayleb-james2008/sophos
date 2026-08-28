@@ -17,13 +17,18 @@ import type {
   AgentMessageReceipt,
   ConnectionState,
   AgentSessionState,
+  BlindCriticRubric,
+  CheckpointEntry,
+  ContextTreeNode,
   ExtensionInfo,
   HarnessState,
-  KernelState,
-  ContextTreeNode,
   IpcEvent,
+  KernelState,
   LocalProviderConfig,
   McpTestResult,
+  MemoryState,
+  MemoryTier,
+  MemoryTierEntry,
   ModelInfo,
   ModelRuntimeConfig,
   NavigateTreeResult,
@@ -36,6 +41,7 @@ import type {
   SessionTree,
   Settings,
   SlashCommand,
+  SquadTopology,
   TranscriptMessage,
 } from "./contract";
 
@@ -56,12 +62,96 @@ const DEMO_MCP_SERVERS = [
   { name: "demo-fs", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem"], enabled: true },
 ];
 
+/** Settings keys whose persisted value is only valid as a string. */
+const MOCK_STRING_SETTING_KEYS = [
+  "shellPath",
+  "sessionDir",
+  "defaultCwd",
+  "defaultProvider",
+  "defaultModel",
+  "defaultThinking",
+  "daemonCliPath",
+  "subagentDefaultProvider",
+  "subagentDefaultModel",
+  "subagentDefaultThinking",
+  "agentProfile",
+] as const;
+
+const MOCK_THEMES = ["dark", "light", "system"] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Deep-sanitize settings loaded from demo-mode localStorage.
+ *
+ * The demo mock is the only surface that persists arbitrary settings shapes,
+ * and the WebView2 profile is shared across installed app + demo launches, so
+ * stale/foreign values (a non-string `defaultProvider`, non-array
+ * `mcpServers`, …) must degrade to clean defaults instead of crashing the UI
+ * — a regression where `defaultProvider: {…}` crashed ProviderGlyph and
+ * blanked the whole app through the ErrorBoundary, reddening Settings e2e.
+ * Unknown keys are dropped: only the known Settings surface is trusted.
+ */
+export function sanitizeMockSettings(raw: unknown): Settings {
+  const input = isRecord(raw) ? raw : {};
+  const out: Record<string, unknown> = {};
+  for (const key of MOCK_STRING_SETTING_KEYS) {
+    const value = input[key];
+    if (typeof value === "string") out[key] = value;
+  }
+  const theme = input.theme;
+  if (typeof theme === "string" && (MOCK_THEMES as readonly string[]).includes(theme)) {
+    out.theme = theme;
+  }
+  if (typeof input.daemonTcp === "boolean") out.daemonTcp = input.daemonTcp;
+  if (Array.isArray(input.disabledSkills)) {
+    out.disabledSkills = input.disabledSkills.filter((v): v is string => typeof v === "string");
+  }
+  if (Array.isArray(input.localProviders)) {
+    out.localProviders = input.localProviders.filter(
+      (v): v is LocalProviderConfig =>
+        isRecord(v) &&
+        typeof v.id === "string" &&
+        typeof v.name === "string" &&
+        typeof v.baseUrl === "string" &&
+        (v.kind === "ollama" || v.kind === "openai-compatible"),
+    );
+  }
+  if (Array.isArray(input.mcpServers)) {
+    out.mcpServers = input.mcpServers.filter(
+      (v): v is { name: string; command: string; args?: string[]; enabled: boolean } =>
+        isRecord(v) &&
+        typeof v.name === "string" &&
+        typeof v.command === "string" &&
+        (v.args === undefined || (Array.isArray(v.args) && v.args.every((a) => typeof a === "string"))) &&
+        typeof v.enabled === "boolean",
+    );
+  }
+  if (Array.isArray(input.customProfiles)) {
+    out.customProfiles = input.customProfiles.filter(
+      (v): v is Record<string, unknown> => isRecord(v) && typeof v.name === "string",
+    );
+  }
+  if (isRecord(input.auth)) {
+    out.auth = Object.fromEntries(
+      Object.entries(input.auth).filter(([, value]) => typeof value === "string" && value.length > 0),
+    );
+  }
+  if (isRecord(input.modelConfig)) {
+    out.modelConfig = Object.fromEntries(
+      Object.entries(input.modelConfig).filter(([, value]) => isRecord(value)),
+    );
+  }
+  return out as Settings;
+}
+
 function readLocalSettings(): Settings {
   try {
     const raw = typeof window !== "undefined" ? window.localStorage.getItem(LOCAL_SETTINGS_KEY) : null;
     if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Settings) : {};
+    return sanitizeMockSettings(JSON.parse(raw));
   } catch {
     return {};
   }
@@ -83,9 +173,11 @@ function readLocalModelConfig(): Record<string, ModelRuntimeConfig> {
     const raw = typeof window !== "undefined" ? window.localStorage.getItem(LOCAL_MODEL_CONFIG_KEY) : null;
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, ModelRuntimeConfig>)
-      : {};
+    if (!isRecord(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([, value]) => isRecord(value))) as Record<
+      string,
+      ModelRuntimeConfig
+    >;
   } catch {
     return {};
   }
@@ -110,7 +202,15 @@ function readLocalProviders(): LocalProviderConfig[] | null {
     const raw = typeof window !== "undefined" ? window.localStorage.getItem(LOCAL_PROVIDER_KEY) : null;
     if (raw === null) return null; // never persisted → treat as not-yet-configured
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as LocalProviderConfig[]) : null;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter(
+      (v): v is LocalProviderConfig =>
+        isRecord(v) &&
+        typeof v.id === "string" &&
+        typeof v.name === "string" &&
+        typeof v.baseUrl === "string" &&
+        (v.kind === "ollama" || v.kind === "openai-compatible"),
+    );
   } catch {
     return null;
   }
@@ -1104,5 +1204,220 @@ export class MockIpcClient implements IpcClient {
   }
   async getSlashCommands(): Promise<SlashCommand[]> {
     return this.mockSlashCommands;
+  }
+
+  // -------------------------------------------------------------------------
+  // Multi-Tier Semantic Memory Architecture (OpenViking / Letta)
+  // -------------------------------------------------------------------------
+
+  private mockMemoryEntries: MemoryTierEntry[] = [
+    {
+      id: "mem-work-1",
+      tier: "working",
+      title: "Active Modernization Scope",
+      content:
+        "Modernizing Sophos harness with Code Intelligence, Memory Tiers, Squad Evaluators, and Checkpoints",
+      confidence: 1.0,
+      tags: ["scope", "modernization", "active"],
+      scope: "local",
+      temporalValidity: { assertedAt: new Date().toISOString() },
+    },
+    {
+      id: "mem-rec-1",
+      tier: "recall",
+      title: "Latest Test Suite Run",
+      content: "131 test files passed with 100% clean vitest assertions",
+      confidence: 0.98,
+      tags: ["testing", "vitest", "clean"],
+      scope: "local",
+      temporalValidity: { assertedAt: new Date(Date.now() - 5 * 60000).toISOString() },
+    },
+    {
+      id: "mem-arch-1",
+      tier: "archival",
+      uri: "viking://user/default/memories/entities/software_system/sophos.md",
+      title: "Sophos Architecture Standard",
+      content:
+        "Windows-native coding agent desktop app with Tauri v2 Rust shell, JSON-RPC sidecar bridge, and Geist aesthetic",
+      confidence: 0.99,
+      tags: ["architecture", "tauri", "standards"],
+      scope: "global",
+      temporalValidity: { validFrom: "2026-08-12", assertedAt: new Date().toISOString() },
+    },
+  ];
+
+  async getMemoryState(tier?: MemoryTier): Promise<MemoryState> {
+    const entries = tier ? this.mockMemoryEntries.filter((e) => e.tier === tier) : this.mockMemoryEntries;
+    return {
+      working: entries.filter((e) => e.tier === "working"),
+      recall: entries.filter((e) => e.tier === "recall"),
+      archival: entries.filter((e) => e.tier === "archival"),
+      totalCount: entries.length,
+      uriIndex: entries.map((e) => e.uri).filter((u): u is string => Boolean(u)),
+    };
+  }
+
+  async searchMemory(query: string, tier?: MemoryTier, maxResults = 10): Promise<MemoryTierEntry[]> {
+    const q = query.toLowerCase();
+    return this.mockMemoryEntries
+      .filter(
+        (e) =>
+          (!tier || e.tier === tier) &&
+          (e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q)),
+      )
+      .slice(0, maxResults);
+  }
+
+  async storeMemory(entry: Omit<MemoryTierEntry, "id">): Promise<MemoryTierEntry> {
+    const created: MemoryTierEntry = {
+      ...entry,
+      id: `mem-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      temporalValidity: entry.temporalValidity ?? { assertedAt: new Date().toISOString() },
+    };
+    this.mockMemoryEntries = [created, ...this.mockMemoryEntries];
+    return created;
+  }
+
+  async recallMemory(query: string, limit = 5): Promise<string[]> {
+    const hits = await this.searchMemory(query, undefined, limit);
+    return hits.map((h) => `[${h.tier.toUpperCase()}] ${h.title}: ${h.content}`);
+  }
+
+  async forgetMemory(id: string): Promise<void> {
+    this.mockMemoryEntries = this.mockMemoryEntries.filter((e) => e.id !== id);
+  }
+
+  // -------------------------------------------------------------------------
+  // Durable Session Checkpointing (LangGraph / Temporal)
+  // -------------------------------------------------------------------------
+
+  private mockCheckpoints: CheckpointEntry[] = [
+    {
+      id: "ckpt-init",
+      sessionId: "session-0",
+      turnIndex: 0,
+      timestamp: new Date(Date.now() - 30 * 60000).toISOString(),
+      label: "Session Bootstrap",
+      summary: "Baseline workspace state before task execution",
+      verifiedStatus: "GREEN",
+      tokenCount: 1200,
+      stateSnapshot: {
+        activeSessionId: "session-0",
+        workingDirectory: "C:\\Users\\Cayleb\\Desktop\\workspace\\sophos",
+        goal: "Modernize harness architecture",
+        appliedEditsCount: 0,
+      },
+    },
+  ];
+
+  async createCheckpoint(label: string, summary?: string): Promise<CheckpointEntry> {
+    const ckpt: CheckpointEntry = {
+      id: `ckpt-${Date.now()}`,
+      sessionId: this.state.activeSessionId ?? "session-0",
+      turnIndex: this.mockCheckpoints.length,
+      timestamp: new Date().toISOString(),
+      label,
+      summary: summary ?? `Checkpoint at step ${this.mockCheckpoints.length}`,
+      verifiedStatus: "GREEN",
+      tokenCount: this.state.context?.tokens ?? 18432,
+      stateSnapshot: {
+        activeSessionId: this.state.activeSessionId,
+        workingDirectory: "C:\\Users\\Cayleb\\Desktop\\workspace\\sophos",
+        appliedEditsCount: this.mockCheckpoints.length,
+      },
+    };
+    this.mockCheckpoints = [ckpt, ...this.mockCheckpoints];
+    return ckpt;
+  }
+
+  async restoreCheckpoint(id: string): Promise<CheckpointEntry> {
+    const hit = this.mockCheckpoints.find((c) => c.id === id);
+    if (!hit) throw new Error(`Checkpoint ${id} not found`);
+    return hit;
+  }
+
+  async listCheckpoints(sessionId?: string): Promise<CheckpointEntry[]> {
+    return sessionId ? this.mockCheckpoints.filter((c) => c.sessionId === sessionId) : this.mockCheckpoints;
+  }
+
+  // -------------------------------------------------------------------------
+  // Gauntlet-RLM Squad Topology & Evaluator-Optimizer
+  // -------------------------------------------------------------------------
+
+  private mockSquadTopology: SquadTopology = {
+    orchestrator: {
+      id: "orch-1",
+      role: "orchestrator",
+      name: "Lead Orchestrator",
+      status: "working",
+      targetPiece: "P1: IPC & Architecture Modernization",
+      reviewRounds: 1,
+    },
+    members: [
+      {
+        id: "worker-1",
+        role: "worker",
+        name: "Gauntlet Worker (Code Intelligence)",
+        status: "working",
+        targetPiece: "P1: IPC & Architecture Modernization",
+        reviewRounds: 1,
+      },
+      {
+        id: "critic-1",
+        role: "critic_text",
+        name: "Blind Text Critic",
+        status: "idle",
+        targetPiece: "P1: IPC & Architecture Modernization",
+        reviewRounds: 1,
+        latestRubric: {
+          goalScore: 0.96,
+          contractScore: 0.95,
+          barScore: 0.98,
+          contractVerdict: "PASS",
+          barVerdict: "PASS",
+          quotedDefects: [],
+          reviewRound: 1,
+          criticRole: "critic_text",
+          timestamp: new Date().toISOString(),
+        },
+      },
+      {
+        id: "researcher-1",
+        role: "researcher",
+        name: "Gauntlet Primary Researcher",
+        status: "idle",
+        targetPiece: "P0: 2026 OSS Architectures",
+        reviewRounds: 1,
+      },
+    ],
+    activeEvaluationRounds: 1,
+    doomLoopDetected: false,
+  };
+
+  async getSquadTopology(): Promise<SquadTopology> {
+    return this.mockSquadTopology;
+  }
+
+  async evaluateSquadPiece(
+    childId: string,
+    _pieceContract: string,
+    _bar: string,
+    _outputPaths: string[],
+  ): Promise<BlindCriticRubric> {
+    const rubric: BlindCriticRubric = {
+      goalScore: 0.97,
+      contractScore: 0.96,
+      barScore: 0.98,
+      contractVerdict: "PASS",
+      barVerdict: "PASS",
+      quotedDefects: [],
+      reviewRound: (this.mockSquadTopology.members.find((m) => m.id === childId)?.reviewRounds ?? 0) + 1,
+      criticRole: "critic_text",
+      timestamp: new Date().toISOString(),
+    };
+    this.mockSquadTopology.members = this.mockSquadTopology.members.map((m) =>
+      m.id === childId ? { ...m, reviewRounds: (m.reviewRounds ?? 0) + 1, latestRubric: rubric } : m,
+    );
+    return rubric;
   }
 }

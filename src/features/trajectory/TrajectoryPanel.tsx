@@ -35,6 +35,8 @@ function kindLabel(kind: TrajectoryEntry["kind"]): string {
       return "Refine";
     case "program":
       return "Program";
+    case "checkpoint":
+      return "Checkpoint";
     default:
       return "System";
   }

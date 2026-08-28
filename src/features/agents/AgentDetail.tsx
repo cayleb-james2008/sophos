@@ -95,8 +95,22 @@ export function AgentDetail({
               <Row icon={<LayersIcon size={14} />} label="Parent" value={agent.parentId} />
             ) : null}
             <Row icon={<ClockIcon size={14} />} label="Agent id" value={agent.id} mono />
+            {agent.squadRole ? (
+              <Row
+                icon={<LayersIcon size={14} />}
+                label="Squad role"
+                value={`${agent.squadRole.toUpperCase()} (Round ${agent.reviewRounds ?? 1})`}
+              />
+            ) : null}
             {agent.summary ? (
               <Row icon={<LayersIcon size={14} />} label="Summary" value={agent.summary} />
+            ) : null}
+            {agent.latestRubric ? (
+              <Row
+                icon={<PlugIcon size={14} />}
+                label="Critic rubric"
+                value={`Goal: ${(agent.latestRubric.goalScore * 100).toFixed(0)}% · Bar: ${(agent.latestRubric.barScore * 100).toFixed(0)}% · Verdict: ${agent.latestRubric.barVerdict}`}
+              />
             ) : null}
             {sessionState ? (
               <Row
@@ -106,6 +120,21 @@ export function AgentDetail({
               />
             ) : null}
           </div>
+          {agent.latestRubric?.quotedDefects && agent.latestRubric.quotedDefects.length > 0 ? (
+            <div className="ag-detail__state">
+              <small>BLIND CRITIC DEFECTS · {agent.latestRubric.quotedDefects.length} items</small>
+              {agent.latestRubric.quotedDefects.map((defect, idx) => (
+                <div key={idx}>
+                  <b>Defect #{idx + 1}</b>
+                  <span>
+                    {typeof defect === "string"
+                      ? defect
+                      : `${defect.defect}${defect.recommendation ? ` (Fix: ${defect.recommendation})` : ""}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {sessionState ? (
             <div className="ag-detail__state">
               <small>LIVE SESSION STATE · {sessionState.transcript.length} messages</small>

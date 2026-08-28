@@ -14,6 +14,7 @@ import { AdvancedPanel } from "./AdvancedPanel";
 import { LongRunningPanel } from "./LongRunningPanel";
 import { AboutPanel } from "./AboutPanel";
 import { FleetStrip } from "./FleetStrip";
+import { MigrationWizard } from "../migration";
 import "./settings.css";
 
 export function SettingsView() {
@@ -24,7 +25,7 @@ export function SettingsView() {
       <header className="settings__header">
         <div className="settings__eyebrow">CONTROL ROOM</div>
         <h1>Settings</h1>
-        <p>Providers, models, preferences, skills, extensions, and runtime telemetry.</p>
+        <p>Providers, models, preferences, skills, extensions, migration, and runtime telemetry.</p>
       </header>
 
       <FleetStrip />
@@ -39,6 +40,7 @@ export function SettingsView() {
           { id: "extensions", label: "Extensions" },
           { id: "advanced", label: "Advanced" },
           { id: "longrunning", label: "Long-running" },
+          { id: "migration", label: "Import" },
           { id: "about", label: "About" },
         ]}
         activeId={tab}
@@ -53,6 +55,7 @@ export function SettingsView() {
         {tab === "extensions" ? <ExtensionsPanel /> : null}
         {tab === "advanced" ? <AdvancedPanel /> : null}
         {tab === "longrunning" ? <LongRunningPanel /> : null}
+        {tab === "migration" ? <MigrationWizard /> : null}
         {tab === "about" ? <AboutPanel /> : null}
       </div>
     </main>

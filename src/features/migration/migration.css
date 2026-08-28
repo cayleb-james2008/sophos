@@ -1,0 +1,201 @@
+/* MigrationWizard — bring-your-own-setup import (Claude / Codex Desktop).
+ *
+ * Design language: near-black surfaces, one sage/terminal-green accent
+ * (var(--pa-green)), hairline borders (var(--pa-border)), and SHARP 0px
+ * corners. This matches the documented Sophos design tokens; radii are forced to
+ * 0 here so the wizard reads as crisp even if a future theme rounds things. */
+
+.mig {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: var(--pa-card, #232320);
+  border: 1px solid var(--pa-border, #3f3d38);
+  border-radius: 0;
+  color: var(--pa-paper, #ece9e2);
+  font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+  max-width: 920px;
+}
+
+.mig__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.mig__subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: var(--pa-paper-muted, rgba(236, 233, 226, 0.64));
+  line-height: 1.5;
+}
+
+.mig__sources {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .mig__sources {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.mig__source {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--pa-border, #3f3d38);
+  border-radius: 0;
+  background: var(--pa-secondary, #2c2c28);
+}
+
+.mig__source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mig__source-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pa-paper-strong, rgba(236, 233, 226, 0.92));
+}
+
+.mig__hint {
+  font-size: 11px;
+  color: var(--pa-paper-dim, rgba(236, 233, 226, 0.46));
+  line-height: 1.45;
+}
+
+.mig__textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  padding: 8px;
+  border: 1px solid var(--pa-border, #3f3d38);
+  border-radius: 0;
+  background: var(--pa-ink, #1a1a18);
+  color: var(--pa-paper, #ece9e2);
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mig__textarea:focus-visible {
+  outline: none;
+  border-color: var(--pa-green, #82b89b);
+  box-shadow: 0 0 0 1px var(--pa-green, #82b89b);
+}
+
+.mig__file-btn {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  border: 1px solid var(--pa-green-border, rgba(130, 184, 155, 0.38));
+  border-radius: 0;
+  background: transparent;
+  color: var(--pa-green, #82b89b);
+}
+
+.mig__file-btn:hover {
+  background: var(--pa-green-soft, rgba(130, 184, 155, 0.14));
+}
+
+.mig__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--pa-border, #3f3d38);
+  border-radius: 0;
+  background: var(--pa-ink, #1a1a18);
+}
+
+.mig__preview-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pa-green, #82b89b);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mig__kv {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 4px 12px;
+  font-size: 12px;
+}
+
+.mig__kv dt {
+  color: var(--pa-paper-dim, rgba(236, 233, 226, 0.46));
+}
+
+.mig__kv dd {
+  margin: 0;
+  color: var(--pa-paper-strong, rgba(236, 233, 226, 0.92));
+  font-family: "Geist Mono", ui-monospace, monospace;
+  word-break: break-word;
+}
+
+.mig__notes {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--pa-paper-muted, rgba(236, 233, 226, 0.64));
+  line-height: 1.5;
+}
+
+.mig__notes li {
+  list-style: square;
+}
+
+.mig__error {
+  padding: 10px 12px;
+  border: 1px solid var(--pa-danger, #e0655f);
+  border-radius: 0;
+  background: var(--pa-danger-soft, rgba(224, 101, 95, 0.12));
+  color: var(--pa-paper-strong, rgba(236, 233, 226, 0.92));
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mig__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mig__import-btn {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  cursor: pointer;
+  border: 1px solid var(--pa-green, #82b89b);
+  border-radius: 0;
+  background: var(--pa-green, #82b89b);
+  color: var(--pa-ink, #1a1a18);
+}
+
+.mig__import-btn:hover:not(:disabled) {
+  background: var(--pa-green-hover, #97c9ad);
+}
+
+.mig__import-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mig__status {
+  font-size: 12px;
+  color: var(--pa-green, #82b89b);
+}

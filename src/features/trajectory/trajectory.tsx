@@ -28,7 +28,17 @@ export interface TrajectoryEntry {
   sessionId: string;
   /** Coarse kind used for the timeline + filters. "program" is a run_code
    *  program (Code Mode) — recorded alongside its individual tool calls. */
-  kind: "prompt" | "thinking" | "tool" | "message" | "state" | "agent" | "refinement" | "system" | "program";
+  kind:
+    | "prompt"
+    | "thinking"
+    | "tool"
+    | "message"
+    | "state"
+    | "agent"
+    | "refinement"
+    | "system"
+    | "program"
+    | "checkpoint";
   /** Short human label, e.g. "User prompt". */
   label: string;
   /** One-line summary shown in the list. */

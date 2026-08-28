@@ -122,6 +122,10 @@ export function ChatView() {
     setSettingsTab("providers");
     setView("settings");
   };
+  const handleImportSetup = () => {
+    setSettingsTab("migration");
+    setView("settings");
+  };
   const chat = useChat();
   const ipc = useIpc();
   const state = useConnectionState();
@@ -305,6 +309,7 @@ export function ChatView() {
 
       <OnboardingWizard
         onSetupProviders={handleSetupProviders}
+        onImportSetup={handleImportSetup}
         onStartChat={onStartChat}
         hasFirstMessage={hasFirstMessage}
         setup={onboarding}

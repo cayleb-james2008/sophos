@@ -24,7 +24,7 @@ import "./agents.css";
 
 const WIDTH = 244;
 
-type NodeKind = "operator" | "daemon" | "agent" | "rlm";
+type NodeKind = "operator" | "daemon" | "agent" | "rlm" | "squad";
 
 type AgentNodeData = {
   kind: NodeKind;
@@ -46,6 +46,7 @@ const NODE_HEIGHT: Record<NodeKind, number> = {
   daemon: 98,
   agent: 132,
   rlm: 106,
+  squad: 116,
 };
 
 function kindLabel(k: NodeKind): string {
@@ -58,12 +59,14 @@ function kindLabel(k: NodeKind): string {
       return "AGENT";
     case "rlm":
       return "RLM CHILD";
+    case "squad":
+      return "SQUAD MEMBER";
   }
 }
 
 function AgentNode({ data }: NodeProps<AgentGraphNode>) {
   const actions =
-    data.kind === "agent" || data.kind === "rlm" ? (
+    data.kind === "agent" || data.kind === "rlm" || data.kind === "squad" ? (
       <>
         {data.attached ? (
           <Button
@@ -251,7 +254,32 @@ export function AgentsGraph({
       style: { width: WIDTH },
     }));
 
-    const all = [operator, daemon, ...agentNodes, ...rlmNodes];
+    const squadNodes: AgentGraphNode[] = rows
+      .filter((r) => r.kind === "squad")
+      .map((s) => ({
+        id: s.id,
+        type: "agent",
+        data: {
+          kind: "squad",
+          label: s.name ?? s.id,
+          status: s.status,
+          subtitle: s.squadRole
+            ? `${s.squadRole.toUpperCase()} · ${s.summary ?? "Active squad member"}`
+            : (s.summary ?? "Squad member"),
+          mono: `${s.id.slice(0, 10).toUpperCase()} · ${s.status}`,
+          attached: attachedIds.includes(s.id),
+          unread: unreadByAgent(s.id),
+          onAttach: () => onAttach(s.id),
+          onDetach: () => onDetach(s.id),
+          onMessage: () => onMessage(s.id),
+        },
+        position: { x: 0, y: 0 },
+        width: WIDTH,
+        height: NODE_HEIGHT.squad,
+        style: { width: WIDTH },
+      }));
+
+    const all = [operator, daemon, ...agentNodes, ...rlmNodes, ...squadNodes];
 
     const edges: Edge[] = [];
     const pulseFor = (status: string) =>
@@ -293,6 +321,19 @@ export function AgentsGraph({
           pulse: pulseFor(c.status),
           color: pulseFor(c.status) ? tokens.color.ok : tokens.color.line,
           animated: pulseFor(c.status),
+        } as PulseEdgeData,
+      });
+    }
+    for (const s of squadNodes) {
+      edges.push({
+        id: `sq-${s.id}`,
+        source: "daemon",
+        target: s.id,
+        type: "pulse",
+        data: {
+          pulse: pulseFor(s.data.status),
+          color: pulseFor(s.data.status) ? tokens.color.ok : tokens.color.line,
+          animated: pulseFor(s.data.status),
         } as PulseEdgeData,
       });
     }

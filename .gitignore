@@ -88,6 +88,10 @@ resources/node/node.zip
 # Gauntlet runtime state (transient, per-piece breadcrumbs)
 evaluator-state.json
 generator-state.json
+.gauntlet/
+*.err
+verify/visual/diffs/
 
 # Smoke test screenshots
 verify/screenshots/
+

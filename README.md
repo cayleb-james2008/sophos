@@ -319,6 +319,46 @@ restart.
 
 ---
 
+## Importing from Claude Desktop / Codex Desktop
+
+Moving your existing setup into Sophos should be friction-free. The **Import from
+Claude Desktop / Codex Desktop** flow (in Settings, or during onboarding) reads
+the files you already have and maps them into Sophos — it shows you a live
+preview of exactly what will change, and writes nothing until you press
+**Import**.
+
+### What to bring
+
+- **`CLAUDE.md`** — your agent instructions.
+- **`~/.claude.json`** — Claude Desktop's config (model, API keys, MCP servers, hooks).
+- **Codex config** — `~/.codex/config.json` (JSON) **or** `~/.codex/config.toml` (minimal TOML).
+
+You can paste the text directly, or use the **Load file…** button (the native
+file dialog in the desktop app, or a file picker in the browser preview).
+
+### How the mapping works
+
+| Source | Becomes in Sophos | Notes |
+| --- | --- | --- |
+| `CLAUDE.md` body | The custom profile's **instructions** | Carried over verbatim into the imported profile. |
+| `model` (`~/.claude.json` or Codex) | `Settings.defaultModel` (and `defaultProvider` when it's a `provider/model` string) | The selected model for new sessions. |
+| `providers` / `auth` (API keys) | `Settings.auth` (provider → key) | Keys are copied **as-is**. Verify them in Settings before trusting them — Sophos does not re-validate third-party keys. |
+| `mcpServers` | `Settings.mcpServers` | Attached as MCP servers (name / command / args / enabled). |
+| `hooks` (`~/.claude.json`) | **Not** imported | Sophos has no hook runner yet. You'll see a note telling you to recreate any startup/event behavior you rely on. |
+| Codex `approvalPolicy` | **Not** auto-applied | Read and noted. Set your confirm rules per profile in the Profile Studio instead. |
+
+### What you get
+
+- Your **Settings** are updated with the model, API keys, and MCP servers above.
+- A new **custom profile** is created in the Profile Studio, prefilled from your
+  imported setup (your `CLAUDE.md` becomes its instructions). Imported profiles
+  are never silently overwritten — a name collision is renamed to a unique copy.
+
+The whole flow is defensive: malformed JSON, an unknown file shape, or an empty
+field is reported as a plain note in the preview and never crashes the app.
+
+---
+
 ## License
 
 MIT — same license as the upstream [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent).

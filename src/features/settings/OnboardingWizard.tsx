@@ -39,6 +39,7 @@ const STEP_INDEX: Record<Step, number> = { welcome: 0, provider: 1, model: 2, fi
 export interface OnboardingWizardProps {
   onSetupProviders?: () => void;
   onStartChat?: () => void;
+  onImportSetup?: () => void;
   hasFirstMessage?: boolean;
   setup: OnboardingStatus;
 }
@@ -46,6 +47,7 @@ export interface OnboardingWizardProps {
 export function OnboardingWizard({
   onSetupProviders,
   onStartChat,
+  onImportSetup,
   hasFirstMessage = false,
   setup,
 }: OnboardingWizardProps): JSX.Element | null {
@@ -66,6 +68,10 @@ export function OnboardingWizard({
   }, [dismiss, onStartChat]);
 
   const openProviderSetup = useCallback(() => onSetupProviders?.(), [onSetupProviders]);
+  const openImportSetup = useCallback(() => {
+    dismiss();
+    onImportSetup?.();
+  }, [dismiss, onImportSetup]);
 
   // Esc dismisses from any step (unless typing in an input).
   useEffect(() => {
@@ -120,7 +126,12 @@ export function OnboardingWizard({
 
         <div className="pa-onboarding__wizard-body">
           {step === "welcome" ? (
-            <WelcomeStep preview={preview} onNext={() => setStep("provider")} onSkip={dismiss} />
+            <WelcomeStep
+              preview={preview}
+              onNext={() => setStep("provider")}
+              onImport={onImportSetup ? openImportSetup : undefined}
+              onSkip={dismiss}
+            />
           ) : step === "provider" ? (
             <ProviderStep
               providerReady={providerReady}
@@ -189,10 +200,12 @@ function stepLabel(step: Step): string {
 function WelcomeStep({
   preview,
   onNext,
+  onImport,
   onSkip,
 }: {
   preview: boolean;
   onNext: () => void;
+  onImport?: () => void;
   onSkip: () => void;
 }) {
   return (
@@ -218,6 +231,17 @@ function WelcomeStep({
         <Button type="button" variant="primary" className="pa-onboarding__action-primary" onClick={onNext}>
           Get started
         </Button>
+        {onImport ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="pa-onboarding__action-secondary"
+            onClick={onImport}
+            title="Import configuration, API keys, and instructions from Claude Desktop or Codex Desktop"
+          >
+            Import from Claude / Codex
+          </Button>
+        ) : null}
         <Button type="button" variant="ghost" className="pa-onboarding__action-secondary" onClick={onSkip}>
           Skip for now
         </Button>

@@ -16,12 +16,17 @@ import type {
   AgentMessageReceipt,
   ConnectionState,
   AgentSessionState,
+  BlindCriticRubric,
+  CheckpointEntry,
+  ContextTreeNode,
   ExtensionInfo,
   HarnessState,
-  KernelState,
-  ContextTreeNode,
   IpcEvent,
+  KernelState,
   McpTestResult,
+  MemoryState,
+  MemoryTier,
+  MemoryTierEntry,
   ModelInfo,
   ModelRuntimeConfig,
   NavigateTreeResult,
@@ -33,6 +38,7 @@ import type {
   SessionTree,
   Settings,
   SlashCommand,
+  SquadTopology,
   TranscriptMessage,
 } from "./contract";
 
@@ -138,6 +144,21 @@ export interface IpcClient {
   getExtensions(): Promise<ExtensionInfo[]>;
   testMcpServer(name: string, command: string, args?: string[]): Promise<McpTestResult>;
   getSlashCommands(): Promise<SlashCommand[]>;
+  getMemoryState(tier?: MemoryTier): Promise<MemoryState>;
+  searchMemory(query: string, tier?: MemoryTier, maxResults?: number): Promise<MemoryTierEntry[]>;
+  storeMemory(entry: Omit<MemoryTierEntry, "id">): Promise<MemoryTierEntry>;
+  recallMemory(query: string, limit?: number): Promise<string[]>;
+  forgetMemory(id: string): Promise<void>;
+  createCheckpoint(label: string, summary?: string): Promise<CheckpointEntry>;
+  restoreCheckpoint(id: string): Promise<CheckpointEntry>;
+  listCheckpoints(sessionId?: string): Promise<CheckpointEntry[]>;
+  getSquadTopology(): Promise<SquadTopology>;
+  evaluateSquadPiece(
+    childId: string,
+    pieceContract: string,
+    bar: string,
+    outputPaths: string[],
+  ): Promise<BlindCriticRubric>;
 
   // Events
   onEvent(cb: (event: IpcEvent) => void): () => void;
@@ -427,6 +448,47 @@ export class TauriIpcClient implements IpcClient {
   }
   getSlashCommands(): Promise<SlashCommand[]> {
     return this.send("getSlashCommands", {}) as Promise<SlashCommand[]>;
+  }
+  getMemoryState(tier?: MemoryTier): Promise<MemoryState> {
+    return this.send("getMemoryState", { tier }) as Promise<MemoryState>;
+  }
+  searchMemory(query: string, tier?: MemoryTier, maxResults?: number): Promise<MemoryTierEntry[]> {
+    return this.send("searchMemory", { query, tier, maxResults }) as Promise<MemoryTierEntry[]>;
+  }
+  storeMemory(entry: Omit<MemoryTierEntry, "id">): Promise<MemoryTierEntry> {
+    return this.send("storeMemory", { entry }) as Promise<MemoryTierEntry>;
+  }
+  recallMemory(query: string, limit?: number): Promise<string[]> {
+    return this.send("recallMemory", { query, limit }) as Promise<string[]>;
+  }
+  forgetMemory(id: string): Promise<void> {
+    return this.send("forgetMemory", { id }) as Promise<void>;
+  }
+  createCheckpoint(label: string, summary?: string): Promise<CheckpointEntry> {
+    return this.send("createCheckpoint", { label, summary }) as Promise<CheckpointEntry>;
+  }
+  restoreCheckpoint(id: string): Promise<CheckpointEntry> {
+    return this.send("restoreCheckpoint", { id }) as Promise<CheckpointEntry>;
+  }
+  listCheckpoints(sessionId?: string): Promise<CheckpointEntry[]>;
+  listCheckpoints(sessionId?: string): Promise<CheckpointEntry[]> {
+    return this.send("listCheckpoints", { sessionId }) as Promise<CheckpointEntry[]>;
+  }
+  getSquadTopology(): Promise<SquadTopology> {
+    return this.send("getSquadTopology", {}) as Promise<SquadTopology>;
+  }
+  evaluateSquadPiece(
+    childId: string,
+    pieceContract: string,
+    bar: string,
+    outputPaths: string[],
+  ): Promise<BlindCriticRubric> {
+    return this.send("evaluateSquadPiece", {
+      childId,
+      pieceContract,
+      bar,
+      outputPaths,
+    }) as Promise<BlindCriticRubric>;
   }
 }
 

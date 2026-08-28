@@ -107,8 +107,9 @@ export function KernelPanel() {
       </div>
       <Text variant="micro" tone="dim">
         This is the daemon-backed IPython state: execution counts and cell results come from real kernel/tool
-        metadata, while names and imports come from the live namespace. The kernel is persistent and is not a
-        security sandbox.
+        metadata. The daemon contract does not expose a live namespace, so names and imports are shown from
+        reported cell metadata and stay empty until the daemon reports them. The kernel is persistent and is
+        not a security sandbox.
       </Text>
       <div role="status" className="kp-diag">
         <Text variant="micro" weight="semibold">

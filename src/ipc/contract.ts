@@ -76,7 +76,20 @@ export type IpcCommand =
   | { method: "removeExtension"; params: { path: string } }
   | { method: "getExtensions"; params: Record<string, never> }
   | { method: "testMcpServer"; params: { name: string; command: string; args?: string[] } }
-  | { method: "getSlashCommands"; params: Record<string, never> };
+  | { method: "getSlashCommands"; params: Record<string, never> }
+  | { method: "getMemoryState"; params: { tier?: MemoryTier } }
+  | { method: "searchMemory"; params: { query: string; tier?: MemoryTier; maxResults?: number } }
+  | { method: "storeMemory"; params: { entry: Omit<MemoryTierEntry, "id"> } }
+  | { method: "recallMemory"; params: { query: string; limit?: number } }
+  | { method: "forgetMemory"; params: { id: string } }
+  | { method: "createCheckpoint"; params: { label: string; summary?: string } }
+  | { method: "restoreCheckpoint"; params: { id: string } }
+  | { method: "listCheckpoints"; params: { sessionId?: string } }
+  | { method: "getSquadTopology"; params: Record<string, never> }
+  | {
+      method: "evaluateSquadPiece";
+      params: { childId: string; pieceContract: string; bar: string; outputPaths: string[] };
+    };
 
 export interface PromptOptions {
   thinking?: string;
@@ -320,6 +333,101 @@ export interface HarnessState {
   entries: HarnessEntry[];
   refinements: HarnessRefinement[];
   source?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Multi-Tier Semantic Memory Architecture (OpenViking / Letta / MemGPT)
+// ---------------------------------------------------------------------------
+
+export type MemoryTier = "working" | "recall" | "archival";
+
+export interface MemoryTierEntry {
+  id: string;
+  tier: MemoryTier;
+  uri?: string; // e.g. viking://user/default/memories/entity.md
+  title: string;
+  content: string;
+  confidence?: number; // 0.0 - 1.0
+  tags?: string[];
+  scope?: "local" | "global";
+  temporalValidity?: {
+    validFrom?: string;
+    validTo?: string;
+    assertedAt: string;
+  };
+  source?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MemoryState {
+  working: MemoryTierEntry[];
+  recall: MemoryTierEntry[];
+  archival: MemoryTierEntry[];
+  totalCount: number;
+  uriIndex?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Durable Session Checkpointing (LangGraph / Temporal / Osmani 2026)
+// ---------------------------------------------------------------------------
+
+export interface CheckpointEntry {
+  id: string;
+  sessionId: string;
+  turnIndex: number;
+  timestamp: string;
+  label: string;
+  summary?: string;
+  deltaDiff?: string;
+  verifiedStatus?: "GREEN" | "UNVERIFIED" | "REFUTED";
+  tokenCount?: number;
+  stateSnapshot?: {
+    activeSessionId?: string;
+    workingDirectory?: string;
+    goal?: string;
+    appliedEditsCount?: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Gauntlet-RLM Squad Topology & Evaluator-Optimizer (Huang et al. / Anthropic)
+// ---------------------------------------------------------------------------
+
+export type SquadRole = "worker" | "critic_text" | "critic_vision" | "researcher" | "orchestrator";
+
+export interface BlindCriticRubric {
+  goalScore: number; // 0.0 - 1.0
+  contractScore: number; // 0.0 - 1.0
+  barScore: number; // 0.0 - 1.0
+  contractVerdict: "PASS" | "FAIL";
+  barVerdict: "PASS" | "FAIL" | "REFUTED";
+  quotedDefects: Array<{
+    file?: string;
+    line?: number;
+    defect: string;
+    recommendation: string;
+  }>;
+  reviewRound: number;
+  criticRole: "critic_text" | "critic_vision";
+  timestamp: string;
+}
+
+export interface SquadMemberState {
+  id: string;
+  role: SquadRole;
+  name: string;
+  status: "idle" | "working" | "evaluating" | "done" | "error";
+  targetPiece?: string;
+  reviewRounds?: number;
+  latestRubric?: BlindCriticRubric;
+  softCriticReplacementCount?: number;
+}
+
+export interface SquadTopology {
+  orchestrator: SquadMemberState;
+  members: SquadMemberState[];
+  activeEvaluationRounds: number;
+  doomLoopDetected: boolean;
 }
 
 /** Live daemon-owned runtime capabilities used by the harness panels. */

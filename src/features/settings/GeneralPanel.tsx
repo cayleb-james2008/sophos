@@ -17,7 +17,7 @@ const THEME_OPTIONS = [
 
 export function GeneralPanel() {
   const ipc = useIpc();
-  const { setView } = useAppState();
+  const { setView, setSettingsTab } = useAppState();
   const [draft, setDraft] = useState<Settings>({});
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -133,6 +133,13 @@ export function GeneralPanel() {
         <div className="gp-foot">
           <Button variant="ghost" onClick={() => setDraft({})} disabled={!loaded}>
             Reset
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setSettingsTab("migration")}
+            title="Import configuration and instructions from Claude Desktop or Codex Desktop"
+          >
+            Import from Claude / Codex
           </Button>
           <Button
             variant="ghost"

@@ -147,6 +147,136 @@ export const BUILTIN_TOOLS: ToolRegistryEntry[] = [
     category: "builtin",
     schema: { type: "object", properties: {} },
   },
+  {
+    name: "ast_grep_search",
+    description: "Structural AST pattern search ignoring formatting and whitespace (ast-grep).",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        pattern: { type: "string", description: "AST syntax pattern to match" },
+        lang: { type: "string", description: "Language (typescript, rust, python, etc.)" },
+        path: { type: "string", description: "Target subdirectory or file" },
+      },
+      required: ["pattern"],
+    },
+  },
+  {
+    name: "ast_grep_outline",
+    description: "Extract symbols, functions, and exports from a file with AST parsing.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path to outline" },
+        lang: { type: "string", description: "Language identifier" },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "repomix_pack",
+    description: "Pack token-budgeted directory context with Tree-Sitter compression (repomix).",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Root path to pack" },
+        token_budget: { type: "number", description: "Strict token budget limit" },
+        compress: { type: "boolean", description: "Enable Tree-Sitter signature compression" },
+      },
+    },
+  },
+  {
+    name: "code_repo_map",
+    description: "Generate high-level call-graph and structural dependency map for the codebase.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Base path of repository" },
+        max_tokens: { type: "number", description: "Maximum token budget for the map" },
+      },
+    },
+  },
+  {
+    name: "memory_search",
+    description: "Semantic search across OpenViking / Letta multi-tier memory.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Semantic search query" },
+        tier: { type: "string", description: "Target tier: working | recall | archival" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "memory_store",
+    description: "Store a durable fact with bi-temporal validity tags into memory.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Fact summary title" },
+        content: { type: "string", description: "Detailed fact content" },
+        tier: { type: "string", description: "Storage tier: working | recall | archival" },
+        uri: { type: "string", description: "Optional viking:// URI identifier" },
+      },
+      required: ["title", "content"],
+    },
+  },
+  {
+    name: "memory_recall",
+    description: "Recall high-confidence facts and active scratchpad entries.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Lookup query" },
+        limit: { type: "number", description: "Max entries to return" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "memory_forget",
+    description: "Invalidate or prune an outdated memory entry.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Memory entry ID to invalidate" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "create_checkpoint",
+    description: "Create a durable session state checkpoint before risky actions or multi-turn loops.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        label: { type: "string", description: "Human-readable checkpoint label" },
+        summary: { type: "string", description: "Description of state delta" },
+      },
+      required: ["label"],
+    },
+  },
+  {
+    name: "restore_checkpoint",
+    description: "Roll back workspace and session state to a saved checkpoint.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        checkpoint_id: { type: "string", description: "ID of checkpoint to restore" },
+      },
+      required: ["checkpoint_id"],
+    },
+  },
 ];
 
 /** The tool names Code mode composes (derived so profiles can't drift). */

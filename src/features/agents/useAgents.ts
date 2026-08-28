@@ -22,12 +22,16 @@ import type {
   AgentMessageReceipt,
   AgentSessionState,
   AgentWatchEvent,
+  BlindCriticRubric,
   RlmChild,
+  SquadMemberState,
+  SquadRole,
+  SquadTopology,
 } from "../../ipc/contract";
 import { useUnreadRefresh } from "../../ipc/unread";
 
 /** Where an agent process originates. */
-export type AgentKind = "daemon" | "rlm";
+export type AgentKind = "daemon" | "rlm" | "squad";
 /** Unified status, normalized from both AgentInfo ("saved") and RlmChild ("done"|"error"). */
 export type AgentStatus = "running" | "idle" | "saved" | "done" | "error";
 
@@ -40,6 +44,9 @@ export interface AgentRow {
   sessionId?: string;
   parentId?: string;
   model?: string;
+  squadRole?: SquadRole;
+  reviewRounds?: number;
+  latestRubric?: BlindCriticRubric;
 }
 
 /** The local client's own agent id. Mirrors the convention used by InboxView. */
@@ -62,11 +69,33 @@ function childToAgentRow(c: RlmChild): AgentRow {
   };
 }
 
+function squadMemberToAgentRow(m: SquadMemberState): AgentRow {
+  const status: AgentStatus =
+    m.status === "working" || m.status === "evaluating"
+      ? "running"
+      : m.status === "done"
+        ? "done"
+        : m.status === "error"
+          ? "error"
+          : "idle";
+  return {
+    id: m.id,
+    name: m.name,
+    kind: "squad",
+    status,
+    summary: m.targetPiece ? `Target: ${m.targetPiece}` : undefined,
+    squadRole: m.role,
+    reviewRounds: m.reviewRounds,
+    latestRubric: m.latestRubric,
+  };
+}
+
 export function useAgents() {
   const ipc = useIpc();
   const conn = useConnectionState();
   const [daemonAgents, setDaemonAgents] = useState<AgentInfo[]>([]);
   const [rlmChildren, setRlmChildren] = useState<RlmChild[]>([]);
+  const [squadTopology, setSquadTopology] = useState<SquadTopology>();
   const [inbox, setInbox] = useState<AgentMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
   const [selectedAgentState, setSelectedAgentState] = useState<AgentSessionState>();
@@ -81,8 +110,12 @@ export function useAgents() {
   const unreadRefresh = useUnreadRefresh();
 
   const rows = useMemo<AgentRow[]>(
-    () => [...daemonAgents.map(toAgentRow), ...rlmChildren.map(childToAgentRow)],
-    [daemonAgents, rlmChildren],
+    () => [
+      ...daemonAgents.map(toAgentRow),
+      ...rlmChildren.map(childToAgentRow),
+      ...(squadTopology?.members ?? []).map(squadMemberToAgentRow),
+    ],
+    [daemonAgents, rlmChildren, squadTopology],
   );
 
   const selected = rows.find((r) => r.id === selectedId) ?? null;
@@ -103,16 +136,39 @@ export function useAgents() {
     setLoading(true);
     setError(undefined);
     try {
-      const [daemon, rlm, mb] = await Promise.all([ipc.listAgents(), ipc.getRlmChildren(), ipc.listInbox()]);
+      const [daemon, rlm, mb, sq] = await Promise.all([
+        typeof ipc.listAgents === "function" ? ipc.listAgents().catch(() => []) : Promise.resolve([]),
+        typeof ipc.getRlmChildren === "function" ? ipc.getRlmChildren().catch(() => []) : Promise.resolve([]),
+        typeof ipc.listInbox === "function" ? ipc.listInbox().catch(() => []) : Promise.resolve([]),
+        typeof ipc.getSquadTopology === "function"
+          ? ipc.getSquadTopology().catch(() => undefined)
+          : Promise.resolve(undefined),
+      ]);
       setDaemonAgents(daemon ?? []);
       setRlmChildren(rlm ?? []);
       setInbox(mb ?? []);
+      setSquadTopology(sq);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Agent relay unavailable");
     } finally {
       setLoading(false);
     }
   }, [ipc]);
+
+  const evaluatePiece = useCallback(
+    async (childId: string, pieceContract: string, bar: string, outputPaths: string[]) => {
+      setError(undefined);
+      try {
+        const rubric = await ipc.evaluateSquadPiece(childId, pieceContract, bar, outputPaths);
+        await refresh();
+        return rubric;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Blind critic evaluation failed");
+        throw e;
+      }
+    },
+    [ipc, refresh],
+  );
 
   useEffect(() => {
     void refresh();
@@ -322,6 +378,8 @@ export function useAgents() {
     loading,
     error,
     refresh,
+    squadTopology,
+    evaluatePiece,
     runtimeModel,
     connectionStatus: conn.status,
     connectionModel: conn.model,

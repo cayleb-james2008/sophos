@@ -19,20 +19,37 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Readable, Writable } from "node:stream";
 
-import type { AgentInfo, ConnectionState, IpcEvent, Settings } from "../../src/ipc/contract.js";
+import type {
+  AgentInfo,
+  ConnectionState,
+  IpcEvent,
+  MemoryTier,
+  MemoryTierEntry,
+  Settings,
+} from "../../src/ipc/contract.js";
 import {
   ConnectionHolder,
+  createCheckpoint as connCreateCheckpoint,
   enrichConnectionState,
+  evaluateSquadPiece as connEvaluateSquadPiece,
+  forgetMemory as connForgetMemory,
   getHarnessState as connGetHarnessState,
   getKernelState as connGetKernelState,
+  getMemoryState as connGetMemoryState,
   getModels as connGetModels,
   getProviders as connGetProviders,
+  getSquadTopology as connGetSquadTopology,
   getTranscript as connGetTranscript,
+  listCheckpoints as connListCheckpoints,
   listSessions as connListSessions,
   mapConnectionState,
   mapContextTree,
   mapCronJobToSchedule,
   mapSessionTree,
+  recallMemory as connRecallMemory,
+  restoreCheckpoint as connRestoreCheckpoint,
+  searchMemory as connSearchMemory,
+  storeMemory as connStoreMemory,
   writeAuthKey,
   writeModelOverrideToModelsJson,
   type AgentConnectionRlmChild,
@@ -780,6 +797,60 @@ export class RpcServer {
         this.holder.getSettingsStore().update({ extensions } as Partial<Settings>);
         await conn.reload();
         return undefined;
+      }
+
+      case "getMemoryState": {
+        const p = optionalParams<{ tier?: MemoryTier }>(params);
+        return connGetMemoryState(this.requireConn(), p?.tier);
+      }
+
+      case "searchMemory": {
+        const p = requireParams<{ query: string; tier?: MemoryTier; maxResults?: number }>(params, ["query"]);
+        return connSearchMemory(this.requireConn(), p.query, p.tier, p.maxResults);
+      }
+
+      case "storeMemory": {
+        const p = requireParams<{ entry: Omit<MemoryTierEntry, "id"> }>(params, ["entry"]);
+        return connStoreMemory(this.requireConn(), p.entry);
+      }
+
+      case "recallMemory": {
+        const p = requireParams<{ query: string; limit?: number }>(params, ["query"]);
+        return connRecallMemory(this.requireConn(), p.query, p.limit);
+      }
+
+      case "forgetMemory": {
+        const p = requireParams<{ id: string }>(params, ["id"]);
+        return connForgetMemory(this.requireConn(), p.id);
+      }
+
+      case "createCheckpoint": {
+        const p = requireParams<{ label: string; summary?: string }>(params, ["label"]);
+        return connCreateCheckpoint(this.requireConn(), p.label, p.summary);
+      }
+
+      case "restoreCheckpoint": {
+        const p = requireParams<{ id: string }>(params, ["id"]);
+        return connRestoreCheckpoint(this.requireConn(), p.id);
+      }
+
+      case "listCheckpoints": {
+        const p = optionalParams<{ sessionId?: string }>(params);
+        return connListCheckpoints(this.requireConn(), p?.sessionId);
+      }
+
+      case "getSquadTopology": {
+        return connGetSquadTopology(this.requireConn());
+      }
+
+      case "evaluateSquadPiece": {
+        const p = requireParams<{
+          childId: string;
+          pieceContract: string;
+          bar: string;
+          outputPaths: string[];
+        }>(params, ["childId", "pieceContract", "bar", "outputPaths"]);
+        return connEvaluateSquadPiece(this.requireConn(), p.childId, p.pieceContract, p.bar, p.outputPaths);
       }
 
       default:

@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Text, Button, IconButton, Badge, Spinner } from "../../design";
 import { useIpc, type IpcClient } from "../../ipc/client";
+import { useAppState } from "../../state/AppState";
 import type { McpTestResult, Settings } from "../../ipc/contract";
 import { describeImportOutcome, useProfile } from "../profiles/profiles";
 import {
@@ -112,6 +113,14 @@ function groupLabel(entry: ToolRegistryEntry): string {
   }
 }
 
+function useOptionalAppState() {
+  try {
+    return useAppState();
+  } catch {
+    return null;
+  }
+}
+
 export function StudioPanel() {
   const {
     studioOpen,
@@ -123,6 +132,7 @@ export function StudioPanel() {
     deleteCustomProfile,
     importCustomProfile,
   } = useProfile();
+  const appState = useOptionalAppState();
   const ipc = useIpc();
 
   const [registry, setRegistry] = useState<RegistryState | null>(null);
@@ -615,6 +625,20 @@ export function StudioPanel() {
               title="Import a custom profile from a .sophos-profile.json file"
             >
               Import…
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => {
+                closeStudio();
+                appState?.setSettingsTab("migration");
+                appState?.setView("settings");
+              }}
+              data-testid="studio-import-harness"
+              title="Import configuration and instructions from Claude Desktop (CLAUDE.md) or Codex Desktop"
+            >
+              Import Claude / Codex…
             </Button>
             <Button
               variant="outline"
