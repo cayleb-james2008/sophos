@@ -23,6 +23,8 @@ import type {
   HarnessState,
   IpcEvent,
   KernelState,
+  McpResource,
+  McpServerDetails,
   McpTestResult,
   MemoryState,
   MemoryTier,
@@ -34,12 +36,18 @@ import type {
   RuntimeInfo,
   RuntimeSkill,
   ScheduleInfo,
+  SecurityAuditEntry,
   SessionInfo,
   SessionTree,
   Settings,
   SlashCommand,
   SquadTopology,
+  SquadWorkflowState,
+  SquadWorkflowType,
+  TokenBudgetBreakdown,
   TranscriptMessage,
+  WorkspaceSecurityPolicy,
+  BlastRadiusReport,
 } from "./contract";
 
 /** True when running inside the Tauri shell (real IPC); false in the browser preview. */
@@ -159,6 +167,32 @@ export interface IpcClient {
     bar: string,
     outputPaths: string[],
   ): Promise<BlindCriticRubric>;
+
+  // Model Context Protocol (MCP) Standard
+  getMcpServers(): Promise<McpServerDetails[]>;
+  readMcpResource(serverName: string, uri: string): Promise<McpResource>;
+  getMcpPrompt(
+    serverName: string,
+    name: string,
+    args?: Record<string, string>,
+  ): Promise<{ description?: string; messages: Array<{ role: "user" | "assistant"; content: string }> }>;
+
+  // Workspace Security Sandbox (SWE-agent)
+  getSecurityPolicy(): Promise<{ policy: WorkspaceSecurityPolicy; customBlockedPatterns: string[] }>;
+  setSecurityPolicy(policy: WorkspaceSecurityPolicy, customBlockedPatterns?: string[]): Promise<void>;
+  analyzeBlastRadius(command: string, targetFiles?: string[]): Promise<BlastRadiusReport>;
+  getSecurityAuditLog(): Promise<SecurityAuditEntry[]>;
+
+  // Dynamic Squad Workflows (LangGraph / AutoGen 0.4)
+  getSquadWorkflow(): Promise<SquadWorkflowState>;
+  runSquadWorkflow(type: SquadWorkflowType, goal: string, bar: string): Promise<SquadWorkflowState>;
+  pauseSquadWorkflow(id: string): Promise<void>;
+
+  // Token Budget & Context Optimizer (DSPy / MemGPT)
+  getTokenBudget(): Promise<TokenBudgetBreakdown>;
+  compactContext(
+    strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
+  ): Promise<{ beforeTokens: number; afterTokens: number; savedTokens: number }>;
 
   // Events
   onEvent(cb: (event: IpcEvent) => void): () => void;
@@ -489,6 +523,58 @@ export class TauriIpcClient implements IpcClient {
       bar,
       outputPaths,
     }) as Promise<BlindCriticRubric>;
+  }
+  getMcpServers(): Promise<McpServerDetails[]> {
+    return this.send("getMcpServers", {}) as Promise<McpServerDetails[]>;
+  }
+  readMcpResource(serverName: string, uri: string): Promise<McpResource> {
+    return this.send("readMcpResource", { serverName, uri }) as Promise<McpResource>;
+  }
+  getMcpPrompt(
+    serverName: string,
+    name: string,
+    args?: Record<string, string>,
+  ): Promise<{ description?: string; messages: Array<{ role: "user" | "assistant"; content: string }> }> {
+    return this.send("getMcpPrompt", { serverName, name, args }) as Promise<{
+      description?: string;
+      messages: Array<{ role: "user" | "assistant"; content: string }>;
+    }>;
+  }
+  getSecurityPolicy(): Promise<{ policy: WorkspaceSecurityPolicy; customBlockedPatterns: string[] }> {
+    return this.send("getSecurityPolicy", {}) as Promise<{
+      policy: WorkspaceSecurityPolicy;
+      customBlockedPatterns: string[];
+    }>;
+  }
+  setSecurityPolicy(policy: WorkspaceSecurityPolicy, customBlockedPatterns?: string[]): Promise<void> {
+    return this.send("setSecurityPolicy", { policy, customBlockedPatterns }) as Promise<void>;
+  }
+  analyzeBlastRadius(command: string, targetFiles?: string[]): Promise<BlastRadiusReport> {
+    return this.send("analyzeBlastRadius", { command, targetFiles }) as Promise<BlastRadiusReport>;
+  }
+  getSecurityAuditLog(): Promise<SecurityAuditEntry[]> {
+    return this.send("getSecurityAuditLog", {}) as Promise<SecurityAuditEntry[]>;
+  }
+  getSquadWorkflow(): Promise<SquadWorkflowState> {
+    return this.send("getSquadWorkflow", {}) as Promise<SquadWorkflowState>;
+  }
+  runSquadWorkflow(type: SquadWorkflowType, goal: string, bar: string): Promise<SquadWorkflowState> {
+    return this.send("runSquadWorkflow", { type, goal, bar }) as Promise<SquadWorkflowState>;
+  }
+  pauseSquadWorkflow(id: string): Promise<void> {
+    return this.send("pauseSquadWorkflow", { id }) as Promise<void>;
+  }
+  getTokenBudget(): Promise<TokenBudgetBreakdown> {
+    return this.send("getTokenBudget", {}) as Promise<TokenBudgetBreakdown>;
+  }
+  compactContext(
+    strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
+  ): Promise<{ beforeTokens: number; afterTokens: number; savedTokens: number }> {
+    return this.send("compactContext", { strategy }) as Promise<{
+      beforeTokens: number;
+      afterTokens: number;
+      savedTokens: number;
+    }>;
   }
 }
 

@@ -25,6 +25,8 @@ import type {
   IpcEvent,
   KernelState,
   LocalProviderConfig,
+  McpResource,
+  McpServerDetails,
   McpTestResult,
   MemoryState,
   MemoryTier,
@@ -37,12 +39,18 @@ import type {
   RuntimeInfo,
   RuntimeSkill,
   ScheduleInfo,
+  SecurityAuditEntry,
   SessionInfo,
   SessionTree,
   Settings,
   SlashCommand,
   SquadTopology,
+  SquadWorkflowState,
+  SquadWorkflowType,
+  TokenBudgetBreakdown,
   TranscriptMessage,
+  WorkspaceSecurityPolicy,
+  BlastRadiusReport,
 } from "./contract";
 
 // ---------------------------------------------------------------------------
@@ -1419,5 +1427,455 @@ export class MockIpcClient implements IpcClient {
       m.id === childId ? { ...m, reviewRounds: (m.reviewRounds ?? 0) + 1, latestRubric: rubric } : m,
     );
     return rubric;
+  }
+
+  // -------------------------------------------------------------------------
+  // MCP Standard Subsystem Mock (Anthropic MCP v1.2+)
+  // -------------------------------------------------------------------------
+
+  private mockMcpServers: McpServerDetails[] = [
+    {
+      name: "filesystem",
+      command: "npx",
+      args: [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\Users\\Cayleb\\Desktop\\workspace\\sophos",
+      ],
+      enabled: true,
+      status: "connected",
+      latencyMs: 14,
+      protocolVersion: "2024-11-05",
+      capabilities: { tools: true, resources: true, prompts: true, logging: true },
+      tools: [
+        {
+          name: "read_file",
+          description: "Read the entire contents of a file from the filesystem",
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string", description: "Path to file" } },
+            required: ["path"],
+          },
+        },
+        {
+          name: "write_file",
+          description: "Write content to a file at the specified path",
+          inputSchema: {
+            type: "object",
+            properties: {
+              path: { type: "string", description: "Path to file" },
+              content: { type: "string", description: "File content to write" },
+            },
+            required: ["path", "content"],
+          },
+        },
+        {
+          name: "list_directory",
+          description: "List directory contents with metadata",
+          inputSchema: {
+            type: "object",
+            properties: { path: { type: "string", description: "Directory path" } },
+            required: ["path"],
+          },
+        },
+      ],
+      resources: [
+        {
+          uri: "file:///workspace/README.md",
+          name: "Project README",
+          description: "Main workspace architectural overview and build instructions",
+          mimeType: "text/markdown",
+          size: 16449,
+          text: "# Sophos\nWindows-native coding agent desktop application.",
+        },
+        {
+          uri: "file:///workspace/package.json",
+          name: "Node Package Manifest",
+          description: "Dependencies and workspace scripts definition",
+          mimeType: "application/json",
+          size: 2588,
+          text: JSON.stringify({ name: "sophos", version: "0.9.0", private: true }, null, 2),
+        },
+        {
+          uri: "file:///workspace/src-tauri/tauri.conf.json",
+          name: "Tauri Desktop Config",
+          description: "Tauri v2 application window and security settings",
+          mimeType: "application/json",
+          size: 1648,
+          text: JSON.stringify({ productName: "Sophos", version: "0.9.0" }, null, 2),
+        },
+      ],
+      prompts: [
+        {
+          name: "code_review",
+          description: "Perform an in-depth blind code review for security, performance, and correctness",
+          arguments: [
+            { name: "filePath", description: "Target file path to review", required: true },
+            {
+              name: "focus",
+              description: "Special focus (e.g. security, memory, typescript)",
+              required: false,
+            },
+          ],
+        },
+        {
+          name: "summarize_diff",
+          description: "Generate a conventional commits summary from a git diff",
+          arguments: [{ name: "diffText", description: "Unified diff text", required: true }],
+        },
+      ],
+    },
+    {
+      name: "github",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-github"],
+      enabled: true,
+      status: "connected",
+      latencyMs: 38,
+      protocolVersion: "2024-11-05",
+      capabilities: { tools: true, resources: true, prompts: false, logging: true },
+      tools: [
+        {
+          name: "create_pull_request",
+          description: "Create a new pull request on GitHub/GitLab",
+          inputSchema: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              body: { type: "string" },
+              head: { type: "string" },
+              base: { type: "string" },
+            },
+            required: ["title", "head", "base"],
+          },
+        },
+        {
+          name: "list_issues",
+          description: "List recent issues from the repository",
+          inputSchema: {
+            type: "object",
+            properties: { state: { type: "string", enum: ["open", "closed", "all"] } },
+          },
+        },
+      ],
+      resources: [
+        {
+          uri: "github://repo/caylebalvarez-james/sophos/issues",
+          name: "Active Issue Tracker",
+          description: "Live issue feed from GitLab / GitHub",
+          mimeType: "application/json",
+          size: 4096,
+          text: JSON.stringify(
+            [
+              { id: 104, title: "Modernize MCP Explorer and Resource Streaming", status: "in_progress" },
+              { id: 105, title: "SWE-agent Workspace Security Sandbox", status: "completed" },
+            ],
+            null,
+            2,
+          ),
+        },
+      ],
+      prompts: [],
+    },
+  ];
+
+  async getMcpServers(): Promise<McpServerDetails[]> {
+    return this.mockMcpServers;
+  }
+
+  async readMcpResource(serverName: string, uri: string): Promise<McpResource> {
+    const server = this.mockMcpServers.find((s) => s.name === serverName);
+    const res = server?.resources.find((r) => r.uri === uri);
+    if (!res) {
+      throw new Error(`MCP Resource not found: ${uri} on server ${serverName}`);
+    }
+    return res;
+  }
+
+  async getMcpPrompt(
+    serverName: string,
+    name: string,
+    args?: Record<string, string>,
+  ): Promise<{ description?: string; messages: Array<{ role: "user" | "assistant"; content: string }> }> {
+    const server = this.mockMcpServers.find((s) => s.name === serverName);
+    const prompt = server?.prompts.find((p) => p.name === name);
+    if (!prompt) {
+      throw new Error(`MCP Prompt template not found: ${name} on server ${serverName}`);
+    }
+    const injectedArgs = args
+      ? Object.entries(args)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join("\n")
+      : "none";
+    return {
+      description: prompt.description,
+      messages: [
+        {
+          role: "user",
+          content: `Execute MCP Prompt Template [${name}] from server [${serverName}].\nParameters:\n${injectedArgs}`,
+        },
+      ],
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Workspace Security Sandbox Mock (SWE-agent Governance)
+  // -------------------------------------------------------------------------
+
+  private mockSecurityPolicy: WorkspaceSecurityPolicy = "confirm-risky";
+  private mockCustomBlockedPatterns: string[] = [
+    ".git/**",
+    "**/.env*",
+    "**/.ssh/**",
+    "**/credentials.json",
+    "**/id_rsa*",
+  ];
+
+  private mockSecurityAuditLog: SecurityAuditEntry[] = [
+    {
+      id: "sec-001",
+      timestamp: new Date(Date.now() - 3600000).toISOString(),
+      command: "git status",
+      policy: "confirm-risky",
+      blastRadius: {
+        filesTargeted: 0,
+        forbiddenPathsHit: [],
+        riskLevel: "low",
+        requiresConfirmation: false,
+        reasons: ["Read-only git command"],
+        suggestedAction: "Execute immediately",
+      },
+      status: "auto-passed",
+      actor: "assistant",
+    },
+    {
+      id: "sec-002",
+      timestamp: new Date(Date.now() - 1800000).toISOString(),
+      command: "rm -rf .git/hooks",
+      policy: "confirm-risky",
+      blastRadius: {
+        filesTargeted: 1,
+        forbiddenPathsHit: [".git/**"],
+        riskLevel: "critical",
+        requiresConfirmation: true,
+        reasons: ["Attempts modification of forbidden git internal path: .git/**"],
+        suggestedAction: "Block destructive operation",
+      },
+      status: "blocked",
+      actor: "assistant",
+    },
+  ];
+
+  async getSecurityPolicy(): Promise<{ policy: WorkspaceSecurityPolicy; customBlockedPatterns: string[] }> {
+    return {
+      policy: this.mockSecurityPolicy,
+      customBlockedPatterns: this.mockCustomBlockedPatterns,
+    };
+  }
+
+  async setSecurityPolicy(policy: WorkspaceSecurityPolicy, customBlockedPatterns?: string[]): Promise<void> {
+    this.mockSecurityPolicy = policy;
+    if (customBlockedPatterns) {
+      this.mockCustomBlockedPatterns = customBlockedPatterns;
+    }
+  }
+
+  async analyzeBlastRadius(command: string, targetFiles?: string[]): Promise<BlastRadiusReport> {
+    const files = targetFiles ?? [];
+    const forbiddenHits: string[] = [];
+    const reasons: string[] = [];
+
+    // Check command string and targets for forbidden path hits
+    const normalized = (command + " " + files.join(" ")).toLowerCase();
+    for (const pattern of this.mockCustomBlockedPatterns) {
+      const cleanPattern = pattern.replace(/\*+/g, "").replace(/^\/|\/$/g, "");
+      if (cleanPattern && normalized.includes(cleanPattern.toLowerCase())) {
+        forbiddenHits.push(pattern);
+        reasons.push(`Target touches guarded security zone: ${pattern}`);
+      }
+    }
+
+    let riskLevel: "low" | "medium" | "high" | "critical" = "low";
+    if (forbiddenHits.length > 0) {
+      riskLevel = "critical";
+    } else if (files.length > 10 || /npm (publish|i -g)|rm -rf|drop table/i.test(command)) {
+      riskLevel = "high";
+      reasons.push("Command touches large file count or high-impact system state");
+    } else if (files.length > 3 || /package(-lock)?\.json|Cargo\.(toml|lock)/i.test(command)) {
+      riskLevel = "medium";
+      reasons.push("Modifies core package manifests or multiple files");
+    } else {
+      reasons.push("Standard bounded workspace operation");
+    }
+
+    const requiresConfirmation =
+      this.mockSecurityPolicy === "strict-sandbox" ||
+      (this.mockSecurityPolicy === "confirm-risky" && (riskLevel === "high" || riskLevel === "critical"));
+
+    const report: BlastRadiusReport = {
+      filesTargeted: files.length,
+      forbiddenPathsHit: forbiddenHits,
+      riskLevel,
+      requiresConfirmation,
+      reasons,
+      suggestedAction: requiresConfirmation
+        ? "Require explicit operator confirmation before execution"
+        : "Safe to proceed under current security policy",
+    };
+
+    // Log to audit log
+    this.mockSecurityAuditLog.unshift({
+      id: `sec-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      command: command || "File modification",
+      policy: this.mockSecurityPolicy,
+      blastRadius: report,
+      status: forbiddenHits.length > 0 ? "blocked" : requiresConfirmation ? "approved" : "auto-passed",
+      actor: "assistant",
+    });
+
+    return report;
+  }
+
+  async getSecurityAuditLog(): Promise<SecurityAuditEntry[]> {
+    return this.mockSecurityAuditLog;
+  }
+
+  // -------------------------------------------------------------------------
+  // Dynamic Squad Workflow Engine Mock (LangGraph / AutoGen 0.4)
+  // -------------------------------------------------------------------------
+
+  private mockSquadWorkflow: SquadWorkflowState = {
+    id: "wf-main",
+    name: "Gauntlet Multi-Agent Synthesis Pipeline",
+    type: "sequential",
+    nodes: [
+      {
+        id: "node-planner",
+        role: "Lead Architect",
+        profileId: "gauntlet",
+        model: "deepseek-v4-flash",
+        status: "completed",
+        contract: "Phase 0: Foundation First & bar.md Specification",
+        outputPreview: "Established 5 non-negotiables, 6 acceptance checks, and 0.9.0 release targets.",
+        latencyMs: 420,
+        round: 1,
+      },
+      {
+        id: "node-coder",
+        role: "Gauntlet Worker (Implementer)",
+        profileId: "code",
+        model: "deepseek-v4-flash",
+        status: "running",
+        contract: "Phase 1: Code Intelligence & MCP Subsystem Expansion",
+        outputPreview: "Implementing McpExplorer, SecuritySandboxPanel, and TokenBudget optimizer.",
+        latencyMs: 1250,
+        round: 1,
+      },
+      {
+        id: "node-critic",
+        role: "Blind Text Critic",
+        profileId: "minimal",
+        model: "deepseek-v4-flash",
+        status: "idle",
+        contract: "Phase 4: Independent External Rubric & Defect Scoring",
+        round: 1,
+      },
+      {
+        id: "node-verifier",
+        role: "Lead End-State Verifier",
+        profileId: "standard",
+        model: "deepseek-v4-flash",
+        status: "idle",
+        contract: "Phase 5: 100% Vitest, TSC, Lint, Format, and Cargo Pass Gate",
+        round: 1,
+      },
+    ],
+    activeNodeId: "node-coder",
+    consensusScore: 0.98,
+    totalRounds: 1,
+    maxRounds: 3,
+    barVerdict: "PASS",
+  };
+
+  async getSquadWorkflow(): Promise<SquadWorkflowState> {
+    return this.mockSquadWorkflow;
+  }
+
+  async runSquadWorkflow(type: SquadWorkflowType, goal: string, bar: string): Promise<SquadWorkflowState> {
+    this.mockSquadWorkflow.type = type;
+    this.mockSquadWorkflow.name = `${type.toUpperCase()} Squad Workflow: ${goal.slice(0, 30)}...`;
+    this.mockSquadWorkflow.nodes = this.mockSquadWorkflow.nodes.map((n, i) => ({
+      ...n,
+      status: i === 0 ? "completed" : i === 1 ? "running" : "idle",
+      contract: `Execute ${n.role} against bar: ${bar.slice(0, 25)}...`,
+    }));
+    this.mockSquadWorkflow.activeNodeId = "node-coder";
+    return this.mockSquadWorkflow;
+  }
+
+  async pauseSquadWorkflow(_id: string): Promise<void> {
+    if (this.mockSquadWorkflow.activeNodeId) {
+      const active = this.mockSquadWorkflow.nodes.find((n) => n.id === this.mockSquadWorkflow.activeNodeId);
+      if (active) active.status = "idle";
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Token Budget & Context Optimizer Mock (DSPy / MemGPT)
+  // -------------------------------------------------------------------------
+
+  private mockTokenBudget: TokenBudgetBreakdown = {
+    totalTokens: 31200,
+    contextLimit: 128000,
+    usagePercent: 24.38,
+    tiers: {
+      systemPrompt: 2400,
+      toolsAndSchemas: 4200,
+      workingMemory: 3800,
+      episodicRecall: 2200,
+      semanticArchival: 1500,
+      chatHistory: 16000,
+      checkpoints: 1100,
+    },
+    autoCompactionThreshold: 90000,
+    compactionSavingsTokens: 0,
+  };
+
+  async getTokenBudget(): Promise<TokenBudgetBreakdown> {
+    return this.mockTokenBudget;
+  }
+
+  async compactContext(
+    strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
+  ): Promise<{ beforeTokens: number; afterTokens: number; savedTokens: number }> {
+    const before = this.mockTokenBudget.totalTokens;
+    let saved = 0;
+    if (strategy === "semantic-summarize") {
+      saved = 8500;
+      this.mockTokenBudget.tiers.chatHistory = Math.max(2000, this.mockTokenBudget.tiers.chatHistory - 8500);
+    } else if (strategy === "prune-oldest") {
+      saved = 6000;
+      this.mockTokenBudget.tiers.chatHistory = Math.max(2000, this.mockTokenBudget.tiers.chatHistory - 6000);
+    } else {
+      saved = 2500;
+      this.mockTokenBudget.tiers.toolsAndSchemas = Math.max(
+        1500,
+        this.mockTokenBudget.tiers.toolsAndSchemas - 2500,
+      );
+    }
+
+    this.mockTokenBudget.totalTokens = Math.max(5000, before - saved);
+    this.mockTokenBudget.usagePercent = Number(
+      ((this.mockTokenBudget.totalTokens / this.mockTokenBudget.contextLimit) * 100).toFixed(2),
+    );
+    this.mockTokenBudget.compactionSavingsTokens =
+      (this.mockTokenBudget.compactionSavingsTokens ?? 0) + saved;
+
+    return {
+      beforeTokens: before,
+      afterTokens: this.mockTokenBudget.totalTokens,
+      savedTokens: saved,
+    };
   }
 }

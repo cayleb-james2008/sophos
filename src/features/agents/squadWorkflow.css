@@ -1,0 +1,66 @@
+/* SquadWorkflowGraph Styles */
+
+.squad-workflow-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.squad-workflow-topologies {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.squad-nodes-flow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-sunken);
+  min-height: 220px;
+}
+
+.squad-node-card {
+  min-width: 220px;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.squad-node-card--active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.squad-node-card--completed {
+  border-color: var(--color-success);
+}
+
+.squad-flow-arrow {
+  color: var(--color-text-dim);
+  font-weight: bold;
+  font-size: 18px;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.45);
+  }
+}

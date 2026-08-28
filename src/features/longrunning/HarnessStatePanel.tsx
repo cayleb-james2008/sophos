@@ -7,6 +7,7 @@ import type {
   MemoryState,
   MemoryTier,
   MemoryTierEntry,
+  TokenBudgetBreakdown,
 } from "../../ipc/contract";
 import { RefreshIcon, XIcon } from "../sessions/icons";
 import { SearchIcon } from "../../shell/icons";
@@ -17,9 +18,12 @@ const memoryTiers: MemoryTier[] = ["working", "recall", "archival"];
 
 export function HarnessStatePanel() {
   const ipc = useIpc();
-  const [viewMode, setViewMode] = useState<"continual" | "memory">("continual");
+  const [viewMode, setViewMode] = useState<"continual" | "memory" | "budget">("continual");
   const [state, setState] = useState<HarnessState>();
   const [memoryState, setMemoryState] = useState<MemoryState>();
+  const [tokenBudget, setTokenBudget] = useState<TokenBudgetBreakdown>();
+  const [compacting, setCompacting] = useState<boolean>(false);
+  const [compactionNotice, setCompactionNotice] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [filter, setFilter] = useState<"all" | HarnessEntry["kind"]>("all");
@@ -36,9 +40,14 @@ export function HarnessStatePanel() {
         typeof ipc.getMemoryState === "function"
           ? ipc.getMemoryState().catch(() => undefined)
           : Promise.resolve(undefined);
-      const [hState, mState] = await Promise.all([hPromise, mPromise]);
+      const bPromise =
+        typeof ipc.getTokenBudget === "function"
+          ? ipc.getTokenBudget().catch(() => undefined)
+          : Promise.resolve(undefined);
+      const [hState, mState, bState] = await Promise.all([hPromise, mPromise, bPromise]);
       setState(hState);
       setMemoryState(mState);
+      setTokenBudget(bState);
       setError(undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Continual harness state unavailable");
@@ -115,6 +124,13 @@ export function HarnessStatePanel() {
             onClick={() => setViewMode("memory")}
           >
             Semantic memory tiers ({memoryState?.totalCount ?? rawMemoryEntries.length})
+          </Button>
+          <Button
+            variant={viewMode === "budget" ? "accent-soft" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("budget")}
+          >
+            Token budget & compaction
           </Button>
           <Button variant="ghost" size="sm" icon={<RefreshIcon size={13} />} onClick={() => void refresh()}>
             Reload
@@ -237,7 +253,7 @@ export function HarnessStatePanel() {
             )}
           </div>
         </>
-      ) : (
+      ) : viewMode === "memory" ? (
         <>
           <Text variant="body" tone="muted">
             3-tier semantic memory architecture (Working scratchpad ↔ Recall conversation buffer ↔ Archival
@@ -334,6 +350,198 @@ export function HarnessStatePanel() {
             </div>
           )}
         </>
+      ) : (
+        /* Token Budget & Context Compaction Optimizer View */
+        <div className="card-stack" data-testid="token-budget-panel">
+          <Text variant="body" tone="muted">
+            Context window usage allocation across system prompts, tool definitions, active memory tiers, and
+            conversation transcripts. Trigger dynamic semantic compaction to reclaim context space without
+            losing durable knowledge.
+          </Text>
+
+          {compactionNotice && (
+            <div
+              className="sp-test sp-test--ok"
+              style={{ padding: "8px 12px", borderRadius: "6px", background: "var(--color-surface-sunken)" }}
+            >
+              <Text variant="micro" tone="success">
+                {compactionNotice}
+              </Text>
+            </div>
+          )}
+
+          {tokenBudget && (
+            <>
+              {/* Main Progress Bar */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", margin: "8px 0" }}>
+                <div className="lr-headrow">
+                  <Text variant="label" weight="semibold">
+                    Context Window Usage: {tokenBudget.totalTokens.toLocaleString()} /{" "}
+                    {tokenBudget.contextLimit.toLocaleString()} tokens
+                  </Text>
+                  <Badge
+                    tone={
+                      tokenBudget.usagePercent > 80
+                        ? "danger"
+                        : tokenBudget.usagePercent > 50
+                          ? "accent"
+                          : "success"
+                    }
+                  >
+                    {tokenBudget.usagePercent}% Used
+                  </Badge>
+                </div>
+                <div
+                  style={{
+                    width: "100%",
+                    height: "10px",
+                    background: "var(--color-surface-sunken)",
+                    borderRadius: "5px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${Math.min(100, tokenBudget.usagePercent)}%`,
+                      height: "100%",
+                      background:
+                        tokenBudget.usagePercent > 80
+                          ? "var(--color-danger)"
+                          : tokenBudget.usagePercent > 50
+                            ? "var(--color-accent)"
+                            : "var(--color-success)",
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Tiers Distribution */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "10px",
+                }}
+              >
+                <Card variant="default" padding="sm">
+                  <Text variant="micro" tone="dim" uppercase weight="semibold">
+                    Chat Transcript
+                  </Text>
+                  <Text variant="label" weight="bold">
+                    {tokenBudget.tiers.chatHistory.toLocaleString()} tokens
+                  </Text>
+                </Card>
+                <Card variant="default" padding="sm">
+                  <Text variant="micro" tone="dim" uppercase weight="semibold">
+                    Tools & Schemas
+                  </Text>
+                  <Text variant="label" weight="bold">
+                    {tokenBudget.tiers.toolsAndSchemas.toLocaleString()} tokens
+                  </Text>
+                </Card>
+                <Card variant="default" padding="sm">
+                  <Text variant="micro" tone="dim" uppercase weight="semibold">
+                    Working Memory
+                  </Text>
+                  <Text variant="label" weight="bold">
+                    {tokenBudget.tiers.workingMemory.toLocaleString()} tokens
+                  </Text>
+                </Card>
+                <Card variant="default" padding="sm">
+                  <Text variant="micro" tone="dim" uppercase weight="semibold">
+                    System Prompt
+                  </Text>
+                  <Text variant="label" weight="bold">
+                    {tokenBudget.tiers.systemPrompt.toLocaleString()} tokens
+                  </Text>
+                </Card>
+                <Card variant="default" padding="sm">
+                  <Text variant="micro" tone="dim" uppercase weight="semibold">
+                    Semantic Archival
+                  </Text>
+                  <Text variant="label" weight="bold">
+                    {tokenBudget.tiers.semanticArchival.toLocaleString()} tokens
+                  </Text>
+                </Card>
+                <Card variant="default" padding="sm">
+                  <Text variant="micro" tone="dim" uppercase weight="semibold">
+                    Checkpoints
+                  </Text>
+                  <Text variant="label" weight="bold">
+                    {tokenBudget.tiers.checkpoints.toLocaleString()} tokens
+                  </Text>
+                </Card>
+              </div>
+
+              {/* Compaction Actions */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+                <Text variant="label" weight="semibold">
+                  Compaction Strategies (DSPy / MemGPT)
+                </Text>
+                <div className="lr-row lr-row--wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={compacting}
+                    onClick={async () => {
+                      setCompacting(true);
+                      try {
+                        const res = await ipc.compactContext("semantic-summarize");
+                        setCompactionNotice(
+                          `Semantic summarization reclaimed ${res.savedTokens.toLocaleString()} tokens!`,
+                        );
+                        void refresh();
+                      } finally {
+                        setCompacting(false);
+                      }
+                    }}
+                  >
+                    Semantic Summarize (DSPy)
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={compacting}
+                    onClick={async () => {
+                      setCompacting(true);
+                      try {
+                        const res = await ipc.compactContext("prune-oldest");
+                        setCompactionNotice(
+                          `Pruned oldest conversation turns, saving ${res.savedTokens.toLocaleString()} tokens!`,
+                        );
+                        void refresh();
+                      } finally {
+                        setCompacting(false);
+                      }
+                    }}
+                  >
+                    Prune Oldest Turns
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={compacting}
+                    onClick={async () => {
+                      setCompacting(true);
+                      try {
+                        const res = await ipc.compactContext("evict-tools");
+                        setCompactionNotice(
+                          `Evicted dormant tool schemas, saving ${res.savedTokens.toLocaleString()} tokens!`,
+                        );
+                        void refresh();
+                      } finally {
+                        setCompacting(false);
+                      }
+                    }}
+                  >
+                    Evict Dormant Tools
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       )}
     </Card>
   );

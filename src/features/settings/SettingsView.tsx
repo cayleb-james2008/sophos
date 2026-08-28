@@ -15,6 +15,8 @@ import { LongRunningPanel } from "./LongRunningPanel";
 import { AboutPanel } from "./AboutPanel";
 import { FleetStrip } from "./FleetStrip";
 import { MigrationWizard } from "../migration";
+import { McpExplorer } from "../mcp";
+import { SecuritySandboxPanel } from "../security";
 import "./settings.css";
 
 export function SettingsView() {
@@ -25,7 +27,10 @@ export function SettingsView() {
       <header className="settings__header">
         <div className="settings__eyebrow">CONTROL ROOM</div>
         <h1>Settings</h1>
-        <p>Providers, models, preferences, skills, extensions, migration, and runtime telemetry.</p>
+        <p>
+          Providers, models, preferences, skills, extensions, MCP, security sandbox, migration, and runtime
+          telemetry.
+        </p>
       </header>
 
       <FleetStrip />
@@ -35,6 +40,8 @@ export function SettingsView() {
         items={[
           { id: "general", label: "General" },
           { id: "providers", label: "Providers" },
+          { id: "mcp", label: "MCP Explorer" },
+          { id: "security", label: "Security & Sandbox" },
           { id: "subagents", label: "Subagents" },
           { id: "skills", label: "Skills" },
           { id: "extensions", label: "Extensions" },
@@ -50,6 +57,8 @@ export function SettingsView() {
       <div className="settings__body">
         {tab === "general" ? <GeneralPanel /> : null}
         {tab === "providers" ? <ProvidersPanel /> : null}
+        {tab === "mcp" ? <McpExplorer /> : null}
+        {tab === "security" ? <SecuritySandboxPanel /> : null}
         {tab === "subagents" ? <SubagentPolicyPanel /> : null}
         {tab === "skills" ? <SkillsPanel /> : null}
         {tab === "extensions" ? <ExtensionsPanel /> : null}

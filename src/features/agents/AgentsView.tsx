@@ -10,14 +10,15 @@
 // overlay when there's nothing to show. All IPC wiring from the prior console
 // is preserved — this is a representation change only.
 
-import { useEffect } from "react";
-import { Text, StatusDot, Button, Spinner } from "../../design";
+import { useEffect, useState } from "react";
+import { Text, StatusDot, Button, Spinner, Tabs } from "../../design";
 import type { StatusDotState } from "../../design";
 import type { ConnectionStatus } from "../../ipc/contract";
 import { useAgents } from "./useAgents";
 import { AgentDetail } from "./AgentDetail";
 import { RefreshIcon } from "./icons";
 import { AgentsGraph } from "./AgentsGraph";
+import { SquadWorkflowGraph } from "./SquadWorkflowGraph";
 import "./agents.css";
 
 function toDot(status: ConnectionStatus): StatusDotState {
@@ -36,6 +37,7 @@ function toDot(status: ConnectionStatus): StatusDotState {
 }
 
 export function AgentsView() {
+  const [agentsTab, setAgentsTab] = useState<string>("fleet");
   const {
     rows,
     selected,
@@ -81,9 +83,9 @@ export function AgentsView() {
           the fleet graph below is the primary object. */}
       <header className="ag-header">
         <div className="ag-heading">
-          <div className="ag-eyebrow">AGENT FLEET</div>
+          <div className="ag-eyebrow">AGENT FLEET & SQUAD WORKFLOWS</div>
           <h1>Agent command center</h1>
-          <p>Live topology of the agent fleet — select a node to attach, message, and monitor.</p>
+          <p>Live topology of the agent fleet and dynamic LangGraph squad execution workflows.</p>
         </div>
 
         <div className="ag-headband">
@@ -116,104 +118,124 @@ export function AgentsView() {
         </div>
       </header>
 
-      {/* Connection error banner — only when the relay degrades */}
-      {error ? (
-        <div className="ag-errorbanner" role="alert">
-          <span>⚡</span>
-          <span>Agent relay degraded — {error}</span>
-          <Button
-            variant="danger"
-            className="ag-errorbanner__action"
-            onClick={() => void refresh()}
-            aria-label="Retry"
-          >
-            Retry
-          </Button>
-        </div>
-      ) : null}
+      <div style={{ padding: "0 var(--space-4)", marginBottom: "var(--space-2)" }}>
+        <Tabs
+          variant="pill"
+          items={[
+            { id: "fleet", label: `Fleet Hierarchy (${rows.length})` },
+            { id: "squad", label: "Squad Workflows (DAG)" },
+          ]}
+          activeId={agentsTab}
+          onChange={setAgentsTab}
+        />
+      </div>
 
-      {/* Console: node graph + inspector */}
-      <section className="ag-console ag-console--graph">
-        <div className="ag-graphwrap">
-          {!loading ? (
-            <AgentsGraph
-              rows={rows}
-              connectionStatus={connectionStatus}
-              attachedIds={attachedIds}
-              unreadByAgent={unreadByAgent}
-              onSelect={setSelectedId}
-              onAttach={attach}
-              onDetach={detach}
-              onMessage={setSelectedId}
-            />
+      {agentsTab === "squad" ? (
+        <div style={{ padding: "0 var(--space-4) var(--space-4)" }}>
+          <SquadWorkflowGraph />
+        </div>
+      ) : (
+        <>
+          {/* Connection error banner — only when the relay degrades */}
+          {error ? (
+            <div className="ag-errorbanner" role="alert">
+              <span>⚡</span>
+              <span>Agent relay degraded — {error}</span>
+              <Button
+                variant="danger"
+                className="ag-errorbanner__action"
+                onClick={() => void refresh()}
+                aria-label="Retry"
+              >
+                Retry
+              </Button>
+            </div>
           ) : null}
 
-          {/* Degraded states overlayed on the graph canvas */}
-          {loading && !hasAgents ? (
-            <div className="ag-graphblank">
-              <div className="ag-graphblank__card">
-                <Spinner size={22} />
-                <b>Scanning the relay…</b>
-                <span>Resolving daemon, agents, and RLM children.</span>
-              </div>
-            </div>
-          ) : error && !hasAgents ? (
-            <div className="ag-graphblank">
-              <div className="ag-graphblank__card">
-                <b>Fleet unavailable</b>
-                <span>{error}</span>
-                <Button variant="outline" className="ag-graphblank__retry" onClick={() => void refresh()}>
-                  Retry
-                </Button>
-              </div>
-            </div>
-          ) : !loading && !error && !hasAgents ? (
-            <div className="ag-graphblank">
-              <div className="ag-graphblank__card">
-                <b>No agents in range</b>
-                <span>
-                  The fleet graph shows daemon-backed agents and RLM children. Attach an agent or spawn an RLM
-                  child to appear here. Agents appear when they connect; expect live status and message relay
-                  once one is present.
-                </span>
-              </div>
-            </div>
-          ) : null}
-        </div>
+          {/* Console: node graph + inspector */}
+          <section className="ag-console ag-console--graph">
+            <div className="ag-graphwrap">
+              {!loading ? (
+                <AgentsGraph
+                  rows={rows}
+                  connectionStatus={connectionStatus}
+                  attachedIds={attachedIds}
+                  unreadByAgent={unreadByAgent}
+                  onSelect={setSelectedId}
+                  onAttach={attach}
+                  onDetach={detach}
+                  onMessage={setSelectedId}
+                />
+              ) : null}
 
-        <div className="ag-inspectorwrap">
-          {loading && !selected ? (
-            <div className="ag-detail__loading">
-              <Spinner size={24} />
-              <Text variant="label" tone="dim">
-                Scanning the relay…
-              </Text>
+              {/* Degraded states overlayed on the graph canvas */}
+              {loading && !hasAgents ? (
+                <div className="ag-graphblank">
+                  <div className="ag-graphblank__card">
+                    <Spinner size={22} />
+                    <b>Scanning the relay…</b>
+                    <span>Resolving daemon, agents, and RLM children.</span>
+                  </div>
+                </div>
+              ) : error && !hasAgents ? (
+                <div className="ag-graphblank">
+                  <div className="ag-graphblank__card">
+                    <b>Fleet unavailable</b>
+                    <span>{error}</span>
+                    <Button variant="outline" className="ag-graphblank__retry" onClick={() => void refresh()}>
+                      Retry
+                    </Button>
+                  </div>
+                </div>
+              ) : !loading && !error && !hasAgents ? (
+                <div className="ag-graphblank">
+                  <div className="ag-graphblank__card">
+                    <b>No agents in range</b>
+                    <span>
+                      The fleet graph shows daemon-backed agents and RLM children. Attach an agent or spawn an
+                      RLM child to appear here. Agents appear when they connect; expect live status and
+                      message relay once one is present.
+                    </span>
+                  </div>
+                </div>
+              ) : null}
             </div>
-          ) : (
-            <AgentDetail
-              agent={selected ?? null}
-              runtimeModel={runtimeModel}
-              attached={selected ? attachedIds.includes(selected.id) : false}
-              sessionState={selectedAgentState}
-              onAttach={() => {
-                if (selected) void attach(selected.id);
-              }}
-              onDetach={() => {
-                if (selected) detach(selected.id);
-              }}
-              thread={thread}
-              unreadCount={selectedId ? unreadByAgent(selectedId) : 0}
-              draft={draft}
-              setDraft={setDraft}
-              sending={sending}
-              onSend={send}
-              deliveryReceipt={deliveryReceipt}
-              onMarkRead={markRead}
-              onMarkAllRead={markAllRead}
-            />
-          )}
-        </div>
-      </section>
+
+            <div className="ag-inspectorwrap">
+              {loading && !selected ? (
+                <div className="ag-detail__loading">
+                  <Spinner size={24} />
+                  <Text variant="label" tone="dim">
+                    Scanning the relay…
+                  </Text>
+                </div>
+              ) : (
+                <AgentDetail
+                  agent={selected ?? null}
+                  runtimeModel={runtimeModel}
+                  attached={selected ? attachedIds.includes(selected.id) : false}
+                  sessionState={selectedAgentState}
+                  onAttach={() => {
+                    if (selected) void attach(selected.id);
+                  }}
+                  onDetach={() => {
+                    if (selected) detach(selected.id);
+                  }}
+                  thread={thread}
+                  unreadCount={selectedId ? unreadByAgent(selectedId) : 0}
+                  draft={draft}
+                  setDraft={setDraft}
+                  sending={sending}
+                  onSend={send}
+                  deliveryReceipt={deliveryReceipt}
+                  onMarkRead={markRead}
+                  onMarkAllRead={markAllRead}
+                />
+              )}
+            </div>
+          </section>
+        </>
+      )}
     </main>
   );
 }

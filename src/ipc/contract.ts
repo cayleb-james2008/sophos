@@ -89,6 +89,24 @@ export type IpcCommand =
   | {
       method: "evaluateSquadPiece";
       params: { childId: string; pieceContract: string; bar: string; outputPaths: string[] };
+    }
+  | { method: "getMcpServers"; params: Record<string, never> }
+  | { method: "readMcpResource"; params: { serverName: string; uri: string } }
+  | { method: "getMcpPrompt"; params: { serverName: string; name: string; args?: Record<string, string> } }
+  | { method: "getSecurityPolicy"; params: Record<string, never> }
+  | {
+      method: "setSecurityPolicy";
+      params: { policy: WorkspaceSecurityPolicy; customBlockedPatterns?: string[] };
+    }
+  | { method: "analyzeBlastRadius"; params: { command: string; targetFiles?: string[] } }
+  | { method: "getSecurityAuditLog"; params: Record<string, never> }
+  | { method: "getSquadWorkflow"; params: Record<string, never> }
+  | { method: "runSquadWorkflow"; params: { type: SquadWorkflowType; goal: string; bar: string } }
+  | { method: "pauseSquadWorkflow"; params: { id: string } }
+  | { method: "getTokenBudget"; params: Record<string, never> }
+  | {
+      method: "compactContext";
+      params: { strategy: "semantic-summarize" | "prune-oldest" | "evict-tools" };
     };
 
 export interface PromptOptions {
@@ -682,4 +700,136 @@ export interface SlashCommand {
   name: string;
   description: string;
   source?: "builtin" | "extension" | "skill";
+}
+
+// ---------------------------------------------------------------------------
+// Model Context Protocol (MCP) Standard Subsystem (Anthropic MCP v1.2+)
+// ---------------------------------------------------------------------------
+
+export interface McpResource {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+  size?: number;
+  text?: string;
+  blob?: string;
+}
+
+export interface McpPromptArgument {
+  name: string;
+  description?: string;
+  required?: boolean;
+}
+
+export interface McpPromptTemplate {
+  name: string;
+  description?: string;
+  arguments?: McpPromptArgument[];
+}
+
+export interface McpToolSchema {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+}
+
+export interface McpServerDetails {
+  name: string;
+  command: string;
+  args?: string[];
+  enabled: boolean;
+  status: "connected" | "disconnected" | "error" | "testing";
+  latencyMs?: number;
+  protocolVersion?: string;
+  capabilities?: {
+    tools?: boolean;
+    resources?: boolean;
+    prompts?: boolean;
+    logging?: boolean;
+  };
+  tools: McpToolSchema[];
+  resources: McpResource[];
+  prompts: McpPromptTemplate[];
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Autonomous Workspace Security & Blast Radius Governance (SWE-agent)
+// ---------------------------------------------------------------------------
+
+export type WorkspaceSecurityPolicy = "strict-sandbox" | "confirm-risky" | "permissive" | "network-isolated";
+
+export type RiskLevel = "low" | "medium" | "high" | "critical";
+
+export interface BlastRadiusReport {
+  filesTargeted: number;
+  forbiddenPathsHit: string[];
+  riskLevel: RiskLevel;
+  requiresConfirmation: boolean;
+  reasons: string[];
+  suggestedAction: string;
+}
+
+export interface SecurityAuditEntry {
+  id: string;
+  timestamp: string;
+  command: string;
+  policy: WorkspaceSecurityPolicy;
+  blastRadius: BlastRadiusReport;
+  status: "approved" | "blocked" | "auto-passed" | "rejected";
+  actor: string;
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic Multi-Agent Squad Workflow Engine (LangGraph / AutoGen 0.4)
+// ---------------------------------------------------------------------------
+
+export type SquadWorkflowType = "sequential" | "hierarchical" | "consensus" | "custom";
+
+export interface SquadWorkflowNode {
+  id: string;
+  role: string;
+  profileId?: string;
+  model?: string;
+  status: "idle" | "running" | "completed" | "failed" | "skipped";
+  contract?: string;
+  outputPreview?: string;
+  latencyMs?: number;
+  round?: number;
+}
+
+export interface SquadWorkflowState {
+  id: string;
+  name: string;
+  type: SquadWorkflowType;
+  nodes: SquadWorkflowNode[];
+  activeNodeId?: string;
+  consensusScore?: number;
+  totalRounds: number;
+  maxRounds: number;
+  barVerdict?: "PASS" | "FAIL" | "REFUTED";
+}
+
+// ---------------------------------------------------------------------------
+// Context Token Budget & Compaction Optimizer (DSPy / MemGPT)
+// ---------------------------------------------------------------------------
+
+export interface TokenBudgetTiers {
+  systemPrompt: number;
+  toolsAndSchemas: number;
+  workingMemory: number;
+  episodicRecall: number;
+  semanticArchival: number;
+  chatHistory: number;
+  checkpoints: number;
+}
+
+export interface TokenBudgetBreakdown {
+  totalTokens: number;
+  contextLimit: number;
+  usagePercent: number;
+  tiers: TokenBudgetTiers;
+  autoCompactionThreshold: number;
+  compactionSavingsTokens?: number;
 }

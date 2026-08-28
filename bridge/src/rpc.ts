@@ -26,6 +26,8 @@ import type {
   MemoryTier,
   MemoryTierEntry,
   Settings,
+  SquadWorkflowType,
+  WorkspaceSecurityPolicy,
 } from "../../src/ipc/contract.js";
 import {
   ConnectionHolder,
@@ -35,10 +37,16 @@ import {
   forgetMemory as connForgetMemory,
   getHarnessState as connGetHarnessState,
   getKernelState as connGetKernelState,
+  getMcpPrompt as connGetMcpPrompt,
+  getMcpServers as connGetMcpServers,
   getMemoryState as connGetMemoryState,
   getModels as connGetModels,
   getProviders as connGetProviders,
+  getSecurityAuditLog as connGetSecurityAuditLog,
+  getSecurityPolicy as connGetSecurityPolicy,
   getSquadTopology as connGetSquadTopology,
+  getSquadWorkflow as connGetSquadWorkflow,
+  getTokenBudget as connGetTokenBudget,
   getTranscript as connGetTranscript,
   listCheckpoints as connListCheckpoints,
   listSessions as connListSessions,
@@ -46,12 +54,18 @@ import {
   mapContextTree,
   mapCronJobToSchedule,
   mapSessionTree,
+  pauseSquadWorkflow as connPauseSquadWorkflow,
+  readMcpResource as connReadMcpResource,
   recallMemory as connRecallMemory,
   restoreCheckpoint as connRestoreCheckpoint,
+  runSquadWorkflow as connRunSquadWorkflow,
   searchMemory as connSearchMemory,
+  setSecurityPolicy as connSetSecurityPolicy,
   storeMemory as connStoreMemory,
   writeAuthKey,
   writeModelOverrideToModelsJson,
+  analyzeBlastRadius as connAnalyzeBlastRadius,
+  compactContext as connCompactContext,
   type AgentConnectionRlmChild,
 } from "./connection.js";
 
@@ -851,6 +865,75 @@ export class RpcServer {
           outputPaths: string[];
         }>(params, ["childId", "pieceContract", "bar", "outputPaths"]);
         return connEvaluateSquadPiece(this.requireConn(), p.childId, p.pieceContract, p.bar, p.outputPaths);
+      }
+
+      case "getMcpServers": {
+        return connGetMcpServers(this.requireConn());
+      }
+
+      case "readMcpResource": {
+        const p = requireParams<{ serverName: string; uri: string }>(params, ["serverName", "uri"]);
+        return connReadMcpResource(this.requireConn(), p.serverName, p.uri);
+      }
+
+      case "getMcpPrompt": {
+        const p = requireParams<{ serverName: string; name: string; args?: Record<string, string> }>(params, [
+          "serverName",
+          "name",
+        ]);
+        return connGetMcpPrompt(this.requireConn(), p.serverName, p.name, p.args);
+      }
+
+      case "getSecurityPolicy": {
+        return connGetSecurityPolicy(this.requireConn());
+      }
+
+      case "setSecurityPolicy": {
+        const p = requireParams<{ policy: WorkspaceSecurityPolicy; customBlockedPatterns?: string[] }>(
+          params,
+          ["policy"],
+        );
+        await connSetSecurityPolicy(this.requireConn(), p.policy, p.customBlockedPatterns);
+        return undefined;
+      }
+
+      case "analyzeBlastRadius": {
+        const p = requireParams<{ command: string; targetFiles?: string[] }>(params, ["command"]);
+        return connAnalyzeBlastRadius(this.requireConn(), p.command, p.targetFiles);
+      }
+
+      case "getSecurityAuditLog": {
+        return connGetSecurityAuditLog(this.requireConn());
+      }
+
+      case "getSquadWorkflow": {
+        return connGetSquadWorkflow(this.requireConn());
+      }
+
+      case "runSquadWorkflow": {
+        const p = requireParams<{ type: SquadWorkflowType; goal: string; bar: string }>(params, [
+          "type",
+          "goal",
+          "bar",
+        ]);
+        return connRunSquadWorkflow(this.requireConn(), p.type, p.goal, p.bar);
+      }
+
+      case "pauseSquadWorkflow": {
+        const p = requireParams<{ id: string }>(params, ["id"]);
+        await connPauseSquadWorkflow(this.requireConn(), p.id);
+        return undefined;
+      }
+
+      case "getTokenBudget": {
+        return connGetTokenBudget(this.requireConn());
+      }
+
+      case "compactContext": {
+        const p = requireParams<{ strategy: "semantic-summarize" | "prune-oldest" | "evict-tools" }>(params, [
+          "strategy",
+        ]);
+        return connCompactContext(this.requireConn(), p.strategy);
       }
 
       default:

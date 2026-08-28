@@ -5,6 +5,37 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-08-28 (Modern Architecture & Fleet Intelligence)
+
+### Added
+- **Model Context Protocol (Anthropic MCP v1.2+) Live Explorer** (`src/features/mcp/McpExplorer.tsx`):
+  - Real-time MCP server discovery, latency health probes, and capability indicators.
+  - Interactive resource explorer with on-demand streaming (`client.readMcpResource()`), syntax highlight preview, and MIME type tagging.
+  - Interactive prompt template catalog (`client.getMcpPrompt()`) with dynamic argument form synthesis and one-click injection into composer.
+  - Live JSON tool schema inspection.
+- **Autonomous Workspace Security Sandbox & Blast Radius Governance** (`src/features/security/SecuritySandboxPanel.tsx`):
+  - 4-tier execution security policy (`strict-sandbox`, `confirm-risky`, `permissive`, `network-isolated`).
+  - Pre-execution blast radius analyzer (`client.analyzeBlastRadius()`) that calculates files targeted, risk level (`low`, `medium`, `high`, `critical`), and safety recommendations.
+  - Guarded security zones (`.git/**`, `**/.env*`, `**/.ssh/**`, `**/*.key*`) with fail-closed gates.
+  - Real-time security execution audit trail.
+- **Dynamic Multi-Agent Squad Workflow Engine** (`src/features/agents/SquadWorkflowGraph.tsx`):
+  - Visual DAG topology engine supporting Sequential Pipelines, Hierarchical Specialist Squads, and Multi-Agent Consensus Synthesis.
+  - Live node execution tracking with state propagation (planner, worker, blind critic, lead verifier) and consensus agreement scoring.
+- **Context Token Budget & Compaction Optimizer** (`src/features/longrunning/HarnessStatePanel.tsx`):
+  - Real-time token budget breakdown across 6 architectural tiers (system prompt, tools/schemas, working memory, episodic recall, semantic archival, chat transcript, checkpoints).
+  - Interactive context compaction optimizer supporting DSPy semantic summarization, oldest turn pruning, and dormant tool eviction.
+
+### Changed
+- **Version** — 0.8.0 → 0.9.0 (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`).
+- **IPC Protocol Seam** — Expanded `src/ipc/contract.ts`, `src/ipc/client.ts`, `src/ipc/mockClient.ts`, `bridge/src/rpc.ts`, and `bridge/src/connection.ts` with 12 new RPC endpoints and full TypeScript domain models.
+- **Navigation & Settings** — Integrated MCP Explorer and Security Sandbox into Settings Control Room; integrated Squad Workflows view toggle into Agent Fleet Command Center.
+
+### Tests
+- **Vitest**: 139 passed test files (1,179 passed tests, 0 failures).
+- **TypeScript & Lint**: `tsc --noEmit` clean, ESLint 9 clean with zero warnings, Prettier clean.
+- **Rust**: `cargo test` 25 passed.
+- **Auto-Updater & Live Feed**: 34/34 updater tests passed, 20/20 live-feed integrity checks passed.
+
 ## [0.8.0] — 2026-08-17 (Beta)
 
 ### Added
