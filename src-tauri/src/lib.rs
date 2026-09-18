@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent};
 
-use contract::{ConnectionStatus, IpcCommand, IpcEvent, SessionInfo, TokenEstimate, TranscriptMessage};
+use contract::{ConnectionStatus, IpcEvent, SessionInfo, TokenEstimate, TranscriptMessage};
 use daemon::DaemonManager;
 use engine_log::{EngineLogEntry, EngineLogSink};
 use job::Job;
