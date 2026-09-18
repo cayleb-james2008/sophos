@@ -60,3 +60,26 @@ This pass deliberately did **not** weaken or delete any test: the failing suite 
 correcting the environment shim, and all 1118 tests now pass on this host with the repo's own
 `npm test` command. The 24-check updater harness remains honest at 21/24 with a named, actionable
 reason.
+
+## Windows-native verification (2026-09-18)
+
+Sophos is the explicitly Windows-only app, and Windows-native is now **verified by
+cross-compiling**: `cargo xwin build --release --target x86_64-pc-windows-msvc` → **exit 0**,
+producing `src-tauri/target/x86_64-pc-windows-msvc/release/prime-agent-windows.exe` —
+`PE32+ executable for MS Windows (GUI), x86-64`, 12 MB, subsystem **2 = GUI**.
+
+Two prerequisites had to be built locally (both gitignored build outputs, not committed):
+`npx vite build` (the `dist/` frontend the Tauri config points at) and empty
+`resources/bridge/dist` + `resources/daemon/dist` directories (the JS sidecar bundles).
+Also fixed a real warning: an unused `IpcCommand` import in `src-tauri/src/lib.rs`; the Windows
+build is now warning-free.
+
+**Note on the Linux build:** `cargo check` for the *Linux* target fails in this repo because the
+source uses unguarded Windows APIs (`std::os::windows::process::CommandExt`,
+`windows_sys` job objects). That is by design — the README states "Sophos is Windows-only by
+design" — and it is why the Linux test suite exercises the Node/TS half (1118 tests) rather than
+the Rust half.
+
+**Runtime Windows testing remains NOT RUN** (needs Windows; a VM install was attempted here and
+did not complete). The gitignored resources (`bridge/dist`, `resources/node_modules`) and the
+`prime-agent-ref` sibling checkout are still required for full packaging.
