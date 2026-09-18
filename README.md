@@ -12,11 +12,18 @@ Node bridge sidecar, and a React frontend styled after the Prime Intellect
 design language: Geist typography, terminal-green accents, sharp corners,
 near-black surfaces.
 
+**Windows-only.** Sophos is built for developers on Windows 10/11 who want
+the Prime Agent coding agent as a native desktop app instead of a terminal.
+To try it, download the latest installer from the
+[Releases page](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
+and follow [Quick start](#quick-start--download--run) below — no manual
+dependencies, no admin rights needed.
+
 [![Tauri](https://img.shields.io/badge/Tauri-v2-blue?logo=tauri)](https://v2.tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Download](https://img.shields.io/badge/Download-Sophos_0.5.0_Beta-85ed75?logo=gitlab)](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
+[![Download](https://img.shields.io/badge/Download-Releases-85ed75?logo=gitlab)](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
 
 **Credits:** This is a Windows port of [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent). All credit for the agent runtime, daemon, and bridge belongs to the Prime Intellect team.
 
@@ -49,7 +56,7 @@ near-black surfaces.
 
 | Step | What |
 |---|---|
-| **1. Download** | Grab `Sophos_0.5.0_x64-setup.exe` from the [Releases](https://gitlab.com/caylebalvarez-james/sophos/-/releases) page. |
+| **1. Download** | Grab the latest `Sophos_<version>_x64-setup.exe` from the [Releases](https://gitlab.com/caylebalvarez-james/sophos/-/releases) page (the manifests in this repo are at 0.7.2 — match the installer name to the release you download). |
 | **2. Install** | Run the `.exe`. Sophos installs to `~\AppData\Local\Sophos`. No admin required. |
 | **3. Launch** | Open **Sophos**. The bundled Node runtime + daemon + bridge start automatically. |
 | **4. Add a provider** | Go to **Settings → Providers** and add an LLM provider (API key or local model). |
@@ -58,6 +65,38 @@ near-black surfaces.
 > **Zero manual dependencies.** The installer bundles the portable Node
 > runtime, the daemon `dist/`, the bridge `dist/`, and the shared
 > `node_modules/` — everything the app needs to run.
+
+---
+
+## What works today
+
+Sophos is Windows-only by design. This is what was verified, and where:
+
+| Area | Status | How verified |
+|---|---|---|
+| Frontend type-check (`npx tsc --noEmit`) | ✅ Passes on Linux | Run on this Linux host (see POLISH-NOTES.md) |
+| Frontend unit tests (`npx vitest run`) | ⚠️ 1116/1118 pass on Linux | Needs a Node 26 flag (see note below); 2 failures remain (see POLISH-NOTES.md) |
+| Local updater harness (`npm run test:updater`) | ⚠️ 20/24 on a fresh checkout | Passes only where `npm run updater:keys` has generated the local signing key (see note below) |
+| Live update-feed check (`node verify/live-feed.mjs`) | ✅ Passes with network | Fetches the live GitLab feed and verifies the Ed25519 signature (20/20) |
+| Native installer build (`npm run tauri build`) | ❌ Needs Windows | NSIS + `node.exe` runtime bundling; cannot run on Linux |
+| `node verify/e2e.mjs` (bundle + daemon round-trip) | ❌ Needs Windows | Boots `resources/node/*/node.exe`, uses named pipes and `taskkill` |
+| cua-driver UI suite (`npm run test:cua`) | ❌ Needs Windows | Drives the real app via UIA accessibility automation + WebView2 |
+
+Building from source and running the app require Windows 10/11 (see
+[Build from source](#build-from-source)). On Linux, the frontend checks above
+are the supported verification path.
+
+> **Environment notes (Linux).** CI targets Node 22 on Windows. This host
+> runs Node v26.7.0, where `globalThis.localStorage` is `undefined` unless
+> `--localstorage-file` is passed, so it shadows the jsdom `localStorage`
+> the tests rely on. Plain `npx vitest run`: 50 failed / 1068 passed
+> (1118 total). With `NODE_OPTIONS=--localstorage-file=/tmp/sophos-ls.json`:
+> **2 failed / 1116 passed** — the 2 residuals are both in
+> `OnboardingWizard.test.tsx` (wizard triggers a document navigation under
+> jsdom: "Not implemented: navigation to another Document"). The updater
+> harness scores 20/24 on a fresh checkout because the private signing key
+> (`scripts/updater.key`) is deliberately gitignored — generate it with
+> `npm run updater:keys` (never commit it) for the full pass.
 
 ---
 
@@ -222,7 +261,7 @@ node scripts/bundle.mjs
 
 # 2. Build the native installer:
 npm run tauri build
-# → src-tauri/target/release/bundle/nsis/Sophos_0.5.0_x64-setup.exe
+# → src-tauri/target/release/bundle/nsis/Sophos_<version>_x64-setup.exe
 #   (native binary at src-tauri/target/release/prime-agent-windows.exe)
 ```
 
@@ -296,11 +335,12 @@ path exceeding Windows `MAX_PATH` (260 chars). This is **non-blocking** — the
 native binary, frontend, and bundle are all built; only the final `.exe`
 wrapper fails.
 
-> **Verified 2026-08-08:** the build succeeded end-to-end from this worktree
-> (`src-tauri/target/release/bundle/nsis/Sophos_0.5.0_x64-setup.exe`, ~93 MB).
+> **Last reported end-to-end build: 2026-08-08** from this worktree
+> (installer under `src-tauri/target/release/bundle/nsis/`). Not re-verified
+> on this Linux host — the native installer only builds on Windows.
 > The blocker only triggers when the staged path pushes the deepest
-> `@mistralai` file past 260 chars — the current `prime-agent-windows`
-> worktree path keeps it at ~221 chars. If you ever hit it, shorten the
+> `@mistralai` file past 260 chars — the `prime-agent-windows` worktree path
+> in use at the time kept it at ~221 chars. If you ever hit it, shorten the
 > worktree path or apply a workaround below.
 
 Workarounds:
