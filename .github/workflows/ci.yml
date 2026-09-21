@@ -105,6 +105,16 @@ jobs:
         # tsc && vite build — emits dist/ that the Tauri shell embeds.
         run: npm run build
 
+      - name: Prepare gitignored resource dirs
+        # tauri-build validates bundle.resources paths at compile time, and the
+        # bundled runtime (resources/daemon/dist, resources/bridge/dist,
+        # resources/node_modules) is assembled only on a developer machine by
+        # scripts/bundle.mjs. The cua-driver suite runs in --demo mode, which
+        # never loads these resources, so empty placeholder dirs satisfy the
+        # build check without shipping any real runtime bytes.
+        run: |
+          mkdir -p resources/node_modules resources/daemon/dist resources/bridge/dist
+
       - name: Build Tauri release exe
         # cargo build --release compiles the Rust shell and embeds the
         # frontend from ../dist, producing
