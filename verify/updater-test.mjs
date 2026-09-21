@@ -11,8 +11,9 @@
 //
 // Usage: node verify/updater-test.mjs
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execSync, spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -102,36 +103,122 @@ async function main() {
     "found",
   ) || (allPass = false);
 
-  // 5. Verify signing key pair exists
+  // 5. Verify signing key pair exists.
+  // CI-mode ephemeral signing: on machines WITHOUT the production private
+  // key (fresh checkout / CI — the key is gitignored by design), generate
+  // an EPHEMERAL keypair into a temp dir OUTSIDE the repo tree (same Tauri
+  // signer path gen-updater-keys.mjs uses) and exercise the FULL
+  // sign + verify path against that ephemeral pair. The ephemeral private
+  // key is never written into the repo tree and is deleted afterwards.
+  // Production-key hygiene (committed .pub vs tauri.conf.json, .gitignore)
+  // still runs in both modes whenever the committed .pub is present.
   console.log("\n→ Checking signing keys...");
   const keyPath = join(SCRIPTS, "updater.key");
   const pubPath = join(SCRIPTS, "updater.key.pub");
-  check(
-    "Private key exists (scripts/updater.key)",
-    existsSync(keyPath),
-    existsSync(keyPath) ? "found" : "missing — run gen-updater-keys.mjs",
-  ) || (allPass = false);
+  const hasProdKey = existsSync(keyPath);
+  const hasProdPub = existsSync(pubPath);
 
-  check(
-    "Public key exists (scripts/updater.key.pub)",
-    existsSync(pubPath),
-    existsSync(pubPath) ? "found" : "missing — run gen-updater-keys.mjs",
-  ) || (allPass = false);
+  let ephemeralMode = false;
+  let ephemeralDir = null;
+  let ephemeralKeyPath = null;
+  let ephemeralPubPath = null;
+  // activePubPath: pubkey file the cryptographic verification below runs
+  // against (production .pub, or the ephemeral pub in CI-mode).
+  let activePubPath = pubPath;
+  // keyPathForBuild: private key build-signed-update.mjs signs with.
+  let keyPathForBuild = keyPath;
 
-  // Verify the pubkey in tauri.conf.json matches the .key.pub file
-  if (existsSync(pubPath) && updaterConf?.pubkey) {
+  if (hasProdKey) {
+    check(
+      "Private key exists (scripts/updater.key)",
+      true,
+      "found",
+    ) || (allPass = false);
+
+    check(
+      "Public key exists (scripts/updater.key.pub)",
+      hasProdPub,
+      hasProdPub ? "found" : "missing — run gen-updater-keys.mjs",
+    ) || (allPass = false);
+  } else {
+    // No production private key — enter ephemeral CI-mode. This is the
+    // EXPECTED state on CI / fresh checkouts; it is not a failure.
+    ephemeralMode = true;
+    console.log("⚠️  CI-MODE (ephemeral signing): scripts/updater.key not found.");
+    console.log("   Generating an EPHEMERAL keypair in a temp dir OUTSIDE the repo tree");
+    console.log("   for signing-verification only. This does NOT verify the production pubkey —");
+    console.log("   it proves the sign → verify → tamper-reject path works end to end.");
+    try {
+      ephemeralDir = mkdtempSync(join(tmpdir(), "sophos-updater-ci-"));
+      ephemeralKeyPath = join(ephemeralDir, "updater.key");
+      ephemeralPubPath = `${ephemeralKeyPath}.pub`;
+      // Same Tauri signer path scripts/gen-updater-keys.mjs uses, pointed
+      // at temp paths so nothing secret lands in the repo tree.
+      execSync(`npx tauri signer generate -w "${ephemeralKeyPath}" --ci -p ""`, {
+        stdio: "pipe",
+        cwd: REPO,
+      });
+      const ephemeralOk = existsSync(ephemeralKeyPath) && existsSync(ephemeralPubPath);
+      check(
+        "Ephemeral CI keypair generated (temp dir outside repo — production key absent)",
+        ephemeralOk,
+        ephemeralOk ? `dir=${ephemeralDir}` : "generation failed",
+      ) || (allPass = false);
+      check(
+        "Ephemeral public key available (temp dir)",
+        existsSync(ephemeralPubPath),
+        existsSync(ephemeralPubPath) ? "found" : "missing",
+      ) || (allPass = false);
+      if (ephemeralOk) {
+        activePubPath = ephemeralPubPath;
+        keyPathForBuild = ephemeralKeyPath;
+        const ephPubPreview = readFileSync(ephemeralPubPath, "utf-8").trim().substring(0, 40);
+        console.log(`   Ephemeral pubkey (first 40 chars): ${ephPubPreview}...`);
+        console.log("   NOTE: tauri.conf.json still holds the PRODUCTION pubkey;");
+        console.log("   ephemeral signatures below verify against the EPHEMERAL pubkey only.");
+      }
+    } catch (e) {
+      check(
+        "Ephemeral CI keypair generated (temp dir outside repo — production key absent)",
+        false,
+        e.message,
+      );
+      allPass = false;
+    }
+  }
+
+  // Committed-key hygiene: whenever the committed production .pub is
+  // present (it is tracked in git), it must match tauri.conf.json —
+  // in BOTH modes. This keeps the production-pubkey check meaningful on
+  // CI even though signing itself uses the ephemeral pair there.
+  if (hasProdPub && updaterConf?.pubkey) {
     const pubFileContent = readFileSync(pubPath, "utf-8").trim();
     check(
       "tauri.conf.json pubkey matches .key.pub file",
       updaterConf.pubkey === pubFileContent,
       `match=${updaterConf.pubkey === pubFileContent}`,
     ) || (allPass = false);
+  } else if (!hasProdPub) {
+    check(
+      "tauri.conf.json pubkey matches .key.pub file",
+      false,
+      "committed scripts/updater.key.pub missing — cannot verify production pubkey hygiene",
+    );
+    allPass = false;
   }
 
-  // 6. Build a signed update and verify the signature
+  // 6. Build a signed update and verify the signature.
+  // In ephemeral CI-mode the build signs with the temp keypair (via the
+  // --key override added for CI); the signed artifacts themselves
+  // (scripts/update.sig, scripts/update-binary.bin) are gitignored test
+  // outputs and are regenerated on every run.
   console.log("\n→ Building and signing a test update...");
+  if (ephemeralMode) {
+    console.log("   CI-MODE: signing with the EPHEMERAL key (not the production key).");
+  }
   try {
-    execSync("node scripts/build-signed-update.mjs --version 0.2.0", {
+    const keyFlag = ephemeralMode && keyPathForBuild !== keyPath ? ` --key "${keyPathForBuild}"` : "";
+    execSync(`node scripts/build-signed-update.mjs --version 0.2.0${keyFlag}`, {
       stdio: "pipe",
       cwd: REPO,
       env: { ...process.env, TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "" },
@@ -280,9 +367,12 @@ async function main() {
   // match key IDs, compute blake2b-512 of the update binary, and verify
   // the Ed25519 signature over the prehash using Node.js crypto.
   console.log("\n→ Cryptographically verifying signature...");
-  if (existsSync(sigPath) && existsSync(pubPath) && existsSync(updatePath)) {
+  if (ephemeralMode) {
+    console.log("   CI-MODE: verifying against the EPHEMERAL pubkey (not the production pubkey).");
+  }
+  if (existsSync(sigPath) && existsSync(activePubPath) && existsSync(updatePath)) {
     const sigContent = readFileSync(sigPath, "utf-8").trim();
-    const pubContent = readFileSync(pubPath, "utf-8").trim();
+    const pubContent = readFileSync(activePubPath, "utf-8").trim();
     const updateData = readFileSync(updatePath);
 
     // Both files are base64-encoded; decoding gives the minisign text format
@@ -367,6 +457,25 @@ async function main() {
         check("Cryptographic signature verification", false, e.message);
         allPass = false;
       }
+    }
+  } else {
+    check(
+      "Cryptographic signature verification inputs present",
+      false,
+      `sig=${existsSync(sigPath)} pub=${existsSync(activePubPath)} bin=${existsSync(updatePath)}`,
+    );
+    allPass = false;
+  }
+
+  // Ephemeral cleanup: the temp private key must never linger — remove the
+  // whole temp dir (it lives outside the repo tree by construction).
+  if (ephemeralDir) {
+    try {
+      rmSync(ephemeralDir, { recursive: true, force: true });
+      console.log(`\n   CI-MODE: ephemeral key material deleted (${ephemeralDir}).`);
+    } catch (e) {
+      check("Ephemeral key material cleaned up", false, e.message);
+      allPass = false;
     }
   }
 
