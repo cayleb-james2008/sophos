@@ -33,6 +33,12 @@ dependencies, no admin rights needed.
 
 ---
 
+## Launch video
+
+[![Sophos launch video](brag-output/brag.jpg)](brag-output/brag.mp4)
+
+*20-second launch video rendered with `/brag` + Hyperframes — click the still to watch.*
+
 ## Screenshots
 
 <table>
