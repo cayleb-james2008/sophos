@@ -112,6 +112,7 @@ jobs:
         # scripts/bundle.mjs. The cua-driver suite runs in --demo mode, which
         # never loads these resources, so empty placeholder dirs satisfy the
         # build check without shipping any real runtime bytes.
+        shell: bash
         run: |
           mkdir -p resources/node_modules resources/daemon/dist resources/bridge/dist
 
