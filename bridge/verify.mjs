@@ -25,11 +25,13 @@ const BRIDGE = process.env.BRIDGE || join(REPO_ROOT, "bridge", "dist", "bridge",
 const results = [];
 
 function isolatedSocketPath() {
-  const runId = `${process.pid}-${randomUUID()}`;
+  const runId = `${process.pid}-${randomUUID().slice(0, 8)}`;
   if (process.platform === "win32") {
     return `\\\\.\\pipe\\prime-agent-bridge-verify-${runId}`;
   }
-  return join(tmpdir(), `prime-agent-bridge-verify-${runId}.sock`);
+  // Linux UDS paths are limited (typically 108 bytes); TMPDIR may itself be
+  // deeply nested in isolated test environments, so keep the basename short.
+  return join(tmpdir(), `pa-${runId}.sock`);
 }
 
 const SOCKET_PATH = process.env.BRIDGE_VERIFY_SOCKET || isolatedSocketPath();
@@ -323,17 +325,89 @@ async function run() {
       ns1.result !== undefined && (typeof ns1.result.cancelled === "boolean" || typeof ns1.result.activeSessionId === "string"),
       `result=${JSON.stringify(ns1.result)}`);
 
-    // 20. newSession with cwd + goal: must thread through daemon create (fix #1).
-    // We don't strictly require success in this environment (the daemon may
-    // reject a bogus cwd), but the call must dispatch and not be silently
-    // dropped — a JSON-RPC error from the daemon is acceptable, a silent
-    // no-op is not.
-    const ns2 = await send({ id: "c22", method: "newSession", params: { cwd: "C:/tmp", goal: "verify harness session" } });
-    record("newSession({cwd,goal}) threads through daemon create (no silent drop)",
-      // Either succeeds or returns a clean JSON-RPC error from the daemon —
-      // never an undefined/null result with no indication.
-      ns2.result !== undefined || (typeof ns2.error === "object" && typeof ns2.error.code === "number"),
+    // 20. newSession with a real, existing cwd must create and attach a real daemon session.
+    const sessionCwd = process.env.BRIDGE_VERIFY_SESSION_CWD || process.cwd();
+    const ns2 = await send({ id: "c22", method: "newSession", params: { cwd: sessionCwd, goal: "verify harness session" } });
+    record("newSession({cwd,goal}) creates a session and returns its real activeSessionId",
+      typeof ns2.result?.activeSessionId === "string" && ns2.result.activeSessionId.length > 0,
       `result=${JSON.stringify(ns2.result)} err=${ns2.error ? ns2.error.code + " " + ns2.error.message : "none"}`);
+
+    const createdSessionId = ns2.result?.activeSessionId;
+    const stateAfterCreate = await send({ id: "c24", method: "getState", params: {} });
+    record("newSession leaves the bridge attached to the returned session",
+      typeof createdSessionId === "string" && stateAfterCreate.result?.activeSessionId === createdSessionId,
+      `created=${createdSessionId} current=${stateAfterCreate.result?.activeSessionId}`);
+
+    const transcriptAfterCreate = await send({ id: "c25", method: "getTranscript", params: {} });
+    record("new session transcript is retrievable",
+      Array.isArray(transcriptAfterCreate.result),
+      `entries=${transcriptAfterCreate.result?.length ?? "not-array"}`);
+
+    const sessionsAfterCreate = await send({ id: "c26", method: "listSessions", params: {} });
+    const priorSessionIds = new Set((Array.isArray(listResp.result) ? listResp.result : []).map((session) => session.id));
+    const newSessionListings = (Array.isArray(sessionsAfterCreate.result) ? sessionsAfterCreate.result : [])
+      .filter((session) => session.cwd === sessionCwd && !priorSessionIds.has(session.id))
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    const createdSessionListing = newSessionListings[0];
+    record("created daemon session is listed with a stable session id",
+      Boolean(createdSessionListing && typeof createdSessionListing.id === "string"),
+      `newListings=${newSessionListings.length} selected=${createdSessionListing?.id ?? "none"}`);
+
+    const previousSessionListing = Array.isArray(listResp.result) ? listResp.result.find((session) => typeof session.id === "string") : undefined;
+    const switchedToPrevious = previousSessionListing
+      ? await send({ id: "c27", method: "switchSession", params: { id: previousSessionListing.id } })
+      : { error: { code: -32603, message: "no previous saved session to switch to" } };
+    record("switchSession resolves listed session ID to upstream session path",
+      switchedToPrevious.result?.cancelled === false,
+      `result=${JSON.stringify(switchedToPrevious.result)} err=${switchedToPrevious.error ? switchedToPrevious.error.code + " " + switchedToPrevious.error.message : "none"}`);
+
+    const switchBackToCreated = createdSessionListing
+      ? await send({ id: "c28", method: "resumeSession", params: { pathOrId: createdSessionListing.id } })
+      : { error: { code: -32603, message: "new session was not listed" } };
+    const stateAfterSwitchBack = await send({ id: "c29", method: "getState", params: {} });
+    record("resumeSession returns to the created session",
+      switchBackToCreated.result?.cancelled === false && stateAfterSwitchBack.result?.activeSessionId === createdSessionId,
+      `result=${JSON.stringify(switchBackToCreated.result)} active=${stateAfterSwitchBack.result?.activeSessionId} expected=${createdSessionId}`);
+
+    if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {
+      const oldDaemon = daemon;
+      terminateProcessTree(oldDaemon);
+      const exited = await waitForExit(oldDaemon);
+      daemon = undefined;
+      record("session-recovery daemon exits before replacement", exited);
+      await sleep(300);
+      const replacement = await startDaemon();
+      daemon = replacement.proc;
+      daemonDiagnostics.push(...replacement.diagnostics);
+      record("replacement supervisor starts with persisted session state", replacement.proc.exitCode === null);
+      const stateAfterReconnect = await send({ id: "c33", method: "getState", params: {} });
+      record("created session remains connected and active after supervisor replacement",
+        stateAfterReconnect.result?.status?.kind === "connected" && stateAfterReconnect.result?.activeSessionId === createdSessionId,
+        `status=${stateAfterReconnect.result?.status?.kind} active=${stateAfterReconnect.result?.activeSessionId} expected=${createdSessionId}`);
+      const listedAfterReconnect = await send({ id: "c34", method: "listSessions", params: {} });
+      record("created session remains listed after daemon replacement",
+        Array.isArray(listedAfterReconnect.result) && listedAfterReconnect.result.some((session) => session.id === createdSessionListing?.id),
+        `listed=${Array.isArray(listedAfterReconnect.result) ? listedAfterReconnect.result.some((session) => session.id === createdSessionListing?.id) : false}`);
+      const transcriptAfterReconnect = await send({ id: "c35", method: "getTranscript", params: {} });
+      record("created session transcript remains retrievable after daemon replacement",
+        Array.isArray(transcriptAfterReconnect.result),
+        `entries=${transcriptAfterReconnect.result?.length ?? "not-array"}`);
+    }
+
+    const malformedSession = await send({ id: "c30", method: "newSession", params: { cwd: 42 } });
+    record("newSession rejects non-string cwd",
+      malformedSession.error?.code === -32602,
+      `err=${malformedSession.error?.code} ${malformedSession.error?.message}`);
+
+    const malformedGoal = await send({ id: "c32", method: "newSession", params: { goal: 42 } });
+    record("newSession rejects non-string goal",
+      malformedGoal.error?.code === -32602,
+      `err=${malformedGoal.error?.code} ${malformedGoal.error?.message}`);
+
+    const invalidCwdSession = await send({ id: "c31", method: "newSession", params: { cwd: "C:/tmp" } });
+    record("daemon create failure preserves upstream response error",
+      invalidCwdSession.error?.code === -32603 && invalidCwdSession.error.message.includes("Failed to obtain daemon session worker pid"),
+      `err=${invalidCwdSession.error?.code} ${invalidCwdSession.error?.message}`);
 
     // 21. forkSession with an entry id (short hex string) must dispatch to AgentConnection.fork
     // without throwing on the type-mismatch path (fix #2). The daemon may reject

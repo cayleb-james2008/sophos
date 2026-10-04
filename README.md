@@ -81,16 +81,17 @@ Sophos is Windows-only by design. This is what was verified, and where:
 | Area | Status | How verified |
 |---|---|---|
 | Frontend type-check (`npx tsc --noEmit`) | ✅ Passes on Linux | Run on this Linux host (see POLISH-NOTES.md) |
-| Frontend unit tests (`npx vitest run`) | ⚠️ 1116/1118 pass on Linux | Needs a Node 26 flag (see note below); 2 failures remain (see POLISH-NOTES.md) |
+| Frontend unit tests (`npm test`) | ✅ 1118/1118 on isolated Linux/Node 22 | Real checkout test run; a timing-sensitive export timestamp assertion failed once, then the targeted retry and full rerun passed |
 | Local updater harness (`npm run test:updater`) | ⚠️ 20/24 on a fresh checkout | Passes only where `npm run updater:keys` has generated the local signing key (see note below) |
 | Live update-feed check (`node verify/live-feed.mjs`) | ✅ Passes with network | Fetches the live GitLab feed and verifies the Ed25519 signature (20/20) |
 | Native installer build (`npm run tauri build`) | ❌ Needs Windows | NSIS + `node.exe` runtime bundling; cannot run on Linux |
-| `node verify/e2e.mjs` (bundle + daemon round-trip) | ❌ Needs Windows | Boots `resources/node/*/node.exe`, uses named pipes and `taskkill` |
+| `node verify/e2e.mjs` (staged runtime + bridge/daemon RPC) | ✅ 30/30 on Linux | Real pinned daemon and bridge, production dependencies, reconnect over a Unix-domain socket; Windows native execution not tested here |
 | cua-driver UI suite (`npm run test:cua`) | ❌ Needs Windows | Drives the real app via UIA accessibility automation + WebView2 |
 
-Building from source and running the app require Windows 10/11 (see
-[Build from source](#build-from-source)). On Linux, the frontend checks above
-are the supported verification path.
+Native Tauri installers and the desktop UI require Windows 10/11 (see
+[Build from source](#build-from-source)). The source bundle and isolated daemon/
+bridge JSON-RPC verifier also run on Linux, but do not validate Windows-native
+installer behavior.
 
 > **Environment notes (Linux).** CI targets Node 22 on Windows. This host
 > runs Node v26.7.0, where `globalThis.localStorage` is `undefined` unless
@@ -261,15 +262,31 @@ Save required to see the effect.
 ### Build steps
 
 ```bash
-# 1. Stage the runtime layout (daemon dist, bridge dist, node, node_modules)
-#    + build the frontend/bridge:
+# Start at the repository root. This command installs the frontend dependencies,
+# clones the exact Prime Agent source pin into ignored .deps/ if needed, installs
+# that source's locked dependencies with normal lifecycle scripts, compiles the
+# upstream daemon + bridge, stages verified runtime inputs, and builds the UI.
+npm ci
 node scripts/bundle.mjs
 
-# 2. Build the native installer:
+# Run the real daemon/bridge offline protocol smoke test with isolated HOME.
+# On Windows it uses the verified bundled node.exe; on Linux it uses the host
+# Node executable to exercise the real Linux daemon/bridge, not the Windows PE.
+node verify/e2e.mjs
+
+# Native Windows installer (requires Windows + Rust/Tauri/NSIS prerequisites).
 npm run tauri build
 # → src-tauri/target/release/bundle/nsis/Sophos_<version>_x64-setup.exe
-#   (native binary at src-tauri/target/release/prime-agent-windows.exe)
 ```
+
+The first `bundle.mjs` run needs network access to clone the pinned public
+Prime Agent source, install locked npm dependencies, and obtain the hash-verified
+official Node runtime. It does not call a model/provider API and needs no API
+keys. Prime Agent publishes its source in a monorepo rather than publishing the
+`@earendil-works/pi-*` package tarballs to npm; run the root bundler before
+installing/building `bridge/` on its own. The bundle command also validates an
+operator-supplied `PRIME_AGENT_REF` against the exact origin, tag commit, version,
+MIT license, and clean-worktree state before using it.
 
 The `bundle.mjs` manifest is written to `resources/.bundle-manifest.json`.
 Flags: `--no-frontend`, `--no-bridge`, `--no-node-modules`, `--layout-check-only`, `--help`.
@@ -278,16 +295,15 @@ Flags: `--no-frontend`, `--no-bridge`, `--no-node-modules`, `--layout-check-only
 
 | Var | Purpose | Default |
 |---|---|---|
-| `PRIME_AGENT_REF` | daemon source checkout (read-only) | `…\workspace\prime-agent-ref` |
-| `PRIME_NODE_MODULES` | portable node_modules source | installed app's `node_modules/` |
-| `PRIME_NODE_RUNTIME` | portable Node runtime source | installed app's `node/` |
-| `PRIME_DAEMON_TCP` | `1` = force TCP transport (if named pipes are blocked) | unset |
+| `PRIME_AGENT_REF` | optional Prime Agent source checkout | `.deps/prime-agent (pinned v0.7.0, MIT)` |
+| `PRIME_NODE_RUNTIME` | verified `node.exe` override | official Node v24.18.0 win-x64 download (SHA-256 checked) |
+| `PRIME_DAEMON_TCP` | Sophos-side toggle only; pinned Prime Agent v0.7.0 does **not** implement TCP listening | unset |
 
 ### Verify
 
 ```bash
 node scripts/bundle.mjs
-node verify/e2e.mjs          # bundle + layout + daemon TCP round-trip
+node verify/e2e.mjs          # staged bundle + real bridge/daemon JSON-RPC + recovery
 ```
 
 Reports: `verify/e2e-report.json`, `verify/e2e-evidence.txt`.
@@ -301,7 +317,7 @@ At runtime the Tauri resource dir contains (this is what
 
 ```
 <resource dir>/
-  node/node.exe                 # portable Node 22+ runtime
+  node/node-v24.18.0-win-x64/node.exe  # official runtime, SHA-256 pinned
   daemon/dist/cli.js            # coding-agent --mode daemon entry
   daemon/package.json
   bridge/dist/bridge/src/index.js  # JSON-RPC sidecar entry
@@ -318,17 +334,17 @@ At runtime the Tauri resource dir contains (this is what
 
 ---
 
-## Named-pipe wedge & TCP fallback
+## TCP fallback compatibility blocker
 
-On some Windows machines `CreateNamedPipeW` returns `ERROR_INVALID_NAME` for
-every caller, while TCP loopback keeps working.
-
-| Mechanism | Effect |
-|---|---|
-| `PRIME_DAEMON_TCP=1` | daemon + client use `tcp://127.0.0.1:48100` |
-| `--daemon-socket tcp://127.0.0.1:48130` | explicit TCP endpoint |
-
-The E2E harness tries named-pipe first and falls back to TCP automatically.
+The previously documented TCP fallback is not supported by the selected public
+Prime Agent dependency. At commit `be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387`,
+`DaemonSupervisor.listen()` calls Node's `net.Server.listen(this.socketPath)`
+with no `tcp://` parsing or `PRIME_DAEMON_TCP` handling. Supplying
+`--daemon-socket tcp://127.0.0.1:<port>` therefore does not create a TCP listener.
+The Linux verifier exercises the real daemon and bridge over a Unix-domain
+socket; Windows named-pipe and native installer behavior require a Windows run.
+Do not rely on the TCP setting until a compatible upstream release or a reviewed
+transport implementation is tested end-to-end.
 
 ---
 

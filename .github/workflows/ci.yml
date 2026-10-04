@@ -8,9 +8,9 @@ on:
 
 jobs:
   test:
-    # verify/e2e.mjs is Windows-specific: it drives named-pipe transports
-    # (`\\.\pipe\...`), uses `taskkill /T` for process-tree teardown, and boots
-    # a bundled `node-v24.18.0-win-x64` runtime. Run the whole job on Windows.
+    # verify/e2e.mjs runs the real staged daemon + bridge: it uses the bundled
+    # Windows Node executable and named-pipe IPC on Windows, or the host Node
+    # and Unix-domain sockets on POSIX. The workflow tests the Windows path.
     runs-on: windows-latest
 
     defaults:
@@ -53,17 +53,25 @@ jobs:
         # must red the build. Network-dependent (hits the live GitLab feed).
         run: node verify/live-feed.mjs
 
-      # e2e.mjs boots the BUNDLED runtime (resources/node/<version>/node.exe +
-      # resources/daemon/dist + resources/bridge/dist + shared node_modules),
-      # which is gitignored and assembled only on the developer machine by
-      # `node scripts/bundle.mjs` (it needs a local prime-agent-ref checkout and
-      # the AppData node_modules ship — neither exists in a fresh CI checkout).
-      # So this step is best-effort here: it still runs, but a failure does not
-      # red the build. Run `node scripts/bundle.mjs && node verify/e2e.mjs`
-      # locally before merge; see CONTRIBUTING.md.
-      - name: End-to-end verification (best-effort)
+      - name: Runtime helper and fail-closed gate regression tests
+        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs
+
+      # Build all ignored runtime inputs from a fresh checkout. The bundler
+      # verifies the exact public Prime Agent tag/commit/license, performs
+      # normal npm lifecycle installation, builds daemon + bridge, and fetches
+      # the hash-pinned official Windows Node executable before staging.
+      - name: Build complete runtime bundle
+        run: node scripts/bundle.mjs
+
+      - name: Verify bridge compatibility with the pinned daemon
+        run: npm --prefix bridge run test:kernel-compat
+
+      # Exercise the real staged daemon + bridge together over the platform's
+      # supported local-socket transport; the harness also validates the pinned
+      # upstream commit, packaged Node checksum, runtime dependencies, and daemon
+      # reconnect behavior. TCP fallback is explicitly not assumed.
+      - name: End-to-end verification
         run: node verify/e2e.mjs
-        continue-on-error: true
 
   # cua-e2e — drives the REAL Sophos desktop app (Tauri v2 release build) via
   # the cua-driver CLI and UIA accessibility automation (verify/cua/*). These

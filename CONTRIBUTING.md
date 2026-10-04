@@ -23,11 +23,17 @@ submit changes.
 
 ### Setup
 
-Install all frontend dependencies from the repository root:
+Install the locked frontend dependencies from the repository root:
 
 ```sh
-npm install
+npm ci
 ```
+
+The Prime Agent runtime is a pinned public source dependency, not an npm
+package tarball. `node scripts/bundle.mjs` clones/validates the exact v0.7.0
+commit into ignored `.deps/prime-agent`, installs its lockfile with normal npm
+lifecycle scripts, builds the daemon and bridge, and stages the verified
+runtime. No machine-local AppData checkout is required.
 
 ### Development
 
@@ -46,8 +52,10 @@ npm run tauri dev
 ### Production build
 
 ```sh
-npm run build      # tsc && vite build (frontend)
-npm run tauri build # bundled desktop installer
+npm ci                  # frontend dependencies
+node scripts/bundle.mjs # pinned Prime Agent + bridge build and runtime staging
+node verify/e2e.mjs     # real offline daemon/bridge protocol smoke test
+npm run tauri build     # native desktop installer on Windows
 ```
 
 The `verify/` suite requires a bundled runtime. Build it first with
@@ -71,17 +79,20 @@ tests import exactly like source code. `npm run test:ui` requires the optional
 `@vitest/ui` package (`npm i -D @vitest/ui`); without it, use `npm test` or
 `npm run test:watch`.
 
-**What is covered:** currently the unit-test harness and CI wiring are in
-place; test files for individual features land as features are added. The CI
-workflow additionally runs a TypeScript check and the headless end-to-end
-verifier (`node verify/e2e.mjs`, which exercises the offline daemon protocol
-and bridge sidecar on Windows).
+**What is covered:** the CI workflow installs from locked dependencies, builds
+the pinned upstream daemon and TypeScript bridge from public source, stages the
+hash-verified Node runtime, and runs the real offline bridge/daemon JSON-RPC
+verifier (`node verify/e2e.mjs`). On Windows this exercises the named-pipe path
+with the bundled Node executable; on Linux/macOS it uses the host Node and a
+Unix-domain socket. Non-Windows results do not validate Windows-native setup.
 
 ### Verifiers
 
-The `verify/` directory holds model-free offline verification scripts, run
-via `npm run verify:safety` and `node verify/e2e.mjs`. These are
-Windows-specific and drive the bundled daemon over named pipes/TCP.
+The `verify/` directory holds model-free offline checks. `node verify/e2e.mjs`
+requires a freshly assembled `resources/` bundle and drives the real daemon
+and bridge together, including reconnect recovery. It does not test provider
+API access, TCP fallback, Tauri installer creation, or Windows behavior when
+run on another OS.
 
 ## Code style
 
@@ -107,12 +118,9 @@ Windows-specific and drive the bundled daemon over named pipes/TCP.
    both must pass.
 5. **Open a pull request** against `master`. Describe what the change does and
    why, and note any manual verification performed.
-6. **CI must pass.** The CI workflow (`.github/workflows/ci.yml`) runs the
-   type-check and unit tests on every push and PR; both must be green. The
-   end-to-end verification step runs **best-effort** in CI (`continue-on-error`)
-   because `verify/e2e.mjs` needs the bundled runtime, which is gitignored and
-   can only be assembled locally via `node scripts/bundle.mjs`. Before merge,
-   run `node scripts/bundle.mjs && node verify/e2e.mjs` locally and confirm it
-   passes.
+6. **CI must pass.** The workflow builds the full pinned runtime from a fresh
+   source checkout and runs the daemon/bridge end-to-end verifier as a required
+   Windows job. The CUA UI job remains best-effort because GitHub-hosted Windows
+   runners do not provide an interactive desktop session.
 
 Thank you for contributing to Sophos.

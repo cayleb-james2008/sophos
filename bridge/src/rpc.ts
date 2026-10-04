@@ -242,6 +242,12 @@ export class RpcServer {
         // The resulting session then needs to be re-attached, so we tear down
         // the current connection and start a fresh attach cycle.
         const p = optionalParams<{ cwd?: string; goal?: string }>(params) ?? {};
+        if (p.cwd !== undefined && typeof p.cwd !== "string") {
+          throw rpcError(JSON_RPC_ERROR.invalidParams, "cwd must be a string");
+        }
+        if (p.goal !== undefined && typeof p.goal !== "string") {
+          throw rpcError(JSON_RPC_ERROR.invalidParams, "goal must be a string");
+        }
         const opts: { cwd?: string; goal?: string } = {};
         if (typeof p.cwd === "string") opts.cwd = p.cwd;
         if (typeof p.goal === "string") opts.goal = p.goal;

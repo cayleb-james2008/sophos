@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 bridge/node_modules/
+.deps/
 
 # Build output
 dist/

@@ -25,6 +25,8 @@ import {
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { readDaemonKernelState } from "./kernel-state-compat.js";
+import type { DaemonKernelMetadata } from "./kernel-state-compat.js";
 
 // ---------------------------------------------------------------------------
 // Persistent settings file.
@@ -732,7 +734,7 @@ export function mapKernelDiagnostic(value: unknown): KernelHealthDiagnostic {
 export async function getKernelState(conn: AgentConnection): Promise<KernelState> {
   const [daemonState, kernelState, messages] = await Promise.all([
     conn.getState(),
-    conn.getKernelState(),
+    readDaemonKernelState(conn) as Promise<DaemonKernelMetadata | undefined>,
     conn.getMessages(),
   ]);
   const activeTools = Array.isArray(daemonState.activeToolNames) ? daemonState.activeToolNames : [];
@@ -784,17 +786,17 @@ export async function getKernelState(conn: AgentConnection): Promise<KernelState
     }
   }
   const latest = cells[cells.length - 1];
-  const running = kernelState.running && kernelState.namespace !== null;
+  const running = kernelState?.running === true && kernelState.namespace !== null;
   return {
     status: !activeTools.includes("ipython") ? "unavailable" : latest?.status === "running" ? "running" : running ? "configured" : "unavailable",
     persistent: activeTools.includes("ipython"),
     toolAvailable: activeTools.includes("ipython"),
     sessionId: daemonState.sessionId,
-    executionCount: kernelState.executionCount,
+    executionCount: kernelState?.executionCount,
     cells,
-    variables: kernelState.namespace?.names ?? [],
-    imports: kernelState.namespace?.imports ?? [],
-    diagnostic: mapKernelDiagnostic(kernelState.diagnostic),
+    variables: kernelState?.namespace?.names ?? [],
+    imports: kernelState?.namespace?.imports ?? [],
+    diagnostic: mapKernelDiagnostic(kernelState?.diagnostic),
     lastOutput: latest?.output,
     lastError: latest?.error,
   };
@@ -1514,8 +1516,9 @@ export class ConnectionHolder {
       { type: "create", ...(Object.keys(config).length > 0 ? { config } : {}) },
       30_000,
     );
-    const created = (createResp as unknown as { data?: { activeSessionId?: string; id: string } }).data;
-    if (!created) throw new Error("daemon create returned no data");
+    if (!createResp.success) throw new Error(`daemon create failed: ${createResp.error}`);
+    const created = createResp.data as { activeSessionId?: string; id?: string } | undefined;
+    if (!created) throw new Error("daemon create succeeded without data");
     const id = created.activeSessionId ?? created.id;
     if (typeof id !== "string" || id.length === 0) {
       throw new Error("daemon create returned no activeSessionId");
@@ -1755,8 +1758,9 @@ export class ConnectionHolder {
       { type: "create", ...(Object.keys(config).length > 0 ? { config } : {}) },
       30_000,
     );
-    const created = (createResp as unknown as { data?: { activeSessionId?: string; id: string } }).data;
-    if (!created) throw new Error("daemon create returned no data");
+    if (!createResp.success) throw new Error(`daemon create failed: ${createResp.error}`);
+    const created = createResp.data as { activeSessionId?: string; id?: string } | undefined;
+    if (!created) throw new Error("daemon create succeeded without data");
     const newId = created.activeSessionId ?? created.id;
     if (typeof newId !== "string" || newId.length === 0) {
       throw new Error("daemon create returned no activeSessionId");
