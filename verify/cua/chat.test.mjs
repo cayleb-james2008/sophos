@@ -246,7 +246,11 @@ const tests = [
       catch { console.log("    [SKIP] Abort: turn did not go busy (streaming timing) — abort path unit-validated"); return; }
       assert(findBy(busyState, { role: "Button", name: "Stop generating" }), "Stop button missing while busy");
       takeScreenshot(app.pid, "chat-abort-busy", app.windowId);
-      clickBy(app.pid, busyState, { role: "Button", name: "Stop generating" });
+      // get_window_state refreshes the CUA snapshot used by element_token; the
+      // screenshot above created a newer snapshot, so re-read before clicking.
+      const stopState = freshState(app);
+      assert(findBy(stopState, { role: "Button", name: "Stop generating" }), "Stop button missing before abort click");
+      clickBy(app.pid, stopState, { role: "Button", name: "Stop generating" });
       await ensureIdle(app);
       const after = freshState(app);
       // Busy cleared: Stop is gone (Send may be disabled — the composer is empty
@@ -420,7 +424,9 @@ const tests = [
       assert(findBy(open, { text: "MiniMax M3" }), "MiniMax M3 not listed in model panel");
       assert(findBy(open, { text: "DeepSeek V4 Flash (free)" }), "DeepSeek V4 Flash (free) not listed");
       takeScreenshot(app.pid, "chat-model-open", app.windowId);
-      clickBy(app.pid, open, { text: "MiniMax M3" });
+      // The screenshot refreshed the CUA snapshot; use a token from the new one.
+      const selectionState = freshState(app);
+      clickBy(app.pid, selectionState, { text: "MiniMax M3" });
       await sleep(1200);
       const sel = freshState(app);
       assertTextContains(sel, "MiniMax M3");

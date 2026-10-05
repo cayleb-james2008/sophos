@@ -144,19 +144,53 @@ export function call(tool, args = {}) {
   return callInSession(tool, args);
 }
 
+function hasBackgroundUnavailableCode(value) {
+  return Boolean(
+    value && typeof value === "object" && (
+      value.code === "background_unavailable" ||
+      value.structuredContent?.code === "background_unavailable" ||
+      value.structured_content?.code === "background_unavailable"
+    ),
+  );
+}
+
+function isBackgroundUnavailableError(error) {
+  if (hasBackgroundUnavailableCode(error)) return true;
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const start = message.indexOf("{");
+  const end = message.lastIndexOf("}");
+  if (start < 0 || end <= start) return false;
+  try {
+    return hasBackgroundUnavailableCode(JSON.parse(message.slice(start, end + 1)));
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Run a tool, and if the driver reports `background_unavailable` (the target
- * surface drops background input — typical for Tauri/Chromium hotkeys and
- * scroll), retry once with `delivery_mode: "foreground"`. This mirrors the
- * driver's own guidance: always try background first, escalate only on the
- * structured signal.
+ * Run a tool in background mode first. Retry only an explicit
+ * `background_unavailable` refusal once in foreground; propagate every other
+ * error unchanged. `invoke` is injectable so the escalation rule is testable.
  */
-export function callWithForegroundFallback(tool, args = {}) {
-  const first = call(tool, args);
-  if (first && first.code === "background_unavailable") {
-    return call(tool, { ...args, delivery_mode: "foreground" });
+export function invokeWithForegroundFallback(invoke, tool, args = {}) {
+  let first;
+  try {
+    first = invoke(tool, args);
+  } catch (error) {
+    if (args.delivery_mode === "foreground" || !isBackgroundUnavailableError(error)) {
+      throw error;
+    }
+    return invoke(tool, { ...args, delivery_mode: "foreground" });
+  }
+
+  if (args.delivery_mode !== "foreground" && isBackgroundUnavailableError(first)) {
+    return invoke(tool, { ...args, delivery_mode: "foreground" });
   }
   return first;
+}
+
+export function callWithForegroundFallback(tool, args = {}) {
+  return invokeWithForegroundFallback(call, tool, args);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,12 +278,13 @@ export function getWindowStateForPixelClick(pid, windowId, invoke = call) {
 /**
  * Left-click at window-local pixel coordinates (x, y) relative to the window's
  * content screenshot. Prefer `clickElement` (element_token) for UIA-exposed
- * elements — pixel clicks are for canvas / custom-drawn surfaces.
+ * elements — pixel clicks are for canvas / custom-drawn surfaces. `opts` is
+ * forwarded to the driver, and explicit background refusals may escalate once.
  */
-export function click(pid, x, y, windowId) {
-  const args = { pid, x, y };
+export function click(pid, x, y, windowId, opts = {}) {
+  const args = { pid, x, y, ...opts };
   if (windowId) args.window_id = windowId;
-  return call("click", args);
+  return callWithForegroundFallback("click", args);
 }
 
 /**

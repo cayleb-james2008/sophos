@@ -44,8 +44,16 @@ const tests = [
 
   {
     name: "reads the UIA tree (nav buttons present)",
-    fn: (appHandle) => {
-      const state = freshState(appHandle);
+    fn: async (appHandle) => {
+      let state = freshState(appHandle);
+      // WebView2 can expose its UIA tree lazily after the first query. Wait a
+      // bounded 3 seconds for the Chat nav, then keep the full-tree assertions
+      // fail-closed rather than treating an empty provider as a pass.
+      if (!state.elements || state.elements.length === 0) {
+        const chatNav = await waitForElement(state, { role: "Button", name: "Chat" }, 3000);
+        assert(chatNav, "UIA tree remained empty after bounded lazy-provider retry");
+        state = freshState(appHandle);
+      }
       assert(state.elements && state.elements.length > 0, "UIA tree is empty");
       for (const view of ["Chat", "Sessions", "Agents", "Inbox", "Settings"]) {
         assertElementVisible(state, { role: "Button", name: view });

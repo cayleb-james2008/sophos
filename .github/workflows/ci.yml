@@ -167,6 +167,7 @@ jobs:
           verify/cua/driver-screenshot-context.test.mjs
           verify/cua/chat-app-path.test.mjs
           verify/cua/driver-session.test.mjs
+          verify/cua/driver-foreground-fallback.test.mjs
 
       - name: Run cua-driver native UI acceptance
         # This is a required check. It drives the real Tauri release executable
@@ -188,8 +189,22 @@ jobs:
           } else {
             Write-Host 'CUA_DRIVER_DOCTOR:'
             & $env:CUA_DRIVER_BIN doctor
-            Write-Host "CUA_DOCTOR_EXIT_CODE=$LASTEXITCODE"
+            $doctorExitCode = $LASTEXITCODE
+            Write-Host "CUA_DOCTOR_EXIT_CODE=$doctorExitCode"
             Write-Host 'CUA_DRIVER_STATUS:'
             & $env:CUA_DRIVER_BIN status
-            Write-Host "CUA_STATUS_EXIT_CODE=$LASTEXITCODE"
+            $statusExitCode = $LASTEXITCODE
+            Write-Host "CUA_STATUS_EXIT_CODE=$statusExitCode"
           }
+          # This step records evidence only. The required CUA acceptance step
+          # above owns the job result; a stopped daemon after teardown is normal.
+          exit 0
+
+      - name: Preserve Windows CUA screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-cua-screenshots-${{ github.run_id }}
+          path: verify/cua/screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 7
