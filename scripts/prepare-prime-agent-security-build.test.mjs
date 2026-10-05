@@ -97,6 +97,7 @@ test("rejects a mismatched later patch digest before changing the build checkout
 // This integration seam intentionally guards the real release entrypoint too;
 // the Windows CI bundle/native/MSI path supplies the end-to-end verification.
 const securityBuildSource = await readFile(new URL("./prepare-prime-agent-security-build.mjs", import.meta.url), "utf8");
+const gitattributes = await readFile(new URL("../.gitattributes", import.meta.url), "utf8");
 const bundleSource = await readFile(new URL("./bundle.mjs", import.meta.url), "utf8");
 const e2eSource = await readFile(new URL("../verify/e2e.mjs", import.meta.url), "utf8");
 test("the real bundler prepares and builds the composed security overlay", () => {
@@ -171,6 +172,25 @@ test("Windows Prime Agent source and build trees use a unique system-TEMP root",
   const linuxPaths = resolvePrimeAgentSecurityWorkPaths("/work/sophos", { platform: "linux" });
   assert.equal(linuxPaths.sourceRoot, "/work/sophos/.deps/prime-agent");
   assert.equal(linuxPaths.buildRoot, "/work/sophos/.deps/prime-agent-v070-security-build");
+});
+
+test("hash-pinned overlay policy files keep their committed bytes on Windows checkouts", () => {
+  assert.match(gitattributes, /^scripts\/dependency-hardening-overlay\.json -text$/m);
+  assert.match(gitattributes, /^patches\/prime-agent-v0\.7\.0-session-lease-windows\.patch -text$/m);
+});
+
+test("checked-out overlay manifest retains the exact reviewed bytes", async (t) => {
+  const manifestBytes = await readFile(new URL("./dependency-hardening-overlay.json", import.meta.url));
+  const manifestSha256 = sha256(manifestBytes);
+  const carriageReturns = manifestBytes.filter((byte) => byte === 0x0d).length;
+  const diagnostics = `manifest checkout: bytes=${manifestBytes.length}, sha256=${manifestSha256}, CR bytes=${carriageReturns}`;
+  t.diagnostic(diagnostics);
+  assert.equal(
+    manifestSha256,
+    PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED.overlayManifestSha256,
+    `${diagnostics}; raw manifest bytes must match the reviewed digest without normalization`,
+  );
+  assert.equal(carriageReturns, 0, `${diagnostics}; checked-out manifest must remain LF-only`);
 });
 
 test("Windows real bundler allocates source and build paths in the validated system-TEMP root", () => {
