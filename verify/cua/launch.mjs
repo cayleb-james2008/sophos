@@ -13,7 +13,14 @@
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { call, listWindows, getWindowState, click, sleep } from "./driver.mjs";
+import {
+  call,
+  listWindows,
+  getWindowState,
+  getWindowStateForPixelClick,
+  click,
+  sleep,
+} from "./driver.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,7 +82,7 @@ export async function waitForWindow(pid, timeoutMs = 15000) {
  * surface), which is inert.
  */
 export async function enableWebContentAccessibility(pid, windowId) {
-  const state = getWindowState(pid, windowId, { include_screenshot: false });
+  const state = getWindowStateForPixelClick(pid, windowId);
   const sw = state.screenshot_width || 1200;
   const sh = state.screenshot_height || 800;
   // Click near the centre of the content area.

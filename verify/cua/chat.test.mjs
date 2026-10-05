@@ -24,7 +24,8 @@ import { navTo, takeScreenshot, getTextContent, elementCenter, SCREENSHOT_DIR } 
 import { findBy, findAll, clickBy, waitFor } from "./find-util.mjs";
 import { assert, assertTextContains } from "./assertions.mjs";
 import { enableWebContentAccessibility } from "./demo-launch.mjs";
-import { waitForWindow } from "./launch.mjs";
+import { WORKSPACE_ROOT } from "./launch.mjs";
+import { resolveChatAppPath } from "./chat-app-path.mjs";
 import { spawn } from "node:child_process";
 
 /** Read a fresh window state for the app handle. If the handle went stale
@@ -461,10 +462,6 @@ const tests = [
 
 import { existsSync } from "node:fs";
 
-const WORKSPACE = "C:/Users/Cayleb/Desktop/workspace/sophos";
-const DEBUG_APP = `${WORKSPACE}/src-tauri/target/debug/prime-agent-windows.exe`;
-const RELEASE_APP = `${WORKSPACE}/src-tauri/target/release/prime-agent-windows.exe`;
-
 /** Launch the chosen app path in demo mode; returns { pid, windowId }.
  * Launches the exe directly (Medium integrity, so our daemon can drive it) and
  * identifies the new window by diffing the window list against the pre-launch
@@ -495,9 +492,9 @@ async function runChatSuite(name, tests) {
   console.log(`\n=== ${name} ===`);
   const daemon = startDaemon();
   const daemonStarted = !daemon.alreadyRunning;
-  // Prefer the debug build (has the busy-clearing fix; the release exe is stale
-  // and contended by siblings); fall back to release.
-  const appPath = existsSync(DEBUG_APP) ? DEBUG_APP : RELEASE_APP;
+  // Prefer a local debug build; the CI release build is the fallback when
+  // target/debug does not exist in this checkout.
+  const appPath = resolveChatAppPath({ workspaceRoot: WORKSPACE_ROOT, exists: existsSync });
   console.log(`launching demo app: ${appPath}`);
   const { pid, windowId } = await launchAppPath(appPath);
   const app = { pid, windowId };

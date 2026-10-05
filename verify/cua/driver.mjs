@@ -162,6 +162,19 @@ export function getWindowState(pid, windowId, opts = {}) {
   return call("get_window_state", { pid, window_id: windowId, ...opts });
 }
 
+/**
+ * Capture UIA state and screenshot before a coordinate-based click.
+ * Windows CUA pixel actions require the screenshot context from this response.
+ * `invoke` is injectable only at the CLI boundary for unit testing.
+ */
+export function getWindowStateForPixelClick(pid, windowId, invoke = call) {
+  return invoke("get_window_state", {
+    pid,
+    window_id: windowId,
+    include_screenshot: true,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Input actions
 // ---------------------------------------------------------------------------
