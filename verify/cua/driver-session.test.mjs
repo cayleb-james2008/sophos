@@ -48,3 +48,23 @@ test("one-shot CUA calls open once and reuse their session snapshot", () => {
     args: { session: "smoke-lifecycle" },
   });
 });
+
+test("per-call process options reach the tool invocation but not session bootstrap", () => {
+  const observed = [];
+  const runTool = (tool, args, options) => {
+    observed.push({ tool, args, ...(options ? { options } : {}) });
+    return { ok: true };
+  };
+  const invoke = createSessionInvoker(runTool, "bounded-readiness");
+
+  invoke("get_window_state", { pid: 12, window_id: 34 }, { timeoutMs: 2500 });
+
+  assert.deepEqual(observed, [
+    { tool: "start_session", args: { session: "bounded-readiness" } },
+    {
+      tool: "get_window_state",
+      args: { pid: 12, window_id: 34, session: "bounded-readiness" },
+      options: { timeoutMs: 2500 },
+    },
+  ]);
+});

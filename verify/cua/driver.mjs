@@ -56,15 +56,27 @@ export function sleep(ms) {
  * Returns the parsed JSON result. Throws on non-zero exit or a plain-text
  * error payload (the driver reports some failures as text, not JSON).
  */
-function invokeDriverCall(tool, args = {}) {
-  const result = spawnSync(DRIVER_BIN, ["call", tool], {
+function invokeDriverCall(tool, args = {}, { timeoutMs } = {}) {
+  const spawnOptions = {
     input: JSON.stringify(args),
     encoding: "utf-8",
     windowsHide: true,
-  });
+  };
+  if (timeoutMs !== undefined) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new RangeError("timeoutMs must be a finite positive number");
+    }
+    spawnOptions.timeout = Math.max(1, Math.ceil(timeoutMs));
+  }
+  const result = spawnSync(DRIVER_BIN, ["call", tool], spawnOptions);
 
   if (result.error) {
-    throw new Error(`cua-driver call ${tool} failed to spawn: ${result.error.message}`);
+    const message = result.error.code === "ETIMEDOUT"
+      ? `cua-driver call ${tool} timed out after ${spawnOptions.timeout}ms`
+      : `cua-driver call ${tool} failed to spawn: ${result.error.message}`;
+    const error = new Error(message, { cause: result.error });
+    error.code = result.error.code;
+    throw error;
   }
   if (result.status !== 0) {
     throw new Error(
@@ -98,17 +110,17 @@ function invokeDriverCall(tool, args = {}) {
 export function createSessionInvoker(invokeTool, defaultSession = DRIVER_SESSION) {
   const activeSessions = new Set();
 
-  const invoke = (tool, args = {}) => {
+  const invoke = (tool, args = {}, callOptions = {}) => {
     const payload = withSession(args, defaultSession);
     const session = payload.session;
 
     if (tool === "start_session") {
-      const result = invokeTool(tool, payload);
+      const result = invokeTool(tool, payload, callOptions);
       activeSessions.add(session);
       return result;
     }
     if (tool === "end_session") {
-      const result = invokeTool(tool, payload);
+      const result = invokeTool(tool, payload, callOptions);
       activeSessions.delete(session);
       return result;
     }
@@ -116,7 +128,7 @@ export function createSessionInvoker(invokeTool, defaultSession = DRIVER_SESSION
       invokeTool("start_session", { session });
       activeSessions.add(session);
     }
-    return invokeTool(tool, payload);
+    return invokeTool(tool, payload, callOptions);
   };
 
   invoke.endAll = () => {
@@ -140,8 +152,8 @@ process.once("exit", callInSession.endAll);
  * Invoke a CUA tool in the current Node process's named session.
  * Returns parsed JSON and throws on CLI/tool errors.
  */
-export function call(tool, args = {}) {
-  return callInSession(tool, args);
+export function call(tool, args = {}, callOptions = {}) {
+  return callInSession(tool, args, callOptions);
 }
 
 function hasBackgroundUnavailableCode(value) {
@@ -254,8 +266,8 @@ export function listWindows(opts = {}) {
  * `elements` (structured array with `element_index`, `element_token`, `role`,
  * `label`, `frame`, `enabled`, …), `tree_markdown`, `pid` and `window_id`.
  */
-export function getWindowState(pid, windowId, opts = {}) {
-  return call("get_window_state", { pid, window_id: windowId, ...opts });
+export function getWindowState(pid, windowId, opts = {}, callOptions = {}) {
+  return call("get_window_state", { pid, window_id: windowId, ...opts }, callOptions);
 }
 
 /**

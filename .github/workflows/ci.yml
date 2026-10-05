@@ -169,6 +169,7 @@ jobs:
           verify/cua/driver-session.test.mjs
           verify/cua/driver-foreground-fallback.test.mjs
           verify/cua/screenshot-path.test.mjs
+          verify/cua/smoke-readiness.test.mjs
 
       - name: Prepare isolated screenshot output
         shell: pwsh
