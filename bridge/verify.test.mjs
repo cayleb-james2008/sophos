@@ -23,5 +23,20 @@ test("supervisor recovery stops only the old supervisor so Windows session worke
   assert.ok(supervisorStopStart >= 0 && supervisorStopEnd > supervisorStopStart, "process-only supervisor stop helper is defined");
   const supervisorStop = verifySource.slice(supervisorStopStart, supervisorStopEnd);
   assert.match(supervisorStop, /execFileSync\("taskkill", \["\/PID", String\(proc\.pid\), "\/F"\]/);
-  assert.doesNotMatch(supervisorStop, /"\/T"/, "process-only termination must not target worker descendants");
+  assert.equal(supervisorStop.includes('"/T"'), false, "process-only termination must not target worker descendants");
+});
+
+test("normal verifier cleanup gracefully stops adopted workers before the isolated HOME is removed", () => {
+  const cleanupStart = verifySource.indexOf("const cleanup = async () => {");
+  const cleanupEnd = verifySource.indexOf("const onSignal", cleanupStart);
+  assert.ok(cleanupStart >= 0 && cleanupEnd > cleanupStart, "async normal cleanup is present");
+  const cleanupBlock = verifySource.slice(cleanupStart, cleanupEnd);
+  assert.ok(cleanupBlock.includes("await shutdownDaemonGracefully()"));
+  assert.ok(cleanupBlock.includes("if (!daemonStopped)") && cleanupBlock.includes("terminateProcessTree(daemon)"));
+
+  const gracefulStart = verifySource.indexOf("async function shutdownDaemonGracefully() {");
+  const gracefulEnd = verifySource.indexOf("\n}", gracefulStart);
+  assert.ok(gracefulStart >= 0 && gracefulEnd > gracefulStart, "graceful shutdown helper is present");
+  assert.ok(verifySource.slice(gracefulStart, gracefulEnd).includes("shutdownDaemonAndWait(SOCKET_PATH, 10000)"));
+  assert.ok(verifySource.includes('record("graceful daemon shutdown releases adopted session workers before HOME removal"'));
 });
