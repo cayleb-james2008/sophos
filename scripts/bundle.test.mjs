@@ -21,7 +21,7 @@ test("bridge compiles against packages built from the pinned overlay, not the cl
   );
 });
 
-test("production dependency staging skips a dev-only root prepare and replays production scripts", async () => {
+test("production install reproduces a missing dev-only root-prepare command and safely replays prod scripts", async () => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "sophos-production-lifecycle-"));
   const fixtureRoot = join(temporaryRoot, "fixture");
   const home = join(temporaryRoot, "home");
@@ -114,7 +114,11 @@ test("production dependency staging skips a dev-only root prepare and replays pr
 
     const baseline = runNpm(["ci", "--omit=dev", "--offline", "--no-audit", "--no-fund"]);
     assert.notEqual(baseline.status, 0, "the unguarded production install should expose the missing dev-only husky command");
-    assert.match(baseline.output, /husky/i, "the baseline failure must come from root prepare, not package resolution");
+    assert.match(
+      baseline.output.replace(/\s+/g, " "),
+      /husky.{0,80}(?:not recognized as an internal or external command|not found|command not found)/i,
+      "the root prepare must fail specifically because the dev-only husky command is unavailable",
+    );
     assert.deepEqual(await readFile(lockPath), lockBytes, "the reproduced lifecycle failure must not alter the reviewed lock bytes");
 
     const candidateCi = runNpm(["ci", "--omit=dev", "--ignore-scripts", "--offline", "--no-audit", "--no-fund"]);

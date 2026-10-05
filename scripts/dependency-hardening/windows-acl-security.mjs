@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { win32 } from "node:path";
 
@@ -39,17 +39,44 @@ function normalizeLocalWindowsPath(path, label) {
   return win32.resolve(path);
 }
 
+function normalizeObservedLocalWindowsPath(path, label) {
+  const extendedPrefix = "\\\\?\\";
+  if (typeof path === "string" && path.startsWith(extendedPrefix)) {
+    const withoutPrefix = path.slice(extendedPrefix.length);
+    if (LOCAL_DRIVE_PATH.test(withoutPrefix)) path = withoutPrefix;
+  }
+  return normalizeLocalWindowsPath(path, label);
+}
+
 function isDriveRoot(path) {
   return /^[A-Za-z]:\\$/.test(path);
 }
 
-function assertRecordShape(record, expectedPath, label) {
+function assertRecordShape(record, expectedPath, label, { allowCanonicalPathAlias = false } = {}) {
   if (!record || typeof record !== "object" || Array.isArray(record)) {
     throw new Error(`Windows ACL query returned an invalid record for ${label}`);
   }
   const normalizedExpected = normalizeLocalWindowsPath(expectedPath, label).toLowerCase();
-  const normalizedObserved = typeof record.path === "string" ? win32.resolve(record.path).toLowerCase() : "";
-  if (normalizedObserved !== normalizedExpected) throw new Error(`Windows ACL query returned a path mismatch for ${label}`);
+  let normalizedObserved = "";
+  try {
+    normalizedObserved = normalizeObservedLocalWindowsPath(record.path, label).toLowerCase();
+  } catch {
+    // Keep the exact-path comparison fail-closed when the query returns an
+    // invalid path, unless the observed path is later proven to be canonical.
+  }
+  if (normalizedObserved !== normalizedExpected) {
+    let canonicalExpected = "";
+    if (allowCanonicalPathAlias && process.platform === "win32") {
+      try {
+        canonicalExpected = normalizeObservedLocalWindowsPath(realpathSync.native(expectedPath), label).toLowerCase();
+      } catch {
+        // A nonexistent/unresolvable input cannot gain an alias exception.
+      }
+    }
+    if (!canonicalExpected || normalizedObserved !== canonicalExpected) {
+      throw new Error(`Windows ACL query returned a path mismatch for ${label}`);
+    }
+  }
   if (!sidLooksValid(record.ownerSid) || !sidLooksValid(record.currentUserSid)) {
     throw new Error(`Windows ACL owner or current-user SID is invalid for ${label}`);
   }
@@ -74,8 +101,12 @@ function assertRecordShape(record, expectedPath, label) {
  * unit suite exercise adversarial ACL shapes; live Windows tests use the same
  * evaluator after querying the host's actual NTFS ACLs. */
 export function assertWindowsAclRecord(record, expectedPath, label = "trusted workspace path", { scope = "private" } = {}) {
+  return evaluateWindowsAclRecord(record, expectedPath, label, { scope });
+}
+
+function evaluateWindowsAclRecord(record, expectedPath, label, { scope = "private", allowCanonicalPathAlias = false } = {}) {
   if (!new Set(["private", "ancestor"]).has(scope)) throw new Error(`unsupported Windows ACL validation scope: ${scope}`);
-  const normalizedPath = assertRecordShape(record, expectedPath, label);
+  const normalizedPath = assertRecordShape(record, expectedPath, label, { allowCanonicalPathAlias });
   if (record.isReparsePoint) throw new Error(`${label} must not be a Windows reparse point: ${expectedPath}`);
   if (record.driveFormat.toUpperCase() !== "NTFS") {
     throw new Error(`${label} requires a local NTFS volume; found ${record.driveFormat || "unknown"}: ${expectedPath}`);
@@ -143,8 +174,9 @@ try {
             if ($fullPath.StartsWith($twoSeparators) -or $pathRoot.Length -ne 3 -or $pathRoot[1] -ne ':' -or $pathRoot[2] -ne [char]92) {
                 throw ('ACL validation supports local drive paths only: ' + $fullPath)
             }
-            $item = Get-Item -LiteralPath $fullPath -Force
-            $acl = Get-Acl -LiteralPath $fullPath
+            # Read reparse attributes from the requested component itself. GetFullPath may expand an NTFS 8.3 alias in $fullPath.
+            $item = Get-Item -LiteralPath ([string]$path) -Force
+            $acl = Get-Acl -LiteralPath ([string]$path)
             $sections = [System.Security.AccessControl.AccessControlSections]::Access
             $raw = [System.Security.AccessControl.RawSecurityDescriptor]::new($acl.GetSecurityDescriptorSddlForm($sections))
             $rules = @(
@@ -214,14 +246,14 @@ function queryWindowsAcls(paths) {
 export async function inspectWindowsPathAcl(path) {
   const absolute = normalizeLocalWindowsPath(path, "Windows ACL inspection");
   const [record] = queryWindowsAcls([absolute]);
-  assertRecordShape(record, absolute, absolute);
+  assertRecordShape(record, absolute, absolute, { allowCanonicalPathAlias: true });
   return record;
 }
 
 export async function assertWindowsPathAcl(path, label = "trusted workspace path", { scope = "private" } = {}) {
   const absolute = normalizeLocalWindowsPath(path, label);
   const record = await inspectWindowsPathAcl(absolute);
-  return assertWindowsAclRecord(record, absolute, label, { scope });
+  return evaluateWindowsAclRecord(record, absolute, label, { scope, allowCanonicalPathAlias: true });
 }
 
 function windowsPathComponents(path) {
@@ -247,7 +279,7 @@ export async function assertSecureWindowsPath(path, label = "trusted Windows pat
     const record = records[index];
     const final = index === components.length - 1;
     const componentScope = final ? scope : "ancestor";
-    assertWindowsAclRecord(record, component, label, { scope: componentScope });
+    evaluateWindowsAclRecord(record, component, label, { scope: componentScope, allowCanonicalPathAlias: true });
     if (!record.isDirectory && (!final || targetType === "directory")) {
       throw new Error(`${label} path component is not a directory: ${component}`);
     }

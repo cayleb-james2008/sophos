@@ -305,13 +305,21 @@ async function main() {
   } else {
     await rm(stagedNodeModules, { recursive: true, force: true });
     // `npm prune --omit=dev` rewrites platform-specific lock metadata (for example
-    // `libc` on optional native packages). Reinstall the production tree from the
-    // reviewed lock instead; `npm ci` consumes the lock without changing its bytes.
-    runNpm(["ci", "--omit=dev"], {
+    // `libc` on optional native packages). A plain `npm ci --omit=dev` does keep
+    // the lock bytes, but runs the root `prepare: husky` hook after omitting the
+    // dev-only Husky CLI, which fails on Windows. Construct the exact production
+    // tree without lifecycle hooks, then replay the installed production packages'
+    // lifecycle scripts; `npm rebuild` does not run the root `prepare` hook.
+    runNpm(["ci", "--omit=dev", "--ignore-scripts"], {
       cwd: primeBuild.path,
-      label: "Prime Agent production dependency tree (normal lifecycle)",
+      label: "Prime Agent production dependency tree (lifecycle deferred)",
     });
-    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm ci --omit=dev");
+    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm ci --omit=dev --ignore-scripts");
+    runNpm(["rebuild", "--omit=dev"], {
+      cwd: primeBuild.path,
+      label: "Prime Agent production dependency lifecycle scripts",
+    });
+    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm rebuild --omit=dev");
     await cp(join(primeBuild.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
     await rm(join(stagedNodeModules, "@earendil-works"), { recursive: true, force: true });
     const upstreamPackages = await stageUpstreamPackages(primeBuild.path, stagedNodeModules);

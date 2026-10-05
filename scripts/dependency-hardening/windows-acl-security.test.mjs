@@ -44,6 +44,15 @@ test("accepts runner read-only Users access but rejects their actual directory-c
   );
 });
 
+test("rejects an ACL record returned for a different path", () => {
+  const expected = String.raw`C:\Users\trusted`;
+  const observed = String.raw`C:\Users\different`;
+  assert.throws(
+    () => windowsAcl.assertWindowsAclRecord(aclRecord(observed, []), expected, "trusted workspace path"),
+    /path mismatch/i,
+  );
+});
+
 test("rejects every untrusted write/delete/ACL-control bit on private paths", () => {
   const path = "D:\\\\private\\\\workspace";
   for (const rights of [2, 4, 16, 64, 256, 65536, 262144, 524288, 0x10000000, 0x40000000]) {

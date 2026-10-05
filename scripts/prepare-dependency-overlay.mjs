@@ -372,8 +372,13 @@ async function resolveSecureParent(parentPath, label = "overlay destination") {
     }
     await assertSecureWindowsPath(parent, `${label} parent`, { scope: "private", targetType: "directory" });
     const physical = await realpath(parent);
-    if (!samePath(physical, parent)) throw new Error(`${label} parent changed during Windows ACL validation`);
-    return parent;
+    const physicalDetails = await lstat(physical);
+    if (physicalDetails.isSymbolicLink() || !physicalDetails.isDirectory()
+      || physicalDetails.dev !== details.dev || physicalDetails.ino !== details.ino) {
+      throw new Error(`${label} parent changed during Windows ACL validation`);
+    }
+    await assertSecureWindowsPath(physical, `${label} parent`, { scope: "private", targetType: "directory" });
+    return physical;
   }
   const parent = await realpath(resolve(parentPath));
   const ancestors = [];
@@ -419,13 +424,23 @@ export async function assertSecureSourceRoot(sourceRoot, label = "pinned Prime A
   if (inputInfo.isSymbolicLink() || !inputInfo.isDirectory()) {
     throw new Error(`${label} root must be a non-symlink real directory: ${sourceInput}`);
   }
+  if (process.platform === "win32") {
+    // NTFS 8.3 aliases can make realpath return a different, equally valid path
+    // string. Reject reparse points from the Windows attributes first, then use
+    // realpath only to obtain a stable physical name and confirm lstat identity.
+    await assertSecureWindowsPath(sourceInput, `${label} root`, { scope: "private", targetType: "directory" });
+    const source = await realpath(sourceInput);
+    const physicalInfo = await lstat(source);
+    if (physicalInfo.isSymbolicLink() || !physicalInfo.isDirectory()
+      || physicalInfo.dev !== inputInfo.dev || physicalInfo.ino !== inputInfo.ino) {
+      throw new Error(`${label} root changed during Windows ACL validation`);
+    }
+    await assertSecureWindowsPath(source, `${label} root`, { scope: "private", targetType: "directory" });
+    return source;
+  }
   const source = await realpath(sourceInput);
   if (!samePath(source, sourceInput)) {
     throw new Error(`${label} path must not traverse symlinked ancestors: ${sourceInput}`);
-  }
-  if (process.platform === "win32") {
-    await assertSecureWindowsPath(source, `${label} root`, { scope: "private", targetType: "directory" });
-    return source;
   }
   const parent = await resolveSecureParent(dirname(source), label);
   if (!samePath(parent, dirname(source))) {
@@ -443,10 +458,15 @@ export async function assertSecureProjectRoot(projectRoot) {
   if (info.isSymbolicLink() || !info.isDirectory()) {
     throw new Error(`dependency overlay project root must be a non-reparse real directory: ${projectInput}`);
   }
-  const physical = await realpath(projectInput);
-  if (!samePath(physical, projectInput)) throw new Error(`dependency overlay project root traverses a reparse point: ${projectInput}`);
   await assertSecureWindowsPath(projectInput, "dependency overlay project root", { scope: "ancestor", targetType: "directory" });
-  return projectInput;
+  const physical = await realpath(projectInput);
+  const physicalInfo = await lstat(physical);
+  if (physicalInfo.isSymbolicLink() || !physicalInfo.isDirectory()
+    || physicalInfo.dev !== info.dev || physicalInfo.ino !== info.ino) {
+    throw new Error(`dependency overlay project root changed during Windows ACL validation: ${projectInput}`);
+  }
+  await assertSecureWindowsPath(physical, "dependency overlay project root", { scope: "ancestor", targetType: "directory" });
+  return physical;
 }
 
 async function resolveDisjointPaths(sourceRoot, destinationRoot) {
@@ -474,12 +494,20 @@ async function assertReservedDestination(destination, destinationParent, reserva
     || current.dev !== reservation.dev || current.ino !== reservation.ino) {
     throw new Error("overlay destination reservation changed during preparation");
   }
-  const physical = await realpath(destination);
-  if (!samePath(physical, destination)) {
-    throw new Error("overlay destination no longer resolves to its reserved directory");
-  }
   if (process.platform === "win32") {
     await assertSecureWindowsPath(destination, "overlay destination", { scope: "private", targetType: "directory" });
+    const physical = await realpath(destination);
+    const physicalInfo = await lstat(physical);
+    if (physicalInfo.isSymbolicLink() || !physicalInfo.isDirectory()
+      || physicalInfo.dev !== current.dev || physicalInfo.ino !== current.ino) {
+      throw new Error("overlay destination no longer resolves to its reserved directory");
+    }
+    await assertSecureWindowsPath(physical, "overlay destination", { scope: "private", targetType: "directory" });
+  } else {
+    const physical = await realpath(destination);
+    if (!samePath(physical, destination)) {
+      throw new Error("overlay destination no longer resolves to its reserved directory");
+    }
   }
 }
 
@@ -490,6 +518,14 @@ async function removeReservedDestination(destination, destinationParent, reserva
     const current = await lstat(destination);
     if (!current.isSymbolicLink() && current.isDirectory()
       && current.dev === reservation.dev && current.ino === reservation.ino) {
+      if (process.platform === "win32") {
+        await assertSecureWindowsPath(destination, "reserved overlay destination cleanup", { scope: "private", targetType: "directory" });
+        const physical = await realpath(destination);
+        const physicalInfo = await lstat(physical);
+        if (physicalInfo.isSymbolicLink() || !physicalInfo.isDirectory()
+          || physicalInfo.dev !== current.dev || physicalInfo.ino !== current.ino) return;
+        await assertSecureWindowsPath(physical, "reserved overlay destination cleanup", { scope: "private", targetType: "directory" });
+      }
       await rm(destination, { recursive: true, force: true });
     }
   } catch {
@@ -503,8 +539,17 @@ async function removeUnreservedEmptyDestination(destination, destinationParent) 
     if (!samePath(parent, destinationParent)) return;
     const current = await lstat(destination);
     if (current.isSymbolicLink() || !current.isDirectory()) return;
-    const physical = await realpath(destination);
-    if (!samePath(physical, destination)) return;
+    if (process.platform === "win32") {
+      await assertSecureWindowsPath(destination, "unreserved overlay destination cleanup", { scope: "private", targetType: "directory" });
+      const physical = await realpath(destination);
+      const physicalInfo = await lstat(physical);
+      if (physicalInfo.isSymbolicLink() || !physicalInfo.isDirectory()
+        || physicalInfo.dev !== current.dev || physicalInfo.ino !== current.ino) return;
+      await assertSecureWindowsPath(physical, "unreserved overlay destination cleanup", { scope: "private", targetType: "directory" });
+    } else {
+      const physical = await realpath(destination);
+      if (!samePath(physical, destination)) return;
+    }
     await rmdir(destination);
   } catch {
     // Fail closed: remove only an empty, real directory in the validated private parent.

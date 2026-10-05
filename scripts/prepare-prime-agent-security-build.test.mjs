@@ -203,12 +203,21 @@ test("the real bundle runs all composed Prime Agent security regression suites",
   for (const stage of ["Prime Agent regression tests", "TUI build", "AI build", "agent-core build", "daemon build"]) {
     assert.ok(bundleSource.includes(`verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "${stage}")`));
   }
-  const productionInstall = bundleSource.indexOf('runNpm(["ci", "--omit=dev"]');
-  const productionInstallLabel = bundleSource.indexOf('label: "Prime Agent production dependency tree (normal lifecycle)"');
-  const productionVerify = bundleSource.indexOf('verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm ci --omit=dev")');
+  const productionInstall = bundleSource.indexOf('runNpm(["ci", "--omit=dev", "--ignore-scripts"]');
+  const productionInstallLabel = bundleSource.indexOf('label: "Prime Agent production dependency tree (lifecycle deferred)"');
+  const productionCiVerify = bundleSource.indexOf('verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm ci --omit=dev --ignore-scripts")');
+  const productionRebuild = bundleSource.indexOf('runNpm(["rebuild", "--omit=dev"]');
+  const productionRebuildLabel = bundleSource.indexOf('label: "Prime Agent production dependency lifecycle scripts"');
+  const productionRebuildVerify = bundleSource.indexOf('verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm rebuild --omit=dev")');
   const stage = bundleSource.indexOf('await cp(join(primeBuild.path, "node_modules")');
-  assert.ok(productionInstall >= 0 && productionInstallLabel > productionInstall && productionVerify > productionInstallLabel && stage > productionVerify,
-    "the production tree is reinstalled from the pinned lock and verified before staging");
+  assert.ok(productionInstall >= 0
+    && productionInstallLabel > productionInstall
+    && productionCiVerify > productionInstallLabel
+    && productionRebuild > productionCiVerify
+    && productionRebuildLabel > productionRebuild
+    && productionRebuildVerify > productionRebuildLabel
+    && stage > productionRebuildVerify,
+  "the exact production lock is installed, production lifecycle scripts are replayed, and both stages are provenance-verified before staging");
   assert.equal(bundleSource.includes('runNpm(["prune", "--omit=dev"]'), false, "do not let npm prune rewrite platform-specific lock metadata");
 });
 

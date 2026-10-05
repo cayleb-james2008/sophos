@@ -451,7 +451,7 @@ async function assertBuildOutputFiles(buildRoot, marker = null, expectedLockByte
 }
 
 async function readExistingMarker(buildRoot, baseMarker, expectedLockBytes) {
-  await assertSecureSourceRoot(buildRoot, "existing Prime Agent security build output");
+  const secureBuildRoot = await assertSecureSourceRoot(buildRoot, "existing Prime Agent security build output");
   const markerPath = await assertRegularFileNoSymlink(buildRoot, [BUILD_MARKER], "security build ownership marker");
   const marker = JSON.parse(await readFile(markerPath, "utf8"));
   const baseKeys = Object.keys(baseMarker).sort();
@@ -468,7 +468,7 @@ async function readExistingMarker(buildRoot, baseMarker, expectedLockBytes) {
     throw new Error("existing Prime Agent security build contains unexpected untracked files");
   }
   const current = await realpath(buildRoot);
-  if (samePath(current, resolve(buildRoot))) return { marker, sourceFileHashes, markerPath };
+  if (samePath(current, secureBuildRoot)) return { marker, sourceFileHashes, markerPath };
   throw new Error("existing Prime Agent security build path changed during verification");
 }
 
@@ -533,7 +533,8 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
 
   const overlay = await withGitAutocrlfDisabled(() => prepareDependencyOverlay(source, buildRoot, root));
   try {
-    if (resolve(overlay.path) !== buildRoot
+    const validatedBuildRoot = await assertSecureSourceRoot(buildRoot, "Prime Agent security build output");
+    if (!samePath(overlay.path, validatedBuildRoot)
       || overlay.commit !== EXPECTED.sourceCommit
       || overlay.version !== EXPECTED.sourceVersion
       || overlay.license !== EXPECTED.sourceLicense
@@ -576,10 +577,10 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
     };
   } catch (error) {
     try {
-      await assertSecureSourceRoot(buildRoot, "failed Prime Agent security build output");
-      assertExpectedSourceIdentity(buildRoot);
+      const secureBuildRoot = await assertSecureSourceRoot(buildRoot, "failed Prime Agent security build output");
+      assertExpectedSourceIdentity(secureBuildRoot);
       const current = await realpath(buildRoot);
-      if (samePath(current, buildRoot)) await rm(buildRoot, { recursive: true, force: true });
+      if (samePath(current, secureBuildRoot)) await rm(secureBuildRoot, { recursive: true, force: true });
     } catch (cleanupError) {
       throw new Error(`${error.message}; secure cleanup failed: ${cleanupError.message}`);
     }
