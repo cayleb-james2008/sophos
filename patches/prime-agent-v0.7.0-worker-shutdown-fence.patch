@@ -16,7 +16,7 @@ index dfebcdf..e785b8c 100644
  			}
  			const launch = createCliSubprocessLaunchSpec(["--mode", "daemon", "--daemon-socket", supervisorSocketPath]);
 diff --git a/packages/coding-agent/test/daemon-supervisor-monitor.test.ts b/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
-index c05afc0..9f6e464 100644
+index c05afc0..420148e 100644
 --- a/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
 +++ b/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
 @@ -32,7 +32,7 @@ import { createDeferred } from "./suite/scheduling.js";
@@ -95,3 +95,8 @@ index c05afc0..9f6e464 100644
  	it("skips socket probes while an authenticated supervisor connection is active", async () => {
  		vi.useFakeTimers();
  		const daemon = createHarness(async () => true);
+@@ -1963,3 +1998,3 @@
+ 	it("limits abort admission to mutation drain", async () => {
+-		const root = mkdtempSync(`/tmp/prime-update-drain-${process.pid}-`);
++		const root = mkdtempSync(join(tmpdir(), `prime-update-drain-${process.pid}-`));
+ 		const socketPath = join(root, "supervisor.sock");
