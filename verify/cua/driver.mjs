@@ -17,11 +17,30 @@
 
 import { spawnSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { win32 } from "node:path";
 
-/** Path to the cua-driver binary. Override with the CUA_DRIVER_BIN env var. */
-export const DRIVER_BIN =
-  process.env.CUA_DRIVER_BIN ||
-  "C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe";
+/** Resolve cua-driver from an explicit override or the current user's install. */
+export function resolveDriverBin({
+  env = process.env,
+  platform = process.platform,
+  homeDir = homedir(),
+} = {}) {
+  if (env.CUA_DRIVER_BIN) return env.CUA_DRIVER_BIN;
+  if (platform !== "win32") return "cua-driver";
+
+  const localAppData = env.LOCALAPPDATA || win32.join(homeDir, "AppData", "Local");
+  return win32.join(
+    localAppData,
+    "Programs",
+    "Cua",
+    "cua-driver",
+    "bin",
+    "cua-driver.exe",
+  );
+}
+
+export const DRIVER_BIN = resolveDriverBin();
 
 /** Small sleep helper (ms). */
 export function sleep(ms) {
@@ -245,7 +264,9 @@ export function desktopScreenshot(outPath) {
   return call("get_desktop_state", { screenshot_out_file: outPath });
 }
 
-/** True when the cua-driver binary exists on disk. */
+/** True when the explicit binary exists or a bare command resolves on PATH. */
 export function isDriverInstalled() {
-  return existsSync(DRIVER_BIN);
+  if (/[\\/]/.test(DRIVER_BIN)) return existsSync(DRIVER_BIN);
+  const result = spawnSync(DRIVER_BIN, ["--version"], { encoding: "utf-8", windowsHide: true, timeout: 5_000 });
+  return !result.error && result.status === 0;
 }

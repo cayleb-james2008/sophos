@@ -92,7 +92,7 @@ jobs:
 
       - name: Runtime helper and fail-closed gate regression tests
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
-        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs scripts/prepare-dependency-overlay.test.mjs scripts/prepare-prime-agent-security-build.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs verify/e2e-home-cleanup.test.mjs scripts/bundle.test.mjs bridge/verify.test.mjs
+        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs scripts/prepare-dependency-overlay.test.mjs scripts/prepare-prime-agent-security-build.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs verify/e2e-home-cleanup.test.mjs scripts/bundle.test.mjs bridge/verify.test.mjs verify/cua/driver.test.mjs
 
       - name: Platform provenance and Tauri resource tests
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
@@ -133,27 +133,13 @@ jobs:
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node verify/e2e.mjs
 
-  # cua-e2e — drives the REAL Sophos desktop app (Tauri v2 release build) via
-  # the cua-driver CLI and UIA accessibility automation (verify/cua/*). These
-  # tests run in DEMO MODE (the `--demo` flag skips the daemon + sidecar and
-  # injects window.__SOPHOS_DEMO__ = true, so the frontend uses the
-  # MockIpcClient with simulated Sessions/Agents data).
-  #
-  # HONEST STATUS (2026-09-21): the cua-driver daemon cannot start on
-  # GitHub-hosted windows-latest runners — they run non-interactive (session 0,
-  # no desktop), and `cua-driver serve` exits immediately there, so every run
-  # fails in startDaemon() before any suite runs. Verified across all four runs
-  # of this workflow (every cua-e2e conclusion to date is FAILURE, including
-  # runs that predate any local changes), with the driver's own stderr captured
-  # in the logs. The build steps above DO run and are kept: they prove the
-  # release exe compiles on real Windows from a clean checkout.
-  #
-  # The suite itself is real: it was executed on an interactive Windows 10
-  # Enterprise LTSC VM (QEMU/KVM) on 2026-09-18/2026-09-21, where the built exe
-  # launched and stayed running (see OVERHAUL-NOTES.md, "Windows runtime test").
-  # Until a runner class with a desktop session is available, this job is
-  # best-effort (continue-on-error) rather than permanently red; the build
-  # compilation result still gates the job's exit code.
+  # cua-e2e drives the real Tauri release executable through UI Automation
+  # (verify/cua/*), using the disclosed demo IPC path (no provider inference).
+  # Raw PR11 logs show 0/8 suites: install reported a runner-local binary, but
+  # the wrapper received no CUA_DRIVER_BIN and used its developer-path fallback.
+  # startDaemon() discarded child stdio, so this is a concrete config defect,
+  # not proof the hosted desktop session is usable. Keep this gate blocking; a
+  # fresh run must execute every suite before native UI acceptance.
   cua-e2e:
     runs-on: windows-latest
 
@@ -229,18 +215,22 @@ jobs:
         run: cargo build --release
 
       - name: Install cua-driver
-        # The cua-driver binary is installed to
-        # %LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe and found
-        # by verify/cua/driver.mjs (overridable via CUA_DRIVER_BIN).
+        # Pin the installed executable path for the next step. Hosted runners
+        # use a per-job profile (for example runneradmin), not the developer's
+        # local C:\Users\Cayleb profile.
         shell: pwsh
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
-        run: irm https://cua.ai/driver/install.ps1 | iex
+        run: |
+          irm https://cua.ai/driver/install.ps1 | iex
+          $driverBin = Join-Path $env:LOCALAPPDATA 'Programs\Cua\cua-driver\bin\cua-driver.exe'
+          if (-not (Test-Path -LiteralPath $driverBin -PathType Leaf)) { throw "Installed cua-driver binary is missing: $driverBin" }
+          $versionOutput = & $driverBin --version
+          $driverExit = $LASTEXITCODE
+          if ($driverExit -ne 0) { throw "Installed cua-driver version probe failed (exit $driverExit): $driverBin" }
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value "CUA_DRIVER_BIN=$driverBin"
+          Write-Output "Configured CUA_DRIVER_BIN=$driverBin ($versionOutput)"
 
       - name: Run cua-driver e2e suite
-        # Best-effort: the driver daemon needs an interactive desktop session
-        # (see the job-level note above); the build steps above still gate this
-        # job's exit code. Run `npm run test:cua` on an interactive Windows host
-        # to exercise the full suite.
+        # Keep failures blocking; a green result must mean all native UI suites ran.
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node verify/cua/run-all.mjs
-        continue-on-error: true

@@ -20,9 +20,9 @@ Exit code `0` = all tests passed. Exit code `1` = at least one test failed.
 
 ## Prerequisites
 
-- The cua-driver binary at
-  `C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe`
-  (override with the `CUA_DRIVER_BIN` env var).
+- The cua-driver binary, normally installed on Windows at
+  `%LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe` (resolved from
+  the current user profile; override with the `CUA_DRIVER_BIN` env var).
 - The Sophos desktop app release build at
   `src-tauri/target/release/prime-agent-windows.exe`.
 - Node.js (ESM `.mjs` modules).
@@ -181,7 +181,7 @@ node verify/cua/run-all.mjs
 | Suite times out (5 min) | App hung or a test is stuck | Check the suite's screenshot in `verify/cua/screenshots/`. Re-run the individual suite file (e.g. `node verify/cua/smoke.mjs`) to isolate. |
 | `cargo build --release` fails in CI | Missing Rust toolchain or MSVC | GitHub Actions: ensure `dtolnay/rust-toolchain@stable` step ran. GitLab CI: ensure the rustup install step ran. MSVC Build Tools are pre-installed on both runner types. |
 | `No window with window_id` | App window was closed externally mid-test | The demo-runner retries up to 5 times on stale-window errors. If it persists, ensure no other process is killing the app. |
-| cua-driver not found after install | PATH not updated in the same shell | The install script adds to PATH. In CI, the binary is at `%LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe`. Set `CUA_DRIVER_BIN` explicitly if needed. |
+| cua-driver not found after install | Installed binary belongs to a different user profile | The harness resolves the per-user binary at `%LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe`. Set `CUA_DRIVER_BIN` explicitly if needed. |
 
 ## Demo mode
 

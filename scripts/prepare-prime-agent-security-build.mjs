@@ -38,8 +38,8 @@ const EXPECTED = Object.freeze({
   leasePatchedSourceSha256: "006802f39f6de128e6b7f418e9fb3b2793ef73410d1247db562ce5dcbe7a0349",
   zipGuardPatchSha256: "e06fa63df26c0e52e699459a0adf284cb032dc88828abc20bfa5a220de681b48",
   zipGuardPatchBytes: 7632,
-  workerShutdownFencePatchSha256: "49174be99b55bba9a1b028d59879f241384517dec8669933ac9aa446da6b38ce",
-  workerShutdownFencePatchBytes: 6649,
+  workerShutdownFencePatchSha256: "b00fe6e14e7c349cc7794a392be9f698c8a02731d727c3a59865f207dba87b64",
+  workerShutdownFencePatchBytes: 6936,
   overlayId: "prime-agent-v070-windows-session-lease-v1",
   overrides: {
     undici: "7.29.1",
@@ -68,9 +68,9 @@ const ALLOWED_PATCH_OUTPUTS = new Set([
 ]);
 const EXPECTED_BUILD_SOURCE_HASHES = Object.freeze({
   "packages/coding-agent/src/core/session-lease.ts": "006802f39f6de128e6b7f418e9fb3b2793ef73410d1247db562ce5dcbe7a0349",
-  "packages/coding-agent/src/modes/daemon/daemon-mode.ts": "61ffac40905989f869b6981b181518fc720b968dbb103d4639b9cdedf8dba441",
+  "packages/coding-agent/src/modes/daemon/daemon-mode.ts": "da4be802d0d6499b9a922a3fca7643ae36483baf4245d2799bafe185b75d9e16",
   "packages/coding-agent/src/utils/tools-manager.ts": "8936f99a387c3426bf4f2210cc1178fec1dcc2605cccab5d93127054340c7064",
-  "packages/coding-agent/test/daemon-supervisor-monitor.test.ts": "e0d9791125fe5823e3dd91415c9c6d269c0c3cb17b053666e1e451e05d67c6b2",
+  "packages/coding-agent/test/daemon-supervisor-monitor.test.ts": "97ee4b24c6327957f203d1d2406aba4113ce1baeacf256d249fbbc5f6af09fce",
   "packages/coding-agent/test/tools-manager.test.ts": "0956ee19088f761770601ff1c00212717c6a7276dd733dc3079c05d4235e8b75",
 });
 
@@ -546,7 +546,7 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
     const patches = [
       { name: "session-lease", bytes: inputs.leasePatchBytes, sha256: EXPECTED.leasePatchSha256, unidiffZero: false },
       { name: "windows-zip-guard", bytes: inputs.zipGuardPatchBytes, sha256: EXPECTED.zipGuardPatchSha256, unidiffZero: true },
-      { name: "worker-shutdown-fence", bytes: inputs.workerShutdownFencePatchBytes, sha256: EXPECTED.workerShutdownFencePatchSha256, unidiffZero: false },
+      { name: "worker-shutdown-fence", bytes: inputs.workerShutdownFencePatchBytes, sha256: EXPECTED.workerShutdownFencePatchSha256, unidiffZero: true },
     ];
     applyReviewedSourcePatches(buildRoot, patches);
     const output = await assertBuildOutputFiles(buildRoot, null, inputs.lockBytes);

@@ -649,6 +649,8 @@ async function run() {
       `result=${JSON.stringify(switchBackToCreated.result)} active=${stateAfterSwitchBack.result?.activeSessionId} expected=${createdSessionId}`);
 
     if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {
+      const recoveryDeadline = Date.now() + 45_000;
+      const reconnectingStart = events.length;
       const oldDaemon = daemon;
       const oldSupervisorIdentity = await logRecoveryOwnership("session-recovery-before-kill", oldDaemon);
       const stopAttempted = await terminateSupervisorOnly(oldSupervisorIdentity);
@@ -657,15 +659,22 @@ async function run() {
       await logRecoveryOwnership("session-recovery-after-kill", oldDaemon);
       record("session-recovery daemon exits before replacement", stopAttempted && exited, `pid=${oldSupervisorIdentity.pid ?? "unknown"} identityChecked=${typeof oldSupervisorIdentity.processStartId === "string"}`);
       const replacementIdentity = exited
-        ? await waitForSupervisorReplacement(oldSupervisorIdentity)
+        ? await waitForSupervisorReplacement(oldSupervisorIdentity, Math.max(0, recoveryDeadline - Date.now()))
         : await inspectSupervisorIdentity();
       await logRecoveryOwnership("session-recovery-after-replacement", daemon);
-      record("replacement supervisor starts with persisted session state", isReplacementIdentity(replacementIdentity, oldSupervisorIdentity),
+      const replacementReady = isReplacementIdentity(replacementIdentity, oldSupervisorIdentity);
+      record("replacement supervisor starts with persisted session state", replacementReady,
         `oldPid=${oldSupervisorIdentity.pid ?? "unknown"} newPid=${replacementIdentity.pid ?? "unknown"}`);
+      const connectedAfterReplacement = () => events.slice(reconnectingStart)
+        .some((e) => e.type === "connection_status" && e.status.kind === "connected");
+      while (replacementReady && Date.now() < recoveryDeadline && !connectedAfterReplacement()) {
+        await sleep(50);
+      }
+      const reconnectEventSeen = Date.now() < recoveryDeadline && connectedAfterReplacement();
       const stateAfterReconnect = await send({ id: "c33", method: "getState", params: {} });
       record("created session remains connected and active after supervisor replacement",
-        stateAfterReconnect.result?.status?.kind === "connected" && stateAfterReconnect.result?.activeSessionId === createdSessionId,
-        `status=${stateAfterReconnect.result?.status?.kind} active=${stateAfterReconnect.result?.activeSessionId} expected=${createdSessionId}`);
+        reconnectEventSeen && stateAfterReconnect.result?.status?.kind === "connected" && stateAfterReconnect.result?.activeSessionId === createdSessionId,
+        `connectedEvent=${reconnectEventSeen} status=${stateAfterReconnect.result?.status?.kind} active=${stateAfterReconnect.result?.activeSessionId} expected=${createdSessionId}`);
       const listedAfterReconnect = await send({ id: "c34", method: "listSessions", params: {} });
       record("created session remains listed after daemon replacement",
         Array.isArray(listedAfterReconnect.result) && listedAfterReconnect.result.some((session) => session.id === createdSessionListing?.id),

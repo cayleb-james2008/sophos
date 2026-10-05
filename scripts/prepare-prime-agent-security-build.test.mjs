@@ -70,7 +70,7 @@ const workerShutdownFencePatch = Buffer.from(
 const reviewedPatchSequence = [
   { name: "session-lease", bytes: leasePatch, sha256: sha256(leasePatch), unidiffZero: false },
   { name: "windows-zip-guard", bytes: zipGuardPatch, sha256: sha256(zipGuardPatch), unidiffZero: true },
-  { name: "worker-shutdown-fence", bytes: workerShutdownFencePatch, sha256: sha256(workerShutdownFencePatch), unidiffZero: false },
+  { name: "worker-shutdown-fence", bytes: workerShutdownFencePatch, sha256: sha256(workerShutdownFencePatch), unidiffZero: true },
 ];
 
 test("applies the session-lease, Windows ZIP guard, and worker-shutdown patches in order", async (t) => {
@@ -263,6 +263,9 @@ test("checked-out worker-shutdown patch retains the exact reviewed bytes", async
   const patchBytes = await readFile(new URL("../patches/prime-agent-v0.7.0-worker-shutdown-fence.patch", import.meta.url));
   assert.equal(patchBytes.length, PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED.workerShutdownFencePatchBytes);
   assert.equal(sha256(patchBytes), PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED.workerShutdownFencePatchSha256);
+  const patch = patchBytes.toString("utf8");
+  assert.ok(patch.includes("getSupervisorLaunchLockDirectory"), "Windows named-pipe recovery lock uses filesystem storage");
+  assert.ok(patch.includes("keeps the replacement lock in filesystem storage for named-pipe sockets"), "the source regression remains in the patch");
 });
 
 test("Windows supervisor-monitor fixture uses platform temp and deterministic drain admission", async () => {

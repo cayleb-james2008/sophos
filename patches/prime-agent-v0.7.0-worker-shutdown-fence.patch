@@ -1,70 +1,71 @@
 diff --git a/packages/coding-agent/src/modes/daemon/daemon-mode.ts b/packages/coding-agent/src/modes/daemon/daemon-mode.ts
-index dfebcdf..e785b8c 100644
+index dfebcdf..0d70e20 100644
 --- a/packages/coding-agent/src/modes/daemon/daemon-mode.ts
 +++ b/packages/coding-agent/src/modes/daemon/daemon-mode.ts
-@@ -799,10 +799,10 @@ export class AgentDaemon {
- 			if (!ownsLock) {
- 				return;
- 			}
+@@ -374,0 +375,5 @@ interface BoundSupervisorGenerationClaim {
++export function getSupervisorLaunchLockDirectory(supervisorSocketPath: string, agentDir: string): string {
++	const key = createHash("sha256").update(supervisorSocketPath).digest("hex").slice(0, 12);
++	return join(resolve(agentDir), ".supervisor-launch", `${key}.lock`);
++}
++
+@@ -758,2 +763 @@ export class AgentDaemon {
+-		const key = createHash("sha256").update(supervisorSocketPath).digest("hex").slice(0, 12);
+-		const lockDirectory = join(dirname(supervisorSocketPath), `.supervisor-launch-${key}.lock`);
++		const lockDirectory = getSupervisorLaunchLockDirectory(supervisorSocketPath, this.agentDir);
+@@ -761,0 +766 @@ export class AgentDaemon {
++			mkdirSync(dirname(lockDirectory), { recursive: true, mode: 0o700 });
+@@ -802 +807 @@ export class AgentDaemon {
 -			if (await this.canConnectToSupervisor(supervisorSocketPath)) {
 +			if (await this.canConnectToSupervisor(supervisorSocketPath) || this.shuttingDown) {
- 				return;
- 			}
+@@ -805 +810 @@ export class AgentDaemon {
 -			if (await isDaemonShutdownAdmissionActive()) {
 +			if (await isDaemonShutdownAdmissionActive() || this.shuttingDown) {
- 				return;
- 			}
- 			const launch = createCliSubprocessLaunchSpec(["--mode", "daemon", "--daemon-socket", supervisorSocketPath]);
 diff --git a/packages/coding-agent/test/daemon-supervisor-monitor.test.ts b/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
-index c05afc0..420148e 100644
+index c05afc0..42d5bb5 100644
 --- a/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
 +++ b/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
-@@ -32,7 +32,7 @@ import { createDeferred } from "./suite/scheduling.js";
- const workerLaunchTestState = vi.hoisted(() => ({
- 	capture: false,
- 	forceMissingProcessStartId: false,
+@@ -6 +6 @@ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { join, relative } from "node:path";
+@@ -12,0 +13 @@ import { DaemonClient } from "../src/modes/daemon/daemon-client.js";
++import * as daemonMode from "../src/modes/daemon/daemon-mode.js";
+@@ -35 +36 @@ const workerLaunchTestState = vi.hoisted(() => ({
 -	fixtureMode: "worker" as "worker" | "close-gate" | "rollback-gate" | "successful-gate",
 +	fixtureMode: "worker" as "worker" | "close-gate" | "rollback-gate" | "successful-gate" | "idle",
- 	gateMarkerPath: "",
- 	tsxCliPath: "",
- 	cliEntrypoint: "",
-@@ -92,6 +92,12 @@ vi.mock("../src/cli/subprocess-launch.js", async (importOriginal) => {
- 					],
- 				};
- 			}
+@@ -94,0 +96,6 @@ vi.mock("../src/cli/subprocess-launch.js", async (importOriginal) => {
 +			if (workerLaunchTestState.fixtureMode === "idle") {
 +				return {
 +					command: process.execPath,
 +					args: ["--eval", "setInterval(() => {}, 1000)"],
 +				};
 +			}
- 			return {
- 				command: process.execPath,
- 				args: [workerLaunchTestState.tsxCliPath, workerLaunchTestState.cliEntrypoint, ...args],
-@@ -117,7 +123,8 @@ const previousSupervisorRegistryDir = process.env[supervisorRegistryDirEnv];
- const supervisorRegistryDirs = new Set<string>();
- 
- interface SupervisorMonitorHarness {
+@@ -120 +127,3 @@ interface SupervisorMonitorHarness {
 -	options: { worker: object };
 +	options: { worker: object; defaultSessionConfig: { cwd: string } };
++	agentDir: string;
 +	socketPath: string;
- 	clients: Set<{ authenticated: boolean }>;
- 	supervisorClaims: Map<object, object>;
- 	shuttingDown: boolean;
-@@ -261,7 +268,8 @@ function createHarness(canConnect: () => Promise<boolean>): SupervisorMonitorHar
- 	supervisorRegistryDirs.add(registryDir);
- 	process.env[supervisorRegistryDirEnv] = registryDir;
- 	return Object.assign(Object.create(AgentDaemon.prototype), {
+@@ -264 +273,3 @@ function createHarness(canConnect: () => Promise<boolean>): SupervisorMonitorHar
 -		options: { worker: {} },
 +		options: { worker: {}, defaultSessionConfig: { cwd: process.cwd() } },
++		agentDir: registryDir,
 +		socketPath: "",
- 		clients: new Set<{ authenticated: boolean }>(),
- 		supervisorClaims: new Map<object, object>(),
- 		shuttingDown: false,
-@@ -976,6 +984,33 @@ describe("daemon worker supervisor monitoring", () => {
- 		expect(daemon.supervisorMonitorTimer).toBeUndefined();
- 	});
- 
+@@ -273,0 +285,15 @@ describe("daemon worker supervisor monitoring", () => {
++	it("keeps the replacement lock in filesystem storage for named-pipe sockets", () => {
++		const agentDir = mkdtempSync(join(tmpdir(), "supervisor-launch-lock-"));
++		try {
++			const socketPath = ["", "", ".", "pipe", `prime-agent-daemon-${process.pid}`].join("\\");
++			const getLockDirectory = Reflect.get(daemonMode, "getSupervisorLaunchLockDirectory");
++			expect(typeof getLockDirectory).toBe("function");
++			if (typeof getLockDirectory !== "function") return;
++			const lockDirectory = Reflect.apply(getLockDirectory, undefined, [socketPath, agentDir]) as string;
++			const relativeLockDirectory = relative(agentDir, lockDirectory);
++			expect(relativeLockDirectory).not.toMatch(/^(?:\.\.(?:[/\\]|$)|[/\\])/);
++		} finally {
++			rmSync(agentDir, { recursive: true, force: true });
++		}
++	});
++
+@@ -978,0 +1005,27 @@ describe("daemon worker supervisor monitoring", () => {
 +	it("does not launch a replacement supervisor if shutdown starts during the availability probe", async () => {
 +		let resolveProbe: (available: boolean) => void = () => undefined;
 +		const probe = new Promise<boolean>((resolve) => {
@@ -92,24 +93,14 @@ index c05afc0..420148e 100644
 +		expect(workerLaunchTestState.spawned).toHaveLength(0);
 +	});
 +
- 	it("skips socket probes while an authenticated supervisor connection is active", async () => {
- 		vi.useFakeTimers();
- 		const daemon = createHarness(async () => true);
-@@ -1961,28 +1996,45 @@
- 	});
- 
- 	it("limits abort admission to mutation drain", async () => {
+@@ -1964,2 +2017,4 @@ describe("daemon worker supervisor monitoring", () => {
 -		const root = mkdtempSync(`/tmp/prime-update-drain-${process.pid}-`);
 -		const socketPath = join(root, "supervisor.sock");
 +		const root = mkdtempSync(join(tmpdir(), `prime-update-drain-${process.pid}-`));
 +		const socketPath = process.platform === "win32"
 +			? `\\\\.\\pipe\\prime-agent-update-drain-${process.pid}`
 +			: join(root, "supervisor.sock");
- 		const supervisor = new DaemonSupervisor(socketPath, {
- 			defaultSessionConfig: { cwd: root, agentDir: root },
- 			descriptorDir: join(root, "workers"),
- 		});
- 		const client = new DaemonClient(socketPath);
+@@ -1970,0 +2026,11 @@ describe("daemon worker supervisor monitoring", () => {
 +		const mutationDrain = Reflect.get(supervisor, "mutationDrain") as MutationDrainLatch;
 +		mutationDrain.begin();
 +		mutationDrain.begin();
@@ -121,10 +112,7 @@ index c05afc0..420148e 100644
 +				heldMutations--;
 +			}
 +		};
- 		vi.spyOn(DaemonCatalogClient.prototype, "start").mockResolvedValue();
- 		try {
- 			await supervisor.start();
- 			await client.connect();
+@@ -1975,3 +2041,4 @@ describe("daemon worker supervisor monitoring", () => {
 -			const prepare = client.request({ type: "prepare_update_restart" });
 -			expect(await client.request({ type: "abort", activeSessionId: "missing" })).not.toMatchObject({
 -				error: "Daemon is preparing an update restart",
@@ -132,17 +120,8 @@ index c05afc0..420148e 100644
 +			await vi.waitFor(() => expect(Reflect.get(supervisor, "updateRestartPhase")).toBe("draining"), { timeout: 5000 });
 +			expect(await client.request({ type: "abort", activeSessionId: "missing" })).toMatchObject({
 +				error: "Unknown active session: missing",
- 			});
+@@ -1978,0 +2046 @@ describe("daemon worker supervisor monitoring", () => {
 +			releaseMutations();
- 			await prepare;
- 			await expect(client.request({ type: "abort", activeSessionId: "missing" })).resolves.toMatchObject({
- 				error: "Daemon is preparing an update restart",
- 			});
- 		} finally {
+@@ -1983,0 +2052,2 @@ describe("daemon worker supervisor monitoring", () => {
 +			releaseMutations();
 +			if (prepare) await prepare.catch(() => undefined);
- 			client.close();
- 			await Reflect.apply(Reflect.get(supervisor, "cleanupSupervisorResources"), supervisor, []);
- 			rmSync(root, { recursive: true, force: true });
- 		}
- 	});
