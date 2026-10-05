@@ -48,6 +48,21 @@ function terminateProcessTree(proc) {
   try { proc.kill("SIGTERM"); } catch {}
 }
 
+function terminateSupervisorOnly(proc) {
+  if (!proc?.pid || proc.exitCode !== null) return;
+  if (process.platform === "win32") {
+    try {
+      // Deliberately omit /T: the Windows worker is not detached, but it must
+      // survive a supervisor-only restart so the replacement can adopt it.
+      execFileSync("taskkill", ["/PID", String(proc.pid), "/F"], { stdio: "ignore" });
+    } catch {
+      // The process may have exited between the check and taskkill.
+    }
+    return;
+  }
+  try { proc.kill("SIGTERM"); } catch {}
+}
+
 function record(label, ok, detail) {
   results.push({ label, ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"}  ${label}${detail ? " — " + detail : ""}`);
@@ -371,7 +386,7 @@ async function run() {
 
     if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {
       const oldDaemon = daemon;
-      terminateProcessTree(oldDaemon);
+      terminateSupervisorOnly(oldDaemon);
       const exited = await waitForExit(oldDaemon);
       daemon = undefined;
       record("session-recovery daemon exits before replacement", exited);
