@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { chmod, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import * as hardening from "./prepare-dependency-overlay.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -339,6 +339,50 @@ test("supports Windows only through its separately validated ACL policy", () => 
   assert.doesNotThrow(() => hardening.assertSafeFilesystemPlatform("win32"));
   for (const platform of ["darwin", "freebsd"]) {
     assert.throws(() => hardening.assertSafeFilesystemPlatform(platform), /supports only Linux and Windows NTFS/i);
+  }
+});
+
+test("accepts a non-reparse 8.3 path alias for a secure Windows source root", { skip: process.platform !== "win32" }, async (t) => {
+  const tempBase = await realpath(tmpdir());
+  const sourceRoot = await mkdtemp(join(tempBase, "sophos-short-name-source-"));
+  const normalized = (path) => path.toLowerCase();
+  try {
+    const hasDosShortName = sourceRoot.split(String.fromCharCode(92)).some((component) => /^.{1,6}~\d+$/i.test(component));
+    if (!hasDosShortName) {
+      t.skip("the native Windows system TEMP path has no 8.3 component to exercise");
+      return;
+    }
+    const physicalPath = await realpath(sourceRoot);
+    if (normalized(physicalPath) === normalized(sourceRoot)) {
+      t.skip("realpath preserved the short-name alias on this Windows runner");
+      return;
+    }
+    t.diagnostic(`8.3 alias resolves to a non-reparse directory: ${sourceRoot} -> ${physicalPath}`);
+    const record = await hardening.inspectWindowsPathAcl(sourceRoot);
+    assert.equal(record.isReparsePoint, false, "an 8.3 alias does not set FILE_ATTRIBUTE_REPARSE_POINT");
+    assert.equal(await hardening.assertSecureSourceRoot(sourceRoot, "native Windows 8.3 alias fixture"), sourceRoot);
+  } finally {
+    await rm(sourceRoot, { recursive: true, force: true });
+  }
+});
+
+test("rejects an actual reparse-point ancestor by its Windows attributes", { skip: process.platform !== "win32" }, async () => {
+  const workspace = await mkdtemp(join(await realpath(tmpdir()), "sophos-reparse-ancestor-"));
+  const actualParent = join(workspace, "actual-parent");
+  const junctionParent = join(workspace, "junction-parent");
+  const sourceThroughJunction = join(junctionParent, "source");
+  try {
+    await mkdir(actualParent);
+    await mkdir(join(actualParent, "source"));
+    await symlink(actualParent, junctionParent, "junction");
+    const junction = await hardening.inspectWindowsPathAcl(junctionParent);
+    assert.equal(junction.isReparsePoint, true, "the fixture must be a real NTFS reparse point");
+    await assert.rejects(
+      hardening.assertSecureSourceRoot(sourceThroughJunction, "native Windows junction fixture"),
+      /reparse point/i,
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
   }
 });
 
