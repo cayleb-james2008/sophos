@@ -243,7 +243,8 @@ export async function assertSecureWindowsPath(path, label = "trusted Windows pat
   if (!new Set(["directory", "file", "any"]).has(targetType)) throw new Error(`unsupported Windows path target type: ${targetType}`);
   const components = windowsPathComponents(path);
   const records = queryWindowsAcls(components);
-  for (const [index, [component, record]] of components.entries()) {
+  for (const [index, component] of components.entries()) {
+    const record = records[index];
     const final = index === components.length - 1;
     const componentScope = final ? scope : "ancestor";
     assertWindowsAclRecord(record, component, label, { scope: componentScope });
