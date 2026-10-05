@@ -9,6 +9,7 @@ import {
   applyReviewedSourcePatches,
   matchesPrimeAgentSecurityBuildProvenance,
   PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED,
+  resolvePrimeAgentSecurityWorkPaths,
   samePath,
 } from "./prepare-prime-agent-security-build.mjs";
 
@@ -141,4 +142,39 @@ test("Windows build output path comparisons ignore case but POSIX comparisons do
   assert.equal(samePath("C:/Temp/Sophos/.deps", "c:/temp/sophos/.deps", "win32"), true);
   assert.equal(samePath("C:/Temp/Sophos/.deps", "C:/Temp/Sophos/other", "win32"), false);
   assert.equal(samePath("/tmp/Build", "/tmp/build", "linux"), false);
+});
+
+test("Windows Prime Agent source and build trees use a unique system-TEMP root", () => {
+  const projectRoot = "D:/a/sophos/repo";
+  const systemTempRoot = "C:/Users/runneradmin/AppData/Local/Temp";
+  const privateTempRoot = `${systemTempRoot}/sophos-prime-agent-security-abc123`;
+  const winPaths = resolvePrimeAgentSecurityWorkPaths(projectRoot, {
+    platform: "win32",
+    systemTempRoot,
+    privateTempRoot,
+  });
+  assert.equal(samePath(winPaths.sourceRoot, `${privateTempRoot}/source`, "win32"), true);
+  assert.equal(samePath(winPaths.buildRoot, `${privateTempRoot}/build`, "win32"), true);
+  assert.equal(samePath(winPaths.sourceRoot, winPaths.buildRoot, "win32"), false);
+  assert.throws(() => resolvePrimeAgentSecurityWorkPaths(projectRoot, {
+    platform: "win32",
+    systemTempRoot,
+    privateTempRoot: "D:/a/sophos/repo/.deps",
+  }), /under system TEMP/);
+  assert.throws(() => resolvePrimeAgentSecurityWorkPaths(projectRoot, {
+    platform: "win32",
+    systemTempRoot,
+  }), /unique private temp root/);
+  const linuxPaths = resolvePrimeAgentSecurityWorkPaths("/work/sophos", { platform: "linux" });
+  assert.equal(linuxPaths.sourceRoot, "/work/sophos/.deps/prime-agent");
+  assert.equal(linuxPaths.buildRoot, "/work/sophos/.deps/prime-agent-v070-security-build");
+});
+
+test("Windows real bundler allocates source and build paths in the validated system-TEMP root", () => {
+  assert.ok(bundleSource.includes('mkdtemp(join(tmpdir(), "sophos-prime-agent-security-"))'));
+  assert.ok(bundleSource.includes("resolvePrimeAgentSecurityWorkPaths"));
+  assert.ok(bundleSource.includes("primePaths.sourceRoot"));
+  assert.ok(bundleSource.includes("primePaths.buildRoot"));
+  assert.ok(bundleSource.includes("const primeSourceRoot = process.env.PRIME_AGENT_REF ?? primePaths.sourceRoot"));
+  assert.ok(bundleSource.includes("preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path, primePaths.buildRoot)"));
 });

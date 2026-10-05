@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { lstat, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
 import { isDeepStrictEqual } from "node:util";
 import {
   assertRegularFileNoSymlink,
@@ -68,6 +69,53 @@ const EXPECTED_BUILD_SOURCE_HASHES = Object.freeze({
 export function samePath(left, right, platform = process.platform) {
   if (platform === "win32") return win32.normalize(left).toLowerCase() === win32.normalize(right).toLowerCase();
   return resolve(left) === resolve(right);
+}
+
+function isWindowsChild(parent, child) {
+  const relativePath = win32.relative(win32.resolve(parent), win32.resolve(child));
+  return relativePath !== ""
+    && relativePath !== ".."
+    && !relativePath.startsWith(`..${win32.sep}`)
+    && !win32.isAbsolute(relativePath);
+}
+
+export function resolvePrimeAgentSecurityBuildRoot(projectRoot, requestedBuildRoot, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const root = platform === "win32" ? win32.resolve(projectRoot) : resolve(projectRoot);
+  if (platform === "win32") {
+    const systemTempRoot = options.systemTempRoot ?? tmpdir();
+    const candidate = requestedBuildRoot ? win32.resolve(requestedBuildRoot) : "";
+    if (!requestedBuildRoot || !isWindowsChild(systemTempRoot, candidate)) {
+      throw new Error("Windows security build output must be under the validated system temporary root");
+    }
+    return candidate;
+  }
+  const candidate = requestedBuildRoot ? resolve(requestedBuildRoot) : resolve(root, BUILD_DIRECTORY);
+  normalizeRelative(root, candidate);
+  return candidate;
+}
+
+export function resolvePrimeAgentSecurityWorkPaths(projectRoot, options = {}) {
+  const platform = options.platform ?? process.platform;
+  if (platform !== "win32") {
+    const root = resolve(projectRoot);
+    return {
+      sourceRoot: resolve(root, ".deps", "prime-agent"),
+      buildRoot: resolve(root, BUILD_DIRECTORY),
+    };
+  }
+  const systemTempRoot = options.systemTempRoot ?? tmpdir();
+  const privateTempRoot = options.privateTempRoot;
+  if (typeof privateTempRoot !== "string" || !isWindowsChild(systemTempRoot, privateTempRoot)) {
+    throw new Error("Windows Prime Agent security build requires a unique private temp root under system TEMP");
+  }
+  const sourceRoot = win32.join(win32.resolve(privateTempRoot), "source");
+  const buildRoot = resolvePrimeAgentSecurityBuildRoot(
+    projectRoot,
+    win32.join(win32.resolve(privateTempRoot), "build"),
+    { platform, systemTempRoot },
+  );
+  return { sourceRoot, buildRoot };
 }
 
 function sha256(bytes) {
@@ -348,8 +396,7 @@ export async function verifyPrimeAgentSecurityBuildTree(projectRoot, buildRoot, 
   if (runGit(["status", "--porcelain", "--untracked-files=all"], source)) {
     throw new Error("pinned Prime Agent source checkout changed during the security build");
   }
-  const expectedBuildRoot = resolve(root, BUILD_DIRECTORY);
-  normalizeRelative(root, expectedBuildRoot);
+  const expectedBuildRoot = resolvePrimeAgentSecurityBuildRoot(root, buildRoot);
   if (!samePath(resolve(buildRoot), expectedBuildRoot)) {
     throw new Error("Prime Agent security build path does not match the pinned output location");
   }
@@ -363,7 +410,7 @@ export async function verifyPrimeAgentSecurityBuildTree(projectRoot, buildRoot, 
   };
 }
 
-export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSourceRoot) {
+export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSourceRoot, requestedBuildRoot) {
   const root = await assertSecureProjectRoot(projectRoot);
   const source = await assertSecureSourceRoot(pinnedSourceRoot, "pinned Prime Agent source");
   const expectedSource = assertExpectedSourceIdentity(source);
@@ -379,8 +426,7 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
   }
   const inputs = await loadReviewedInputs(root);
   const baseMarker = expectedMarker(inputs);
-  const buildRoot = resolve(root, BUILD_DIRECTORY);
-  normalizeRelative(root, buildRoot);
+  const buildRoot = resolvePrimeAgentSecurityBuildRoot(root, requestedBuildRoot);
   await removeExistingBuild(buildRoot, baseMarker);
 
   const overlay = await withGitAutocrlfDisabled(() => prepareDependencyOverlay(source, buildRoot, root));

@@ -8,8 +8,9 @@
  * The build uses the checked-in generated model catalog; it does not call
  * provider/model-catalog APIs or require credentials.
  */
-import { cp, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { cp, copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -17,6 +18,7 @@ import { ensureNodeRuntime } from "./node-runtime.mjs";
 import { ensurePrimeAgentRef, resolvePrimeAgentRef } from "./prime-agent-ref.mjs";
 import {
   preparePrimeAgentSecurityBuildTree,
+  resolvePrimeAgentSecurityWorkPaths,
   verifyPrimeAgentSecurityBuildTree,
 } from "./prepare-prime-agent-security-build.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "./runtime-pins.mjs";
@@ -153,6 +155,7 @@ Options:
 Environment:
   PRIME_AGENT_REF     optional path to an unmodified clone of the exact pinned
                       public Prime Agent commit; default is .deps/prime-agent
+                      on POSIX, or a unique directory under system TEMP on Windows
   PRIME_NODE_RUNTIME  optional node.exe (or directory containing it); accepted
                       only when its SHA-256 matches the official pinned binary
 `);
@@ -188,10 +191,19 @@ async function main() {
     runNpm(["ci"], { cwd: WORKTREE, label: "Sophos locked dependency install (normal lifecycle)" });
   }
 
-  const primeRefPath = resolvePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
+  const privateTempRoot = process.platform === "win32"
+    ? await mkdtemp(join(tmpdir(), "sophos-prime-agent-security-"))
+    : undefined;
+  const primePaths = resolvePrimeAgentSecurityWorkPaths(WORKTREE, {
+    platform: process.platform,
+    systemTempRoot: tmpdir(),
+    privateTempRoot,
+  });
+  const primeSourceRoot = process.env.PRIME_AGENT_REF ?? primePaths.sourceRoot;
+  const primeRefPath = resolvePrimeAgentRef(WORKTREE, primeSourceRoot);
   log("gray", "Prime Agent source:", relative(WORKTREE, primeRefPath) || primeRefPath);
-  const primeSource = await ensurePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
-  const primeBuild = await preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path);
+  const primeSource = await ensurePrimeAgentRef(WORKTREE, primeSourceRoot);
+  const primeBuild = await preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path, primePaths.buildRoot);
   manifest.upstream = {
     repository: primeSource.repository,
     ref: primeSource.ref,
