@@ -38,6 +38,14 @@ export function resolveDriverBin({ env = process.env, platform = process.platfor
 /** Path to the cua-driver binary. CI may set CUA_DRIVER_BIN explicitly. */
 export const DRIVER_BIN = resolveDriverBin();
 
+/** Stable label shared by every one-shot CLI call in this Node process. */
+export const DRIVER_SESSION = process.env.CUA_DRIVER_SESSION || `sophos-ui-${process.pid}`;
+
+/** Add the caller-declared session to one-shot CLI tool arguments. */
+export function withSession(args = {}, session = DRIVER_SESSION) {
+  return { ...args, session: args.session ?? session };
+}
+
 /** Small sleep helper (ms). */
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,7 +56,7 @@ export function sleep(ms) {
  * Returns the parsed JSON result. Throws on non-zero exit or a plain-text
  * error payload (the driver reports some failures as text, not JSON).
  */
-export function call(tool, args = {}) {
+function invokeDriverCall(tool, args = {}) {
   const result = spawnSync(DRIVER_BIN, ["call", tool], {
     input: JSON.stringify(args),
     encoding: "utf-8",
@@ -81,6 +89,59 @@ export function call(tool, args = {}) {
     throw new Error(`cua-driver call ${tool} error: ${parsed.error || JSON.stringify(parsed)}`);
   }
   return parsed;
+}
+
+/**
+ * Keep snapshot and pixel actions in one named CUA session across one-shot CLI
+ * processes. `invokeTool` is injectable so session lifecycle can be unit-tested.
+ */
+export function createSessionInvoker(invokeTool, defaultSession = DRIVER_SESSION) {
+  const activeSessions = new Set();
+
+  const invoke = (tool, args = {}) => {
+    const payload = withSession(args, defaultSession);
+    const session = payload.session;
+
+    if (tool === "start_session") {
+      const result = invokeTool(tool, payload);
+      activeSessions.add(session);
+      return result;
+    }
+    if (tool === "end_session") {
+      const result = invokeTool(tool, payload);
+      activeSessions.delete(session);
+      return result;
+    }
+    if (!activeSessions.has(session)) {
+      invokeTool("start_session", { session });
+      activeSessions.add(session);
+    }
+    return invokeTool(tool, payload);
+  };
+
+  invoke.endAll = () => {
+    for (const session of activeSessions) {
+      try {
+        invokeTool("end_session", { session });
+      } catch {
+        // The daemon may already have stopped during runner teardown.
+      }
+    }
+    activeSessions.clear();
+  };
+
+  return invoke;
+}
+
+const callInSession = createSessionInvoker(invokeDriverCall);
+process.once("exit", callInSession.endAll);
+
+/**
+ * Invoke a CUA tool in the current Node process's named session.
+ * Returns parsed JSON and throws on CLI/tool errors.
+ */
+export function call(tool, args = {}) {
+  return callInSession(tool, args);
 }
 
 /**
@@ -136,6 +197,7 @@ export function startDaemon() {
 
 /** Stop the cua-driver daemon. Returns the driver's status output. */
 export function stopDaemon() {
+  callInSession.endAll();
   const result = spawnSync(DRIVER_BIN, ["stop"], { encoding: "utf-8", windowsHide: true });
   return result.stdout || result.stderr || "";
 }

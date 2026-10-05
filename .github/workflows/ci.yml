@@ -161,7 +161,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "cua-driver --version exited $LASTEXITCODE" }
 
       - name: Test CUA driver and checkout path prerequisites
-        run: node --test verify/cua/driver-path.test.mjs verify/cua/driver-screenshot-context.test.mjs verify/cua/chat-app-path.test.mjs
+        run: >-
+          node --test
+          verify/cua/driver-path.test.mjs
+          verify/cua/driver-screenshot-context.test.mjs
+          verify/cua/chat-app-path.test.mjs
+          verify/cua/driver-session.test.mjs
 
       - name: Run cua-driver native UI acceptance
         # This is a required check. It drives the real Tauri release executable
