@@ -201,11 +201,14 @@ test("checked-out worker-shutdown patch retains the exact reviewed bytes", async
   assert.equal(sha256(patchBytes), PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED.workerShutdownFencePatchSha256);
 });
 
-test("Windows supervisor-monitor fixture uses platform temp and named-pipe paths", async () => {
+test("Windows supervisor-monitor fixture uses platform temp and deterministic drain admission", async () => {
   const patch = await readFile(new URL("../patches/prime-agent-v0.7.0-worker-shutdown-fence.patch", import.meta.url), "utf8");
   assert.ok(patch.includes("mkdtempSync(join(tmpdir(), `prime-update-drain-${process.pid}-`))"));
   assert.ok(patch.includes("const socketPath = process.platform === \"win32\""));
   assert.ok(patch.includes("prime-agent-update-drain-${process.pid}"));
+  assert.ok(patch.includes("await vi.waitFor(() => expect(Reflect.get(supervisor, \"updateRestartPhase\")).toBe(\"draining\"), { timeout: 5000 });"));
+  assert.ok(patch.includes("mutationDrain.begin();"));
+  assert.ok(patch.includes('error: "Unknown active session: missing"'));
   assert.ok(patch.includes("-\t\tconst root = mkdtempSync(`/tmp/prime-update-drain-${process.pid}-`);"));
 });
 

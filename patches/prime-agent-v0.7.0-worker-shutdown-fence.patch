@@ -95,16 +95,54 @@ index c05afc0..420148e 100644
  	it("skips socket probes while an authenticated supervisor connection is active", async () => {
  		vi.useFakeTimers();
  		const daemon = createHarness(async () => true);
-@@ -1961,8 +1996,10 @@
+@@ -1961,28 +1996,45 @@
  	});
  
  	it("limits abort admission to mutation drain", async () => {
 -		const root = mkdtempSync(`/tmp/prime-update-drain-${process.pid}-`);
-+		const root = mkdtempSync(join(tmpdir(), `prime-update-drain-${process.pid}-`));
 -		const socketPath = join(root, "supervisor.sock");
++		const root = mkdtempSync(join(tmpdir(), `prime-update-drain-${process.pid}-`));
 +		const socketPath = process.platform === "win32"
 +			? `\\\\.\\pipe\\prime-agent-update-drain-${process.pid}`
 +			: join(root, "supervisor.sock");
  		const supervisor = new DaemonSupervisor(socketPath, {
  			defaultSessionConfig: { cwd: root, agentDir: root },
  			descriptorDir: join(root, "workers"),
+ 		});
+ 		const client = new DaemonClient(socketPath);
++		const mutationDrain = Reflect.get(supervisor, "mutationDrain") as MutationDrainLatch;
++		mutationDrain.begin();
++		mutationDrain.begin();
++		let heldMutations = 2;
++		let prepare: Promise<unknown> | undefined;
++		const releaseMutations = () => {
++			while (heldMutations > 0) {
++				mutationDrain.end();
++				heldMutations--;
++			}
++		};
+ 		vi.spyOn(DaemonCatalogClient.prototype, "start").mockResolvedValue();
+ 		try {
+ 			await supervisor.start();
+ 			await client.connect();
+-			const prepare = client.request({ type: "prepare_update_restart" });
+-			expect(await client.request({ type: "abort", activeSessionId: "missing" })).not.toMatchObject({
+-				error: "Daemon is preparing an update restart",
++			prepare = client.request({ type: "prepare_update_restart" });
++			await vi.waitFor(() => expect(Reflect.get(supervisor, "updateRestartPhase")).toBe("draining"), { timeout: 5000 });
++			expect(await client.request({ type: "abort", activeSessionId: "missing" })).toMatchObject({
++				error: "Unknown active session: missing",
+ 			});
++			releaseMutations();
+ 			await prepare;
+ 			await expect(client.request({ type: "abort", activeSessionId: "missing" })).resolves.toMatchObject({
+ 				error: "Daemon is preparing an update restart",
+ 			});
+ 		} finally {
++			releaseMutations();
++			if (prepare) await prepare.catch(() => undefined);
+ 			client.close();
+ 			await Reflect.apply(Reflect.get(supervisor, "cleanupSupervisorResources"), supervisor, []);
+ 			rmSync(root, { recursive: true, force: true });
+ 		}
+ 	});
