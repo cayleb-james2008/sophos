@@ -17,11 +17,26 @@
 
 import { spawnSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import path from "node:path";
 
-/** Path to the cua-driver binary. Override with the CUA_DRIVER_BIN env var. */
-export const DRIVER_BIN =
-  process.env.CUA_DRIVER_BIN ||
-  "C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe";
+/** Resolve cua-driver's installed path without assuming a particular user. */
+export function resolveDriverBin({ env = process.env, platform = process.platform } = {}) {
+  if (env.CUA_DRIVER_BIN) return env.CUA_DRIVER_BIN;
+  if (platform === "win32" && env.LOCALAPPDATA) {
+    return path.win32.join(
+      env.LOCALAPPDATA,
+      "Programs",
+      "Cua",
+      "cua-driver",
+      "bin",
+      "cua-driver.exe",
+    );
+  }
+  return "cua-driver";
+}
+
+/** Path to the cua-driver binary. CI may set CUA_DRIVER_BIN explicitly. */
+export const DRIVER_BIN = resolveDriverBin();
 
 /** Small sleep helper (ms). */
 export function sleep(ms) {

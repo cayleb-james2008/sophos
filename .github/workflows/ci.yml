@@ -92,26 +92,15 @@ jobs:
         run: node verify/e2e.mjs
 
   # cua-e2e — drives the REAL Sophos desktop app (Tauri v2 release build) via
-  # the cua-driver CLI and UIA accessibility automation (verify/cua/*). These
-  # tests run in DEMO MODE (the `--demo` flag skips the daemon + sidecar and
-  # injects window.__SOPHOS_DEMO__ = true, so the frontend uses the
-  # MockIpcClient with simulated Sessions/Agents data).
+  # cua-driver and Windows UI Automation. The build stages real pinned runtime
+  # resources and the upstream license; UI suites use the app's disclosed demo
+  # IPC path to verify native startup/render and simulated interactions only.
+  # This does not claim provider/model generation.
   #
-  # HONEST STATUS (2026-09-21): the cua-driver daemon cannot start on
-  # GitHub-hosted windows-latest runners — they run non-interactive (session 0,
-  # no desktop), and `cua-driver serve` exits immediately there, so every run
-  # fails in startDaemon() before any suite runs. Verified across all four runs
-  # of this workflow (every cua-e2e conclusion to date is FAILURE, including
-  # runs that predate any local changes), with the driver's own stderr captured
-  # in the logs. The build steps above DO run and are kept: they prove the
-  # release exe compiles on real Windows from a clean checkout.
-  #
-  # The suite itself is real: it was executed on an interactive Windows 10
-  # Enterprise LTSC VM (QEMU/KVM) on 2026-09-18/2026-09-21, where the built exe
-  # launched and stayed running (see OVERHAUL-NOTES.md, "Windows runtime test").
-  # Until a runner class with a desktop session is available, this job is
-  # best-effort (continue-on-error) rather than permanently red; the build
-  # compilation result still gates the job's exit code.
+  # cua-driver requires a logged-on Windows user session for UIA. The prior
+  # readiness error did not record the runner session and is not enough to
+  # attribute the failure to a desktop limitation. The CUA suite is a hard
+  # acceptance gate; host diagnostics are recorded after the attempt.
   cua-e2e:
     runs-on: windows-latest
 
@@ -155,16 +144,47 @@ jobs:
         run: cargo build --release
 
       - name: Install cua-driver
-        # The cua-driver binary is installed to
-        # %LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe and found
-        # by verify/cua/driver.mjs (overridable via CUA_DRIVER_BIN).
+        # Resolve the per-user install from this runner, not an agent-specific
+        # profile path. The path is exported for verify/cua/driver.mjs.
         shell: pwsh
-        run: irm https://cua.ai/driver/install.ps1 | iex
+        run: |
+          irm https://cua.ai/driver/install.ps1 | iex
+          $cua = Join-Path $env:LOCALAPPDATA 'Programs'
+          $cua = Join-Path $cua 'Cua'
+          $cua = Join-Path $cua 'cua-driver'
+          $cua = Join-Path $cua 'bin'
+          $cua = Join-Path $cua 'cua-driver.exe'
+          if (-not (Test-Path -LiteralPath $cua)) { throw "cua-driver was not installed at $cua" }
+          "CUA_DRIVER_BIN=$cua" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
+          Write-Host "CUA_DRIVER_BIN=$cua"
+          & $cua --version
+          if ($LASTEXITCODE -ne 0) { throw "cua-driver --version exited $LASTEXITCODE" }
 
-      - name: Run cua-driver e2e suite
-        # Best-effort: the driver daemon needs an interactive desktop session
-        # (see the job-level note above); the build steps above still gate this
-        # job's exit code. Run `npm run test:cua` on an interactive Windows host
-        # to exercise the full suite.
+      - name: Test CUA driver path resolution
+        run: node --test verify/cua/driver-path.test.mjs
+
+      - name: Run cua-driver native UI acceptance
+        # This is a required check. It drives the real Tauri release executable
+        # built above and retains the demo IPC boundary; failures fail the job.
         run: node verify/cua/run-all.mjs
-        continue-on-error: true
+
+      - name: Record cua-driver Windows session diagnostics
+        if: always()
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          Write-Host "RUNNER_USER=$env:USERNAME"
+          $jobSessionId = (Get-Process -Id $PID).SessionId
+          Write-Host "JOB_SESSION_ID=$jobSessionId"
+          Write-Host 'CUA_DRIVER_PROCESSES:'
+          Get-Process -Name cua-driver -ErrorAction SilentlyContinue | Select-Object Id, SessionId, StartTime
+          if (-not (Test-Path -LiteralPath $env:CUA_DRIVER_BIN)) {
+            Write-Host "CUA_DRIVER_MISSING=$env:CUA_DRIVER_BIN"
+          } else {
+            Write-Host 'CUA_DRIVER_DOCTOR:'
+            & $env:CUA_DRIVER_BIN doctor
+            Write-Host "CUA_DOCTOR_EXIT_CODE=$LASTEXITCODE"
+            Write-Host 'CUA_DRIVER_STATUS:'
+            & $env:CUA_DRIVER_BIN status
+            Write-Host "CUA_STATUS_EXIT_CODE=$LASTEXITCODE"
+          }
