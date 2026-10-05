@@ -8,7 +8,7 @@
  * executed natively there) and separately validates the bundled Windows
  * runtime checksum.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync, readdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,6 +18,7 @@ import { selectE2ENode } from "./runtime-executable.mjs";
 import { parseBridgeVerifyResult } from "./e2e-result.mjs";
 import { validateNodeExecutable } from "../scripts/node-runtime.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "../scripts/runtime-pins.mjs";
+import { PRIME_AGENT_SESSION_LEASE_OVERLAY } from "../scripts/apply-prime-agent-overlay.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RESOURCES = join(REPO, "resources");
@@ -95,6 +96,18 @@ async function main() {
         && manifest.upstream?.version === PRIME_AGENT_PIN.version
         && manifest.upstream?.license === PRIME_AGENT_PIN.license,
       `${manifest.upstream?.version} ${manifest.upstream?.commit} (${manifest.upstream?.license})`);
+      const overlay = manifest.upstream?.overlay;
+      const expectedOverlay = PRIME_AGENT_SESSION_LEASE_OVERLAY;
+      const overlayMatches = overlay?.id === expectedOverlay.id
+        && overlay?.upstreamRepository === expectedOverlay.upstreamRepository
+        && overlay?.upstreamCommit === expectedOverlay.upstreamCommit
+        && overlay?.sourcePath === expectedOverlay.sourcePath
+        && overlay?.sourceSha256 === expectedOverlay.sourceSha256
+        && overlay?.patchPath === expectedOverlay.patchPath
+        && overlay?.patchSha256 === expectedOverlay.patchSha256
+        && overlay?.patchedSourceSha256 === expectedOverlay.patchedSourceSha256;
+      record("provenance: audited Windows session-lease overlay", overlayMatches,
+        overlayMatches ? `${overlay.id} source=${overlay.sourceSha256} patch=${overlay.patchSha256}` : "bundle overlay metadata does not match the pinned source patch");
     } catch (error) {
       record("provenance: pinned Prime Agent source", false, String(error));
       report.summary = { overall: "FAIL", reason: "bundle manifest missing or invalid" };
@@ -153,6 +166,40 @@ async function main() {
       BRIDGE_VERIFY_RECOVERY: "1",
       BRIDGE_VERIFY_SESSION_CWD: sessionCwd,
     };
+    push("\n=== Pinned session-lease ownership, replacement, and provenance ===\n");
+    const leaseTestHome = mkdtempSync(join(tmpdir(), "sophos-session-lease-e2e-home-"));
+    const leaseTestEnv = {
+      ...isolatedEnv,
+      HOME: leaseTestHome,
+      USERPROFILE: leaseTestHome,
+      XDG_CONFIG_HOME: join(leaseTestHome, ".config"),
+      XDG_DATA_HOME: join(leaseTestHome, ".local", "share"),
+      XDG_CACHE_HOME: join(leaseTestHome, ".cache"),
+      APPDATA: join(leaseTestHome, "AppData", "Roaming"),
+      LOCALAPPDATA: join(leaseTestHome, "AppData", "Local"),
+      TMPDIR: tmpdir(),
+      TEMP: tmpdir(),
+      TMP: tmpdir(),
+      PI_OFFLINE: "1",
+    };
+    let leaseTests;
+    try {
+      leaseTests = spawnSync(NODE_EXE, ["--test", join(REPO, "scripts", "session-lease-lifecycle.test.mjs")], {
+        cwd: REPO,
+        env: leaseTestEnv,
+        encoding: "utf8",
+        windowsHide: true,
+        timeout: 60_000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+    } finally {
+      rmSync(leaseTestHome, { recursive: true, force: true });
+    }
+    if (leaseTests.stdout?.trim()) push(leaseTests.stdout.trimEnd());
+    if (leaseTests.stderr?.trim()) push(`[session-lease stderr]\n${leaseTests.stderr.trimEnd()}`);
+    record("pinned session-lease holder, replacement, and provenance regressions",
+      leaseTests.status === 0 && !leaseTests.error,
+      `exit=${leaseTests.status ?? "not-started"}${leaseTests.error ? `; ${leaseTests.error.message}` : ""}`);
     const hostAuthFile = join(testHome, ".prime", "agent", "auth.json");
     record("session E2E starts from isolated HOME with no host auth file",
       !existsSync(hostAuthFile) && readdirSync(testHome).length === 1,
