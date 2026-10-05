@@ -8,7 +8,7 @@
  * executed natively there) and separately validates the bundled Windows
  * runtime checksum.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync, readdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -153,6 +153,20 @@ async function main() {
       BRIDGE_VERIFY_RECOVERY: "1",
       BRIDGE_VERIFY_SESSION_CWD: sessionCwd,
     };
+    push("\n=== Pinned session-lease ownership, replacement, and provenance ===\n");
+    const leaseTests = spawnSync(NODE_EXE, ["--test", join(REPO, "scripts", "session-lease-lifecycle.test.mjs")], {
+      cwd: REPO,
+      env,
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 60_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    if (leaseTests.stdout?.trim()) push(leaseTests.stdout.trimEnd());
+    if (leaseTests.stderr?.trim()) push(`[session-lease stderr]\n${leaseTests.stderr.trimEnd()}`);
+    record("pinned session-lease holder, replacement, and provenance regressions",
+      leaseTests.status === 0 && !leaseTests.error,
+      `exit=${leaseTests.status ?? "not-started"}${leaseTests.error ? `; ${leaseTests.error.message}` : ""}`);
     const hostAuthFile = join(testHome, ".prime", "agent", "auth.json");
     record("session E2E starts from isolated HOME with no host auth file",
       !existsSync(hostAuthFile) && readdirSync(testHome).length === 1,
