@@ -69,7 +69,7 @@ function record(label, ok, detail) {
 }
 
 async function waitForExit(proc, timeoutMs = 5000) {
-  if (!proc || proc.exitCode !== null) return true;
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) return true;
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(false), timeoutMs);
     proc.once("exit", () => {
@@ -129,17 +129,19 @@ async function run() {
     }
 
     let daemonStopped = false;
+    let daemonProcessStopped = !daemon || daemon.exitCode !== null || daemon.signalCode !== null;
     let shutdownError;
     try {
       daemonStopped = await shutdownDaemonGracefully();
+      if (daemonStopped) daemonProcessStopped = await waitForExit(daemon, 5000);
     } catch (error) {
       shutdownError = error instanceof Error ? error.message : String(error);
     }
-    if (!daemonStopped) {
+    if (!daemonStopped || !daemonProcessStopped) {
       terminateProcessTree(daemon);
-      await waitForExit(daemon, 5000);
+      daemonProcessStopped = await waitForExit(daemon, 5000);
     }
-    return { bridgeStopped, daemonStopped, shutdownError };
+    return { bridgeStopped, daemonStopped: daemonStopped && daemonProcessStopped, shutdownError };
   };
   const onSignal = () => {
     forceCleanup();
