@@ -27,6 +27,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install dependencies
         run: npm ci
 
@@ -54,7 +57,10 @@ jobs:
         run: node verify/live-feed.mjs
 
       - name: Runtime helper and fail-closed gate regression tests
-        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs
+        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs verify/e2e-home-cleanup.test.mjs scripts/bundle.test.mjs bridge/verify.test.mjs
+
+      - name: Platform provenance and Tauri resource tests
+        run: node --test scripts/native-runtime-platform.test.mjs scripts/bundle-platform.test.mjs scripts/tauri-license-resource.test.mjs scripts/tauri-package-license.test.mjs
 
       # Build all ignored runtime inputs from a fresh checkout. The bundler
       # verifies the exact public Prime Agent tag/commit/license, performs
@@ -62,6 +68,18 @@ jobs:
       # the hash-pinned official Windows Node executable before staging.
       - name: Build complete runtime bundle
         run: node scripts/bundle.mjs
+
+      - name: Load production Windows native modules
+        run: node scripts/verify-native-runtime.mjs
+
+      - name: Focused JSON-RPC wire regression
+        run: node bridge/verify-rpc-errors.test.mjs
+
+      - name: Build guarded Tauri MSI
+        run: node scripts/build-windows-installer.mjs
+
+      - name: Verify MIT notice is inside the built MSI
+        run: node scripts/verify-tauri-package.mjs
 
       - name: Verify bridge compatibility with the pinned daemon
         run: npm --prefix bridge run test:kernel-compat
@@ -121,16 +139,10 @@ jobs:
         # tsc && vite build — emits dist/ that the Tauri shell embeds.
         run: npm run build
 
-      - name: Prepare gitignored resource dirs
-        # tauri-build validates bundle.resources paths at compile time, and the
-        # bundled runtime (resources/daemon/dist, resources/bridge/dist,
-        # resources/node_modules) is assembled only on a developer machine by
-        # scripts/bundle.mjs. The cua-driver suite runs in --demo mode, which
-        # never loads these resources, so empty placeholder dirs satisfy the
-        # build check without shipping any real runtime bytes.
-        shell: bash
-        run: |
-          mkdir -p resources/node_modules resources/daemon/dist resources/bridge/dist
+      - name: Build actual pinned runtime resources
+        # Even the simulated UI build uses real pinned resources and the upstream
+        # MIT notice. No placeholder runtime is counted as packaging evidence.
+        run: node scripts/bundle.mjs
 
       - name: Build Tauri release exe
         # cargo build --release compiles the Rust shell and embeds the

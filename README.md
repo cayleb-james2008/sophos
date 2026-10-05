@@ -288,8 +288,11 @@ installing/building `bridge/` on its own. The bundle command also validates an
 operator-supplied `PRIME_AGENT_REF` against the exact origin, tag commit, version,
 MIT license, and clean-worktree state before using it.
 
-The `bundle.mjs` manifest is written to `resources/.bundle-manifest.json`.
-Flags: `--no-frontend`, `--no-bridge`, `--no-node-modules`, `--layout-check-only`, `--help`.
+The `bundle.mjs` manifest is written to `resources/.bundle-manifest.json` and records the native dependency build host, architecture, Windows target, build mode, and release eligibility. Default Windows release staging is accepted only on a real Windows x64 host. Linux/macOS may use `--diagnostic` for source/Unix-socket diagnostics; that provenance is permanently ineligible for the Windows installer, and `scripts/build-windows-installer.mjs` fails closed unless it validates a Windows-release manifest.
+
+Flags: `--no-frontend`, `--no-bridge`, `--no-node-modules`, `--layout-check-only`, `--diagnostic`, `--help`.
+
+The Windows CI workflow is configured to load ZeroMQ, Koffi, and the Windows clipboard addon using the bundled Windows Node binary, build the MSI through the guarded release entrypoint, then administratively extract the MSI and compare its `daemon/LICENSE` beside the installed `prime-agent-windows.exe` byte-for-byte with the staged upstream `resources/daemon/LICENSE`. These checks require a successful Windows runner; Linux results do not substitute for native or installer evidence.
 
 ### Environment variables
 
@@ -297,7 +300,8 @@ Flags: `--no-frontend`, `--no-bridge`, `--no-node-modules`, `--layout-check-only
 |---|---|---|
 | `PRIME_AGENT_REF` | optional Prime Agent source checkout | `.deps/prime-agent (pinned v0.7.0, MIT)` |
 | `PRIME_NODE_RUNTIME` | verified `node.exe` override | official Node v24.18.0 win-x64 download (SHA-256 checked) |
-| `PRIME_DAEMON_TCP` | Sophos-side toggle only; pinned Prime Agent v0.7.0 does **not** implement TCP listening | unset |
+| `PRIME_DAEMON_TCP` | Unsupported by pinned Prime Agent v0.7.0; Sophos does not set it | not set |
+| `daemonTcp` (`settings.json`) | Legacy persisted field ignored by the Rust shell; it cannot enable TCP | ignored |
 
 ### Verify
 
@@ -320,6 +324,7 @@ At runtime the Tauri resource dir contains (this is what
   node/node-v24.18.0-win-x64/node.exe  # official runtime, SHA-256 pinned
   daemon/dist/cli.js            # coding-agent --mode daemon entry
   daemon/package.json
+  daemon/LICENSE               # pinned upstream Prime Agent MIT notice
   bridge/dist/bridge/src/index.js  # JSON-RPC sidecar entry
   node_modules/                 # shared dependency tree
 ```
@@ -328,6 +333,7 @@ At runtime the Tauri resource dir contains (this is what
 |---|---|
 | `resources/daemon/dist` | `daemon/dist` |
 | `resources/daemon/package.json` | `daemon/package.json` |
+| `resources/daemon/LICENSE` | `daemon/LICENSE` |
 | `resources/bridge/dist` | `bridge/dist` |
 | `resources/node_modules` | `node_modules` |
 | `resources/node/node-v24.18.0-win-x64` | `node` |
@@ -341,10 +347,13 @@ Prime Agent dependency. At commit `be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387`,
 `DaemonSupervisor.listen()` calls Node's `net.Server.listen(this.socketPath)`
 with no `tcp://` parsing or `PRIME_DAEMON_TCP` handling. Supplying
 `--daemon-socket tcp://127.0.0.1:<port>` therefore does not create a TCP listener.
+The Settings control is disabled and explicitly labels TCP unsupported; a legacy
+`daemonTcp: true` value in `settings.json` is ignored by Rust. Both daemon and
+bridge launch using the pinned runtime's supported default local socket.
 The Linux verifier exercises the real daemon and bridge over a Unix-domain
 socket; Windows named-pipe and native installer behavior require a Windows run.
-Do not rely on the TCP setting until a compatible upstream release or a reviewed
-transport implementation is tested end-to-end.
+Do not rely on TCP until a compatible upstream release or a reviewed transport
+implementation is tested end-to-end.
 
 ---
 

@@ -15,12 +15,15 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ensureNodeRuntime } from "./node-runtime.mjs";
 import { ensurePrimeAgentRef, resolvePrimeAgentRef } from "./prime-agent-ref.mjs";
+import { preparePrimeAgentBuildTree } from "./apply-prime-agent-overlay.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "./runtime-pins.mjs";
 import { validateDaemonRuntimePackage } from "./daemon-runtime-package.mjs";
+import { assertWindowsReleaseProvenance, createNativeBuildProvenance } from "./native-runtime-platform.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const WORKTREE = resolve(SCRIPT_DIR, "..");
 const RESOURCES = join(WORKTREE, "resources");
+const MANIFEST_PATH = join(RESOURCES, ".bundle-manifest.json");
 const BRIDGE_DIR = join(WORKTREE, "bridge");
 const COLORS = { green: "\x1b[32m", red: "\x1b[31m", yellow: "\x1b[33m", cyan: "\x1b[36m", gray: "\x1b[90m", reset: "\x1b[0m" };
 const log = (color, ...values) => console.log(COLORS[color] ?? "", ...values, COLORS.reset);
@@ -121,11 +124,16 @@ function printHelp() {
 Builds the frontend, pinned Prime Agent daemon, TypeScript bridge and Windows
 Node runtime, then stages the self-contained Tauri resource layout.
 
+Default mode is Windows-release staging and requires a real Windows x64 host.
+Use --diagnostic on other hosts to build source diagnostics only; those resources
+are marked ineligible for a Windows installer.
+
 Options:
   --no-frontend       reuse an existing frontend dist/
   --no-bridge         reuse an existing bridge/dist/
   --no-node-modules   skip dependency staging (layout validation will fail)
   --layout-check-only assemble and validate, without creating an installer
+  --diagnostic        permit host-native source diagnostics; never releaseable
   --help              show this help
 
 Environment:
@@ -139,12 +147,20 @@ Environment:
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes("--help")) return printHelp();
-  const supportedFlags = new Set(["--no-frontend", "--no-bridge", "--no-node-modules", "--layout-check-only"]);
+  const supportedFlags = new Set(["--no-frontend", "--no-bridge", "--no-node-modules", "--layout-check-only", "--diagnostic"]);
   const unknownFlags = args.filter((arg) => arg.startsWith("--") && !supportedFlags.has(arg));
   if (unknownFlags.length) throw new Error(`unsupported option(s): ${unknownFlags.join(", ")}`);
   const flags = new Set(args);
+  const platformProvenance = createNativeBuildProvenance(flags.has("--diagnostic") ? "source-diagnostic" : "windows-release");
+  if (!flags.has("--diagnostic")) {
+    assertWindowsReleaseProvenance({ platformProvenance });
+  }
+  // Invalidate prior provenance before touching host-native dependencies. If
+  // staging fails midway, no stale Windows manifest can bless the partial tree.
+  await rm(MANIFEST_PATH, { force: true });
   const manifest = {
     generatedAt: new Date().toISOString(),
+    platformProvenance,
     upstream: {},
     nodeRuntime: {},
     components: [],
@@ -160,17 +176,20 @@ async function main() {
 
   const primeRefPath = resolvePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
   log("gray", "Prime Agent source:", relative(WORKTREE, primeRefPath) || primeRefPath);
-  const primeRef = await ensurePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
+  const primeSource = await ensurePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
+  const primeBuild = preparePrimeAgentBuildTree(WORKTREE, primeSource.path);
   manifest.upstream = {
-    repository: primeRef.repository,
-    ref: primeRef.ref,
-    commit: primeRef.commit,
-    version: primeRef.version,
-    license: primeRef.license,
-    sourceDirectory: relative(WORKTREE, primeRef.path) || ".",
+    repository: primeSource.repository,
+    ref: primeSource.ref,
+    commit: primeSource.commit,
+    version: primeSource.version,
+    license: primeSource.license,
+    sourceDirectory: relative(WORKTREE, primeSource.path) || ".",
+    buildDirectory: relative(WORKTREE, primeBuild.path) || ".",
+    overlay: primeBuild.provenance,
   };
 
-  const daemonDist = await buildPinnedDaemon(primeRef.path);
+  const daemonDist = await buildPinnedDaemon(primeBuild.path);
 
   const frontendDist = join(WORKTREE, "dist");
   if (!flags.has("--no-frontend")) {
@@ -189,6 +208,10 @@ async function main() {
   const bridgeDist = join(BRIDGE_DIR, "dist");
   if (!flags.has("--no-bridge")) {
     runNpm(["ci"], { cwd: BRIDGE_DIR, label: "bridge locked dependency install (normal lifecycle)" });
+    // The bridge's file dependencies intentionally point at the clean source
+    // checkout. Compile against corresponding packages built from the overlay,
+    // without modifying that immutable source checkout.
+    await stageUpstreamPackages(primeBuild.path, join(BRIDGE_DIR, "node_modules"));
     runNpm(["run", "build"], { cwd: BRIDGE_DIR, label: "bridge TypeScript build" });
   } else {
     log("yellow", "reusing bridge/dist (--no-bridge)");
@@ -201,9 +224,9 @@ async function main() {
   await mkdir(join(RESOURCES, "daemon"), { recursive: true });
   const daemonRuntimeManifest = JSON.parse(await readFile(join(RESOURCES, "daemon", "package.json"), "utf8"));
   validateDaemonRuntimePackage(daemonRuntimeManifest, PRIME_AGENT_PIN);
-  await copyFile(join(primeRef.path, "LICENSE"), join(RESOURCES, "daemon", "LICENSE"));
+  await copyFile(join(primeSource.path, "LICENSE"), join(RESOURCES, "daemon", "LICENSE"));
   record("daemon", {
-    source: `${manifest.upstream.sourceDirectory}/packages/coding-agent/dist`,
+    source: `${manifest.upstream.buildDirectory}/packages/coding-agent/dist`,
     dest: "resources/daemon/dist",
     version: PRIME_AGENT_PIN.version,
     license: PRIME_AGENT_PIN.license,
@@ -244,15 +267,19 @@ async function main() {
     // bridge install. Preserve the exact upstream lockfile's production graph
     // separately, then replace its workspace links with built package files.
     runNpm(["prune", "--omit=dev"], {
-      cwd: primeRef.path,
+      cwd: primeBuild.path,
       label: "Prime Agent production dependency tree (normal lifecycle)",
     });
-    await cp(join(primeRef.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
+    await cp(join(primeBuild.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
     await rm(join(stagedNodeModules, "@earendil-works"), { recursive: true, force: true });
-    const upstreamPackages = await stageUpstreamPackages(primeRef.path, stagedNodeModules);
+    const upstreamPackages = await stageUpstreamPackages(primeBuild.path, stagedNodeModules);
     record("node_modules", {
       source: "pinned Prime Agent production lockfile plus bridge runtime packages",
       dest: "resources/node_modules/",
+      builtOn: { ...platformProvenance.buildHost },
+      target: { ...platformProvenance.target },
+      mode: platformProvenance.mode,
+      releaseEligible: platformProvenance.releaseEligible,
       upstreamPackages,
       files: await countFiles(stagedNodeModules),
       bytes: await sizeOf(stagedNodeModules),
@@ -276,12 +303,11 @@ async function main() {
     && manifest.layout.daemon_license;
   log(layoutOk ? "green" : "red", layoutOk ? "✓ runtime layout and license present" : "✗ runtime layout incomplete");
   console.log(JSON.stringify(manifest.layout, null, 2));
-
-  const manifestPath = join(RESOURCES, ".bundle-manifest.json");
-  await mkdir(RESOURCES, { recursive: true });
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  log("cyan", "manifest:", manifestPath);
   if (!layoutOk) throw new Error("bundle layout is incomplete; refusing to report success");
+
+  await mkdir(RESOURCES, { recursive: true });
+  await writeFile(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+  log("cyan", "manifest:", MANIFEST_PATH);
   log("green", "\n=== bundle complete ===\n");
 }
 

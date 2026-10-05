@@ -30,10 +30,13 @@ npm ci
 ```
 
 The Prime Agent runtime is a pinned public source dependency, not an npm
-package tarball. `node scripts/bundle.mjs` clones/validates the exact v0.7.0
-commit into ignored `.deps/prime-agent`, installs its lockfile with normal npm
-lifecycle scripts, builds the daemon and bridge, and stages the verified
-runtime. No machine-local AppData checkout is required.
+package tarball. On Windows x64, `node scripts/bundle.mjs` clones/validates the
+exact v0.7.0 commit into ignored `.deps/prime-agent`, installs its lockfile with
+normal npm lifecycle scripts, builds the daemon and bridge, and stages the
+verified runtime. Linux/macOS developers can run
+`node scripts/bundle.mjs --diagnostic` for source/Unix-socket diagnostics; its
+native dependencies are explicitly marked ineligible for a Windows installer.
+No machine-local AppData checkout is required.
 
 ### Development
 
@@ -52,11 +55,18 @@ npm run tauri dev
 ### Production build
 
 ```sh
-npm ci                  # frontend dependencies
-node scripts/bundle.mjs # pinned Prime Agent + bridge build and runtime staging
-node verify/e2e.mjs     # real offline daemon/bridge protocol smoke test
-npm run tauri build     # native desktop installer on Windows
+npm ci                                  # frontend dependencies
+node scripts/bundle.mjs                # Windows x64: pinned runtime + native dependency staging
+node verify/e2e.mjs                    # real offline daemon/bridge protocol smoke test
+node scripts/verify-native-runtime.mjs  # real Windows bundled-Node native addon load
+node scripts/build-windows-installer.mjs # guarded Tauri MSI build
+node scripts/verify-tauri-package.mjs   # extract MSI and compare packaged MIT notice
 ```
+
+On Linux/macOS, replace the bundle command with
+`node scripts/bundle.mjs --diagnostic`; do not pass that host-native dependency
+tree to Tauri's Windows release build. The installer helper rejects diagnostic
+or cross-platform manifest provenance.
 
 The `verify/` suite requires a bundled runtime. Build it first with
 `node scripts/bundle.mjs`, then run the verifiers (see Testing).
@@ -85,6 +95,9 @@ hash-verified Node runtime, and runs the real offline bridge/daemon JSON-RPC
 verifier (`node verify/e2e.mjs`). On Windows this exercises the named-pipe path
 with the bundled Node executable; on Linux/macOS it uses the host Node and a
 Unix-domain socket. Non-Windows results do not validate Windows-native setup.
+The Windows workflow also configures a bundled-Node native-module smoke, guarded
+MSI build, and MSI license-extraction check; these steps still need a Windows
+runner result before installer or native-module claims are considered verified.
 
 ### Verifiers
 

@@ -1,7 +1,9 @@
 //! Settings — reads `~/.prime/agent/settings.json` for operator configuration.
 //!
-//! Currently only `daemonCliPath` is consumed by the Rust shell. The file is
-//! optional; a sensible default is used when it is absent or malformed.
+//! Currently only `daemonCliPath` is consumed by the Rust shell. The legacy
+//! `daemonTcp` setting is ignored because pinned Prime Agent v0.7.0 does not
+//! implement that transport. The file is optional; sensible defaults are used
+//! when it is absent or malformed.
 //!
 //! The daemon CLI path never hardcodes a developer's machine: it resolves
 //! from the app's own directory (a sibling `prime-agent-ref` checkout), or
@@ -165,11 +167,8 @@ pub fn settings_path() -> PathBuf {
 pub struct Settings {
     /// Path to the daemon CLI script (`node <path> --mode daemon`).
     pub daemon_cli_path: String,
-    /// When true, launch the daemon + bridge with `PRIME_DAEMON_TCP=1` so the
-    /// IPC uses the TCP-loopback fallback instead of a Windows named pipe.
-    /// This is the escape hatch for machines where `CreateNamedPipeW` is wedged
-    /// (ERROR_INVALID_NAME) while TCP loopback still works. Default: false
-    /// (named pipe stays the transport).
+    /// Legacy settings.json field retained for compatibility. It is always false
+    /// because pinned Prime Agent v0.7.0 does not implement TCP listening.
     pub daemon_tcp: bool,
 }
 
@@ -195,14 +194,50 @@ impl Settings {
                 settings.daemon_cli_path = p.to_string();
             }
         }
-        // `daemonTcp` accepts a real bool or the string "true"/"1" for hand-edits.
-        settings.daemon_tcp = match value.get("daemonTcp") {
-            Some(serde_json::Value::Bool(b)) => *b,
-            Some(serde_json::Value::String(s)) => {
-                matches!(s.trim().to_ascii_lowercase().as_str(), "true" | "1" | "yes" | "on")
-            }
-            _ => false,
-        };
         settings
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Settings;
+    use std::ffi::OsString;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn replace_env(name: &str, value: Option<OsString>) -> Option<OsString> {
+        let previous = std::env::var_os(name);
+        match value {
+            Some(value) => std::env::set_var(name, value),
+            None => std::env::remove_var(name),
+        }
+        previous
+    }
+
+    #[test]
+    fn persisted_true_tcp_fallback_is_ignored() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock must be after epoch")
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!(
+            "sophos-settings-test-{}-{unique}",
+            std::process::id()
+        ));
+        let settings_dir = home.join(".prime").join("agent");
+        std::fs::create_dir_all(&settings_dir).expect("create isolated settings directory");
+        std::fs::write(settings_dir.join("settings.json"), r#"{"daemonTcp":true}"#)
+            .expect("write legacy settings");
+
+        let old_home = replace_env("HOME", Some(home.as_os_str().to_owned()));
+        let old_userprofile = replace_env("USERPROFILE", Some(home.as_os_str().to_owned()));
+        let loaded = Settings::load();
+        replace_env("USERPROFILE", old_userprofile);
+        replace_env("HOME", old_home);
+        std::fs::remove_dir_all(&home).expect("remove isolated settings directory");
+
+        assert!(
+            !loaded.daemon_tcp,
+            "legacy daemonTcp=true must not select an unsupported transport"
+        );
     }
 }

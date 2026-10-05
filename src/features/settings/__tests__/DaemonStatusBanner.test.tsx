@@ -1,9 +1,8 @@
 // DaemonStatusBanner.test.tsx — DaemonStatusBanner renders only when the
-// connection is down, explains the failure in plain English, and offers the
-// TCP-loopback fallback that persists daemonTcp via setSettings.
+// connection is down, explains the failure in plain English, and does not
+// advertise the unsupported TCP fallback.
 
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DaemonStatusBanner } from "../DaemonStatusBanner";
 
@@ -34,11 +33,11 @@ beforeEach(() => {
 });
 
 describe("DaemonStatusBanner", () => {
-  it("renders nothing when the connection is up", async () => {
+  it("renders nothing when the connection is up and does not read fallback settings", () => {
     setStatus({ kind: "connected" });
     render(<DaemonStatusBanner />);
-    await waitFor(() => expect(mockClient.getSettings).toHaveBeenCalled());
     expect(screen.queryByText(/Agent engine offline/i)).not.toBeInTheDocument();
+    expect(mockClient.getSettings).not.toHaveBeenCalled();
   });
 
   it("renders the offline banner with the plain-English reason when disconnected", async () => {
@@ -49,37 +48,35 @@ describe("DaemonStatusBanner", () => {
     expect(screen.getByText(/named-pipe creation blocked/i)).toBeInTheDocument();
   });
 
-  it("persists the TCP fallback and flips to the already-enabled state", async () => {
-    const user = userEvent.setup();
-    setStatus({ kind: "disconnected" });
+  it("uses the supported local socket for reconnect diagnostics without TCP actions", async () => {
+    setStatus({ kind: "reconnecting" });
     render(<DaemonStatusBanner />);
-    await screen.findByText(/Agent engine offline/i);
 
-    await user.click(screen.getByRole("button", { name: /enable tcp mode/i }));
-
-    await waitFor(() => expect(mockClient.setSettings).toHaveBeenCalledWith({ daemonTcp: true }));
-    // Once daemonTcp is saved the card swaps to the already-enabled guidance.
-    expect(await screen.findByText(/TCP mode is already enabled/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Reconnecting to the agent engine on its default local socket/i)).toBeInTheDocument();
+    expect(screen.getByText(/TCP fallback is unsupported by pinned Prime Agent/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /enable tcp mode/i })).not.toBeInTheDocument();
+    expect(mockClient.setSettings).not.toHaveBeenCalled();
   });
 
-  it("shows that TCP mode is already enabled when the setting is true", async () => {
+  it("does not recommend TCP fallback when the engine is disconnected", async () => {
+    setStatus({ kind: "disconnected" });
+    render(<DaemonStatusBanner />);
+
+    expect(await screen.findByText(/Agent engine offline/i)).toBeInTheDocument();
+    expect(screen.getByText(/TCP fallback is unsupported by pinned Prime Agent/i)).toBeInTheDocument();
+    expect(screen.getByText(/unsupported by pinned Prime Agent.*default local socket/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /enable tcp mode/i })).not.toBeInTheDocument();
+    expect(mockClient.setSettings).not.toHaveBeenCalled();
+  });
+
+  it("does not treat a stale persisted daemonTcp=true value as an enabled transport", async () => {
     setStatus({ kind: "reconnecting" });
     (mockClient.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({ daemonTcp: true });
     render(<DaemonStatusBanner />);
 
-    expect(await screen.findByText(/TCP mode is already enabled/i)).toBeInTheDocument();
+    expect(await screen.findByText(/TCP fallback is unsupported by pinned Prime Agent/i)).toBeInTheDocument();
+    expect(screen.getByText(/unsupported by pinned Prime Agent.*default local socket/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /enable tcp mode/i })).not.toBeInTheDocument();
-  });
-
-  it("surfaces an error when the TCP toggle save fails", async () => {
-    const user = userEvent.setup();
-    setStatus({ kind: "disconnected" });
-    (mockClient.setSettings as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("write denied"));
-    render(<DaemonStatusBanner />);
-    await screen.findByText(/Agent engine offline/i);
-
-    await user.click(screen.getByRole("button", { name: /enable tcp mode/i }));
-
-    expect(await screen.findByText(/write denied/i)).toBeInTheDocument();
+    expect(mockClient.setSettings).not.toHaveBeenCalled();
   });
 });

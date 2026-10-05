@@ -10,7 +10,9 @@ import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "../scripts/runtime-pins.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCES = [
   "verify/e2e.mjs", "verify/runtime-executable.mjs", "verify/e2e-result.mjs",
+  "verify/e2e-home-cleanup.mjs",
   "scripts/node-runtime.mjs", "scripts/runtime-pins.mjs", "scripts/runtime-pins.json",
+  "scripts/prime-agent-ref.mjs", "scripts/apply-prime-agent-overlay.mjs",
 ];
 
 // These intentionally incomplete assets exercise the verifier's refusal paths,
