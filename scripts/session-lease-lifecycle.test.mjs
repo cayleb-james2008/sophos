@@ -8,7 +8,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const LEASE_MODULE = pathToFileURL(join(REPO, "resources", "daemon", "dist", "core", "session-lease.js")).href;
+const defaultLeaseModulePath = join(REPO, "resources", "daemon", "dist", "core", "session-lease.js");
+const leaseModuleOverride = process.env.SOPHOS_SESSION_LEASE_TEST_MODULE;
+const LEASE_MODULE = leaseModuleOverride
+  ? (leaseModuleOverride.startsWith("file:") ? leaseModuleOverride : pathToFileURL(resolve(leaseModuleOverride)).href)
+  : pathToFileURL(defaultLeaseModulePath).href;
 const { acquireSessionLease, canonicalSessionPath, SESSION_LEASE_OWNER_ID_ENV, SESSION_LEASES_ENABLED_ENV, SessionAlreadyActiveError } = await import(LEASE_MODULE);
 const tempRoots = new Set();
 
