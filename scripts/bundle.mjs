@@ -17,10 +17,12 @@ import { ensureNodeRuntime } from "./node-runtime.mjs";
 import { ensurePrimeAgentRef, resolvePrimeAgentRef } from "./prime-agent-ref.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "./runtime-pins.mjs";
 import { validateDaemonRuntimePackage } from "./daemon-runtime-package.mjs";
+import { assertWindowsReleaseProvenance, createNativeBuildProvenance } from "./native-runtime-platform.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const WORKTREE = resolve(SCRIPT_DIR, "..");
 const RESOURCES = join(WORKTREE, "resources");
+const MANIFEST_PATH = join(RESOURCES, ".bundle-manifest.json");
 const BRIDGE_DIR = join(WORKTREE, "bridge");
 const COLORS = { green: "\x1b[32m", red: "\x1b[31m", yellow: "\x1b[33m", cyan: "\x1b[36m", gray: "\x1b[90m", reset: "\x1b[0m" };
 const log = (color, ...values) => console.log(COLORS[color] ?? "", ...values, COLORS.reset);
@@ -121,11 +123,16 @@ function printHelp() {
 Builds the frontend, pinned Prime Agent daemon, TypeScript bridge and Windows
 Node runtime, then stages the self-contained Tauri resource layout.
 
+Default mode is Windows-release staging and requires a real Windows x64 host.
+Use --diagnostic on other hosts to build source diagnostics only; those resources
+are marked ineligible for a Windows installer.
+
 Options:
   --no-frontend       reuse an existing frontend dist/
   --no-bridge         reuse an existing bridge/dist/
   --no-node-modules   skip dependency staging (layout validation will fail)
   --layout-check-only assemble and validate, without creating an installer
+  --diagnostic        permit host-native source diagnostics; never releaseable
   --help              show this help
 
 Environment:
@@ -139,12 +146,20 @@ Environment:
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes("--help")) return printHelp();
-  const supportedFlags = new Set(["--no-frontend", "--no-bridge", "--no-node-modules", "--layout-check-only"]);
+  const supportedFlags = new Set(["--no-frontend", "--no-bridge", "--no-node-modules", "--layout-check-only", "--diagnostic"]);
   const unknownFlags = args.filter((arg) => arg.startsWith("--") && !supportedFlags.has(arg));
   if (unknownFlags.length) throw new Error(`unsupported option(s): ${unknownFlags.join(", ")}`);
   const flags = new Set(args);
+  const platformProvenance = createNativeBuildProvenance(flags.has("--diagnostic") ? "source-diagnostic" : "windows-release");
+  if (!flags.has("--diagnostic")) {
+    assertWindowsReleaseProvenance({ platformProvenance });
+  }
+  // Invalidate prior provenance before touching host-native dependencies. If
+  // staging fails midway, no stale Windows manifest can bless the partial tree.
+  await rm(MANIFEST_PATH, { force: true });
   const manifest = {
     generatedAt: new Date().toISOString(),
+    platformProvenance,
     upstream: {},
     nodeRuntime: {},
     components: [],
@@ -253,6 +268,10 @@ async function main() {
     record("node_modules", {
       source: "pinned Prime Agent production lockfile plus bridge runtime packages",
       dest: "resources/node_modules/",
+      builtOn: { ...platformProvenance.buildHost },
+      target: { ...platformProvenance.target },
+      mode: platformProvenance.mode,
+      releaseEligible: platformProvenance.releaseEligible,
       upstreamPackages,
       files: await countFiles(stagedNodeModules),
       bytes: await sizeOf(stagedNodeModules),
@@ -276,12 +295,11 @@ async function main() {
     && manifest.layout.daemon_license;
   log(layoutOk ? "green" : "red", layoutOk ? "✓ runtime layout and license present" : "✗ runtime layout incomplete");
   console.log(JSON.stringify(manifest.layout, null, 2));
-
-  const manifestPath = join(RESOURCES, ".bundle-manifest.json");
-  await mkdir(RESOURCES, { recursive: true });
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  log("cyan", "manifest:", manifestPath);
   if (!layoutOk) throw new Error("bundle layout is incomplete; refusing to report success");
+
+  await mkdir(RESOURCES, { recursive: true });
+  await writeFile(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+  log("cyan", "manifest:", MANIFEST_PATH);
   log("green", "\n=== bundle complete ===\n");
 }
 

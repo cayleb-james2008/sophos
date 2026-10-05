@@ -31,33 +31,29 @@ describe("DaemonTransportCard", () => {
     expect(screen.queryByText(/TCP loopback fallback armed/i)).not.toBeInTheDocument();
   });
 
-  it("reflects a saved daemonTcp=true setting as an armed toggle + badge", async () => {
+  it("keeps a stale daemonTcp=true setting disabled and labels TCP unsupported", async () => {
     (mockClient.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({ daemonTcp: true });
     render(<DaemonTransportCard />);
-    await waitFor(() => expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true"));
-    expect(screen.getByText(/TCP loopback fallback armed/i)).toBeInTheDocument();
+    const control = screen.getByRole("switch");
+    expect(control).toBeDisabled();
+    expect(control).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText(/TCP fallback is unsupported by pinned Prime Agent/i)).toBeInTheDocument();
+    expect(screen.getByText(/default local socket/i)).toBeInTheDocument();
   });
 
-  it("persists an enable via setSettings and shows a saved confirmation", async () => {
-    const user = userEvent.setup();
+  it("does not read the obsolete persisted transport setting", () => {
     render(<DaemonTransportCard />);
-    await waitFor(() => expect(screen.getByRole("switch")).toBeInTheDocument());
-
-    await user.click(screen.getByRole("switch"));
-
-    await waitFor(() => expect(mockClient.setSettings).toHaveBeenCalledWith({ daemonTcp: true }));
-    expect(screen.getByText(/Saved\. Restart the app/i)).toBeInTheDocument();
+    expect(mockClient.getSettings).not.toHaveBeenCalled();
+    expect(mockClient.setSettings).not.toHaveBeenCalled();
   });
 
-  it("persists a disable back to setSettings", async () => {
+  it("does not persist or enable the unsupported transport", async () => {
     const user = userEvent.setup();
-    (mockClient.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({ daemonTcp: true });
     render(<DaemonTransportCard />);
-    await waitFor(() => expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true"));
-
-    await user.click(screen.getByRole("switch"));
-
-    await waitFor(() => expect(mockClient.setSettings).toHaveBeenCalledWith({ daemonTcp: false }));
+    const control = screen.getByRole("switch");
+    expect(control).toBeDisabled();
+    await user.click(control);
+    expect(mockClient.setSettings).not.toHaveBeenCalled();
   });
 });
 
@@ -71,14 +67,14 @@ describe("DaemonDiagnosticsCard", () => {
     );
     // "Connected" appears both as the top-right badge and the stat value.
     expect(screen.getAllByText("Connected").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText("Enabled")).toBeInTheDocument();
+    expect(screen.getByText(/Pinned default local socket \(TCP unsupported\)/)).toBeInTheDocument();
     expect(screen.getByText("\\\\.\\pipe\\sophos")).toBeInTheDocument();
   });
 
   it("renders a disconnected state with TCP disabled and a fallback socket", () => {
     render(<DaemonDiagnosticsCard status={{ connected: false, tcpEnabled: false }} onRefresh={vi.fn()} />);
     expect(screen.getAllByText("Disconnected").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText(/Disabled \(Unix domain socket\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Pinned default local socket \(TCP unsupported\)/)).toBeInTheDocument();
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 

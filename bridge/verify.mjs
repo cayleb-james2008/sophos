@@ -120,6 +120,7 @@ async function run() {
   let stdoutBuf = "";
   let stderrBuf = "";
   const responses = new Map(); // id → parsed response
+  const responseFrames = [];
   const events = [];
 
   bridge.stdout.on("data", (chunk) => {
@@ -132,8 +133,10 @@ async function run() {
         // Production bridge events are direct IpcEvent envelopes. Keep the
         // legacy wrapped form above for older sidecars used by this fixture.
         events.push(parsed);
-      } else if (parsed && typeof parsed === "object" && "id" in parsed) {
-        responses.set(String(parsed.id), parsed);
+      } else if (parsed && typeof parsed === "object"
+        && (Object.hasOwn(parsed, "result") || Object.hasOwn(parsed, "error"))) {
+        responseFrames.push(parsed);
+        if (Object.hasOwn(parsed, "id")) responses.set(String(parsed.id), parsed);
       }
     });
   });
@@ -277,20 +280,58 @@ async function run() {
     record("getContextStats responds",
       typeof ctxResp.result === "object");
 
-    // 13. Robustness: malformed JSON line — should not crash
+    // 13. Robustness: malformed JSON returns -32700 and the bridge stays alive.
+    const parseResponseStart = responseFrames.length;
     sendRaw("not-json-at-all{");
+    const parseDeadline = Date.now() + 5000;
+    while (responseFrames.length < parseResponseStart + 1 && Date.now() < parseDeadline) await sleep(20);
+    const parseResponses = responseFrames.slice(parseResponseStart);
+    const parseErrorResp = parseResponses[0];
+    record("malformed JSON returns parse error with null id",
+      parseResponses.length === 1 && parseErrorResp.error?.code === -32700
+        && Object.hasOwn(parseErrorResp, "id") && parseErrorResp.id === null,
+      `responses=${JSON.stringify(parseResponses)}`);
     await sleep(300);
     record("bridge survives malformed JSON line", bridge.exitCode === null, `pid alive=${bridge.exitCode === null}`);
 
-    // 14. Robustness: object without method field — should respond with -32600
-    const noMethodResp = await send({ id: "c16", method: "getState", params: {} }); // First ensure pipeline still works
-    record("bridge still responds after malformed line",
-      noMethodResp.result?.status?.kind === "connected");
+    // 14. A real object without method must receive one -32600/null-id response.
+    const invalidRequestStart = responseFrames.length;
+    sendRaw(JSON.stringify({ jsonrpc: "2.0", id: "invalid-no-method" }));
+    const invalidRequestDeadline = Date.now() + 5000;
+    while (responseFrames.length < invalidRequestStart + 1 && Date.now() < invalidRequestDeadline) await sleep(20);
+    const invalidRequestFrames = responseFrames.slice(invalidRequestStart);
+    const invalidRequestResp = invalidRequestFrames[0];
+    record("object without method returns invalid request with null id",
+      invalidRequestFrames.length === 1 && invalidRequestResp.error?.code === -32600
+        && Object.hasOwn(invalidRequestResp, "id") && invalidRequestResp.id === null,
+      `responses=${JSON.stringify(invalidRequestFrames)}`);
 
-    // 15. Robustness: notification (no id) should NOT emit a response line
-    bridge.stdin.write(JSON.stringify({ method: "getState", params: {} }) + "\n"); // no id
+    // 15. Confirm later valid requests still traverse the actual bridge.
+    const afterMalformedResp = await send({ id: "c16", method: "getState", params: {} });
+    record("bridge still responds after malformed requests",
+      afterMalformedResp.result?.status?.kind === "connected");
+
+    // 16. An explicitly present null ID is a request, not a notification;
+    // version omission remains supported for the Rust shell's wire format.
+    const nullIdResponseStart = responseFrames.length;
+    sendRaw(JSON.stringify({ id: null, method: "getState", params: {} }));
+    const nullIdDeadline = Date.now() + 5000;
+    while (responseFrames.length < nullIdResponseStart + 1 && Date.now() < nullIdDeadline) await sleep(20);
+    const nullIdFrames = responseFrames.slice(nullIdResponseStart);
+    const nullIdResp = nullIdFrames[0];
+    record("present null id returns one successful response",
+      nullIdFrames.length === 1 && Object.hasOwn(nullIdResp, "id") && nullIdResp.id === null
+        && Object.hasOwn(nullIdResp, "result") && typeof nullIdResp.result?.status?.kind === "string",
+      `responses=${JSON.stringify(nullIdFrames)}`);
+
+    // 17. Only an absent ID denotes a notification; assert no response frame.
+    const notificationResponseStart = responseFrames.length;
+    sendRaw(JSON.stringify({ method: "getState", params: {} }));
     await sleep(300);
-    record("notification (no id) produces no response line", true); // Can't easily measure; just confirm no crash
+    const notificationResponses = responseFrames.slice(notificationResponseStart);
+    record("notification (no id) produces no response line",
+      notificationResponses.length === 0,
+      `responseCount=${notificationResponses.length}`);
 
     // 16. login/logout stubs
     const loginResp = await send({ id: "c17", method: "login", params: { provider: "openrouter" } });
