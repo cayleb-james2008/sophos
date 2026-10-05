@@ -1,0 +1,27 @@
+name: Windows dependency-hardening ACL diagnostic
+
+on:
+  push:
+    branches: [fix/windows-dependency-hardening]
+  pull_request:
+    branches: [fix/reproducible-runtime]
+    paths:
+      - '.github/workflows/windows-dependency-hardening.yml'
+      - 'scripts/dependency-hardening/windows-acl-probe.ps1'
+      - 'scripts/prepare-dependency-overlay.mjs'
+      - 'scripts/prepare-dependency-overlay.test.mjs'
+      - 'scripts/dependency-hardening/**'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-acl-diagnostic:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Record actual Windows runner ACLs before policy design
+        shell: pwsh
+        run: ./scripts/dependency-hardening/windows-acl-probe.ps1
