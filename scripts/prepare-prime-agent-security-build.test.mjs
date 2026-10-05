@@ -201,9 +201,11 @@ test("checked-out worker-shutdown patch retains the exact reviewed bytes", async
   assert.equal(sha256(patchBytes), PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED.workerShutdownFencePatchSha256);
 });
 
-test("Windows supervisor-monitor temp fixture uses the platform temp directory", async () => {
+test("Windows supervisor-monitor fixture uses platform temp and named-pipe paths", async () => {
   const patch = await readFile(new URL("../patches/prime-agent-v0.7.0-worker-shutdown-fence.patch", import.meta.url), "utf8");
   assert.ok(patch.includes("mkdtempSync(join(tmpdir(), `prime-update-drain-${process.pid}-`))"));
+  assert.ok(patch.includes("const socketPath = process.platform === \"win32\""));
+  assert.ok(patch.includes("prime-agent-update-drain-${process.pid}"));
   assert.ok(patch.includes("-\t\tconst root = mkdtempSync(`/tmp/prime-update-drain-${process.pid}-`);"));
 });
 

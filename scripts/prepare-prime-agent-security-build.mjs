@@ -38,8 +38,8 @@ const EXPECTED = Object.freeze({
   leasePatchedSourceSha256: "006802f39f6de128e6b7f418e9fb3b2793ef73410d1247db562ce5dcbe7a0349",
   zipGuardPatchSha256: "e06fa63df26c0e52e699459a0adf284cb032dc88828abc20bfa5a220de681b48",
   zipGuardPatchBytes: 7632,
-  workerShutdownFencePatchSha256: "11e48251877f3f3a4116bed978d3a857bddafd451062e41114637abaaa1756cd",
-  workerShutdownFencePatchBytes: 4755,
+  workerShutdownFencePatchSha256: "50df6455b728c63c01201df958b4476543f452f8a51bbd0a9ae3a8bfe0ad531f",
+  workerShutdownFencePatchBytes: 5069,
   overlayId: "prime-agent-v070-windows-session-lease-v1",
   overrides: {
     undici: "7.29.1",
@@ -70,7 +70,7 @@ const EXPECTED_BUILD_SOURCE_HASHES = Object.freeze({
   "packages/coding-agent/src/core/session-lease.ts": "006802f39f6de128e6b7f418e9fb3b2793ef73410d1247db562ce5dcbe7a0349",
   "packages/coding-agent/src/modes/daemon/daemon-mode.ts": "61ffac40905989f869b6981b181518fc720b968dbb103d4639b9cdedf8dba441",
   "packages/coding-agent/src/utils/tools-manager.ts": "8936f99a387c3426bf4f2210cc1178fec1dcc2605cccab5d93127054340c7064",
-  "packages/coding-agent/test/daemon-supervisor-monitor.test.ts": "b7d86e925a691ee046d73c5d4e978923faa83ba514af73211f5421be2c3c41f2",
+  "packages/coding-agent/test/daemon-supervisor-monitor.test.ts": "49a8d170aebb106bdba452c55d5e2f46ecc75cd821383acfbb1a69c63c26f9c8",
   "packages/coding-agent/test/tools-manager.test.ts": "0956ee19088f761770601ff1c00212717c6a7276dd733dc3079c05d4235e8b75",
 });
 
