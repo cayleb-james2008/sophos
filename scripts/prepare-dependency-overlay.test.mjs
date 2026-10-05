@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { chmod, mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import * as hardening from "./prepare-dependency-overlay.mjs";
@@ -343,24 +344,42 @@ test("supports Windows only through its separately validated ACL policy", () => 
 });
 
 test("accepts a non-reparse 8.3 path alias for a secure Windows source root", { skip: process.platform !== "win32" }, async (t) => {
-  const tempBase = await realpath(tmpdir());
-  const sourceRoot = await mkdtemp(join(tempBase, "sophos-short-name-source-"));
+  const sourceRoot = await mkdtemp(join(tmpdir(), "sophos-short-name-source-"));
   const normalized = (path) => path.toLowerCase();
   try {
-    const hasDosShortName = sourceRoot.split(String.fromCharCode(92)).some((component) => /^.{1,6}~\d+$/i.test(component));
-    if (!hasDosShortName) {
-      t.skip("the native Windows system TEMP path has no 8.3 component to exercise");
+    const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
+    const commandProcessor = process.env.ComSpec ?? (systemRoot ? join(systemRoot, "System32", "cmd.exe") : "cmd.exe");
+    const shortPathResult = spawnSync(commandProcessor, [
+      "/d", "/s", "/c", 'for %I in ("%SOPHOS_LONG_PATH%") do @echo %~sI',
+    ], {
+      encoding: "utf8",
+      windowsHide: true,
+      env: {
+        PATH: systemRoot ? join(systemRoot, "System32") : "",
+        SystemRoot: systemRoot,
+        ComSpec: commandProcessor,
+        PATHEXT: process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD",
+        SOPHOS_LONG_PATH: sourceRoot,
+      },
+    });
+    assert.equal(shortPathResult.error, undefined, shortPathResult.error?.message);
+    assert.equal(shortPathResult.status, 0, shortPathResult.stderr || shortPathResult.stdout);
+    const shortPath = shortPathResult.stdout.trim().split(/\r?\n/).at(-1);
+    assert.ok(shortPath, "cmd.exe must return the native short path for the fixture");
+    const hasDosShortName = shortPath.split(String.fromCharCode(92)).some((component) => /^.{1,6}~\d+$/i.test(component));
+    if (!hasDosShortName || normalized(shortPath) === normalized(sourceRoot)) {
+      t.skip("the native Windows volume does not expose an 8.3 alias for this fixture");
       return;
     }
     const physicalPath = await realpath(sourceRoot);
-    if (normalized(physicalPath) === normalized(sourceRoot)) {
-      t.skip("realpath preserved the short-name alias on this Windows runner");
-      return;
-    }
-    t.diagnostic(`8.3 alias resolves to a non-reparse directory: ${sourceRoot} -> ${physicalPath}`);
-    const record = await hardening.inspectWindowsPathAcl(sourceRoot);
+    assert.equal(normalized(await realpath(shortPath)), normalized(physicalPath), "the DOS alias must resolve to the exact long-name directory");
+    t.diagnostic(`8.3 alias resolves to a non-reparse directory: ${shortPath} -> ${physicalPath}`);
+    const record = await hardening.inspectWindowsPathAcl(shortPath);
     assert.equal(record.isReparsePoint, false, "an 8.3 alias does not set FILE_ATTRIBUTE_REPARSE_POINT");
-    assert.equal(await hardening.assertSecureSourceRoot(sourceRoot, "native Windows 8.3 alias fixture"), sourceRoot);
+    const secureSourceRoot = await hardening.assertSecureSourceRoot(shortPath, "native Windows 8.3 alias fixture");
+    assert.equal(normalized(secureSourceRoot), normalized(physicalPath), "the trusted source path may be canonicalized after the reparse check");
+    const secureProjectRoot = await hardening.assertSecureProjectRoot(shortPath);
+    assert.equal(normalized(secureProjectRoot), normalized(physicalPath), "the trusted project path may be canonicalized after the reparse check");
   } finally {
     await rm(sourceRoot, { recursive: true, force: true });
   }
