@@ -44,10 +44,14 @@ test("canonicalizes CRLF overlay lock bytes only when the reviewed SHA-256 match
   );
   const reviewed = JSON.parse(await readFile(new URL("./dependency-hardening-overlay.json", import.meta.url), "utf8"));
   const pinnedLockBytes = await readFile(new URL("./dependency-hardening/prime-agent-package-lock.json", import.meta.url));
-  const windowsCheckedOutBytes = Buffer.from(pinnedLockBytes.toString("utf8").replaceAll("\n", "\r\n"), "utf8");
+  const canonicalPinnedLockBytes = Buffer.from(pinnedLockBytes.toString("utf8").replace(/\r\n/g, "\n"), "utf8");
+  const windowsCheckedOutBytes = Buffer.from(
+    canonicalPinnedLockBytes.toString("utf8").replaceAll("\n", "\r\n"),
+    "utf8",
+  );
   assert.deepEqual(
     hardening.canonicalizeOverlayLockBytes(windowsCheckedOutBytes, reviewed.overlayLockSha256),
-    pinnedLockBytes,
+    canonicalPinnedLockBytes,
   );
 });
 
