@@ -33,17 +33,48 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      - name: Prepare a secure Windows source checkout
+        shell: pwsh
+        run: |
+          $privateParent = (node -p "require('node:fs').mkdtempSync(require('node:path').join(require('node:fs').realpathSync(require('node:os').tmpdir()), 'sophos-secure-'))").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $privateParent) { throw 'Could not create a unique checkout root under canonical Node system TEMP' }
+          $safeRepo = Join-Path $privateParent 'repo'
+          if (Test-Path -LiteralPath $safeRepo) { throw 'Refusing to reuse a secure checkout path' }
+          git clone --quiet --depth=1 --no-tags --no-checkout --no-hardlinks https://github.com/cayleb-james2008/sophos.git $safeRepo
+          if ($LASTEXITCODE -ne 0) { throw 'Anonymous Sophos source clone failed' }
+          git -C $safeRepo config core.autocrlf false
+          if ($LASTEXITCODE -ne 0) { throw 'Could not disable Git line-ending conversion in secure checkout' }
+          git -C $safeRepo fetch --quiet --no-tags --depth=1 origin $env:GITHUB_REF
+          if ($LASTEXITCODE -ne 0) { throw "Could not fetch event ref $env:GITHUB_REF" }
+          git -C $safeRepo checkout --quiet --detach $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Could not check out event SHA $env:GITHUB_SHA" }
+          $actualSha = (git -C $safeRepo rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actualSha -ne $env:GITHUB_SHA) { throw "Secure checkout SHA mismatch: $actualSha" }
+          $dirty = git -C $safeRepo status --porcelain --untracked-files=all
+          if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Secure checkout is not clean after the pinned checkout' }
+          Push-Location $safeRepo
+          try {
+            node --input-type=module -e 'import("./scripts/prepare-dependency-overlay.mjs").then(({ assertSecureProjectRoot }) => assertSecureProjectRoot(process.cwd()).then((root) => console.log("Validated secure project root: " + root))).catch((error) => { console.error(error); process.exitCode = 1; })'
+            if ($LASTEXITCODE -ne 0) { throw 'Secure Windows project-root ACL validation failed' }
+          } finally { Pop-Location }
+          Add-Content -Path $env:GITHUB_ENV -Value "SAFE_WINDOWS_REPO=$safeRepo"
+          Write-Output "Pinned secure Windows checkout: $actualSha"
+
       - name: Build dependency overlay under private Windows NTFS ACLs
         shell: pwsh
         timeout-minutes: 15
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         env:
           GIT_CONFIG_COUNT: '1'
           GIT_CONFIG_KEY_0: core.autocrlf
           GIT_CONFIG_VALUE_0: 'false'
         run: |
-          $privateTemp = (Get-Item -LiteralPath $env:TEMP -Force).FullName
-          $source = Join-Path $privateTemp "prime-agent-overlay-source-$env:GITHUB_RUN_ID"
-          $destination = Join-Path $privateTemp "prime-agent-overlay-output-$env:GITHUB_RUN_ID"
+          $privateTemp = (node -p "require('node:fs').realpathSync(require('node:os').tmpdir())").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $privateTemp) { throw 'Could not resolve canonical Node system TEMP' }
+          $runSuffix = [guid]::NewGuid().ToString('N')
+          $source = Join-Path $privateTemp "prime-agent-overlay-source-$env:GITHUB_RUN_ID-$runSuffix"
+          $destination = Join-Path $privateTemp "prime-agent-overlay-output-$env:GITHUB_RUN_ID-$runSuffix"
           git clone --quiet --depth 1 --branch v0.7.0 https://github.com/PrimeIntellect-ai/prime-agent.git $source
           if ($LASTEXITCODE -ne 0) { throw 'Pinned Prime Agent clone for ACL overlay check failed' }
           $commit = (git -C $source rev-parse HEAD).Trim()
@@ -61,25 +92,32 @@ jobs:
           if ($manifestHash -ne 'c2014bd6f87bd0d0f758a02e090dfc7741928ee67ae6746d6e2712d02357c3b4' -or $lockHash -ne '725ef9e8b2035e4e6f1b77d44b3ca95440bb20f702825c159294e42a92840e3f') { throw 'Windows-generated overlay bytes changed from reviewed manifest or lock' }
       - name: Run dependency overlay tests on native Windows ACLs
         shell: pwsh
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node --test scripts/dependency-hardening/windows-acl-security.test.mjs scripts/prepare-dependency-overlay.test.mjs
       - name: Verify the guarded Windows ZIP installer against pinned Prime Agent source
         shell: pwsh
         timeout-minutes: 15
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         env:
           GIT_CONFIG_COUNT: '1'
           GIT_CONFIG_KEY_0: core.autocrlf
           GIT_CONFIG_VALUE_0: 'false'
           NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
-          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/npmrc-user-empty
-          NPM_CONFIG_GLOBALCONFIG: ${{ runner.temp }}/npmrc-global-empty
         run: |
-          $source = Join-Path $env:RUNNER_TEMP 'prime-agent-v0.7.0'
+          $privateTemp = (node -p "require('node:fs').realpathSync(require('node:os').tmpdir())").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $privateTemp) { throw 'Could not resolve canonical Node system TEMP' }
+          $runSuffix = [guid]::NewGuid().ToString('N')
+          $source = Join-Path $privateTemp "prime-agent-v0.7.0-$env:GITHUB_RUN_ID-$runSuffix"
+          $patch = Join-Path $privateTemp "prime-agent-windows-zip-guard-$env:GITHUB_RUN_ID-$runSuffix.patch"
+          $env:NPM_CONFIG_USERCONFIG = Join-Path $privateTemp "npmrc-user-empty-$env:GITHUB_RUN_ID-$runSuffix"
+          $env:NPM_CONFIG_GLOBALCONFIG = Join-Path $privateTemp "npmrc-global-empty-$env:GITHUB_RUN_ID-$runSuffix"
+          [System.IO.File]::WriteAllText($env:NPM_CONFIG_USERCONFIG, '')
+          [System.IO.File]::WriteAllText($env:NPM_CONFIG_GLOBALCONFIG, '')
           git clone --quiet --depth 1 --branch v0.7.0 https://github.com/PrimeIntellect-ai/prime-agent.git $source
           if ($LASTEXITCODE -ne 0) { throw 'Pinned Prime Agent clone failed' }
           $commit = (git -C $source rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $commit -ne 'be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387') { throw "Unexpected Prime Agent source commit: $commit" }
-          $encodedPatch = Join-Path $env:GITHUB_WORKSPACE 'scripts/dependency-hardening/prime-agent-windows-zip-guard.patch.b64'
-          $patch = Join-Path $env:RUNNER_TEMP 'prime-agent-windows-zip-guard.patch'
+          $encodedPatch = Join-Path $env:SAFE_WINDOWS_REPO 'scripts/dependency-hardening/prime-agent-windows-zip-guard.patch.b64'
           $patchContents = (Get-Content -LiteralPath $encodedPatch -Raw).Trim()
           $patchBytes = [System.Convert]::FromBase64String($patchContents)
           [System.IO.File]::WriteAllBytes($patch, $patchBytes)
@@ -92,8 +130,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Prime Agent source overlay application failed' }
           git -C $source diff --check
           if ($LASTEXITCODE -ne 0) { throw 'Prime Agent source overlay has whitespace errors' }
-          New-Item -ItemType File -Force -Path $env:NPM_CONFIG_USERCONFIG | Out-Null
-          New-Item -ItemType File -Force -Path $env:NPM_CONFIG_GLOBALCONFIG | Out-Null
           Push-Location $source
           try {
             npm ci --ignore-scripts --no-audit --no-fund

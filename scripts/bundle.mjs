@@ -304,14 +304,14 @@ async function main() {
     log("yellow", "skipping node_modules staging (--no-node-modules)");
   } else {
     await rm(stagedNodeModules, { recursive: true, force: true });
-    // Local workspace/file links do not bring their own dependencies into the
-    // bridge install. Preserve the exact upstream lockfile's production graph
-    // separately, then replace its workspace links with built package files.
-    runNpm(["prune", "--omit=dev"], {
+    // `npm prune --omit=dev` rewrites platform-specific lock metadata (for example
+    // `libc` on optional native packages). Reinstall the production tree from the
+    // reviewed lock instead; `npm ci` consumes the lock without changing its bytes.
+    runNpm(["ci", "--omit=dev"], {
       cwd: primeBuild.path,
       label: "Prime Agent production dependency tree (normal lifecycle)",
     });
-    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm prune --omit=dev");
+    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm ci --omit=dev");
     await cp(join(primeBuild.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
     await rm(join(stagedNodeModules, "@earendil-works"), { recursive: true, force: true });
     const upstreamPackages = await stageUpstreamPackages(primeBuild.path, stagedNodeModules);

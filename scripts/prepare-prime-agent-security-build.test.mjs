@@ -110,6 +110,55 @@ const securityBuildSource = await readFile(new URL("./prepare-prime-agent-securi
 const gitattributes = await readFile(new URL("../.gitattributes", import.meta.url), "utf8");
 const bundleSource = await readFile(new URL("./bundle.mjs", import.meta.url), "utf8");
 const e2eSource = await readFile(new URL("../verify/e2e.mjs", import.meta.url), "utf8");
+const windowsCiWorkflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+const windowsAclWorkflow = await readFile(new URL("../.github/workflows/windows-dependency-hardening.yml", import.meta.url), "utf8");
+test("Windows release workflows bootstrap a SHA-pinned, ACL-validated private checkout before package operations", () => {
+  const findStepBlock = (source, stepName, offset = 0) => {
+    const start = source.indexOf(`      - name: ${stepName}`, offset);
+    assert.ok(start >= 0, `workflow step exists: ${stepName}`);
+    const next = source.indexOf("\n      - name: ", start + 1);
+    return source.slice(start, next < 0 ? source.length : next);
+  };
+  const cuaJobOffset = windowsCiWorkflow.indexOf("  cua-e2e:");
+  assert.ok(cuaJobOffset > 0, "CI defines the best-effort CUA job");
+  const testJob = windowsCiWorkflow.slice(0, cuaJobOffset);
+  const cuaJob = windowsCiWorkflow.slice(cuaJobOffset);
+  const prepTest = findStepBlock(testJob, "Prepare a secure Windows source checkout");
+  const prepCua = findStepBlock(cuaJob, "Prepare a secure Windows source checkout");
+  for (const prep of [prepTest, prepCua]) {
+    assert.ok(prep.includes("node:os") && prep.includes("tmpdir") && prep.includes("mkdtempSync"), "the checkout uses a unique directory under Node's system TEMP");
+    assert.ok(prep.includes("GITHUB_REF") && prep.includes("GITHUB_SHA"), "the event ref is checked out and pinned to its exact SHA");
+    assert.ok(prep.includes("assertSecureProjectRoot"), "the secure-root ACL gate runs before package operations");
+  }
+  const testSteps = [
+    "Install dependencies", "Type-check", "Unit tests", "Updater harness (config + keys + signature crypto)",
+    "Live update-feed integrity check", "Runtime helper and fail-closed gate regression tests",
+    "Platform provenance and Tauri resource tests", "Build complete runtime bundle", "Load production Windows native modules",
+    "Focused JSON-RPC wire regression", "Build guarded Tauri MSI", "Verify MIT notice is inside the built MSI",
+    "Verify bridge compatibility with the pinned daemon", "End-to-end verification",
+  ];
+  for (const name of testSteps) {
+    assert.ok(findStepBlock(testJob, name).includes("working-directory: ${{ env.SAFE_WINDOWS_REPO }}"), `${name} runs from the validated checkout`);
+  }
+  const cuaSteps = ["Install dependencies", "Build frontend", "Build actual pinned runtime resources", "Install cua-driver", "Run cua-driver e2e suite"];
+  for (const name of cuaSteps) {
+    assert.ok(findStepBlock(cuaJob, name).includes("working-directory: ${{ env.SAFE_WINDOWS_REPO }}"), `${name} runs from the validated checkout`);
+  }
+  assert.ok(findStepBlock(cuaJob, "Build Tauri release exe").includes("working-directory: ${{ env.SAFE_WINDOWS_REPO }}/src-tauri"));
+
+  const aclPrep = findStepBlock(windowsAclWorkflow, "Prepare a secure Windows source checkout");
+  assert.ok(aclPrep.includes("GITHUB_REF") && aclPrep.includes("GITHUB_SHA") && aclPrep.includes("assertSecureProjectRoot"));
+  assert.ok(windowsAclWorkflow.indexOf("Record actual Windows runner ACLs before policy design") < windowsAclWorkflow.indexOf("Prepare a secure Windows source checkout"),
+    "the diagnostic still records the runner workspace ACL before building privately");
+  for (const name of [
+    "Build dependency overlay under private Windows NTFS ACLs",
+    "Run dependency overlay tests on native Windows ACLs",
+    "Verify the guarded Windows ZIP installer against pinned Prime Agent source",
+  ]) {
+    assert.ok(findStepBlock(windowsAclWorkflow, name).includes("working-directory: ${{ env.SAFE_WINDOWS_REPO }}"), `${name} uses the validated checkout`);
+  }
+});
+
 test("the real bundler prepares and builds the composed security overlay", () => {
   assert.match(bundleSource, /preparePrimeAgentSecurityBuildTree/);
   assert.ok(bundleSource.includes("primeBuild.path"));
@@ -154,10 +203,13 @@ test("the real bundle runs all composed Prime Agent security regression suites",
   for (const stage of ["Prime Agent regression tests", "TUI build", "AI build", "agent-core build", "daemon build"]) {
     assert.ok(bundleSource.includes(`verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "${stage}")`));
   }
-  const prune = bundleSource.indexOf('label: "Prime Agent production dependency tree (normal lifecycle)"');
-  const pruneVerify = bundleSource.indexOf('verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm prune --omit=dev")');
+  const productionInstall = bundleSource.indexOf('runNpm(["ci", "--omit=dev"]');
+  const productionInstallLabel = bundleSource.indexOf('label: "Prime Agent production dependency tree (normal lifecycle)"');
+  const productionVerify = bundleSource.indexOf('verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm ci --omit=dev")');
   const stage = bundleSource.indexOf('await cp(join(primeBuild.path, "node_modules")');
-  assert.ok(prune >= 0 && pruneVerify > prune && stage > pruneVerify, "source and patch provenance are reverified after npm prune before staging");
+  assert.ok(productionInstall >= 0 && productionInstallLabel > productionInstall && productionVerify > productionInstallLabel && stage > productionVerify,
+    "the production tree is reinstalled from the pinned lock and verified before staging");
+  assert.equal(bundleSource.includes('runNpm(["prune", "--omit=dev"]'), false, "do not let npm prune rewrite platform-specific lock metadata");
 });
 
 test("Windows build output path comparisons ignore case but POSIX comparisons do not", () => {
