@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { win32 } from "node:path";
 
@@ -111,6 +112,9 @@ export function assertWindowsAclRecord(record, expectedPath, label = "trusted wo
 }
 
 function powershellPath() {
+  const programFiles = process.env.ProgramFiles || "C:\\Program Files";
+  const pwsh = win32.join(programFiles, "PowerShell", "7", "pwsh.exe");
+  if (existsSync(pwsh)) return pwsh;
   const root = process.env.SystemRoot || process.env.WINDIR || "C:\\Windows";
   return win32.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 }
@@ -123,8 +127,10 @@ function makeAclQueryScript(paths) {
   const pathsJsonBase64 = Buffer.from(JSON.stringify(paths), "utf8").toString("base64");
   return `
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 try {
+    Import-Module Microsoft.PowerShell.Security -ErrorAction Stop
     $pathsJson = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${pathsJsonBase64}'))
     $paths = @(ConvertFrom-Json -InputObject $pathsJson)
     $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
