@@ -7,6 +7,7 @@
 // substring), role, and/or name — and click via element_token (UIA Invoke) or
 // a pixel click at the element's centre.
 
+import { performance } from "node:perf_hooks";
 import { click, clickElement as driverClickElement, getWindowState, sleep } from "./driver.mjs";
 import { elementCenter } from "./helpers.mjs";
 
@@ -25,6 +26,47 @@ export function findBy(windowState, { text, role, name } = {}) {
     if (needle && !String(e.label || "").toLowerCase().includes(needle)) return false;
     return true;
   });
+}
+
+/**
+ * Poll fresh window states until every required UIA element is present.
+ * A nonempty WebView2 tree can still be partial while its provider materializes;
+ * callers that need a complete navigation surface must wait for the full set.
+ * The deadline bounds retries and rejects late snapshots; it cannot preempt a
+ * synchronous readState call that itself stalls. Returns the complete state or
+ * null at the deadline.
+ */
+export async function waitForAllElements(readState, criteriaList, timeoutMs = 10000, {
+  sleepFn = sleep,
+  nowFn = performance.now.bind(performance),
+} = {}) {
+  if (typeof readState !== "function") throw new TypeError("readState must be a function");
+  if (!Array.isArray(criteriaList) || criteriaList.length === 0) {
+    throw new TypeError("criteriaList must contain at least one element query");
+  }
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
+    throw new RangeError("timeoutMs must be a finite nonnegative number");
+  }
+
+  const deadline = nowFn() + timeoutMs;
+  for (;;) {
+    const remainingBeforeRead = deadline - nowFn();
+    if (remainingBeforeRead <= 0) return null;
+
+    let state;
+    try {
+      state = readState(remainingBeforeRead);
+    } catch (error) {
+      if (error?.code === "ETIMEDOUT" || nowFn() >= deadline) return null;
+      throw error;
+    }
+    if (nowFn() >= deadline) return null;
+    if (criteriaList.every((criteria) => findBy(state, criteria))) return state;
+
+    const remaining = deadline - nowFn();
+    if (remaining <= 0) return null;
+    await sleepFn(Math.min(250, remaining));
+  }
 }
 
 /** Find ALL elements matching the criteria (same matching rules as findBy). */

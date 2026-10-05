@@ -10,5 +10,7 @@
 }
 .pa-view-transition {
   height: 100%;
+}
+.pa-view-transition--animated {
   animation: pa-fade-in var(--pa-motion-duration, 180ms) var(--pa-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
 }

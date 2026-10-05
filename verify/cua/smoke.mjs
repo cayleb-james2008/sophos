@@ -19,6 +19,7 @@ import { runSuite } from "./runner.mjs";
 import { getWindowState } from "./driver.mjs";
 import { findSophosWindow } from "./launch.mjs";
 import { navTo, takeScreenshot, getTextContent, waitForElement } from "./helpers.mjs";
+import { waitForAllElements } from "./find-util.mjs";
 import {
   assert,
   assertElementVisible,
@@ -27,8 +28,16 @@ import {
 } from "./assertions.mjs";
 
 /** Read a fresh window state for the app handle. */
-function freshState(appHandle) {
-  return getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: false });
+function freshState(appHandle, timeoutMs) {
+  const callOptions = Number.isFinite(timeoutMs)
+    ? { timeoutMs: Math.max(1, timeoutMs) }
+    : {};
+  return getWindowState(
+    appHandle.pid,
+    appHandle.windowId,
+    { include_screenshot: false },
+    callOptions,
+  );
 }
 
 const tests = [
@@ -44,10 +53,16 @@ const tests = [
 
   {
     name: "reads the UIA tree (nav buttons present)",
-    fn: (appHandle) => {
-      const state = freshState(appHandle);
-      assert(state.elements && state.elements.length > 0, "UIA tree is empty");
-      for (const view of ["Chat", "Sessions", "Agents", "Inbox", "Settings"]) {
+    fn: async (appHandle) => {
+      const views = ["Chat", "Sessions", "Agents", "Inbox", "Settings"];
+      const requiredNav = views.map((name) => ({ role: "Button", name }));
+      const state = await waitForAllElements(
+        (remainingMs) => freshState(appHandle, remainingMs),
+        requiredNav,
+        3000,
+      );
+      assert(state, `UIA tree did not expose every required nav button within 3s: ${views.join(", ")}`);
+      for (const view of views) {
         assertElementVisible(state, { role: "Button", name: view });
       }
     },

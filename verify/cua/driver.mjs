@@ -17,11 +17,34 @@
 
 import { spawnSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import path from "node:path";
 
-/** Path to the cua-driver binary. Override with the CUA_DRIVER_BIN env var. */
-export const DRIVER_BIN =
-  process.env.CUA_DRIVER_BIN ||
-  "C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe";
+/** Resolve cua-driver's installed path without assuming a particular user. */
+export function resolveDriverBin({ env = process.env, platform = process.platform } = {}) {
+  if (env.CUA_DRIVER_BIN) return env.CUA_DRIVER_BIN;
+  if (platform === "win32" && env.LOCALAPPDATA) {
+    return path.win32.join(
+      env.LOCALAPPDATA,
+      "Programs",
+      "Cua",
+      "cua-driver",
+      "bin",
+      "cua-driver.exe",
+    );
+  }
+  return "cua-driver";
+}
+
+/** Path to the cua-driver binary. CI may set CUA_DRIVER_BIN explicitly. */
+export const DRIVER_BIN = resolveDriverBin();
+
+/** Stable label shared by every one-shot CLI call in this Node process. */
+export const DRIVER_SESSION = process.env.CUA_DRIVER_SESSION || `sophos-ui-${process.pid}`;
+
+/** Add the caller-declared session to one-shot CLI tool arguments. */
+export function withSession(args = {}, session = DRIVER_SESSION) {
+  return { ...args, session: args.session ?? session };
+}
 
 /** Small sleep helper (ms). */
 export function sleep(ms) {
@@ -33,15 +56,27 @@ export function sleep(ms) {
  * Returns the parsed JSON result. Throws on non-zero exit or a plain-text
  * error payload (the driver reports some failures as text, not JSON).
  */
-export function call(tool, args = {}) {
-  const result = spawnSync(DRIVER_BIN, ["call", tool], {
+function invokeDriverCall(tool, args = {}, { timeoutMs } = {}) {
+  const spawnOptions = {
     input: JSON.stringify(args),
     encoding: "utf-8",
     windowsHide: true,
-  });
+  };
+  if (timeoutMs !== undefined) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new RangeError("timeoutMs must be a finite positive number");
+    }
+    spawnOptions.timeout = Math.max(1, Math.ceil(timeoutMs));
+  }
+  const result = spawnSync(DRIVER_BIN, ["call", tool], spawnOptions);
 
   if (result.error) {
-    throw new Error(`cua-driver call ${tool} failed to spawn: ${result.error.message}`);
+    const message = result.error.code === "ETIMEDOUT"
+      ? `cua-driver call ${tool} timed out after ${spawnOptions.timeout}ms`
+      : `cua-driver call ${tool} failed to spawn: ${result.error.message}`;
+    const error = new Error(message, { cause: result.error });
+    error.code = result.error.code;
+    throw error;
   }
   if (result.status !== 0) {
     throw new Error(
@@ -69,18 +104,105 @@ export function call(tool, args = {}) {
 }
 
 /**
- * Run a tool, and if the driver reports `background_unavailable` (the target
- * surface drops background input — typical for Tauri/Chromium hotkeys and
- * scroll), retry once with `delivery_mode: "foreground"`. This mirrors the
- * driver's own guidance: always try background first, escalate only on the
- * structured signal.
+ * Keep snapshot and pixel actions in one named CUA session across one-shot CLI
+ * processes. `invokeTool` is injectable so session lifecycle can be unit-tested.
  */
-export function callWithForegroundFallback(tool, args = {}) {
-  const first = call(tool, args);
-  if (first && first.code === "background_unavailable") {
-    return call(tool, { ...args, delivery_mode: "foreground" });
+export function createSessionInvoker(invokeTool, defaultSession = DRIVER_SESSION) {
+  const activeSessions = new Set();
+
+  const invoke = (tool, args = {}, callOptions = {}) => {
+    const payload = withSession(args, defaultSession);
+    const session = payload.session;
+
+    if (tool === "start_session") {
+      const result = invokeTool(tool, payload, callOptions);
+      activeSessions.add(session);
+      return result;
+    }
+    if (tool === "end_session") {
+      const result = invokeTool(tool, payload, callOptions);
+      activeSessions.delete(session);
+      return result;
+    }
+    if (!activeSessions.has(session)) {
+      invokeTool("start_session", { session });
+      activeSessions.add(session);
+    }
+    return invokeTool(tool, payload, callOptions);
+  };
+
+  invoke.endAll = () => {
+    for (const session of activeSessions) {
+      try {
+        invokeTool("end_session", { session });
+      } catch {
+        // The daemon may already have stopped during runner teardown.
+      }
+    }
+    activeSessions.clear();
+  };
+
+  return invoke;
+}
+
+const callInSession = createSessionInvoker(invokeDriverCall);
+process.once("exit", callInSession.endAll);
+
+/**
+ * Invoke a CUA tool in the current Node process's named session.
+ * Returns parsed JSON and throws on CLI/tool errors.
+ */
+export function call(tool, args = {}, callOptions = {}) {
+  return callInSession(tool, args, callOptions);
+}
+
+function hasBackgroundUnavailableCode(value) {
+  return Boolean(
+    value && typeof value === "object" && (
+      value.code === "background_unavailable" ||
+      value.structuredContent?.code === "background_unavailable" ||
+      value.structured_content?.code === "background_unavailable"
+    ),
+  );
+}
+
+function isBackgroundUnavailableError(error) {
+  if (hasBackgroundUnavailableCode(error)) return true;
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const start = message.indexOf("{");
+  const end = message.lastIndexOf("}");
+  if (start < 0 || end <= start) return false;
+  try {
+    return hasBackgroundUnavailableCode(JSON.parse(message.slice(start, end + 1)));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Run a tool in background mode first. Retry only an explicit
+ * `background_unavailable` refusal once in foreground; propagate every other
+ * error unchanged. `invoke` is injectable so the escalation rule is testable.
+ */
+export function invokeWithForegroundFallback(invoke, tool, args = {}) {
+  let first;
+  try {
+    first = invoke(tool, args);
+  } catch (error) {
+    if (args.delivery_mode === "foreground" || !isBackgroundUnavailableError(error)) {
+      throw error;
+    }
+    return invoke(tool, { ...args, delivery_mode: "foreground" });
+  }
+
+  if (args.delivery_mode !== "foreground" && isBackgroundUnavailableError(first)) {
+    return invoke(tool, { ...args, delivery_mode: "foreground" });
   }
   return first;
+}
+
+export function callWithForegroundFallback(tool, args = {}) {
+  return invokeWithForegroundFallback(call, tool, args);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +243,7 @@ export function startDaemon() {
 
 /** Stop the cua-driver daemon. Returns the driver's status output. */
 export function stopDaemon() {
+  callInSession.endAll();
   const result = spawnSync(DRIVER_BIN, ["stop"], { encoding: "utf-8", windowsHide: true });
   return result.stdout || result.stderr || "";
 }
@@ -143,8 +266,21 @@ export function listWindows(opts = {}) {
  * `elements` (structured array with `element_index`, `element_token`, `role`,
  * `label`, `frame`, `enabled`, …), `tree_markdown`, `pid` and `window_id`.
  */
-export function getWindowState(pid, windowId, opts = {}) {
-  return call("get_window_state", { pid, window_id: windowId, ...opts });
+export function getWindowState(pid, windowId, opts = {}, callOptions = {}) {
+  return call("get_window_state", { pid, window_id: windowId, ...opts }, callOptions);
+}
+
+/**
+ * Capture UIA state and screenshot before a coordinate-based click.
+ * Windows CUA pixel actions require the screenshot context from this response.
+ * `invoke` is injectable only at the CLI boundary for unit testing.
+ */
+export function getWindowStateForPixelClick(pid, windowId, invoke = call) {
+  return invoke("get_window_state", {
+    pid,
+    window_id: windowId,
+    include_screenshot: true,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -154,12 +290,13 @@ export function getWindowState(pid, windowId, opts = {}) {
 /**
  * Left-click at window-local pixel coordinates (x, y) relative to the window's
  * content screenshot. Prefer `clickElement` (element_token) for UIA-exposed
- * elements — pixel clicks are for canvas / custom-drawn surfaces.
+ * elements — pixel clicks are for canvas / custom-drawn surfaces. `opts` is
+ * forwarded to the driver, and explicit background refusals may escalate once.
  */
-export function click(pid, x, y, windowId) {
-  const args = { pid, x, y };
+export function click(pid, x, y, windowId, opts = {}) {
+  const args = { pid, x, y, ...opts };
   if (windowId) args.window_id = windowId;
-  return call("click", args);
+  return callWithForegroundFallback("click", args);
 }
 
 /**
