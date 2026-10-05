@@ -10,6 +10,7 @@
 // backgrounded windows). It falls back to a pixel click at the element's
 // centre bounds for elements without a token (e.g. canvas surfaces).
 
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -23,8 +24,10 @@ import { findSophosWindow } from "./launch.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Directory where screenshots are saved. */
-export const SCREENSHOT_DIR = path.join(__dirname, "screenshots");
+/** Directory where screenshots are saved; CI can isolate each run with an override. */
+export const SCREENSHOT_DIR = process.env.CUA_SCREENSHOT_DIR
+  ? path.resolve(process.env.CUA_SCREENSHOT_DIR)
+  : path.join(__dirname, "screenshots");
 
 /**
  * Convert screen coordinates (the space element `frame` values are reported
@@ -117,13 +120,16 @@ export async function waitForElement(windowState, criteria, timeoutMs = 10000) {
 }
 
 /**
- * Save a screenshot of the app window to `verify/cua/screenshots/{name}.png`.
+ * Save a screenshot of the app window to the configured screenshot directory.
+ * By default, this is `verify/cua/screenshots`; CUA_SCREENSHOT_DIR can isolate
+ * artifacts for the current CI run from any checked-in historical images.
  * `windowId` is optional — when omitted the Sophos window is looked up.
  * Returns the absolute path to the saved PNG.
  */
 export function takeScreenshot(pid, name, windowId) {
   const wid = windowId ?? findSophosWindow()?.windowId;
   if (!wid) throw new Error(`takeScreenshot: no Sophos window for pid ${pid}`);
+  mkdirSync(SCREENSHOT_DIR, { recursive: true });
   const outPath = path.join(SCREENSHOT_DIR, `${name}.png`);
   getWindowState(pid, wid, { screenshot_out_file: outPath });
   return outPath;

@@ -21,15 +21,17 @@ const SUITES = [
   { file: "smoke.mjs", label: "SMOKE" },
   { file: "sessions.test.mjs", label: "SESSIONS" },
   { file: "agents.test.mjs", label: "AGENTS" },
-  { file: "chat.test.mjs", label: "CHAT" },
+  // Eleven native chat interactions can take close to five minutes on the
+  // hosted Windows UI runner; keep a finite margin for app startup/cleanup.
+  { file: "chat.test.mjs", label: "CHAT", timeoutMs: 7 * 60 * 1000 },
   { file: "inbox.test.mjs", label: "INBOX" },
   { file: "settings.test.mjs", label: "SETTINGS" },
   { file: "shell.test.mjs", label: "SHELL" },
   { file: "studio.test.mjs", label: "STUDIO" },
 ];
 
-/** Hard per-suite timeout (ms). 5 minutes is generous for 30s–2min suites. */
-const SUITE_TIMEOUT_MS = 5 * 60 * 1000;
+/** Default hard per-suite timeout (ms); CHAT has a measured longer allowance. */
+const DEFAULT_SUITE_TIMEOUT_MS = 5 * 60 * 1000;
 
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -39,6 +41,7 @@ const thisDir = path.dirname(fileURLToPath(import.meta.url));
  */
 function runSuiteChild(suite) {
   return new Promise((resolve) => {
+    const suiteTimeoutMs = suite.timeoutMs ?? DEFAULT_SUITE_TIMEOUT_MS;
     const scriptPath = path.join(thisDir, suite.file);
     const child = spawn(process.execPath, [scriptPath], {
       cwd: path.join(thisDir, "..", ".."),
@@ -69,7 +72,7 @@ function runSuiteChild(suite) {
 
     const killTimer = setTimeout(() => {
       killedByTimer = true;
-      console.error(`  ! ${suite.label}: exceeded ${SUITE_TIMEOUT_MS / 1000}s timeout; killing`);
+      console.error(`  ! ${suite.label}: exceeded ${suiteTimeoutMs / 1000}s timeout; killing`);
       child.kill("SIGKILL");
       // If the child ignores the kill and never emits `close`, force-resolve
       // as a timed-out failure so the runner advances to the next suite.
@@ -81,10 +84,10 @@ function runSuiteChild(suite) {
           timedOut: true,
           code: null,
           signal: "SIGKILL",
-          reason: `timed out after ${SUITE_TIMEOUT_MS / 1000}s (child did not exit)`,
+          reason: `timed out after ${suiteTimeoutMs / 1000}s (child did not exit)`,
         });
       }, 5000);
-    }, SUITE_TIMEOUT_MS);
+    }, suiteTimeoutMs);
 
     child.on("error", (err) => {
       clearTimeout(killTimer);
@@ -115,7 +118,7 @@ function runSuiteChild(suite) {
         code,
         signal,
         reason: timedOut
-          ? `timed out after ${SUITE_TIMEOUT_MS / 1000}s`
+          ? `timed out after ${suiteTimeoutMs / 1000}s`
           : code === 0
             ? "exit 0"
             : `exit ${code}`,
@@ -128,7 +131,10 @@ async function main() {
   const startedAt = Date.now();
   console.log("================================================");
   console.log("  cua-driver e2e — run-all");
-  console.log(`  ${SUITES.length} suites, ${SUITE_TIMEOUT_MS / 1000}s timeout each`);
+  const timeoutSummary = SUITES
+    .map((suite) => `${suite.label}=${(suite.timeoutMs ?? DEFAULT_SUITE_TIMEOUT_MS) / 1000}s`)
+    .join(", ");
+  console.log(`  ${SUITES.length} suites; timeouts ${timeoutSummary}`);
   console.log("================================================");
 
   const results = [];

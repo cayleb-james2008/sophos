@@ -15,7 +15,7 @@
 
 import { getWindowState, getWindowStateForPixelClick, click, sleep, typeText } from "./driver.mjs";
 import { takeScreenshot, getTextContent, elementCenter } from "./helpers.mjs";
-import { findBy, clickBy, waitFor } from "./find-util.mjs";
+import { findAll, findBy, clickBy, waitFor } from "./find-util.mjs";
 import { assert, assertTextContains } from "./assertions.mjs";
 import { runDemoSuite } from "./demo-runner.mjs";
 
@@ -28,6 +28,17 @@ function freshState(appHandle) {
 function countText(state, needle) {
   const content = getTextContent(state);
   return content.split("\n").filter((l) => l.includes(needle)).length;
+}
+
+function unreadDiagnostics(state) {
+  const matches = /api-reviewer|test-runner|Endpoint review approved|\bUNREAD\b|\bREAD\b|unread/i;
+  return {
+    unreadLabels: countText(state, "UNREAD"),
+    textLines: getTextContent(state).split("\n").filter((line) => matches.test(line)),
+    elements: findAll(state, { text: "Endpoint review approved" })
+      .map(({ role, label, frame }) => ({ role, label, frame }))
+      .slice(0, 5),
+  };
 }
 
 /** Navigate to the Inbox view and wait for the relay to render. */
@@ -98,13 +109,18 @@ const tests = [
       // foreground after observing that no unread-state change occurred.
       takeScreenshot(appHandle.pid, "inbox-unread-before", appHandle.windowId);
       const clickState = getWindowStateForPixelClick(appHandle.pid, appHandle.windowId);
+      takeScreenshot(appHandle.pid, "inbox-unread-click-state", appHandle.windowId);
       const pixelNode = findBy(clickState, { text: "Endpoint review approved" });
       assert(pixelNode, "Unread message node not found in fresh click state");
       const point = elementCenter(pixelNode, clickState);
-      click(appHandle.pid, point.x, point.y, appHandle.windowId);
+      console.log(`[INBOX-DIAG] pre-click ${JSON.stringify({ countBefore: before, clickState: unreadDiagnostics(clickState), target: { role: pixelNode.role, label: pixelNode.label, frame: pixelNode.frame, point, screenshot: { width: clickState.screenshot_width, height: clickState.screenshot_height } } })}`);
+      const backgroundResult = click(appHandle.pid, point.x, point.y, appHandle.windowId);
+      console.log(`[INBOX-DIAG] background result ${JSON.stringify(backgroundResult)}`);
       await sleep(1200);
       let after = freshState(appHandle);
       let afterCount = countText(after, "UNREAD");
+      takeScreenshot(appHandle.pid, "inbox-mark-read-after-background", appHandle.windowId);
+      console.log(`[INBOX-DIAG] after background ${JSON.stringify(unreadDiagnostics(after))}`);
       if (afterCount >= before) {
         // This is a verified background no-op, so retry only this same click
         // with the CUA driver's foreground input rung.
@@ -112,10 +128,14 @@ const tests = [
         const retryNode = findBy(retryState, { text: "Endpoint review approved" });
         assert(retryNode, "Unread message node not found in foreground retry state");
         const retryPoint = elementCenter(retryNode, retryState);
-        click(appHandle.pid, retryPoint.x, retryPoint.y, appHandle.windowId, { delivery_mode: "foreground" });
+        console.log(`[INBOX-DIAG] foreground target ${JSON.stringify({ role: retryNode.role, label: retryNode.label, frame: retryNode.frame, point: retryPoint, screenshot: { width: retryState.screenshot_width, height: retryState.screenshot_height } })}`);
+        const foregroundResult = click(appHandle.pid, retryPoint.x, retryPoint.y, appHandle.windowId, { delivery_mode: "foreground" });
+        console.log(`[INBOX-DIAG] foreground result ${JSON.stringify(foregroundResult)}`);
         await sleep(1200);
         after = freshState(appHandle);
         afterCount = countText(after, "UNREAD");
+        takeScreenshot(appHandle.pid, "inbox-mark-read-after-foreground", appHandle.windowId);
+        console.log(`[INBOX-DIAG] after foreground ${JSON.stringify(unreadDiagnostics(after))}`);
       }
       // The unread pill is gone (that message flipped to read).
       assert(afterCount < before, `Expected UNREAD count to drop (was ${before}, now ${afterCount})`);

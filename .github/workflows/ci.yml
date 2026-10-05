@@ -168,6 +168,18 @@ jobs:
           verify/cua/chat-app-path.test.mjs
           verify/cua/driver-session.test.mjs
           verify/cua/driver-foreground-fallback.test.mjs
+          verify/cua/screenshot-path.test.mjs
+
+      - name: Prepare isolated screenshot output
+        shell: pwsh
+        run: |
+          $screenshotDir = Join-Path $env:RUNNER_TEMP ("cua-screenshots-" + $env:GITHUB_RUN_ID)
+          if (Test-Path -LiteralPath $screenshotDir) {
+            Remove-Item -LiteralPath $screenshotDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null
+          "CUA_SCREENSHOT_DIR=$screenshotDir" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
+          Write-Host "CUA_SCREENSHOT_DIR=$screenshotDir"
 
       - name: Run cua-driver native UI acceptance
         # This is a required check. It drives the real Tauri release executable
@@ -205,6 +217,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-cua-screenshots-${{ github.run_id }}
-          path: verify/cua/screenshots/*.png
-          if-no-files-found: warn
+          path: ${{ runner.temp }}/cua-screenshots-${{ github.run_id }}/*.png
+          if-no-files-found: error
           retention-days: 7
