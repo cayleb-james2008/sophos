@@ -1,0 +1,105 @@
+name: Windows dependency-hardening ACL diagnostic
+
+on:
+  push:
+    branches: [fix/windows-dependency-hardening]
+  pull_request:
+    branches: [fix/reproducible-runtime]
+    paths:
+      - '.github/workflows/windows-dependency-hardening.yml'
+      - 'scripts/dependency-hardening/windows-acl-probe.ps1'
+      - 'scripts/prepare-dependency-overlay.mjs'
+      - 'scripts/prepare-dependency-overlay.test.mjs'
+      - 'scripts/dependency-hardening/**'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-acl-diagnostic:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Record actual Windows runner ACLs before policy design
+        shell: pwsh
+        run: ./scripts/dependency-hardening/windows-acl-probe.ps1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build dependency overlay under private Windows NTFS ACLs
+        shell: pwsh
+        timeout-minutes: 15
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+        run: |
+          $privateTemp = (Get-Item -LiteralPath $env:TEMP -Force).FullName
+          $source = Join-Path $privateTemp "prime-agent-overlay-source-$env:GITHUB_RUN_ID"
+          $destination = Join-Path $privateTemp "prime-agent-overlay-output-$env:GITHUB_RUN_ID"
+          git clone --quiet --depth 1 --branch v0.7.0 https://github.com/PrimeIntellect-ai/prime-agent.git $source
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Prime Agent clone for ACL overlay check failed' }
+          $commit = (git -C $source rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $commit -ne 'be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387') { throw "Unexpected Prime Agent source commit: $commit" }
+          $resultLines = node scripts/prepare-dependency-overlay.mjs $source $destination
+          if ($LASTEXITCODE -ne 0) { throw 'Windows ACL-protected dependency overlay preparation failed' }
+          $resultText = $resultLines -join "`n"
+          Write-Output $resultText
+          $result = $resultText | ConvertFrom-Json
+          if ($result.commit -ne 'be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387' -or $result.packageLockSha256 -ne '725ef9e8b2035e4e6f1b77d44b3ca95440bb20f702825c159294e42a92840e3f') { throw 'Windows-generated overlay provenance or lock hash mismatch' }
+          $manifestHash = (Get-FileHash -Algorithm SHA256 (Join-Path $destination 'package.json')).Hash.ToLowerInvariant()
+          $lockHash = (Get-FileHash -Algorithm SHA256 (Join-Path $destination 'package-lock.json')).Hash.ToLowerInvariant()
+          Write-Output "overlay package.json SHA-256: $manifestHash"
+          Write-Output "overlay package-lock.json SHA-256: $lockHash"
+          if ($manifestHash -ne 'c2014bd6f87bd0d0f758a02e090dfc7741928ee67ae6746d6e2712d02357c3b4' -or $lockHash -ne '725ef9e8b2035e4e6f1b77d44b3ca95440bb20f702825c159294e42a92840e3f') { throw 'Windows-generated overlay bytes changed from reviewed manifest or lock' }
+      - name: Run dependency overlay tests on native Windows ACLs
+        shell: pwsh
+        run: node --test scripts/dependency-hardening/windows-acl-security.test.mjs scripts/prepare-dependency-overlay.test.mjs
+      - name: Verify the guarded Windows ZIP installer against pinned Prime Agent source
+        shell: pwsh
+        timeout-minutes: 15
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/npmrc-user-empty
+          NPM_CONFIG_GLOBALCONFIG: ${{ runner.temp }}/npmrc-global-empty
+        run: |
+          $source = Join-Path $env:RUNNER_TEMP 'prime-agent-v0.7.0'
+          git clone --quiet --depth 1 --branch v0.7.0 https://github.com/PrimeIntellect-ai/prime-agent.git $source
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Prime Agent clone failed' }
+          $commit = (git -C $source rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $commit -ne 'be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387') { throw "Unexpected Prime Agent source commit: $commit" }
+          $encodedPatch = Join-Path $env:GITHUB_WORKSPACE 'scripts/dependency-hardening/prime-agent-windows-zip-guard.patch.b64'
+          $patch = Join-Path $env:RUNNER_TEMP 'prime-agent-windows-zip-guard.patch'
+          $patchContents = (Get-Content -LiteralPath $encodedPatch -Raw).Trim()
+          $patchBytes = [System.Convert]::FromBase64String($patchContents)
+          [System.IO.File]::WriteAllBytes($patch, $patchBytes)
+          $patchHash = (Get-FileHash -Algorithm SHA256 $patch).Hash.ToLowerInvariant()
+          Write-Output "Prime Agent source patch SHA-256: $patchHash"
+          if ($patchHash -ne 'e06fa63df26c0e52e699459a0adf284cb032dc88828abc20bfa5a220de681b48') { throw "Unexpected Prime Agent patch hash: $patchHash" }
+          git -C $source apply --unidiff-zero --check $patch
+          if ($LASTEXITCODE -ne 0) { throw 'Prime Agent source overlay does not apply cleanly' }
+          git -C $source apply --unidiff-zero $patch
+          if ($LASTEXITCODE -ne 0) { throw 'Prime Agent source overlay application failed' }
+          git -C $source diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Prime Agent source overlay has whitespace errors' }
+          New-Item -ItemType File -Force -Path $env:NPM_CONFIG_USERCONFIG | Out-Null
+          New-Item -ItemType File -Force -Path $env:NPM_CONFIG_GLOBALCONFIG | Out-Null
+          Push-Location $source
+          try {
+            npm ci --ignore-scripts --no-audit --no-fund
+            if ($LASTEXITCODE -ne 0) { throw 'Pinned Prime Agent npm ci failed' }
+            Push-Location (Join-Path $source 'packages/coding-agent')
+            try {
+              node ../../node_modules/vitest/vitest.mjs --run test/tools-manager.test.ts
+              if ($LASTEXITCODE -ne 0) { throw 'Windows managed-tool guard tests failed' }
+            } finally {
+              Pop-Location
+            }
+          } finally {
+            Pop-Location
+          }
