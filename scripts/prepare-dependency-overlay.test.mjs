@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import test from "node:test";
 import { chmod, mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import * as hardening from "./prepare-dependency-overlay.mjs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { applyExactOverrides, assertLockDeltaIsScoped, assertResolvedLock, assertOverrideReviewMetadata, assertOverrideConstraintsMatchLock, assertRegistryMetadataMatchesPins, prepareDependencyOverlay } from "./prepare-dependency-overlay.mjs";
 
 const overlay = {
@@ -347,25 +348,57 @@ test("accepts a non-reparse 8.3 path alias for a secure Windows source root", { 
   const sourceRoot = await mkdtemp(join(tmpdir(), "sophos-short-name-source-"));
   const normalized = (path) => path.toLowerCase();
   try {
-    const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
-    const commandProcessor = process.env.ComSpec ?? (systemRoot ? join(systemRoot, "System32", "cmd.exe") : "cmd.exe");
-    const shortPathResult = spawnSync(commandProcessor, [
-      "/d", "/s", "/c", 'for %I in ("%SOPHOS_LONG_PATH%") do @echo %~sI',
+    const programFiles = process.env.ProgramFiles ?? "C:\\Program Files";
+    const systemRoot = process.env.SystemRoot ?? process.env.WINDIR ?? "C:\\Windows";
+    const pwsh = join(programFiles, "PowerShell", "7", "pwsh.exe");
+    const powershell = existsSync(pwsh)
+      ? pwsh
+      : join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+    const pathPayload = Buffer.from(JSON.stringify(sourceRoot), "utf8").toString("base64");
+    const script = `
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$source = @'
+using System.Runtime.InteropServices;
+using System.Text;
+public static class SophosPathAliasNative {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern uint GetShortPathName(string longPath, StringBuilder shortPath, uint capacity);
+}
+'@
+Add-Type -TypeDefinition $source
+$longPath = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${pathPayload}'))
+$buffer = [System.Text.StringBuilder]::new(32768)
+$length = [SophosPathAliasNative]::GetShortPathName($longPath, $buffer, [uint32]$buffer.Capacity)
+if ($length -eq 0 -or $length -ge $buffer.Capacity) {
+    $errorCode = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    throw "GetShortPathName failed: Win32 error $errorCode"
+}
+[Console]::WriteLine($buffer.ToString())
+`;
+    const encodedScript = Buffer.from(script, "utf16le").toString("base64");
+    const shortPathResult = spawnSync(powershell, [
+      "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodedScript,
     ], {
       encoding: "utf8",
       windowsHide: true,
+      timeout: 15_000,
+      maxBuffer: 1024 * 1024,
       env: {
-        PATH: systemRoot ? join(systemRoot, "System32") : "",
         SystemRoot: systemRoot,
-        ComSpec: commandProcessor,
-        PATHEXT: process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD",
-        SOPHOS_LONG_PATH: sourceRoot,
+        WINDIR: systemRoot,
+        ProgramFiles: programFiles,
+        TEMP: process.env.TEMP ?? tmpdir(),
+        TMP: process.env.TMP ?? tmpdir(),
+        USERPROFILE: process.env.USERPROFILE ?? "",
+        PATH: [dirname(powershell), join(systemRoot, "System32")].join(delimiter),
       },
     });
     assert.equal(shortPathResult.error, undefined, shortPathResult.error?.message);
     assert.equal(shortPathResult.status, 0, shortPathResult.stderr || shortPathResult.stdout);
-    const shortPath = shortPathResult.stdout.trim().split(/\r?\n/).at(-1);
-    assert.ok(shortPath, "cmd.exe must return the native short path for the fixture");
+    const shortPath = shortPathResult.stdout.trim();
+    assert.ok(shortPath, "GetShortPathName must return the native short path for the fixture");
     const hasDosShortName = shortPath.split(String.fromCharCode(92)).some((component) => /^.{1,6}~\d+$/i.test(component));
     if (!hasDosShortName || normalized(shortPath) === normalized(sourceRoot)) {
       t.skip("the native Windows volume does not expose an 8.3 alias for this fixture");
