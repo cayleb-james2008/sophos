@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { chmod, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import * as hardening from "./prepare-dependency-overlay.mjs";
@@ -22,6 +23,33 @@ const overlay = {
     },
   },
 };
+
+test("canonicalizes CRLF overlay lock bytes only when the reviewed SHA-256 matches", async () => {
+  const lfBytes = Buffer.from('{"lockfileVersion":3}\n', "utf8");
+  const expectedSha256 = createHash("sha256").update(lfBytes).digest("hex");
+  const crlfBytes = Buffer.from(lfBytes.toString("utf8").replaceAll("\n", "\r\n"), "utf8");
+
+  assert.deepEqual(hardening.canonicalizeOverlayLockBytes(crlfBytes, expectedSha256), lfBytes);
+  assert.throws(
+    () => hardening.canonicalizeOverlayLockBytes(Buffer.from('{"lockfileVersion":2}\r\n'), expectedSha256),
+    /overlay lock SHA-256 mismatch/i,
+  );
+  assert.throws(
+    () => hardening.canonicalizeOverlayLockBytes(Buffer.from("{\"lockfileVersion\":3}\r", "utf8"), expectedSha256),
+    /standalone carriage return/i,
+  );
+  assert.throws(
+    () => hardening.canonicalizeOverlayLockBytes(crlfBytes, "bad-hash"),
+    /expected overlay lock SHA-256/i,
+  );
+  const reviewed = JSON.parse(await readFile(new URL("./dependency-hardening-overlay.json", import.meta.url), "utf8"));
+  const pinnedLockBytes = await readFile(new URL("./dependency-hardening/prime-agent-package-lock.json", import.meta.url));
+  const windowsCheckedOutBytes = Buffer.from(pinnedLockBytes.toString("utf8").replaceAll("\n", "\r\n"), "utf8");
+  assert.deepEqual(
+    hardening.canonicalizeOverlayLockBytes(windowsCheckedOutBytes, reviewed.overlayLockSha256),
+    pinnedLockBytes,
+  );
+});
 
 test("applies exact semver-compatible overrides without mutating the upstream manifest", () => {
   const original = { overrides: { rimraf: "6.1.2", "shell-quote": "^1.10.0" }, dependencies: { minimatch: "^10.2.3" } };

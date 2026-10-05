@@ -22,6 +22,7 @@
     "uniqueAdvisoryEntries": 31
   },
   "registry": "https://registry.npmjs.org/",
+  "overlayLockSha256": "725ef9e8b2035e4e6f1b77d44b3ca95440bb20f702825c159294e42a92840e3f",
   "npmPolicy": {
     "lockfileVersion": 3,
     "minimumReleaseAgeDays": 7,

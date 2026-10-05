@@ -36,13 +36,6 @@ jobs:
           GIT_CONFIG_KEY_0: core.autocrlf
           GIT_CONFIG_VALUE_0: 'false'
         run: |
-          git -C $env:GITHUB_WORKSPACE config core.autocrlf false
-          if ($LASTEXITCODE -ne 0) { throw 'Could not disable Git autocrlf for byte-preserving overlay inputs' }
-          git -C $env:GITHUB_WORKSPACE checkout-index --force -- scripts/dependency-hardening/prime-agent-package-lock.json scripts/dependency-hardening-overlay.json
-          if ($LASTEXITCODE -ne 0) { throw 'Could not restore byte-preserving overlay inputs from the Git index' }
-          $lockEol = git -C $env:GITHUB_WORKSPACE ls-files --eol -- scripts/dependency-hardening/prime-agent-package-lock.json
-          if ($LASTEXITCODE -ne 0 -or $lockEol -notmatch 'w/lf') { throw "Overlay lock checkout is not LF: $lockEol" }
-          Write-Output $lockEol
           $privateTemp = (Get-Item -LiteralPath $env:TEMP -Force).FullName
           $source = Join-Path $privateTemp "prime-agent-overlay-source-$env:GITHUB_RUN_ID"
           $destination = Join-Path $privateTemp "prime-agent-overlay-output-$env:GITHUB_RUN_ID"

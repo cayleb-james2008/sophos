@@ -39,6 +39,24 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+export function canonicalizeOverlayLockBytes(bytes, expectedSha256) {
+  if (!Buffer.isBuffer(bytes) && !(bytes instanceof Uint8Array)) {
+    throw new Error("overlay lock bytes must be a Buffer");
+  }
+  if (typeof expectedSha256 !== "string" || !/^[a-f0-9]{64}$/.test(expectedSha256)) {
+    throw new Error("expected overlay lock SHA-256 must be 64 lowercase hexadecimal characters");
+  }
+  const normalizedText = Buffer.from(bytes).toString("utf8").replace(/\r\n/g, "\n");
+  if (normalizedText.includes("\r")) {
+    throw new Error("overlay lock contains a standalone carriage return");
+  }
+  const normalizedBytes = Buffer.from(normalizedText, "utf8");
+  if (sha256(normalizedBytes) !== expectedSha256) {
+    throw new Error("overlay lock SHA-256 mismatch after line-ending normalization");
+  }
+  return normalizedBytes;
+}
+
 export function assertSafeFilesystemPlatform(platform = process.platform) {
   if (platform !== "linux" && platform !== "win32") {
     throw new Error("dependency overlay preparation supports only Linux and Windows NTFS permission validation");
@@ -609,7 +627,7 @@ export async function prepareDependencyOverlay(sourceRoot, destinationRoot, proj
   const manifestPath = await assertRegularFileNoSymlink(root, ["scripts", "dependency-hardening-overlay.json"], "overlay manifest");
   const lockPath = await assertRegularFileNoSymlink(root, ["scripts", "dependency-hardening", "prime-agent-package-lock.json"], "overlay lock");
   const overlay = await readJson(manifestPath);
-  const overlayLockBytes = await readFile(lockPath);
+  const overlayLockBytes = canonicalizeOverlayLockBytes(await readFile(lockPath), overlay.overlayLockSha256);
   assertSourceGitCheckout(source, overlay);
   const registryMetadataValidatedAt = await assertRegistryMetadataMatchesPins(overlay);
   const packageJsonPath = await assertRegularFileNoSymlink(source, ["package.json"], "Prime Agent root package.json");
