@@ -18,7 +18,10 @@ import { selectE2ENode } from "./runtime-executable.mjs";
 import { parseBridgeVerifyResult } from "./e2e-result.mjs";
 import { validateNodeExecutable } from "../scripts/node-runtime.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "../scripts/runtime-pins.mjs";
-import { PRIME_AGENT_SESSION_LEASE_OVERLAY } from "../scripts/apply-prime-agent-overlay.mjs";
+import {
+  matchesPrimeAgentSecurityBuildProvenance,
+  verifyPrimeAgentSecurityBuildTree,
+} from "../scripts/prepare-prime-agent-security-build.mjs";
 import { removeTemporaryHomeWithRetry } from "./e2e-home-cleanup.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -98,17 +101,22 @@ async function main() {
         && manifest.upstream?.license === PRIME_AGENT_PIN.license,
       `${manifest.upstream?.version} ${manifest.upstream?.commit} (${manifest.upstream?.license})`);
       const overlay = manifest.upstream?.overlay;
-      const expectedOverlay = PRIME_AGENT_SESSION_LEASE_OVERLAY;
-      const overlayMatches = overlay?.id === expectedOverlay.id
-        && overlay?.upstreamRepository === expectedOverlay.upstreamRepository
-        && overlay?.upstreamCommit === expectedOverlay.upstreamCommit
-        && overlay?.sourcePath === expectedOverlay.sourcePath
-        && overlay?.sourceSha256 === expectedOverlay.sourceSha256
-        && overlay?.patchPath === expectedOverlay.patchPath
-        && overlay?.patchSha256 === expectedOverlay.patchSha256
-        && overlay?.patchedSourceSha256 === expectedOverlay.patchedSourceSha256;
-      record("provenance: audited Windows session-lease overlay", overlayMatches,
-        overlayMatches ? `${overlay.id} source=${overlay.sourceSha256} patch=${overlay.patchSha256}` : "bundle overlay metadata does not match the pinned source patch");
+      const recordedOverlayMatches = matchesPrimeAgentSecurityBuildProvenance(overlay);
+      let overlayBuildError = null;
+      if (recordedOverlayMatches) {
+        try {
+          const buildDirectory = resolve(REPO, manifest.upstream?.buildDirectory ?? "");
+          const sourceDirectory = resolve(REPO, manifest.upstream?.sourceDirectory ?? "");
+          await verifyPrimeAgentSecurityBuildTree(REPO, buildDirectory, sourceDirectory);
+        } catch (error) {
+          overlayBuildError = error instanceof Error ? error.message : String(error);
+        }
+      }
+      const overlayMatches = recordedOverlayMatches && overlayBuildError === null;
+      record("provenance: composed Prime Agent lease and Windows ZIP guard", overlayMatches,
+        overlayMatches
+          ? `lease=${overlay.sessionLeasePatchSha256} ZIP=${overlay.windowsZipGuardPatchSha256} order=${overlay.patchOrder.join(" -> ")}`
+          : overlayBuildError ?? "bundle overlay metadata does not match the reviewed composed source patches");
     } catch (error) {
       record("provenance: pinned Prime Agent source", false, String(error));
       report.summary = { overall: "FAIL", reason: "bundle manifest missing or invalid" };

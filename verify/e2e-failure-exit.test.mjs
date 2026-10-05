@@ -13,6 +13,8 @@ const SOURCES = [
   "verify/e2e-home-cleanup.mjs",
   "scripts/node-runtime.mjs", "scripts/runtime-pins.mjs", "scripts/runtime-pins.json",
   "scripts/prime-agent-ref.mjs", "scripts/apply-prime-agent-overlay.mjs",
+  "scripts/prepare-prime-agent-security-build.mjs", "scripts/prepare-dependency-overlay.mjs",
+  "scripts/dependency-hardening/windows-acl-security.mjs",
 ];
 
 // These intentionally incomplete assets exercise the verifier's refusal paths,

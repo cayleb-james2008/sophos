@@ -15,7 +15,10 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ensureNodeRuntime } from "./node-runtime.mjs";
 import { ensurePrimeAgentRef, resolvePrimeAgentRef } from "./prime-agent-ref.mjs";
-import { preparePrimeAgentBuildTree } from "./apply-prime-agent-overlay.mjs";
+import {
+  preparePrimeAgentSecurityBuildTree,
+  verifyPrimeAgentSecurityBuildTree,
+} from "./prepare-prime-agent-security-build.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "./runtime-pins.mjs";
 import { validateDaemonRuntimePackage } from "./daemon-runtime-package.mjs";
 import { assertWindowsReleaseProvenance, createNativeBuildProvenance } from "./native-runtime-platform.mjs";
@@ -72,8 +75,19 @@ function runNpm(args, options = {}) {
   return run("npm", args, options);
 }
 
-async function buildPinnedDaemon(primeAgentRoot) {
+async function buildPinnedDaemon(primeAgentRoot, primeSourceRoot) {
   runNpm(["ci"], { cwd: primeAgentRoot, label: "Prime Agent locked dependency install (normal lifecycle)" });
+  await verifyPrimeAgentSecurityBuildTree(WORKTREE, primeAgentRoot, primeSourceRoot);
+  run(process.execPath, [
+    join(primeAgentRoot, "node_modules", "vitest", "vitest.mjs"),
+    "--run",
+    "test/session-lease.test.ts",
+    "test/tools-manager.test.ts",
+  ], {
+    cwd: join(primeAgentRoot, "packages", "coding-agent"),
+    shell: false,
+    label: "Prime Agent session-lease and Windows ZIP guard regression tests",
+  });
   runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "tui"), label: "Prime Agent TUI build" });
   // pi-ai's normal build refreshes its model catalog from external vendor APIs.
   // Sophos uses the catalog committed at the pinned source revision instead.
@@ -177,7 +191,7 @@ async function main() {
   const primeRefPath = resolvePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
   log("gray", "Prime Agent source:", relative(WORKTREE, primeRefPath) || primeRefPath);
   const primeSource = await ensurePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
-  const primeBuild = preparePrimeAgentBuildTree(WORKTREE, primeSource.path);
+  const primeBuild = await preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path);
   manifest.upstream = {
     repository: primeSource.repository,
     ref: primeSource.ref,
@@ -189,7 +203,7 @@ async function main() {
     overlay: primeBuild.provenance,
   };
 
-  const daemonDist = await buildPinnedDaemon(primeBuild.path);
+  const daemonDist = await buildPinnedDaemon(primeBuild.path, primeSource.path);
 
   const frontendDist = join(WORKTREE, "dist");
   if (!flags.has("--no-frontend")) {
@@ -270,6 +284,7 @@ async function main() {
       cwd: primeBuild.path,
       label: "Prime Agent production dependency tree (normal lifecycle)",
     });
+    await verifyPrimeAgentSecurityBuildTree(WORKTREE, primeBuild.path, primeSource.path);
     await cp(join(primeBuild.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
     await rm(join(stagedNodeModules, "@earendil-works"), { recursive: true, force: true });
     const upstreamPackages = await stageUpstreamPackages(primeBuild.path, stagedNodeModules);

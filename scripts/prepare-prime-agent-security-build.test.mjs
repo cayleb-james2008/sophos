@@ -1,0 +1,144 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import {
+  applyReviewedSourcePatches,
+  matchesPrimeAgentSecurityBuildProvenance,
+  PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED,
+  samePath,
+} from "./prepare-prime-agent-security-build.mjs";
+
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function runGit(args, cwd, options = {}) {
+  const result = spawnSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0" },
+    ...options,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr ?? ""}`);
+  return (result.stdout ?? "").trim();
+}
+
+async function makeFixture() {
+  const root = await mkdtemp(join(tmpdir(), "sophos-security-patch-sequence-"));
+  const source = join(root, "packages/coding-agent/src/core/session-lease.ts");
+  await mkdir(join(root, "packages/coding-agent/src/core"), { recursive: true });
+  await writeFile(source, 'export const state = "base";\n');
+  runGit(["init", "--quiet", "--initial-branch=main"], root);
+  runGit(["config", "user.name", "Sophos test"], root);
+  runGit(["config", "user.email", "sophos-test@example.invalid"], root);
+  runGit(["add", "packages/coding-agent/src/core/session-lease.ts"], root);
+  runGit(["commit", "--quiet", "-m", "fixture base"], root);
+  return { root, source };
+}
+
+const leasePatch = Buffer.from(
+  "diff --git a/packages/coding-agent/src/core/session-lease.ts b/packages/coding-agent/src/core/session-lease.ts\n"
+  + "--- a/packages/coding-agent/src/core/session-lease.ts\n"
+  + "+++ b/packages/coding-agent/src/core/session-lease.ts\n"
+  + "@@ -1 +1,2 @@\n"
+  + ' export const state = "base";\n'
+  + "+export const lease = true;\n",
+);
+const zipGuardPatch = Buffer.from(
+  "diff --git a/packages/coding-agent/src/core/session-lease.ts b/packages/coding-agent/src/core/session-lease.ts\n"
+  + "--- a/packages/coding-agent/src/core/session-lease.ts\n"
+  + "+++ b/packages/coding-agent/src/core/session-lease.ts\n"
+  + "@@ -2,0 +3 @@\n"
+  + "+export const archiveGuard = true;\n",
+);
+
+const reviewedPatchSequence = [
+  { name: "session-lease", bytes: leasePatch, sha256: sha256(leasePatch), unidiffZero: false },
+  { name: "windows-zip-guard", bytes: zipGuardPatch, sha256: sha256(zipGuardPatch), unidiffZero: true },
+];
+
+test("applies the session-lease patch before the Windows ZIP guard to the build checkout", async (t) => {
+  const fixture = await makeFixture();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+
+  applyReviewedSourcePatches(fixture.root, reviewedPatchSequence);
+
+  assert.equal(
+    await readFile(fixture.source, "utf8"),
+    'export const state = "base";\nexport const lease = true;\nexport const archiveGuard = true;\n',
+  );
+  assert.equal(runGit(["rev-parse", "HEAD"], fixture.root).length, 40, "the pinned source commit remains unchanged");
+  assert.deepEqual(
+    runGit(["diff", "--name-only"], fixture.root).split(/\r?\n/),
+    ["packages/coding-agent/src/core/session-lease.ts"],
+  );
+});
+
+test("rejects a mismatched later patch digest before changing the build checkout", async (t) => {
+  const fixture = await makeFixture();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const badSequence = [
+    reviewedPatchSequence[0],
+    { ...reviewedPatchSequence[1], sha256: "0".repeat(64) },
+  ];
+
+  assert.throws(() => applyReviewedSourcePatches(fixture.root, badSequence), /windows-zip-guard.*SHA-256 mismatch/);
+  assert.equal(await readFile(fixture.source, "utf8"), 'export const state = "base";\n');
+  assert.equal(runGit(["status", "--porcelain"], fixture.root), "");
+});
+
+// This integration seam intentionally guards the real release entrypoint too;
+// the Windows CI bundle/native/MSI path supplies the end-to-end verification.
+const bundleSource = await readFile(new URL("./bundle.mjs", import.meta.url), "utf8");
+test("the real bundler prepares and builds the composed security overlay", () => {
+  assert.match(bundleSource, /preparePrimeAgentSecurityBuildTree/);
+  assert.ok(bundleSource.includes("primeBuild.path"));
+  assert.ok(!bundleSource.includes("preparePrimeAgentBuildTree(WORKTREE, primeSource.path)"));
+});
+
+test("accepts only exact composed Prime Agent lease and Windows ZIP guard provenance", () => {
+  const provenance = {
+    ...PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED,
+    sourceDirectory: "/tmp/prime-agent",
+    buildDirectory: "/tmp/prime-agent-v070-security-build",
+  };
+  assert.equal(matchesPrimeAgentSecurityBuildProvenance(provenance), true);
+  assert.equal(matchesPrimeAgentSecurityBuildProvenance({
+    ...provenance,
+    windowsZipGuardPatchSha256: "e06fa63df26c0e52e699459a0d2f84cb032dc88828abc20bfa5a220de681b48",
+  }), false);
+  assert.equal(matchesPrimeAgentSecurityBuildProvenance({
+    ...provenance,
+    patchOrder: ["windows-zip-guard", "session-lease"],
+  }), false);
+});
+
+
+test("the real bundle runs both composed Prime Agent security regression suites", () => {
+  assert.ok(bundleSource.includes("session-lease.test.ts"));
+  assert.ok(bundleSource.includes("tools-manager.test.ts"));
+  assert.ok(bundleSource.includes('"node_modules", "vitest", "vitest.mjs"'));
+  assert.ok(bundleSource.includes('cwd: join(primeAgentRoot, "packages", "coding-agent")'));
+  assert.ok(bundleSource.includes("shell: false"));
+  assert.ok(bundleSource.includes("await buildPinnedDaemon(primeBuild.path, primeSource.path)"));
+  assert.ok(bundleSource.includes("verifyPrimeAgentSecurityBuildTree(WORKTREE, primeAgentRoot, primeSourceRoot)"));
+  const install = bundleSource.indexOf('label: "Prime Agent locked dependency install (normal lifecycle)"');
+  const verify = bundleSource.indexOf("verifyPrimeAgentSecurityBuildTree(WORKTREE, primeAgentRoot, primeSourceRoot)");
+  const tests = bundleSource.indexOf('label: "Prime Agent session-lease and Windows ZIP guard regression tests"');
+  assert.ok(install >= 0 && verify > install && tests > verify, "build output is reverified after npm ci and before tests");
+  const prune = bundleSource.indexOf('label: "Prime Agent production dependency tree (normal lifecycle)"');
+  const pruneVerify = bundleSource.indexOf("verifyPrimeAgentSecurityBuildTree(WORKTREE, primeBuild.path, primeSource.path)");
+  const stage = bundleSource.indexOf('await cp(join(primeBuild.path, "node_modules")');
+  assert.ok(prune >= 0 && pruneVerify > prune && stage > pruneVerify, "source and patch provenance are reverified after npm prune before staging");
+});
+
+test("Windows build output path comparisons ignore case but POSIX comparisons do not", () => {
+  assert.equal(samePath("C:/Temp/Sophos/.deps", "c:/temp/sophos/.deps", "win32"), true);
+  assert.equal(samePath("C:/Temp/Sophos/.deps", "C:/Temp/Sophos/other", "win32"), false);
+  assert.equal(samePath("/tmp/Build", "/tmp/build", "linux"), false);
+});
