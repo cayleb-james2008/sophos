@@ -354,7 +354,7 @@ test("accepts a non-reparse 8.3 path alias for a secure Windows source root", { 
     const powershell = existsSync(pwsh)
       ? pwsh
       : join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-    const pathPayload = Buffer.from(JSON.stringify(sourceRoot), "utf8").toString("base64");
+    const pathPayload = Buffer.from(sourceRoot, "utf8").toString("base64");
     const script = `
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
