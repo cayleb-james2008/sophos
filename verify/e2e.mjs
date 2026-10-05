@@ -113,9 +113,9 @@ async function main() {
         }
       }
       const overlayMatches = recordedOverlayMatches && overlayBuildError === null;
-      record("provenance: composed Prime Agent lease and Windows ZIP guard", overlayMatches,
+      record("provenance: composed Prime Agent lease, Windows ZIP guard, and worker-shutdown fence", overlayMatches,
         overlayMatches
-          ? `lease=${overlay.sessionLeasePatchSha256} ZIP=${overlay.windowsZipGuardPatchSha256} order=${overlay.patchOrder.join(" -> ")}`
+          ? `lease=${overlay.sessionLeasePatchSha256} ZIP=${overlay.windowsZipGuardPatchSha256} shutdown=${overlay.workerShutdownFencePatchSha256} order=${overlay.patchOrder.join(" -> ")}`
           : overlayBuildError ?? "bundle overlay metadata does not match the reviewed composed source patches");
     } catch (error) {
       record("provenance: pinned Prime Agent source", false, String(error));

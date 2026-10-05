@@ -58,13 +58,22 @@ const zipGuardPatch = Buffer.from(
   + "@@ -2,0 +3 @@\n"
   + "+export const archiveGuard = true;\n",
 );
+const workerShutdownFencePatch = Buffer.from(
+  "diff --git a/packages/coding-agent/src/core/session-lease.ts b/packages/coding-agent/src/core/session-lease.ts\n"
+  + "--- a/packages/coding-agent/src/core/session-lease.ts\n"
+  + "+++ b/packages/coding-agent/src/core/session-lease.ts\n"
+  + "@@ -3 +3,2 @@\n"
+  + " export const archiveGuard = true;\n"
+  + "+export const shutdownFence = true;\n",
+);
 
 const reviewedPatchSequence = [
   { name: "session-lease", bytes: leasePatch, sha256: sha256(leasePatch), unidiffZero: false },
   { name: "windows-zip-guard", bytes: zipGuardPatch, sha256: sha256(zipGuardPatch), unidiffZero: true },
+  { name: "worker-shutdown-fence", bytes: workerShutdownFencePatch, sha256: sha256(workerShutdownFencePatch), unidiffZero: false },
 ];
 
-test("applies the session-lease patch before the Windows ZIP guard to the build checkout", async (t) => {
+test("applies the session-lease, Windows ZIP guard, and worker-shutdown patches in order", async (t) => {
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, { recursive: true, force: true }));
 
@@ -72,7 +81,7 @@ test("applies the session-lease patch before the Windows ZIP guard to the build 
 
   assert.equal(
     await readFile(fixture.source, "utf8"),
-    'export const state = "base";\nexport const lease = true;\nexport const archiveGuard = true;\n',
+    'export const state = "base";\nexport const lease = true;\nexport const archiveGuard = true;\nexport const shutdownFence = true;\n',
   );
   assert.equal(runGit(["rev-parse", "HEAD"], fixture.root).length, 40, "the pinned source commit remains unchanged");
   assert.deepEqual(
@@ -86,10 +95,11 @@ test("rejects a mismatched later patch digest before changing the build checkout
   t.after(() => rm(fixture.root, { recursive: true, force: true }));
   const badSequence = [
     reviewedPatchSequence[0],
-    { ...reviewedPatchSequence[1], sha256: "0".repeat(64) },
+    reviewedPatchSequence[1],
+    { ...reviewedPatchSequence[2], sha256: "0".repeat(64) },
   ];
 
-  assert.throws(() => applyReviewedSourcePatches(fixture.root, badSequence), /windows-zip-guard.*SHA-256 mismatch/);
+  assert.throws(() => applyReviewedSourcePatches(fixture.root, badSequence), /worker-shutdown-fence.*SHA-256 mismatch/);
   assert.equal(await readFile(fixture.source, "utf8"), 'export const state = "base";\n');
   assert.equal(runGit(["status", "--porcelain"], fixture.root), "");
 });
@@ -106,7 +116,7 @@ test("the real bundler prepares and builds the composed security overlay", () =>
   assert.ok(!bundleSource.includes("preparePrimeAgentBuildTree(WORKTREE, primeSource.path)"));
 });
 
-test("accepts only exact composed Prime Agent lease and Windows ZIP guard provenance", () => {
+test("accepts only exact composed Prime Agent lease, Windows ZIP guard, and worker-shutdown provenance", () => {
   const provenance = {
     ...PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED,
     sourceDirectory: "/tmp/prime-agent",
@@ -115,16 +125,21 @@ test("accepts only exact composed Prime Agent lease and Windows ZIP guard proven
   assert.equal(matchesPrimeAgentSecurityBuildProvenance(provenance), true);
   assert.equal(matchesPrimeAgentSecurityBuildProvenance({
     ...provenance,
-    windowsZipGuardPatchSha256: "e06fa63df26c0e52e699459a0d2f84cb032dc88828abc20bfa5a220de681b48",
+    windowsZipGuardPatchSha256: "0".repeat(64),
   }), false);
   assert.equal(matchesPrimeAgentSecurityBuildProvenance({
     ...provenance,
-    patchOrder: ["windows-zip-guard", "session-lease"],
+    workerShutdownFencePatchSha256: "0".repeat(64),
+  }), false);
+  assert.equal(matchesPrimeAgentSecurityBuildProvenance({
+    ...provenance,
+    patchOrder: ["windows-zip-guard", "session-lease", "worker-shutdown-fence"],
   }), false);
 });
 
 
-test("the real bundle runs both composed Prime Agent security regression suites", () => {
+test("the real bundle runs all composed Prime Agent security regression suites", () => {
+  assert.ok(bundleSource.includes("daemon-supervisor-monitor.test.ts"));
   assert.ok(bundleSource.includes("session-lease.test.ts"));
   assert.ok(bundleSource.includes("tools-manager.test.ts"));
   assert.ok(bundleSource.includes('"node_modules", "vitest", "vitest.mjs"'));
@@ -134,7 +149,7 @@ test("the real bundle runs both composed Prime Agent security regression suites"
   assert.ok(bundleSource.includes("verifyPrimeAgentSecurityBuildTree(WORKTREE, primeAgentRoot, primeSourceRoot)"));
   const install = bundleSource.indexOf('label: "Prime Agent locked dependency install (normal lifecycle)"');
   const verify = bundleSource.indexOf("verifyPrimeAgentSecurityBuildTree(WORKTREE, primeAgentRoot, primeSourceRoot)");
-  const tests = bundleSource.indexOf('label: "Prime Agent session-lease and Windows ZIP guard regression tests"');
+  const tests = bundleSource.indexOf('label: "Prime Agent session-lease, Windows ZIP guard, and worker-shutdown fence regression tests"');
   assert.ok(install >= 0 && verify > install && tests > verify, "build output is reverified after npm ci and before tests");
   const prune = bundleSource.indexOf('label: "Prime Agent production dependency tree (normal lifecycle)"');
   const pruneVerify = bundleSource.indexOf("verifyPrimeAgentSecurityBuildTree(WORKTREE, primeBuild.path, primeSource.path)");
@@ -177,6 +192,13 @@ test("Windows Prime Agent source and build trees use a unique system-TEMP root",
 test("hash-pinned overlay policy files keep their committed bytes on Windows checkouts", () => {
   assert.match(gitattributes, /^scripts\/dependency-hardening-overlay\.json -text$/m);
   assert.match(gitattributes, /^patches\/prime-agent-v0\.7\.0-session-lease-windows\.patch -text$/m);
+  assert.match(gitattributes, /^patches\/prime-agent-v0\.7\.0-worker-shutdown-fence\.patch -text$/m);
+});
+
+test("checked-out worker-shutdown patch retains the exact reviewed bytes", async () => {
+  const patchBytes = await readFile(new URL("../patches/prime-agent-v0.7.0-worker-shutdown-fence.patch", import.meta.url));
+  assert.equal(patchBytes.length, PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED.workerShutdownFencePatchBytes);
+  assert.equal(sha256(patchBytes), PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED.workerShutdownFencePatchSha256);
 });
 
 test("checked-out overlay manifest retains the exact reviewed bytes", async (t) => {
@@ -204,4 +226,16 @@ test("Windows real bundler allocates source and build paths in the validated sys
   assert.ok(securityBuildSource.includes('const systemTempRoot = process.platform === "win32" ? await realpath(tmpdir()) : undefined;'));
   assert.ok(e2eSource.includes("await verifyPrimeAgentSecurityBuildTree(REPO, buildDirectory, sourceDirectory)"));
   assert.ok(!bundleSource.includes("systemTempDirectory"), "do not expose ephemeral CI temp paths in the bundle manifest");
+});
+
+test("build hash mismatch diagnostics identify only changed files and both hashes", async () => {
+  const { describeBuildHashMismatches } = await import("./prepare-prime-agent-security-build.mjs");
+  assert.equal(typeof describeBuildHashMismatches, "function");
+  assert.deepEqual(
+    describeBuildHashMismatches(
+      { "package-lock.json": "actual-lock", LICENSE: "matching-license" },
+      { "package-lock.json": "expected-lock", LICENSE: "matching-license" },
+    ),
+    [{ file: "package-lock.json", expected: "expected-lock", actual: "actual-lock" }],
+  );
 });

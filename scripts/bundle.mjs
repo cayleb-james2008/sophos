@@ -83,12 +83,13 @@ async function buildPinnedDaemon(primeAgentRoot, primeSourceRoot) {
   run(process.execPath, [
     join(primeAgentRoot, "node_modules", "vitest", "vitest.mjs"),
     "--run",
+    "test/daemon-supervisor-monitor.test.ts",
     "test/session-lease.test.ts",
     "test/tools-manager.test.ts",
   ], {
     cwd: join(primeAgentRoot, "packages", "coding-agent"),
     shell: false,
-    label: "Prime Agent session-lease and Windows ZIP guard regression tests",
+    label: "Prime Agent session-lease, Windows ZIP guard, and worker-shutdown fence regression tests",
   });
   runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "tui"), label: "Prime Agent TUI build" });
   // pi-ai's normal build refreshes its model catalog from external vendor APIs.

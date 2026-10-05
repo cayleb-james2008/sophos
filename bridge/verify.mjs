@@ -10,6 +10,7 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -48,19 +49,30 @@ function terminateProcessTree(proc) {
   try { proc.kill("SIGTERM"); } catch {}
 }
 
-function terminateSupervisorOnly(proc) {
-  if (!proc?.pid || proc.exitCode !== null) return;
+async function terminateSupervisorOnly(identity) {
+  if (!Number.isInteger(identity?.pid) || identity.pid <= 0) return false;
+  if (typeof identity.processStartId !== "string" || identity.processStartId.length === 0) return false;
+  const sessionLeaseUrl = pathToFileURL(join(REF_ROOT, "dist", "core", "session-lease.js")).href;
+  const { getProcessStartId } = await import(sessionLeaseUrl);
+  const currentStartId = getProcessStartId(identity.pid);
+  if (!currentStartId || currentStartId !== identity.processStartId) return false;
   if (process.platform === "win32") {
     try {
       // Deliberately omit /T: the Windows worker is not detached, but it must
       // survive a supervisor-only restart so the replacement can adopt it.
-      execFileSync("taskkill", ["/PID", String(proc.pid), "/F"], { stdio: "ignore" });
+      execFileSync("taskkill", ["/PID", String(identity.pid), "/F"], { stdio: "ignore" });
+      return true;
     } catch {
-      // The process may have exited between the check and taskkill.
+      // The process may have exited between the identity check and taskkill.
+      return false;
     }
-    return;
   }
-  try { proc.kill("SIGTERM"); } catch {}
+  try {
+    process.kill(identity.pid, "SIGTERM");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function record(label, ok, detail) {
@@ -77,6 +89,146 @@ async function waitForExit(proc, timeoutMs = 5000) {
       resolve(true);
     });
   });
+}
+
+function processIsAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code !== "ESRCH";
+  }
+}
+
+function readWorkerDescriptorPids() {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? tmpdir();
+  const descriptorRoot = join(home, ".prime", "agent", "daemon-workers");
+  if (!existsSync(descriptorRoot)) return [];
+  const workers = [];
+  try {
+    for (const directory of readdirSync(descriptorRoot, { withFileTypes: true })) {
+      if (!directory.isDirectory()) continue;
+      const directoryPath = join(descriptorRoot, directory.name);
+      for (const entry of readdirSync(directoryPath, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+        try {
+          const descriptor = JSON.parse(readFileSync(join(directoryPath, entry.name), "utf8"));
+          if (typeof descriptor.workerId === "string" && Number.isInteger(descriptor.pid) && descriptor.pid > 0) {
+            workers.push({ pid: descriptor.pid, lifecycle: typeof descriptor.lifecycle === "string" ? descriptor.lifecycle : "unknown" });
+          }
+        } catch {
+          // A descriptor may be atomically replaced while diagnostics are reading it.
+        }
+      }
+    }
+  } catch {
+    // The daemon can remove its descriptor tree concurrently with diagnostics.
+  }
+  return workers;
+}
+
+async function inspectSupervisorIdentity() {
+  const daemonClientUrl = pathToFileURL(join(REF_ROOT, "dist", "modes", "daemon", "daemon-client.js")).href;
+  const { DaemonClient } = await import(daemonClientUrl);
+  const client = new DaemonClient(SOCKET_PATH);
+  try {
+    await client.connect(500);
+    const hello = await client.waitForHello(500).catch(() => undefined);
+    return {
+      reachable: true,
+      ...(Number.isInteger(hello?.supervisorPid) ? { pid: hello.supervisorPid } : {}),
+      ...(typeof hello?.supervisorProcessStartId === "string" ? { processStartId: hello.supervisorProcessStartId } : {}),
+    };
+  } catch {
+    return { reachable: false };
+  } finally {
+    client.close();
+  }
+}
+
+async function waitForProcessIdentityExit(identity, timeoutMs = 5000) {
+  if (!Number.isInteger(identity?.pid) || identity.pid <= 0) return false;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!processIsAlive(identity.pid)) return true;
+    await sleep(100);
+  }
+  return !processIsAlive(identity.pid);
+}
+
+function isReplacementIdentity(current, previous) {
+  return Boolean(current?.reachable && Number.isInteger(current.pid) && current.pid > 0
+    && (current.pid !== previous?.pid
+      || (typeof current.processStartId === "string" && typeof previous?.processStartId === "string"
+        && current.processStartId !== previous.processStartId)));
+}
+
+async function waitForSupervisorReplacement(previousIdentity, timeoutMs = 45_000) {
+  const deadline = Date.now() + timeoutMs;
+  let current = { reachable: false };
+  while (Date.now() < deadline) {
+    current = await inspectSupervisorIdentity();
+    if (isReplacementIdentity(current, previousIdentity)) return current;
+    await sleep(100);
+  }
+  return current;
+}
+
+function processTreeSnapshot(seedPids) {
+  const seeds = [...new Set(seedPids.filter((pid) => Number.isInteger(pid) && pid > 0))];
+  if (process.platform === "win32") {
+    return seeds.map((pid) => ({ pid, alive: processIsAlive(pid) }));
+  }
+  try {
+    const lines = execFileSync("ps", ["-eo", "pid=,ppid=,pgid=,stat=,comm="], { encoding: "utf8", timeout: 3000 }).trim().split("\n");
+    const rows = lines.filter(Boolean).map((line) => {
+      const [pid, ppid, pgid, state, comm] = line.trim().split(/\s+/, 5);
+      return { pid: Number(pid), ppid: Number(ppid), pgid: Number(pgid), state, comm };
+    });
+    const byPid = new Map(rows.map((row) => [row.pid, row]));
+    const selected = new Set(seeds);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const row of rows) {
+        if (!selected.has(row.pid) && selected.has(row.ppid)) {
+          selected.add(row.pid);
+          changed = true;
+        }
+      }
+    }
+    return [...selected].sort((a, b) => a - b).map((pid) => byPid.get(pid) ?? { pid, present: false, alive: processIsAlive(pid) });
+  } catch {
+    return seeds.map((pid) => ({ pid, alive: processIsAlive(pid) }));
+  }
+}
+
+async function snapshotShutdownState(daemon, supervisorIdentity) {
+  const socketState = await inspectSupervisorIdentity().catch(() => ({ reachable: false }));
+  const workers = readWorkerDescriptorPids().map((worker) => ({ ...worker, alive: processIsAlive(worker.pid) }));
+  const pids = [daemon?.pid, supervisorIdentity?.pid, socketState.pid, ...workers.map((worker) => worker.pid)];
+  return {
+    gracefulSupervisor: supervisorIdentity ?? { reachable: false },
+    postGracefulSocket: socketState,
+    daemonLauncher: daemon ? { pid: daemon.pid, exitCode: daemon.exitCode, signalCode: daemon.signalCode, alive: processIsAlive(daemon.pid) } : null,
+    workers,
+    processes: processTreeSnapshot(pids),
+  };
+}
+
+async function logRecoveryOwnership(stage, processHandle) {
+  const socketSupervisor = await inspectSupervisorIdentity();
+  const workers = readWorkerDescriptorPids().map((worker) => ({ ...worker, alive: processIsAlive(worker.pid) }));
+  const processes = processTreeSnapshot([processHandle?.pid, socketSupervisor.pid, ...workers.map((worker) => worker.pid)]);
+  console.log(`[ownership] ${JSON.stringify({
+    stage,
+    processHandle: processHandle ? { pid: processHandle.pid, exitCode: processHandle.exitCode, signalCode: processHandle.signalCode, alive: processIsAlive(processHandle.pid) } : null,
+    socketSupervisor,
+    workers,
+    processes,
+  })}`);
+  return socketSupervisor;
 }
 
 function parseLines(buffer, onLine) {
@@ -116,8 +268,29 @@ async function run() {
   };
   async function shutdownDaemonGracefully() {
     const daemonLaunchUrl = pathToFileURL(join(REF_ROOT, "dist", "cli", "daemon-launch.js")).href;
-    const { shutdownDaemonAndWait } = await import(daemonLaunchUrl);
-    return shutdownDaemonAndWait(SOCKET_PATH, 10000);
+    const daemonClientUrl = pathToFileURL(join(REF_ROOT, "dist", "modes", "daemon", "daemon-client.js")).href;
+    const { shutdownDaemonAndWait, shutdownConnectedDaemonAndWait } = await import(daemonLaunchUrl);
+    const { DaemonClient } = await import(daemonClientUrl);
+    const client = new DaemonClient(SOCKET_PATH);
+    let identity;
+    try {
+      await client.connect(1000);
+      const hello = await client.waitForHello(2000).catch(() => undefined);
+      identity = {
+        reachable: true,
+        ...(Number.isInteger(hello?.supervisorPid) ? { pid: hello.supervisorPid } : {}),
+        ...(typeof hello?.supervisorProcessStartId === "string" ? { processStartId: hello.supervisorProcessStartId } : {}),
+      };
+      return {
+        stopped: await shutdownConnectedDaemonAndWait(client, SOCKET_PATH, 10000, hello),
+        identity,
+      };
+    } catch {
+      client.close();
+      return { stopped: await shutdownDaemonAndWait(SOCKET_PATH, 10000), identity: identity ?? { reachable: false } };
+    } finally {
+      client.close();
+    }
   }
   const cleanup = async () => {
     try { bridge?.stdin.end(); } catch {}
@@ -131,17 +304,32 @@ async function run() {
     let daemonStopped = false;
     let daemonProcessStopped = !daemon || daemon.exitCode !== null || daemon.signalCode !== null;
     let shutdownError;
+    let shutdownResult;
     try {
-      daemonStopped = await shutdownDaemonGracefully();
+      shutdownResult = await shutdownDaemonGracefully();
+      daemonStopped = shutdownResult.stopped;
       if (daemonStopped) daemonProcessStopped = await waitForExit(daemon, 5000);
     } catch (error) {
       shutdownError = error instanceof Error ? error.message : String(error);
     }
+    let shutdownDiagnostics;
+    let fallbackTerminationNeeded = false;
     if (!daemonStopped || !daemonProcessStopped) {
+      fallbackTerminationNeeded = true;
+      shutdownDiagnostics = await snapshotShutdownState(daemon, shutdownResult?.identity);
       terminateProcessTree(daemon);
       daemonProcessStopped = await waitForExit(daemon, 5000);
+      shutdownDiagnostics.afterFallback = await snapshotShutdownState(daemon, shutdownResult?.identity);
     }
-    return { bridgeStopped, daemonStopped: daemonStopped && daemonProcessStopped, shutdownError };
+    return {
+      bridgeStopped,
+      daemonStopped: daemonStopped && daemonProcessStopped && !fallbackTerminationNeeded,
+      gracefulDaemonStopped: daemonStopped,
+      daemonProcessStopped,
+      fallbackTerminationNeeded,
+      shutdownError,
+      shutdownDiagnostics,
+    };
   };
   const onSignal = () => {
     forceCleanup();
@@ -157,7 +345,7 @@ async function run() {
     record("spawn bridge", false, err.message);
     const cleanupState = await cleanup();
     record("graceful shutdown releases the isolated session HOME", cleanupState.daemonStopped && cleanupState.bridgeStopped,
-      `daemonStopped=${cleanupState.daemonStopped}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}`);
+      `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     return;
@@ -250,15 +438,19 @@ async function run() {
       // Replace the daemon while keeping the bridge alive. This exercises the
       // recoverDaemon readiness gate and the upstream reconnect/reattach path.
       const oldDaemon = daemon;
-      terminateProcessTree(oldDaemon);
-      const exited = await waitForExit(oldDaemon);
-      daemon = undefined;
-      record("old daemon exits before replacement", exited);
-      await sleep(300);
       const reconnectingStart = events.length;
-      const replacement = await startDaemon();
-      daemon = replacement.proc;
-      daemonDiagnostics.push(...replacement.diagnostics);
+      const oldSupervisorIdentity = await logRecoveryOwnership("initial-recovery-before-kill", oldDaemon);
+      const stopAttempted = await terminateSupervisorOnly(oldSupervisorIdentity);
+      const exited = await waitForProcessIdentityExit(oldSupervisorIdentity);
+      daemon = undefined;
+      await logRecoveryOwnership("initial-recovery-after-kill", oldDaemon);
+      record("old daemon exits before replacement", stopAttempted && exited, `pid=${oldSupervisorIdentity.pid ?? "unknown"} identityChecked=${typeof oldSupervisorIdentity.processStartId === "string"}`);
+      const replacementIdentity = exited
+        ? await waitForSupervisorReplacement(oldSupervisorIdentity)
+        : await inspectSupervisorIdentity();
+      await logRecoveryOwnership("initial-recovery-after-replacement", daemon);
+      record("replacement supervisor becomes reachable after daemon loss", isReplacementIdentity(replacementIdentity, oldSupervisorIdentity),
+        `oldPid=${oldSupervisorIdentity.pid ?? "unknown"} newPid=${replacementIdentity.pid ?? "unknown"}`);
       const reconnectDeadline = Date.now() + 45_000;
       while (!events.slice(reconnectingStart).some((e) => e.type === "connection_status" && e.status.kind === "connected") && Date.now() < reconnectDeadline) {
         await sleep(50);
@@ -458,15 +650,18 @@ async function run() {
 
     if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {
       const oldDaemon = daemon;
-      terminateSupervisorOnly(oldDaemon);
-      const exited = await waitForExit(oldDaemon);
+      const oldSupervisorIdentity = await logRecoveryOwnership("session-recovery-before-kill", oldDaemon);
+      const stopAttempted = await terminateSupervisorOnly(oldSupervisorIdentity);
+      const exited = await waitForProcessIdentityExit(oldSupervisorIdentity);
       daemon = undefined;
-      record("session-recovery daemon exits before replacement", exited);
-      await sleep(300);
-      const replacement = await startDaemon();
-      daemon = replacement.proc;
-      daemonDiagnostics.push(...replacement.diagnostics);
-      record("replacement supervisor starts with persisted session state", replacement.proc.exitCode === null);
+      await logRecoveryOwnership("session-recovery-after-kill", oldDaemon);
+      record("session-recovery daemon exits before replacement", stopAttempted && exited, `pid=${oldSupervisorIdentity.pid ?? "unknown"} identityChecked=${typeof oldSupervisorIdentity.processStartId === "string"}`);
+      const replacementIdentity = exited
+        ? await waitForSupervisorReplacement(oldSupervisorIdentity)
+        : await inspectSupervisorIdentity();
+      await logRecoveryOwnership("session-recovery-after-replacement", daemon);
+      record("replacement supervisor starts with persisted session state", isReplacementIdentity(replacementIdentity, oldSupervisorIdentity),
+        `oldPid=${oldSupervisorIdentity.pid ?? "unknown"} newPid=${replacementIdentity.pid ?? "unknown"}`);
       const stateAfterReconnect = await send({ id: "c33", method: "getState", params: {} });
       record("created session remains connected and active after supervisor replacement",
         stateAfterReconnect.result?.status?.kind === "connected" && stateAfterReconnect.result?.activeSessionId === createdSessionId,
@@ -510,7 +705,7 @@ async function run() {
     const cleanupState = await cleanup();
     record("graceful daemon shutdown releases adopted session workers before HOME removal",
       cleanupState.daemonStopped && cleanupState.bridgeStopped,
-      `daemonStopped=${cleanupState.daemonStopped}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}`);
+      `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
   }

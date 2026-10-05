@@ -38,6 +38,8 @@ const EXPECTED = Object.freeze({
   leasePatchedSourceSha256: "006802f39f6de128e6b7f418e9fb3b2793ef73410d1247db562ce5dcbe7a0349",
   zipGuardPatchSha256: "e06fa63df26c0e52e699459a0adf284cb032dc88828abc20bfa5a220de681b48",
   zipGuardPatchBytes: 7632,
+  workerShutdownFencePatchSha256: "41b1c256f5defcf1b9f5a0f3a27d8a09720b567259fadb1781e5185b99d72af2",
+  workerShutdownFencePatchBytes: 4462,
   overlayId: "prime-agent-v070-windows-session-lease-v1",
   overrides: {
     undici: "7.29.1",
@@ -51,18 +53,24 @@ const EXPECTED_TRACKED_CHANGES = [
   "package-lock.json",
   "package.json",
   "packages/coding-agent/src/core/session-lease.ts",
+  "packages/coding-agent/src/modes/daemon/daemon-mode.ts",
   "packages/coding-agent/src/utils/tools-manager.ts",
+  "packages/coding-agent/test/daemon-supervisor-monitor.test.ts",
   "packages/coding-agent/test/tools-manager.test.ts",
 ].sort();
-const EXPECTED_PATCH_ORDER = Object.freeze(["session-lease", "windows-zip-guard"]);
+const EXPECTED_PATCH_ORDER = Object.freeze(["session-lease", "windows-zip-guard", "worker-shutdown-fence"]);
 const ALLOWED_PATCH_OUTPUTS = new Set([
   "packages/coding-agent/src/core/session-lease.ts",
+  "packages/coding-agent/src/modes/daemon/daemon-mode.ts",
   "packages/coding-agent/src/utils/tools-manager.ts",
+  "packages/coding-agent/test/daemon-supervisor-monitor.test.ts",
   "packages/coding-agent/test/tools-manager.test.ts",
 ]);
 const EXPECTED_BUILD_SOURCE_HASHES = Object.freeze({
   "packages/coding-agent/src/core/session-lease.ts": "006802f39f6de128e6b7f418e9fb3b2793ef73410d1247db562ce5dcbe7a0349",
+  "packages/coding-agent/src/modes/daemon/daemon-mode.ts": "61ffac40905989f869b6981b181518fc720b968dbb103d4639b9cdedf8dba441",
   "packages/coding-agent/src/utils/tools-manager.ts": "8936f99a387c3426bf4f2210cc1178fec1dcc2605cccab5d93127054340c7064",
+  "packages/coding-agent/test/daemon-supervisor-monitor.test.ts": "182468b0402d1ba55f3ced8f1dbd31ca6d16c7b38e6f1828cb6de80046748f0d",
   "packages/coding-agent/test/tools-manager.test.ts": "0956ee19088f761770601ff1c00212717c6a7276dd733dc3079c05d4235e8b75",
 });
 
@@ -157,8 +165,8 @@ function assertExpectedSourceIdentity(checkout) {
 }
 
 function assertPatchRecords(patches) {
-  if (!Array.isArray(patches) || patches.length !== 2) {
-    throw new Error("the security composition requires exactly two reviewed source patches");
+  if (!Array.isArray(patches) || patches.length !== 3) {
+    throw new Error("the security composition requires exactly three reviewed source patches");
   }
   const names = patches.map((patch) => patch?.name);
   if (!isDeepStrictEqual(names, EXPECTED_PATCH_ORDER)) {
@@ -224,6 +232,11 @@ async function loadReviewedInputs(projectRoot) {
     ["scripts", "dependency-hardening", "prime-agent-windows-zip-guard.patch.b64"],
     "Prime Agent Windows ZIP guard patch payload",
   );
+  const workerShutdownFencePatchPath = await assertRegularFileNoSymlink(
+    projectRoot,
+    ["patches", "prime-agent-v0.7.0-worker-shutdown-fence.patch"],
+    "Prime Agent worker-shutdown fence patch",
+  );
 
   const manifestBytes = await readFile(manifestPath);
   if (sha256(manifestBytes) !== EXPECTED.overlayManifestSha256) {
@@ -266,6 +279,11 @@ async function loadReviewedInputs(projectRoot) {
     || sha256(zipGuardPatchBytes) !== EXPECTED.zipGuardPatchSha256) {
     throw new Error("decoded Windows ZIP guard patch SHA-256 or size mismatch");
   }
+  const workerShutdownFencePatchBytes = await readFile(workerShutdownFencePatchPath);
+  if (workerShutdownFencePatchBytes.length !== EXPECTED.workerShutdownFencePatchBytes
+    || sha256(workerShutdownFencePatchBytes) !== EXPECTED.workerShutdownFencePatchSha256) {
+    throw new Error("worker-shutdown fence patch SHA-256 or size mismatch");
+  }
   if (sha256(lockBytes) !== EXPECTED.overlayLockSha256) {
     throw new Error("canonical dependency overlay lock SHA-256 mismatch");
   }
@@ -275,6 +293,7 @@ async function loadReviewedInputs(projectRoot) {
     lockSha256: sha256(lockBytes),
     leasePatchBytes,
     zipGuardPatchBytes,
+    workerShutdownFencePatchBytes,
   };
 }
 
@@ -292,6 +311,8 @@ function expectedMarker(inputs) {
     sessionLeasePatchSha256: EXPECTED.leasePatchSha256,
     windowsZipGuardPatchSha256: EXPECTED.zipGuardPatchSha256,
     windowsZipGuardPatchBytes: EXPECTED.zipGuardPatchBytes,
+    workerShutdownFencePatchSha256: EXPECTED.workerShutdownFencePatchSha256,
+    workerShutdownFencePatchBytes: EXPECTED.workerShutdownFencePatchBytes,
     patchOrder: [...EXPECTED_PATCH_ORDER],
   };
 }
@@ -320,6 +341,13 @@ async function fileHash(root, relativePath) {
   return sha256(await readFile(path));
 }
 
+export function describeBuildHashMismatches(actualHashes, expectedHashes) {
+  return Object.entries(expectedHashes).flatMap(([file, expected]) => {
+    const actual = Object.hasOwn(actualHashes, file) ? actualHashes[file] : "<missing>";
+    return actual === expected ? [] : [{ file, expected, actual }];
+  });
+}
+
 async function assertBuildOutputFiles(buildRoot, marker = null) {
   const provenance = assertExpectedSourceIdentity(buildRoot);
   const changedFiles = runGit(["diff", "--name-only"], buildRoot).split(/\r?\n/).filter(Boolean).sort();
@@ -333,11 +361,25 @@ async function assertBuildOutputFiles(buildRoot, marker = null) {
   const lockHash = await fileHash(buildRoot, "package-lock.json");
   const licenseHash = await fileHash(buildRoot, "LICENSE");
   const leaseSourceHash = await fileHash(buildRoot, PRIME_AGENT_SESSION_LEASE_OVERLAY.sourcePath);
-  if (packageJsonHash !== EXPECTED.overlayPackageJsonSha256
-    || lockHash !== EXPECTED.overlayLockSha256
-    || licenseHash !== EXPECTED.licenseSha256
-    || leaseSourceHash !== EXPECTED.leasePatchedSourceSha256) {
-    throw new Error("Prime Agent build manifest, lock, MIT license, or session-lease source hash mismatch");
+  const inputHashMismatches = describeBuildHashMismatches(
+    {
+      "package.json": packageJsonHash,
+      "package-lock.json": lockHash,
+      LICENSE: licenseHash,
+      [PRIME_AGENT_SESSION_LEASE_OVERLAY.sourcePath]: leaseSourceHash,
+    },
+    {
+      "package.json": EXPECTED.overlayPackageJsonSha256,
+      "package-lock.json": EXPECTED.overlayLockSha256,
+      LICENSE: EXPECTED.licenseSha256,
+      [PRIME_AGENT_SESSION_LEASE_OVERLAY.sourcePath]: EXPECTED.leasePatchedSourceSha256,
+    },
+  );
+  if (inputHashMismatches.length > 0) {
+    const detail = inputHashMismatches
+      .map(({ file, expected, actual }) => `${file}: expected ${expected}, got ${actual}`)
+      .join("; ");
+    throw new Error(`Prime Agent build input SHA-256 mismatch (${detail})`);
   }
   const sourceFileHashes = {};
   for (const path of [...ALLOWED_PATCH_OUTPUTS].sort()) sourceFileHashes[path] = await fileHash(buildRoot, path);
@@ -445,6 +487,7 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
     const patches = [
       { name: "session-lease", bytes: inputs.leasePatchBytes, sha256: EXPECTED.leasePatchSha256, unidiffZero: false },
       { name: "windows-zip-guard", bytes: inputs.zipGuardPatchBytes, sha256: EXPECTED.zipGuardPatchSha256, unidiffZero: true },
+      { name: "worker-shutdown-fence", bytes: inputs.workerShutdownFencePatchBytes, sha256: EXPECTED.workerShutdownFencePatchSha256, unidiffZero: false },
     ];
     applyReviewedSourcePatches(buildRoot, patches);
     const output = await assertBuildOutputFiles(buildRoot);

@@ -1,0 +1,97 @@
+diff --git a/packages/coding-agent/src/modes/daemon/daemon-mode.ts b/packages/coding-agent/src/modes/daemon/daemon-mode.ts
+index dfebcdf..e785b8c 100644
+--- a/packages/coding-agent/src/modes/daemon/daemon-mode.ts
++++ b/packages/coding-agent/src/modes/daemon/daemon-mode.ts
+@@ -799,10 +799,10 @@ export class AgentDaemon {
+ 			if (!ownsLock) {
+ 				return;
+ 			}
+-			if (await this.canConnectToSupervisor(supervisorSocketPath)) {
++			if (await this.canConnectToSupervisor(supervisorSocketPath) || this.shuttingDown) {
+ 				return;
+ 			}
+-			if (await isDaemonShutdownAdmissionActive()) {
++			if (await isDaemonShutdownAdmissionActive() || this.shuttingDown) {
+ 				return;
+ 			}
+ 			const launch = createCliSubprocessLaunchSpec(["--mode", "daemon", "--daemon-socket", supervisorSocketPath]);
+diff --git a/packages/coding-agent/test/daemon-supervisor-monitor.test.ts b/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
+index c05afc0..9f6e464 100644
+--- a/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
++++ b/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
+@@ -32,7 +32,7 @@ import { createDeferred } from "./suite/scheduling.js";
+ const workerLaunchTestState = vi.hoisted(() => ({
+ 	capture: false,
+ 	forceMissingProcessStartId: false,
+-	fixtureMode: "worker" as "worker" | "close-gate" | "rollback-gate" | "successful-gate",
++	fixtureMode: "worker" as "worker" | "close-gate" | "rollback-gate" | "successful-gate" | "idle",
+ 	gateMarkerPath: "",
+ 	tsxCliPath: "",
+ 	cliEntrypoint: "",
+@@ -92,6 +92,12 @@ vi.mock("../src/cli/subprocess-launch.js", async (importOriginal) => {
+ 					],
+ 				};
+ 			}
++			if (workerLaunchTestState.fixtureMode === "idle") {
++				return {
++					command: process.execPath,
++					args: ["--eval", "setInterval(() => {}, 1000)"],
++				};
++			}
+ 			return {
+ 				command: process.execPath,
+ 				args: [workerLaunchTestState.tsxCliPath, workerLaunchTestState.cliEntrypoint, ...args],
+@@ -117,7 +123,8 @@ const previousSupervisorRegistryDir = process.env[supervisorRegistryDirEnv];
+ const supervisorRegistryDirs = new Set<string>();
+ 
+ interface SupervisorMonitorHarness {
+-	options: { worker: object };
++	options: { worker: object; defaultSessionConfig: { cwd: string } };
++	socketPath: string;
+ 	clients: Set<{ authenticated: boolean }>;
+ 	supervisorClaims: Map<object, object>;
+ 	shuttingDown: boolean;
+@@ -261,7 +268,8 @@ function createHarness(canConnect: () => Promise<boolean>): SupervisorMonitorHar
+ 	supervisorRegistryDirs.add(registryDir);
+ 	process.env[supervisorRegistryDirEnv] = registryDir;
+ 	return Object.assign(Object.create(AgentDaemon.prototype), {
+-		options: { worker: {} },
++		options: { worker: {}, defaultSessionConfig: { cwd: process.cwd() } },
++		socketPath: "",
+ 		clients: new Set<{ authenticated: boolean }>(),
+ 		supervisorClaims: new Map<object, object>(),
+ 		shuttingDown: false,
+@@ -976,6 +984,33 @@ describe("daemon worker supervisor monitoring", () => {
+ 		expect(daemon.supervisorMonitorTimer).toBeUndefined();
+ 	});
+ 
++	it("does not launch a replacement supervisor if shutdown starts during the availability probe", async () => {
++		let resolveProbe: (available: boolean) => void = () => undefined;
++		const probe = new Promise<boolean>((resolve) => {
++			resolveProbe = resolve;
++		});
++		const daemon = createHarness(() => probe);
++		const registryDir = process.env[supervisorRegistryDirEnv];
++		if (!registryDir) throw new Error("Supervisor registry test directory was not set");
++		workerLaunchTestState.capture = true;
++		workerLaunchTestState.fixtureMode = "idle";
++		workerLaunchTestState.gateMarkerPath = join(registryDir, "spawned");
++		const launchReplacementSupervisor = Object.getOwnPropertyDescriptor(
++			AgentDaemon.prototype,
++			"launchReplacementSupervisor",
++		)?.value as ((this: SupervisorMonitorHarness, socketPath: string) => Promise<void>) | undefined;
++		if (!launchReplacementSupervisor) throw new Error("Replacement-supervisor launch method was not found");
++
++		const socketPath = join(registryDir, "supervisor.sock");
++		daemon.socketPath = socketPath;
++		const launch = launchReplacementSupervisor.call(daemon, socketPath);
++		daemon.shuttingDown = true;
++		resolveProbe(false);
++		await launch;
++
++		expect(workerLaunchTestState.spawned).toHaveLength(0);
++	});
++
+ 	it("skips socket probes while an authenticated supervisor connection is active", async () => {
+ 		vi.useFakeTimers();
+ 		const daemon = createHarness(async () => true);
