@@ -25,3 +25,9 @@ jobs:
       - name: Record actual Windows runner ACLs before policy design
         shell: pwsh
         run: ./scripts/dependency-hardening/windows-acl-probe.ps1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run dependency overlay tests on native Windows ACLs
+        shell: pwsh
+        run: node --test scripts/dependency-hardening/windows-acl-security.test.mjs scripts/prepare-dependency-overlay.test.mjs
