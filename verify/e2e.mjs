@@ -19,6 +19,7 @@ import { parseBridgeVerifyResult } from "./e2e-result.mjs";
 import { validateNodeExecutable } from "../scripts/node-runtime.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "../scripts/runtime-pins.mjs";
 import { PRIME_AGENT_SESSION_LEASE_OVERLAY } from "../scripts/apply-prime-agent-overlay.mjs";
+import { removeTemporaryHomeWithRetry } from "./e2e-home-cleanup.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RESOURCES = join(REPO, "resources");
@@ -232,8 +233,14 @@ async function main() {
     };
   } finally {
     // Early returns still reach finally: no failed or incomplete report may exit zero.
+    const cleanup = await removeTemporaryHomeWithRetry(testHome, {
+      onRetry: ({ attempt, error, retryDelayMs }) => push(
+        `[cleanup] temporary HOME is locked (${error.code}) on attempt ${attempt}; retrying in ${retryDelayMs}ms`,
+      ),
+    });
+    report.cleanup = { status: "PASS", attempts: cleanup.attempts };
+    push(`[cleanup] temporary HOME removed after ${cleanup.attempts} attempt(s)`);
     process.exitCode = report.summary.overall === "PASS" ? 0 : 1;
-    rmSync(testHome, { recursive: true, force: true });
     report.finishedAt = new Date().toISOString();
     writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
     writeFileSync(EVIDENCE_PATH, `${evidence.join("\n")}\n`);
