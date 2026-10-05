@@ -154,14 +154,34 @@ async function main() {
       BRIDGE_VERIFY_SESSION_CWD: sessionCwd,
     };
     push("\n=== Pinned session-lease ownership, replacement, and provenance ===\n");
-    const leaseTests = spawnSync(NODE_EXE, ["--test", join(REPO, "scripts", "session-lease-lifecycle.test.mjs")], {
-      cwd: REPO,
-      env,
-      encoding: "utf8",
-      windowsHide: true,
-      timeout: 60_000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
+    const leaseTestHome = mkdtempSync(join(tmpdir(), "sophos-session-lease-e2e-home-"));
+    const leaseTestEnv = {
+      ...isolatedEnv,
+      HOME: leaseTestHome,
+      USERPROFILE: leaseTestHome,
+      XDG_CONFIG_HOME: join(leaseTestHome, ".config"),
+      XDG_DATA_HOME: join(leaseTestHome, ".local", "share"),
+      XDG_CACHE_HOME: join(leaseTestHome, ".cache"),
+      APPDATA: join(leaseTestHome, "AppData", "Roaming"),
+      LOCALAPPDATA: join(leaseTestHome, "AppData", "Local"),
+      TMPDIR: tmpdir(),
+      TEMP: tmpdir(),
+      TMP: tmpdir(),
+      PI_OFFLINE: "1",
+    };
+    let leaseTests;
+    try {
+      leaseTests = spawnSync(NODE_EXE, ["--test", join(REPO, "scripts", "session-lease-lifecycle.test.mjs")], {
+        cwd: REPO,
+        env: leaseTestEnv,
+        encoding: "utf8",
+        windowsHide: true,
+        timeout: 60_000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+    } finally {
+      rmSync(leaseTestHome, { recursive: true, force: true });
+    }
     if (leaseTests.stdout?.trim()) push(leaseTests.stdout.trimEnd());
     if (leaseTests.stderr?.trim()) push(`[session-lease stderr]\n${leaseTests.stderr.trimEnd()}`);
     record("pinned session-lease holder, replacement, and provenance regressions",
