@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
 import test from "node:test";
+import { join } from "node:path";
 import * as windowsAcl from "./windows-acl-security.mjs";
 
 const READ_ONLY_RUNNER_USERS_RIGHTS = 1_179_817;
@@ -90,6 +92,16 @@ test("treats inherited untrusted writes as effective and rejects unknown ACE met
   assert.throws(() => windowsAcl.assertWindowsAclRecord(invalidMask, path, "workspace", { scope: "private" }), /unsupported access rule/i);
 });
 
+test("permits the trusted Windows servicing owner only on the drive root", () => {
+  const root = "C:" + String.fromCharCode(92);
+  const trustedRoot = aclRecord(root, []);
+  trustedRoot.ownerSid = "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
+  assert.doesNotThrow(() => windowsAcl.assertWindowsAclRecord(trustedRoot, root, "volume root", { scope: "ancestor" }));
+  const nested = aclRecord(String.raw`C:\\Users`, []);
+  nested.ownerSid = trustedRoot.ownerSid;
+  assert.throws(() => windowsAcl.assertWindowsAclRecord(nested, nested.path, "nested directory", { scope: "ancestor" }), /owner is not/i);
+});
+
 test("refuses to present Linux ACL data as native Windows evidence", async () => {
   if (process.platform === "win32") return;
   await assert.rejects(windowsAcl.inspectWindowsPathAcl("D:\\\\a"), /requires a native Windows process/i);
@@ -113,4 +125,14 @@ test("reads and enforces the actual GitHub Windows runner workspace ACL", { skip
     windowsAcl.assertSecureWindowsPath(workspace, "actual GitHub Windows checkout", { scope: "private" }),
     /untrusted SID S-1-5-32-545.*write-capable rights/i,
   );
+
+  const privateBase = process.env.LOCALAPPDATA;
+  assert.ok(privateBase, "LOCALAPPDATA must identify the runner's per-user NTFS area");
+  await windowsAcl.assertSecureWindowsPath(privateBase, "runner LOCALAPPDATA", { scope: "private" });
+  const privateDestination = mkdtempSync(join(privateBase, "sophos-dependency-acl-"));
+  try {
+    await windowsAcl.assertSecureWindowsPath(privateDestination, "new per-user destination", { scope: "private" });
+  } finally {
+    rmSync(privateDestination, { recursive: true, force: true });
+  }
 });

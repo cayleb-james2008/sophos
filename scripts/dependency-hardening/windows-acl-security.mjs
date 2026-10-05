@@ -4,6 +4,7 @@ import { win32 } from "node:path";
 const OWNER_RIGHTS_SID = "S-1-3-4";
 const CREATOR_OWNER_SID = "S-1-3-0";
 const NETWORK_SERVICE_SID = "S-1-5-20";
+const TRUSTED_INSTALLER_SID = "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
 const SYSTEM_SID = "S-1-5-18";
 const ADMINISTRATORS_SID = "S-1-5-32-544";
 const PRIVATE_WRITE_MASK = 2 | 4 | 16 | 64 | 256 | 65536 | 262144 | 524288 | 0x10000000 | 0x40000000;
@@ -84,7 +85,7 @@ export function assertWindowsAclRecord(record, expectedPath, label = "trusted wo
   const ownerTrusted = record.ownerSid === record.currentUserSid
     || record.ownerSid === SYSTEM_SID
     || record.ownerSid === ADMINISTRATORS_SID
-    || (isDriveRoot(normalizedPath) && record.ownerSid === NETWORK_SERVICE_SID);
+    || (isDriveRoot(normalizedPath) && [NETWORK_SERVICE_SID, TRUSTED_INSTALLER_SID].includes(record.ownerSid));
   if (!ownerTrusted) throw new Error(`${label} owner is not the current user or a trusted Windows principal (${record.ownerSid}): ${expectedPath}`);
 
   const trustedWriters = new Set([record.currentUserSid, SYSTEM_SID, ADMINISTRATORS_SID, OWNER_RIGHTS_SID]);
@@ -132,7 +133,8 @@ try {
         foreach ($path in $paths) {
             $fullPath = [System.IO.Path]::GetFullPath([string]$path)
             $twoSeparators = ([string][char]92) + [char]92
-            if ($fullPath.StartsWith($twoSeparators) -or $fullPath -notmatch '^[A-Za-z]:\\') {
+            $pathRoot = [System.IO.Path]::GetPathRoot($fullPath)
+            if ($fullPath.StartsWith($twoSeparators) -or $pathRoot.Length -ne 3 -or $pathRoot[1] -ne ':' -or $pathRoot[2] -ne [char]92) {
                 throw ('ACL validation supports local drive paths only: ' + $fullPath)
             }
             $item = Get-Item -LiteralPath $fullPath -Force

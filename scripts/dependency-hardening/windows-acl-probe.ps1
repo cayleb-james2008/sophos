@@ -30,7 +30,7 @@ foreach ($start in $paths) {
             driveFormat = $driveFormat
             daclPresent = ($null -ne $raw.DiscretionaryAcl)
             canonical = [bool]$acl.AreAccessRulesCanonical
-            isDirectory = [bool]$item.PSIsContainer
+            isDirectory = (($item.Attributes -band [System.IO.FileAttributes]::Directory) -ne 0)
             isReparsePoint = (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)
             rules = $rules
         }
