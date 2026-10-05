@@ -35,6 +35,7 @@ async function makeFixture() {
   await mkdir(join(root, "packages/coding-agent/src/core"), { recursive: true });
   await writeFile(source, 'export const state = "base";\n');
   runGit(["init", "--quiet", "--initial-branch=main"], root);
+  runGit(["config", "core.autocrlf", "false"], root);
   runGit(["config", "user.name", "Sophos test"], root);
   runGit(["config", "user.email", "sophos-test@example.invalid"], root);
   runGit(["add", "packages/coding-agent/src/core/session-lease.ts"], root);
@@ -95,7 +96,9 @@ test("rejects a mismatched later patch digest before changing the build checkout
 
 // This integration seam intentionally guards the real release entrypoint too;
 // the Windows CI bundle/native/MSI path supplies the end-to-end verification.
+const securityBuildSource = await readFile(new URL("./prepare-prime-agent-security-build.mjs", import.meta.url), "utf8");
 const bundleSource = await readFile(new URL("./bundle.mjs", import.meta.url), "utf8");
+const e2eSource = await readFile(new URL("../verify/e2e.mjs", import.meta.url), "utf8");
 test("the real bundler prepares and builds the composed security overlay", () => {
   assert.match(bundleSource, /preparePrimeAgentSecurityBuildTree/);
   assert.ok(bundleSource.includes("primeBuild.path"));
@@ -171,10 +174,14 @@ test("Windows Prime Agent source and build trees use a unique system-TEMP root",
 });
 
 test("Windows real bundler allocates source and build paths in the validated system-TEMP root", () => {
-  assert.ok(bundleSource.includes('mkdtemp(join(tmpdir(), "sophos-prime-agent-security-"))'));
+  assert.ok(bundleSource.includes('mkdtemp(join(systemTempRoot, "sophos-prime-agent-security-"))'));
+  assert.ok(bundleSource.includes('const systemTempRoot = process.platform === "win32" ? await realpath(tmpdir()) : tmpdir()'));
   assert.ok(bundleSource.includes("resolvePrimeAgentSecurityWorkPaths"));
   assert.ok(bundleSource.includes("primePaths.sourceRoot"));
   assert.ok(bundleSource.includes("primePaths.buildRoot"));
   assert.ok(bundleSource.includes("const primeSourceRoot = process.env.PRIME_AGENT_REF ?? primePaths.sourceRoot"));
-  assert.ok(bundleSource.includes("preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path, primePaths.buildRoot)"));
+  assert.ok(bundleSource.includes("preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path, primePaths.buildRoot, systemTempRoot)"));
+  assert.ok(securityBuildSource.includes('const systemTempRoot = process.platform === "win32" ? await realpath(tmpdir()) : undefined;'));
+  assert.ok(e2eSource.includes("await verifyPrimeAgentSecurityBuildTree(REPO, buildDirectory, sourceDirectory)"));
+  assert.ok(!bundleSource.includes("systemTempDirectory"), "do not expose ephemeral CI temp paths in the bundle manifest");
 });

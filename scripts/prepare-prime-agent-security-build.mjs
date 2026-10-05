@@ -2,8 +2,8 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { lstat, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve, sep, win32 } from "node:path";
+import { lstat, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { isDeepStrictEqual } from "node:util";
@@ -83,10 +83,10 @@ export function resolvePrimeAgentSecurityBuildRoot(projectRoot, requestedBuildRo
   const platform = options.platform ?? process.platform;
   const root = platform === "win32" ? win32.resolve(projectRoot) : resolve(projectRoot);
   if (platform === "win32") {
-    const systemTempRoot = options.systemTempRoot ?? tmpdir();
+    const systemTempRoot = options.systemTempRoot;
     const candidate = requestedBuildRoot ? win32.resolve(requestedBuildRoot) : "";
-    if (!requestedBuildRoot || !isWindowsChild(systemTempRoot, candidate)) {
-      throw new Error("Windows security build output must be under the validated system temporary root");
+    if (typeof systemTempRoot !== "string" || !requestedBuildRoot || !isWindowsChild(systemTempRoot, candidate)) {
+      throw new Error("Windows security build output must be under the canonical validated system TEMP root");
     }
     return candidate;
   }
@@ -98,15 +98,16 @@ export function resolvePrimeAgentSecurityBuildRoot(projectRoot, requestedBuildRo
 export function resolvePrimeAgentSecurityWorkPaths(projectRoot, options = {}) {
   const platform = options.platform ?? process.platform;
   if (platform !== "win32") {
-    const root = resolve(projectRoot);
+    const root = posix.resolve(projectRoot);
     return {
-      sourceRoot: resolve(root, ".deps", "prime-agent"),
-      buildRoot: resolve(root, BUILD_DIRECTORY),
+      sourceRoot: posix.resolve(root, ".deps", "prime-agent"),
+      buildRoot: posix.resolve(root, BUILD_DIRECTORY),
     };
   }
-  const systemTempRoot = options.systemTempRoot ?? tmpdir();
+  const systemTempRoot = options.systemTempRoot;
   const privateTempRoot = options.privateTempRoot;
-  if (typeof privateTempRoot !== "string" || !isWindowsChild(systemTempRoot, privateTempRoot)) {
+  if (typeof systemTempRoot !== "string" || typeof privateTempRoot !== "string"
+    || !isWindowsChild(systemTempRoot, privateTempRoot)) {
     throw new Error("Windows Prime Agent security build requires a unique private temp root under system TEMP");
   }
   const sourceRoot = win32.join(win32.resolve(privateTempRoot), "source");
@@ -396,7 +397,8 @@ export async function verifyPrimeAgentSecurityBuildTree(projectRoot, buildRoot, 
   if (runGit(["status", "--porcelain", "--untracked-files=all"], source)) {
     throw new Error("pinned Prime Agent source checkout changed during the security build");
   }
-  const expectedBuildRoot = resolvePrimeAgentSecurityBuildRoot(root, buildRoot);
+  const systemTempRoot = process.platform === "win32" ? await realpath(tmpdir()) : undefined;
+  const expectedBuildRoot = resolvePrimeAgentSecurityBuildRoot(root, buildRoot, { systemTempRoot });
   if (!samePath(resolve(buildRoot), expectedBuildRoot)) {
     throw new Error("Prime Agent security build path does not match the pinned output location");
   }
@@ -410,7 +412,7 @@ export async function verifyPrimeAgentSecurityBuildTree(projectRoot, buildRoot, 
   };
 }
 
-export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSourceRoot, requestedBuildRoot) {
+export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSourceRoot, requestedBuildRoot, systemTempRoot) {
   const root = await assertSecureProjectRoot(projectRoot);
   const source = await assertSecureSourceRoot(pinnedSourceRoot, "pinned Prime Agent source");
   const expectedSource = assertExpectedSourceIdentity(source);
@@ -426,7 +428,7 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
   }
   const inputs = await loadReviewedInputs(root);
   const baseMarker = expectedMarker(inputs);
-  const buildRoot = resolvePrimeAgentSecurityBuildRoot(root, requestedBuildRoot);
+  const buildRoot = resolvePrimeAgentSecurityBuildRoot(root, requestedBuildRoot, { systemTempRoot });
   await removeExistingBuild(buildRoot, baseMarker);
 
   const overlay = await withGitAutocrlfDisabled(() => prepareDependencyOverlay(source, buildRoot, root));
@@ -486,8 +488,20 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const projectRoot = process.argv[2] ? resolve(process.argv[2]) : DEFAULT_PROJECT_ROOT;
-  const sourceRoot = process.argv[3] ? resolve(process.argv[3]) : resolve(projectRoot, ".deps", "prime-agent");
-  preparePrimeAgentSecurityBuildTree(projectRoot, sourceRoot)
+  const prepare = async () => {
+    const systemTempRoot = process.platform === "win32" ? await realpath(tmpdir()) : tmpdir();
+    const privateTempRoot = process.platform === "win32"
+      ? await mkdtemp(join(systemTempRoot, "sophos-prime-agent-security-"))
+      : undefined;
+    const paths = resolvePrimeAgentSecurityWorkPaths(projectRoot, {
+      platform: process.platform,
+      systemTempRoot,
+      privateTempRoot,
+    });
+    const sourceRoot = process.argv[3] ? resolve(process.argv[3]) : paths.sourceRoot;
+    return preparePrimeAgentSecurityBuildTree(projectRoot, sourceRoot, paths.buildRoot, systemTempRoot);
+  };
+  prepare()
     .then((result) => console.log(JSON.stringify(result, null, 2)))
     .catch((error) => {
       console.error(`Prime Agent security build preparation failed: ${error.message}`);

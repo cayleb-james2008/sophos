@@ -8,7 +8,7 @@
  * The build uses the checked-in generated model catalog; it does not call
  * provider/model-catalog APIs or require credentials.
  */
-import { cp, copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { cp, copyFile, mkdir, mkdtemp, readFile, realpath, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -191,19 +191,20 @@ async function main() {
     runNpm(["ci"], { cwd: WORKTREE, label: "Sophos locked dependency install (normal lifecycle)" });
   }
 
+  const systemTempRoot = process.platform === "win32" ? await realpath(tmpdir()) : tmpdir();
   const privateTempRoot = process.platform === "win32"
-    ? await mkdtemp(join(tmpdir(), "sophos-prime-agent-security-"))
+    ? await mkdtemp(join(systemTempRoot, "sophos-prime-agent-security-"))
     : undefined;
   const primePaths = resolvePrimeAgentSecurityWorkPaths(WORKTREE, {
     platform: process.platform,
-    systemTempRoot: tmpdir(),
+    systemTempRoot,
     privateTempRoot,
   });
   const primeSourceRoot = process.env.PRIME_AGENT_REF ?? primePaths.sourceRoot;
   const primeRefPath = resolvePrimeAgentRef(WORKTREE, primeSourceRoot);
   log("gray", "Prime Agent source:", relative(WORKTREE, primeRefPath) || primeRefPath);
   const primeSource = await ensurePrimeAgentRef(WORKTREE, primeSourceRoot);
-  const primeBuild = await preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path, primePaths.buildRoot);
+  const primeBuild = await preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path, primePaths.buildRoot, systemTempRoot);
   manifest.upstream = {
     repository: primeSource.repository,
     ref: primeSource.ref,
