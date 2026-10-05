@@ -292,7 +292,7 @@ The `bundle.mjs` manifest is written to `resources/.bundle-manifest.json` and re
 
 Flags: `--no-frontend`, `--no-bridge`, `--no-node-modules`, `--layout-check-only`, `--diagnostic`, `--help`.
 
-The Windows CI workflow is configured to load ZeroMQ, Koffi, and clipboard native addons using the bundled Windows Node binary, build the MSI through the guarded release entrypoint, then extract the MSI and byte-compare its packaged `resources/daemon/LICENSE` against the staged upstream MIT notice. Linux runs do not substitute for these Windows checks; they remain pending until that workflow runs on a Windows runner.
+The Windows CI workflow is configured to load ZeroMQ, Koffi, and the Windows clipboard addon using the bundled Windows Node binary, build the MSI through the guarded release entrypoint, then administratively extract the MSI and compare its `daemon/LICENSE` beside the installed `prime-agent-windows.exe` byte-for-byte with the staged upstream `resources/daemon/LICENSE`. These checks require a successful Windows runner; Linux results do not substitute for native or installer evidence.
 
 ### Environment variables
 

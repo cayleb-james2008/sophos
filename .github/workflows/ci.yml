@@ -60,7 +60,7 @@ jobs:
         run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs
 
       - name: Platform provenance and Tauri resource tests
-        run: node --test scripts/native-runtime-platform.test.mjs scripts/bundle-platform.test.mjs scripts/tauri-license-resource.test.mjs
+        run: node --test scripts/native-runtime-platform.test.mjs scripts/bundle-platform.test.mjs scripts/tauri-license-resource.test.mjs scripts/tauri-package-license.test.mjs
 
       # Build all ignored runtime inputs from a fresh checkout. The bundler
       # verifies the exact public Prime Agent tag/commit/license, performs
