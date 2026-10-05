@@ -127,6 +127,7 @@ export function preparePrimeAgentBuildTree(
   let created = true;
   try {
     runGit(["clone", "--quiet", "--shared", "--no-checkout", "--no-tags", source, overlayRoot], root);
+    runGit(["config", "core.autocrlf", "false"], overlayRoot);
     runGit(["checkout", "--quiet", "--detach", overlay.upstreamCommit], overlayRoot);
     runGit(["remote", "set-url", "origin", overlay.upstreamRepository], overlayRoot);
     if (runGit(["rev-parse", "HEAD"], overlayRoot) !== overlay.upstreamCommit) {

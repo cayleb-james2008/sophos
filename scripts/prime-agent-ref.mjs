@@ -56,9 +56,11 @@ export async function ensurePrimeAgentRef(projectRoot, override = process.env.PR
   await mkdir(dirname(root), { recursive: true });
   try {
     runGit([
-      "clone", "--depth", "1", "--branch", pin.ref, "--single-branch", "--no-recurse-submodules",
+      "clone", "--depth", "1", "--branch", pin.ref, "--single-branch", "--no-recurse-submodules", "--no-checkout",
       pin.repository, root,
     ], { cwd: projectRoot, quiet: false });
+    runGit(["config", "core.autocrlf", "false"], { cwd: root });
+    runGit(["checkout", "--quiet", "--detach", pin.commit], { cwd: root });
     return validatePrimeAgentRef(root, pin);
   } catch (error) {
     await rm(root, { recursive: true, force: true }).catch(() => {});

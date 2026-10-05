@@ -63,6 +63,11 @@ function createFixture(t) {
 
 test("the production overlay is bound to the public source and exact patch hashes", () => {
   const patchPath = join(process.cwd(), PRIME_AGENT_SESSION_LEASE_OVERLAY.patchPath);
+  const textAttribute = execFileSync("git", ["check-attr", "text", "--", PRIME_AGENT_SESSION_LEASE_OVERLAY.patchPath], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  }).trim();
+  assert.match(textAttribute, /: text: unset$/);
   assert.equal(PRIME_AGENT_SESSION_LEASE_OVERLAY.upstreamCommit, PRIME_AGENT_PIN.commit);
   assert.equal(PRIME_AGENT_SESSION_LEASE_OVERLAY.upstreamRepository, PRIME_AGENT_PIN.repository);
   assert.equal(PRIME_AGENT_SESSION_LEASE_OVERLAY.sourceSha256, "78ae066a92f101771875a9d566549761ab459aaa4c7f6ce1de087cc00a6e462a");
@@ -96,6 +101,23 @@ test("applies only to a separate build tree and leaves the pinned source clean",
   assert.equal(second.path, first.path);
   assert.equal(readFileSync(join(second.path, SESSION_LEASE_PATH), "utf8"), PATCHED_SOURCE);
   assert.equal(runGit(["status", "--porcelain", "--untracked-files=all"], fixture.sourceRoot), "");
+});
+
+test("checks out exact pinned source bytes when Git autocrlf is enabled", (t) => {
+  const fixture = createFixture(t);
+  const globalConfig = join(fixture.projectRoot, "global.gitconfig");
+  writeFileSync(globalConfig, "[core]\nautocrlf = true\n");
+  const previousGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
+  process.env.GIT_CONFIG_GLOBAL = globalConfig;
+  try {
+    assert.equal(runGit(["config", "--global", "core.autocrlf"], fixture.sourceRoot), "true");
+    const build = preparePrimeAgentBuildTree(fixture.projectRoot, fixture.sourceRoot, fixture);
+    assert.equal(readFileSync(join(build.path, SESSION_LEASE_PATH), "utf8"), PATCHED_SOURCE);
+    assert.equal(runGit(["status", "--porcelain", "--untracked-files=all"], fixture.sourceRoot), "");
+  } finally {
+    if (previousGlobalConfig === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+    else process.env.GIT_CONFIG_GLOBAL = previousGlobalConfig;
+  }
 });
 
 test("refuses a dirty pinned source tree before creating an overlay", (t) => {
