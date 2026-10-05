@@ -77,9 +77,17 @@ function runNpm(args, options = {}) {
   return run("npm", args, options);
 }
 
+async function verifyPrimeAgentBuildStage(projectRoot, primeAgentRoot, primeSourceRoot, stage) {
+  try {
+    return await verifyPrimeAgentSecurityBuildTree(projectRoot, primeAgentRoot, primeSourceRoot);
+  } catch (error) {
+    throw new Error(`Prime Agent security build verification failed after ${stage}: ${error.message}`);
+  }
+}
+
 async function buildPinnedDaemon(primeAgentRoot, primeSourceRoot) {
   runNpm(["ci"], { cwd: primeAgentRoot, label: "Prime Agent locked dependency install (normal lifecycle)" });
-  await verifyPrimeAgentSecurityBuildTree(WORKTREE, primeAgentRoot, primeSourceRoot);
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "npm ci");
   run(process.execPath, [
     join(primeAgentRoot, "node_modules", "vitest", "vitest.mjs"),
     "--run",
@@ -91,15 +99,20 @@ async function buildPinnedDaemon(primeAgentRoot, primeSourceRoot) {
     shell: false,
     label: "Prime Agent session-lease, Windows ZIP guard, and worker-shutdown fence regression tests",
   });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "Prime Agent regression tests");
   runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "tui"), label: "Prime Agent TUI build" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "TUI build");
   // pi-ai's normal build refreshes its model catalog from external vendor APIs.
   // Sophos uses the catalog committed at the pinned source revision instead.
   runNpm(["exec", "--prefix", ".", "--", "tsgo", "-p", "packages/ai/tsconfig.build.json"], {
     cwd: primeAgentRoot,
     label: "Prime Agent AI build (pinned checked-in catalog)",
   });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "AI build");
   runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "agent"), label: "Prime Agent agent-core build" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "agent-core build");
   runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "coding-agent"), label: "Prime Agent daemon build" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "daemon build");
 
   const daemonDist = join(primeAgentRoot, "packages", "coding-agent", "dist");
   requirePath(join(daemonDist, "cli.js"), "built Prime Agent daemon CLI");
@@ -298,7 +311,7 @@ async function main() {
       cwd: primeBuild.path,
       label: "Prime Agent production dependency tree (normal lifecycle)",
     });
-    await verifyPrimeAgentSecurityBuildTree(WORKTREE, primeBuild.path, primeSource.path);
+    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm prune --omit=dev");
     await cp(join(primeBuild.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
     await rm(join(stagedNodeModules, "@earendil-works"), { recursive: true, force: true });
     const upstreamPackages = await stageUpstreamPackages(primeBuild.path, stagedNodeModules);

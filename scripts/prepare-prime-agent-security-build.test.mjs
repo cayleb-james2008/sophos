@@ -146,13 +146,16 @@ test("the real bundle runs all composed Prime Agent security regression suites",
   assert.ok(bundleSource.includes('cwd: join(primeAgentRoot, "packages", "coding-agent")'));
   assert.ok(bundleSource.includes("shell: false"));
   assert.ok(bundleSource.includes("await buildPinnedDaemon(primeBuild.path, primeSource.path)"));
-  assert.ok(bundleSource.includes("verifyPrimeAgentSecurityBuildTree(WORKTREE, primeAgentRoot, primeSourceRoot)"));
+  assert.ok(bundleSource.includes("verifyPrimeAgentSecurityBuildTree(projectRoot, primeAgentRoot, primeSourceRoot)"));
   const install = bundleSource.indexOf('label: "Prime Agent locked dependency install (normal lifecycle)"');
-  const verify = bundleSource.indexOf("verifyPrimeAgentSecurityBuildTree(WORKTREE, primeAgentRoot, primeSourceRoot)");
+  const verify = bundleSource.indexOf('verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "npm ci")');
   const tests = bundleSource.indexOf('label: "Prime Agent session-lease, Windows ZIP guard, and worker-shutdown fence regression tests"');
   assert.ok(install >= 0 && verify > install && tests > verify, "build output is reverified after npm ci and before tests");
+  for (const stage of ["Prime Agent regression tests", "TUI build", "AI build", "agent-core build", "daemon build"]) {
+    assert.ok(bundleSource.includes(`verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "${stage}")`));
+  }
   const prune = bundleSource.indexOf('label: "Prime Agent production dependency tree (normal lifecycle)"');
-  const pruneVerify = bundleSource.indexOf("verifyPrimeAgentSecurityBuildTree(WORKTREE, primeBuild.path, primeSource.path)");
+  const pruneVerify = bundleSource.indexOf('verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm prune --omit=dev")');
   const stage = bundleSource.indexOf('await cp(join(primeBuild.path, "node_modules")');
   assert.ok(prune >= 0 && pruneVerify > prune && stage > pruneVerify, "source and patch provenance are reverified after npm prune before staging");
 });
@@ -249,4 +252,33 @@ test("build hash mismatch diagnostics identify only changed files and both hashe
     ),
     [{ file: "package-lock.json", expected: "expected-lock", actual: "actual-lock" }],
   );
+});
+
+test("build lock byte diagnostics report exact hashes, EOL counts, semantic equality and first byte change", async () => {
+  const { describeBuildInputBytes } = await import("./prepare-prime-agent-security-build.mjs");
+  assert.equal(typeof describeBuildInputBytes, "function");
+  const expected = Buffer.from('{"lock":1}\n');
+  const actual = Buffer.from('{"lock":1}\r\n');
+  const report = describeBuildInputBytes(expected, actual);
+  assert.deepEqual(report.expected, {
+    bytes: expected.length,
+    sha256: sha256(expected),
+    crBytes: 0,
+    lfBytes: 1,
+    crlfPairs: 0,
+  });
+  assert.deepEqual(report.actual, {
+    bytes: actual.length,
+    sha256: sha256(actual),
+    crBytes: 1,
+    lfBytes: 1,
+    crlfPairs: 1,
+  });
+  assert.equal(report.byteDifferences, 2);
+  assert.deepEqual(report.firstDifference, {
+    offset: expected.length - 1,
+    expectedByte: 0x0a,
+    actualByte: 0x0d,
+  });
+  assert.equal(report.jsonSemanticallyEqual, true);
 });

@@ -131,6 +131,51 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+export function describeBuildInputBytes(expectedBytes, actualBytes) {
+  if (!Buffer.isBuffer(expectedBytes) || !Buffer.isBuffer(actualBytes)) {
+    throw new TypeError("build input byte diagnostics require Buffer values");
+  }
+  const stats = (bytes) => {
+    let crBytes = 0;
+    let lfBytes = 0;
+    let crlfPairs = 0;
+    for (let index = 0; index < bytes.length; index += 1) {
+      if (bytes[index] === 0x0d) {
+        crBytes += 1;
+        if (bytes[index + 1] === 0x0a) crlfPairs += 1;
+      }
+      if (bytes[index] === 0x0a) lfBytes += 1;
+    }
+    return { bytes: bytes.length, sha256: sha256(bytes), crBytes, lfBytes, crlfPairs };
+  };
+  let firstDifference = null;
+  let byteDifferences = 0;
+  for (let offset = 0; offset < Math.max(expectedBytes.length, actualBytes.length); offset += 1) {
+    const expectedByte = offset < expectedBytes.length ? expectedBytes[offset] : null;
+    const actualByte = offset < actualBytes.length ? actualBytes[offset] : null;
+    if (expectedByte !== actualByte) {
+      byteDifferences += 1;
+      if (firstDifference === null) firstDifference = { offset, expectedByte, actualByte };
+    }
+  }
+  let jsonSemanticallyEqual = null;
+  try {
+    jsonSemanticallyEqual = isDeepStrictEqual(
+      JSON.parse(expectedBytes.toString("utf8")),
+      JSON.parse(actualBytes.toString("utf8")),
+    );
+  } catch {
+    // Raw-byte diagnostics remain useful when the changed input is not valid JSON.
+  }
+  return {
+    expected: stats(expectedBytes),
+    actual: stats(actualBytes),
+    byteDifferences,
+    firstDifference,
+    jsonSemanticallyEqual,
+  };
+}
+
 function runGit(args, cwd, input) {
   const result = spawnSync("git", args, {
     cwd,
@@ -290,6 +335,7 @@ async function loadReviewedInputs(projectRoot) {
   return {
     manifest,
     manifestSha256: EXPECTED.overlayManifestSha256,
+    lockBytes,
     lockSha256: sha256(lockBytes),
     leasePatchBytes,
     zipGuardPatchBytes,
@@ -348,7 +394,10 @@ export function describeBuildHashMismatches(actualHashes, expectedHashes) {
   });
 }
 
-async function assertBuildOutputFiles(buildRoot, marker = null) {
+async function assertBuildOutputFiles(buildRoot, marker = null, expectedLockBytes) {
+  if (!Buffer.isBuffer(expectedLockBytes)) {
+    throw new TypeError("Prime Agent build verification requires the canonical reviewed lock bytes");
+  }
   const provenance = assertExpectedSourceIdentity(buildRoot);
   const changedFiles = runGit(["diff", "--name-only"], buildRoot).split(/\r?\n/).filter(Boolean).sort();
   if (!isDeepStrictEqual(changedFiles, EXPECTED_TRACKED_CHANGES)) {
@@ -358,7 +407,13 @@ async function assertBuildOutputFiles(buildRoot, marker = null) {
     throw new Error("Prime Agent security build has unexpected staged files");
   }
   const packageJsonHash = await fileHash(buildRoot, "package.json");
-  const lockHash = await fileHash(buildRoot, "package-lock.json");
+  const lockPath = await assertRegularFileNoSymlink(
+    buildRoot,
+    ["package-lock.json"],
+    "Prime Agent build output package-lock.json",
+  );
+  const lockBytes = await readFile(lockPath);
+  const lockHash = sha256(lockBytes);
   const licenseHash = await fileHash(buildRoot, "LICENSE");
   const leaseSourceHash = await fileHash(buildRoot, PRIME_AGENT_SESSION_LEASE_OVERLAY.sourcePath);
   const inputHashMismatches = describeBuildHashMismatches(
@@ -376,9 +431,12 @@ async function assertBuildOutputFiles(buildRoot, marker = null) {
     },
   );
   if (inputHashMismatches.length > 0) {
-    const detail = inputHashMismatches
+    let detail = inputHashMismatches
       .map(({ file, expected, actual }) => `${file}: expected ${expected}, got ${actual}`)
       .join("; ");
+    if (inputHashMismatches.some(({ file }) => file === "package-lock.json")) {
+      detail += `; package-lock raw-byte diagnostics=${JSON.stringify(describeBuildInputBytes(expectedLockBytes, lockBytes))}`;
+    }
     throw new Error(`Prime Agent build input SHA-256 mismatch (${detail})`);
   }
   const sourceFileHashes = {};
@@ -392,7 +450,7 @@ async function assertBuildOutputFiles(buildRoot, marker = null) {
   return { provenance, packageJsonHash, lockHash, licenseHash, sourceFileHashes, changedFiles };
 }
 
-async function readExistingMarker(buildRoot, baseMarker) {
+async function readExistingMarker(buildRoot, baseMarker, expectedLockBytes) {
   await assertSecureSourceRoot(buildRoot, "existing Prime Agent security build output");
   const markerPath = await assertRegularFileNoSymlink(buildRoot, [BUILD_MARKER], "security build ownership marker");
   const marker = JSON.parse(await readFile(markerPath, "utf8"));
@@ -401,7 +459,7 @@ async function readExistingMarker(buildRoot, baseMarker) {
   if (!isDeepStrictEqual(markerBase, baseMarker)) {
     throw new Error(`refusing to replace an unowned or differently pinned Prime Agent security build at ${buildRoot}`);
   }
-  const { sourceFileHashes } = await assertBuildOutputFiles(buildRoot, marker);
+  const { sourceFileHashes } = await assertBuildOutputFiles(buildRoot, marker, expectedLockBytes);
   if (!isDeepStrictEqual(Object.keys(marker.sourceFileHashes ?? {}).sort(), [...ALLOWED_PATCH_OUTPUTS].sort())) {
     throw new Error("existing Prime Agent security build marker has unexpected patch outputs");
   }
@@ -414,13 +472,13 @@ async function readExistingMarker(buildRoot, baseMarker) {
   throw new Error("existing Prime Agent security build path changed during verification");
 }
 
-async function removeExistingBuild(buildRoot, baseMarker) {
+async function removeExistingBuild(buildRoot, baseMarker, expectedLockBytes) {
   if (!existsSync(buildRoot)) return;
   const details = await lstat(buildRoot);
   if (details.isSymbolicLink() || !details.isDirectory()) {
     throw new Error(`refusing to replace a symlink or non-directory security build output: ${buildRoot}`);
   }
-  const verified = await readExistingMarker(buildRoot, baseMarker);
+  const verified = await readExistingMarker(buildRoot, baseMarker, expectedLockBytes);
   const currentMarker = JSON.parse(await readFile(verified.markerPath, "utf8"));
   if (!isDeepStrictEqual(currentMarker, verified.marker)) {
     throw new Error("Prime Agent security build marker changed during verification");
@@ -446,7 +504,7 @@ export async function verifyPrimeAgentSecurityBuildTree(projectRoot, buildRoot, 
   }
   const inputs = await loadReviewedInputs(root);
   const baseMarker = expectedMarker(inputs);
-  const verified = await readExistingMarker(expectedBuildRoot, baseMarker);
+  const verified = await readExistingMarker(expectedBuildRoot, baseMarker, inputs.lockBytes);
   return {
     path: expectedBuildRoot,
     sourceFileHashes: verified.sourceFileHashes,
@@ -471,7 +529,7 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
   const inputs = await loadReviewedInputs(root);
   const baseMarker = expectedMarker(inputs);
   const buildRoot = resolvePrimeAgentSecurityBuildRoot(root, requestedBuildRoot, { systemTempRoot });
-  await removeExistingBuild(buildRoot, baseMarker);
+  await removeExistingBuild(buildRoot, baseMarker, inputs.lockBytes);
 
   const overlay = await withGitAutocrlfDisabled(() => prepareDependencyOverlay(source, buildRoot, root));
   try {
@@ -490,7 +548,7 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
       { name: "worker-shutdown-fence", bytes: inputs.workerShutdownFencePatchBytes, sha256: EXPECTED.workerShutdownFencePatchSha256, unidiffZero: false },
     ];
     applyReviewedSourcePatches(buildRoot, patches);
-    const output = await assertBuildOutputFiles(buildRoot);
+    const output = await assertBuildOutputFiles(buildRoot, null, inputs.lockBytes);
     const marker = withBuildMarker(baseMarker, output.sourceFileHashes);
     const markerPath = resolve(buildRoot, BUILD_MARKER);
     await writeFile(markerPath, `${JSON.stringify(marker, null, 2)}\n`, { flag: "wx", mode: 0o600 });
