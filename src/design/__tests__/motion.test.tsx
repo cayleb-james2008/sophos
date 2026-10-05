@@ -1,7 +1,6 @@
 // motion.test.tsx — the dependency-free motion layer. Transitions are CSS
 // keyframe classes plus timing via CSS custom properties; Stagger fans out a
-// per-child delay. All of it honors prefers-reduced-motion (no animation class,
-// zero stagger).
+// per-child delay. Reduced motion suppresses animation while retaining layout.
 
 import { render, screen, renderHook, act } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -149,22 +148,24 @@ describe("Stagger / StaggerItem", () => {
 });
 
 describe("ViewTransition", () => {
-  it("applies the view-transition class and uses transitionKey as the React key", () => {
+  it("keeps layout sizing and applies the animation class when motion is allowed", () => {
     const { container } = render(
       <ViewTransition transitionKey="chat">
         <div>view</div>
       </ViewTransition>,
     );
     expect(container.firstChild).toHaveClass("pa-view-transition");
+    expect(container.firstChild).toHaveClass("pa-view-transition--animated");
   });
 
-  it("is suppressed under reduced motion", () => {
+  it("preserves layout sizing but suppresses animation under reduced motion", () => {
     mockMatchMedia(true);
     const { container } = render(
       <ViewTransition transitionKey="chat">
         <div>view</div>
       </ViewTransition>,
     );
-    expect(container.firstChild).not.toHaveClass("pa-view-transition");
+    expect(container.firstChild).toHaveClass("pa-view-transition");
+    expect(container.firstChild).not.toHaveClass("pa-view-transition--animated");
   });
 });
