@@ -12,7 +12,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -48,13 +48,28 @@ function terminateProcessTree(proc) {
   try { proc.kill("SIGTERM"); } catch {}
 }
 
+function terminateSupervisorOnly(proc) {
+  if (!proc?.pid || proc.exitCode !== null) return;
+  if (process.platform === "win32") {
+    try {
+      // Deliberately omit /T: the Windows worker is not detached, but it must
+      // survive a supervisor-only restart so the replacement can adopt it.
+      execFileSync("taskkill", ["/PID", String(proc.pid), "/F"], { stdio: "ignore" });
+    } catch {
+      // The process may have exited between the check and taskkill.
+    }
+    return;
+  }
+  try { proc.kill("SIGTERM"); } catch {}
+}
+
 function record(label, ok, detail) {
   results.push({ label, ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"}  ${label}${detail ? " — " + detail : ""}`);
 }
 
 async function waitForExit(proc, timeoutMs = 5000) {
-  if (!proc || proc.exitCode !== null) return true;
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) return true;
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(false), timeoutMs);
     proc.once("exit", () => {
@@ -94,13 +109,42 @@ async function run() {
   let daemon = firstDaemon.proc;
   const daemonDiagnostics = [...firstDaemon.diagnostics];
   let bridge;
-  const cleanup = () => {
+  const forceCleanup = () => {
     try { bridge?.stdin.end(); } catch {}
     terminateProcessTree(bridge);
     terminateProcessTree(daemon);
   };
+  async function shutdownDaemonGracefully() {
+    const daemonLaunchUrl = pathToFileURL(join(REF_ROOT, "dist", "cli", "daemon-launch.js")).href;
+    const { shutdownDaemonAndWait } = await import(daemonLaunchUrl);
+    return shutdownDaemonAndWait(SOCKET_PATH, 10000);
+  }
+  const cleanup = async () => {
+    try { bridge?.stdin.end(); } catch {}
+    let bridgeStopped = !bridge || bridge.exitCode !== null || bridge.signalCode !== null;
+    if (!bridgeStopped) bridgeStopped = await waitForExit(bridge, 5000);
+    if (!bridgeStopped) {
+      terminateProcessTree(bridge);
+      bridgeStopped = await waitForExit(bridge, 1000);
+    }
+
+    let daemonStopped = false;
+    let daemonProcessStopped = !daemon || daemon.exitCode !== null || daemon.signalCode !== null;
+    let shutdownError;
+    try {
+      daemonStopped = await shutdownDaemonGracefully();
+      if (daemonStopped) daemonProcessStopped = await waitForExit(daemon, 5000);
+    } catch (error) {
+      shutdownError = error instanceof Error ? error.message : String(error);
+    }
+    if (!daemonStopped || !daemonProcessStopped) {
+      terminateProcessTree(daemon);
+      daemonProcessStopped = await waitForExit(daemon, 5000);
+    }
+    return { bridgeStopped, daemonStopped: daemonStopped && daemonProcessStopped, shutdownError };
+  };
   const onSignal = () => {
-    cleanup();
+    forceCleanup();
     process.exit(130);
   };
   process.once("SIGINT", onSignal);
@@ -111,7 +155,9 @@ async function run() {
     });
   } catch (err) {
     record("spawn bridge", false, err.message);
-    cleanup();
+    const cleanupState = await cleanup();
+    record("graceful shutdown releases the isolated session HOME", cleanupState.daemonStopped && cleanupState.bridgeStopped,
+      `daemonStopped=${cleanupState.daemonStopped}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     return;
@@ -371,7 +417,7 @@ async function run() {
 
     if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {
       const oldDaemon = daemon;
-      terminateProcessTree(oldDaemon);
+      terminateSupervisorOnly(oldDaemon);
       const exited = await waitForExit(oldDaemon);
       daemon = undefined;
       record("session-recovery daemon exits before replacement", exited);
@@ -420,7 +466,10 @@ async function run() {
   } catch (err) {
     record("test harness", false, err.message);
   } finally {
-    cleanup();
+    const cleanupState = await cleanup();
+    record("graceful daemon shutdown releases adopted session workers before HOME removal",
+      cleanupState.daemonStopped && cleanupState.bridgeStopped,
+      `daemonStopped=${cleanupState.daemonStopped}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
   }

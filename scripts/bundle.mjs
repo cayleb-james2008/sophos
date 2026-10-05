@@ -15,6 +15,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ensureNodeRuntime } from "./node-runtime.mjs";
 import { ensurePrimeAgentRef, resolvePrimeAgentRef } from "./prime-agent-ref.mjs";
+import { preparePrimeAgentBuildTree } from "./apply-prime-agent-overlay.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "./runtime-pins.mjs";
 import { validateDaemonRuntimePackage } from "./daemon-runtime-package.mjs";
 
@@ -160,17 +161,20 @@ async function main() {
 
   const primeRefPath = resolvePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
   log("gray", "Prime Agent source:", relative(WORKTREE, primeRefPath) || primeRefPath);
-  const primeRef = await ensurePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
+  const primeSource = await ensurePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
+  const primeBuild = preparePrimeAgentBuildTree(WORKTREE, primeSource.path);
   manifest.upstream = {
-    repository: primeRef.repository,
-    ref: primeRef.ref,
-    commit: primeRef.commit,
-    version: primeRef.version,
-    license: primeRef.license,
-    sourceDirectory: relative(WORKTREE, primeRef.path) || ".",
+    repository: primeSource.repository,
+    ref: primeSource.ref,
+    commit: primeSource.commit,
+    version: primeSource.version,
+    license: primeSource.license,
+    sourceDirectory: relative(WORKTREE, primeSource.path) || ".",
+    buildDirectory: relative(WORKTREE, primeBuild.path) || ".",
+    overlay: primeBuild.provenance,
   };
 
-  const daemonDist = await buildPinnedDaemon(primeRef.path);
+  const daemonDist = await buildPinnedDaemon(primeBuild.path);
 
   const frontendDist = join(WORKTREE, "dist");
   if (!flags.has("--no-frontend")) {
@@ -189,6 +193,10 @@ async function main() {
   const bridgeDist = join(BRIDGE_DIR, "dist");
   if (!flags.has("--no-bridge")) {
     runNpm(["ci"], { cwd: BRIDGE_DIR, label: "bridge locked dependency install (normal lifecycle)" });
+    // The bridge's file dependencies intentionally point at the clean source
+    // checkout. Compile against corresponding packages built from the overlay,
+    // without modifying that immutable source checkout.
+    await stageUpstreamPackages(primeBuild.path, join(BRIDGE_DIR, "node_modules"));
     runNpm(["run", "build"], { cwd: BRIDGE_DIR, label: "bridge TypeScript build" });
   } else {
     log("yellow", "reusing bridge/dist (--no-bridge)");
@@ -201,9 +209,9 @@ async function main() {
   await mkdir(join(RESOURCES, "daemon"), { recursive: true });
   const daemonRuntimeManifest = JSON.parse(await readFile(join(RESOURCES, "daemon", "package.json"), "utf8"));
   validateDaemonRuntimePackage(daemonRuntimeManifest, PRIME_AGENT_PIN);
-  await copyFile(join(primeRef.path, "LICENSE"), join(RESOURCES, "daemon", "LICENSE"));
+  await copyFile(join(primeSource.path, "LICENSE"), join(RESOURCES, "daemon", "LICENSE"));
   record("daemon", {
-    source: `${manifest.upstream.sourceDirectory}/packages/coding-agent/dist`,
+    source: `${manifest.upstream.buildDirectory}/packages/coding-agent/dist`,
     dest: "resources/daemon/dist",
     version: PRIME_AGENT_PIN.version,
     license: PRIME_AGENT_PIN.license,
@@ -244,12 +252,12 @@ async function main() {
     // bridge install. Preserve the exact upstream lockfile's production graph
     // separately, then replace its workspace links with built package files.
     runNpm(["prune", "--omit=dev"], {
-      cwd: primeRef.path,
+      cwd: primeBuild.path,
       label: "Prime Agent production dependency tree (normal lifecycle)",
     });
-    await cp(join(primeRef.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
+    await cp(join(primeBuild.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
     await rm(join(stagedNodeModules, "@earendil-works"), { recursive: true, force: true });
-    const upstreamPackages = await stageUpstreamPackages(primeRef.path, stagedNodeModules);
+    const upstreamPackages = await stageUpstreamPackages(primeBuild.path, stagedNodeModules);
     record("node_modules", {
       source: "pinned Prime Agent production lockfile plus bridge runtime packages",
       dest: "resources/node_modules/",
