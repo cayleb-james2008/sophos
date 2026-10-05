@@ -193,6 +193,10 @@ async function main() {
   const bridgeDist = join(BRIDGE_DIR, "dist");
   if (!flags.has("--no-bridge")) {
     runNpm(["ci"], { cwd: BRIDGE_DIR, label: "bridge locked dependency install (normal lifecycle)" });
+    // The bridge's file dependencies intentionally point at the clean source
+    // checkout. Compile against corresponding packages built from the overlay,
+    // without modifying that immutable source checkout.
+    await stageUpstreamPackages(primeBuild.path, join(BRIDGE_DIR, "node_modules"));
     runNpm(["run", "build"], { cwd: BRIDGE_DIR, label: "bridge TypeScript build" });
   } else {
     log("yellow", "reusing bridge/dist (--no-bridge)");

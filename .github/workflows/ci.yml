@@ -54,7 +54,7 @@ jobs:
         run: node verify/live-feed.mjs
 
       - name: Runtime helper and fail-closed gate regression tests
-        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs
+        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs scripts/bundle.test.mjs
 
       # Build all ignored runtime inputs from a fresh checkout. The bundler
       # verifies the exact public Prime Agent tag/commit/license, performs
