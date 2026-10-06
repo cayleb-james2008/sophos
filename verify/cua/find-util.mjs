@@ -36,12 +36,13 @@ function indexedScrollTarget(node, byIndex) {
 }
 
 /**
- * Resolve a named semantic region to an indexed UIA scroll target. WebView2
- * may render `role=region` as an unindexed Group in `tree_markdown`; when no
- * indexed scrollable descendant exists, the nearest indexed scrollable
- * ancestor (often the Document) is the actionable path to bring the region on
- * screen. Return the structured element from this same snapshot so callers use
- * its native frame and verified scroll action rather than guessing bounds from text.
+ * Resolve a named semantic region to an indexed UIA element that advertises a
+ * scroll action. WebView2 may render `role=region` as an unindexed Group in
+ * `tree_markdown`; when no indexed scrollable descendant exists, the nearest
+ * indexed scrollable ancestor (often the Document) is the native action path.
+ * This action element is not necessarily a valid pointer hit target: its frame
+ * may be outside the named region, so use a same-snapshot descendant's frame
+ * for the wheel coordinates.
  */
 export function findNamedRegionScrollElement(windowState, regionName) {
   const lines = String(windowState?.tree_markdown ?? "").split(/\r?\n/);
@@ -79,6 +80,47 @@ export function findNamedRegionScrollElement(windowState, regionName) {
   for (let i = ancestors.length - 1; i >= 0; i -= 1) {
     const element = indexedScrollTarget(ancestors[i], byIndex);
     if (element) return element;
+  }
+  return undefined;
+}
+
+/**
+ * Find a structured element that is actually inside a named native-tree
+ * region. A scrollable ancestor such as the WebView Document may be actionable
+ * but its center can lie in an unrelated sibling panel; callers can use this
+ * element's frame as an in-region pointer target for wheel input. Returns the
+ * first tree-order match; callers must validate its native frame and fail
+ * closed when it is missing or outside the window rather than guessing.
+ */
+export function findNamedRegionDescendantElement(windowState, regionName, criteria = {}) {
+  const lines = String(windowState?.tree_markdown ?? "").split(/\r?\n/);
+  const byIndex = new Map();
+  for (const element of windowState?.elements ?? []) {
+    const index = Number(element.element_index);
+    if (Number.isInteger(index) && !byIndex.has(index)) byIndex.set(index, element);
+  }
+
+  let regionIndent = null;
+  const textNeedle = criteria.text ? String(criteria.text).toLowerCase() : null;
+  for (const line of lines) {
+    const node = parseTreeNode(line);
+    if (!node) continue;
+
+    if (regionIndent === null) {
+      if (["Group", "Pane", "Region"].includes(node.role) && node.label === regionName) {
+        regionIndent = node.indent;
+      }
+      continue;
+    }
+
+    if (node.indent <= regionIndent) break;
+    if (node.index == null) continue;
+    const element = byIndex.get(node.index);
+    if (!element) continue;
+    if (criteria.role && element.role !== criteria.role) continue;
+    if (criteria.name && element.label !== criteria.name) continue;
+    if (textNeedle && !String(element.label ?? "").toLowerCase().includes(textNeedle)) continue;
+    return element;
   }
   return undefined;
 }

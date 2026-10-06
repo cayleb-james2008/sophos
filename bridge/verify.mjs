@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
+import { getSessionRecoveryAssertions } from "./session-recovery-readiness.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REF_ROOT = resolve(
@@ -667,18 +668,69 @@ async function run() {
         `oldPid=${oldSupervisorIdentity.pid ?? "unknown"} newPid=${replacementIdentity.pid ?? "unknown"}`);
       const connectedAfterReplacement = () => events.slice(reconnectingStart)
         .some((e) => e.type === "connection_status" && e.status.kind === "connected");
-      while (replacementReady && Date.now() < recoveryDeadline && !connectedAfterReplacement()) {
-        await sleep(50);
+      const recoveryPollStarted = Date.now();
+      let connectedEventObservedAt;
+      let stateAfterReconnect;
+      let stateAfterReconnectObservedAt;
+      let listedAfterReconnect;
+      let listedAfterReconnectObservedAt;
+      let recoveryPollCount = 0;
+      while (replacementReady && createdSessionListing?.id && Date.now() < recoveryDeadline) {
+        if (!connectedAfterReplacement()) {
+          await sleep(50);
+          continue;
+        }
+        connectedEventObservedAt ??= Date.now();
+        if (Date.now() >= recoveryDeadline) break;
+        recoveryPollCount += 1;
+        stateAfterReconnect = await send({ id: `c33-${recoveryPollCount}`, method: "getState", params: {} });
+        stateAfterReconnectObservedAt = Date.now();
+        if (Date.now() >= recoveryDeadline) break;
+        listedAfterReconnect = await send({ id: `c34-${recoveryPollCount}`, method: "listSessions", params: {} });
+        listedAfterReconnectObservedAt = Date.now();
+        if (getSessionRecoveryAssertions({
+          connectedEventObservedAt,
+          state: stateAfterReconnect.result,
+          stateObservedAt: stateAfterReconnectObservedAt,
+          sessions: listedAfterReconnect.result,
+          sessionsObservedAt: listedAfterReconnectObservedAt,
+          recoveryDeadline,
+          expectedActiveSessionId: createdSessionId,
+          expectedSessionListingId: createdSessionListing.id,
+        }).ready) break;
+        if (Date.now() < recoveryDeadline) await sleep(250);
       }
-      const reconnectEventSeen = Date.now() < recoveryDeadline && connectedAfterReplacement();
-      const stateAfterReconnect = await send({ id: "c33", method: "getState", params: {} });
+      if (!connectedEventObservedAt && Date.now() < recoveryDeadline && connectedAfterReplacement()) {
+        connectedEventObservedAt = Date.now();
+      }
+      if (!stateAfterReconnect && Date.now() < recoveryDeadline) {
+        stateAfterReconnect = await send({ id: "c33-final", method: "getState", params: {} });
+        stateAfterReconnectObservedAt = Date.now();
+      }
+      if (!listedAfterReconnect && Date.now() < recoveryDeadline) {
+        listedAfterReconnect = await send({ id: "c34-final", method: "listSessions", params: {} });
+        listedAfterReconnectObservedAt = Date.now();
+      }
+      const recoveryElapsedMs = Date.now() - recoveryPollStarted;
+      const recoveryAssertions = getSessionRecoveryAssertions({
+        connectedEventObservedAt,
+        state: stateAfterReconnect?.result,
+        stateObservedAt: stateAfterReconnectObservedAt,
+        sessions: listedAfterReconnect?.result,
+        sessionsObservedAt: listedAfterReconnectObservedAt,
+        recoveryDeadline,
+        expectedActiveSessionId: createdSessionId,
+        expectedSessionListingId: createdSessionListing?.id,
+      });
+      const connectedEventDelayMs = Number.isFinite(connectedEventObservedAt) ? connectedEventObservedAt - recoveryPollStarted : "none";
+      const stateObservedDelayMs = Number.isFinite(stateAfterReconnectObservedAt) ? stateAfterReconnectObservedAt - recoveryPollStarted : "none";
+      const sessionsObservedDelayMs = Number.isFinite(listedAfterReconnectObservedAt) ? listedAfterReconnectObservedAt - recoveryPollStarted : "none";
       record("created session remains connected and active after supervisor replacement",
-        reconnectEventSeen && stateAfterReconnect.result?.status?.kind === "connected" && stateAfterReconnect.result?.activeSessionId === createdSessionId,
-        `connectedEvent=${reconnectEventSeen} status=${stateAfterReconnect.result?.status?.kind} active=${stateAfterReconnect.result?.activeSessionId} expected=${createdSessionId}`);
-      const listedAfterReconnect = await send({ id: "c34", method: "listSessions", params: {} });
+        recoveryAssertions.activeSessionReady,
+        `connectedEvent=${recoveryAssertions.connectedEventSeen} status=${stateAfterReconnect?.result?.status?.kind ?? "not-sampled"} active=${stateAfterReconnect?.result?.activeSessionId ?? "not-sampled"} expected=${createdSessionId} polls=${recoveryPollCount} elapsedMs=${recoveryElapsedMs} connectedAtMs=${connectedEventDelayMs} stateAtMs=${stateObservedDelayMs}`);
       record("created session remains listed after daemon replacement",
-        Array.isArray(listedAfterReconnect.result) && listedAfterReconnect.result.some((session) => session.id === createdSessionListing?.id),
-        `listed=${Array.isArray(listedAfterReconnect.result) ? listedAfterReconnect.result.some((session) => session.id === createdSessionListing?.id) : false}`);
+        recoveryAssertions.listedSessionReady,
+        `listed=${Array.isArray(listedAfterReconnect?.result) ? listedAfterReconnect.result.some((session) => session.id === createdSessionListing?.id) : false} polls=${recoveryPollCount} elapsedMs=${recoveryElapsedMs} sessionsAtMs=${sessionsObservedDelayMs}`);
       const transcriptAfterReconnect = await send({ id: "c35", method: "getTranscript", params: {} });
       record("created session transcript remains retrievable after daemon replacement",
         Array.isArray(transcriptAfterReconnect.result),

@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findNamedRegionScrollElement } from "./find-util.mjs";
+import * as findUtil from "./find-util.mjs";
+
+const { findNamedRegionScrollElement } = findUtil;
 
 test("maps an unindexed named region to its indexed native scroll pane", () => {
   const state = {
@@ -101,4 +103,111 @@ test("does not select a scroll pane from a following sibling subtree", () => {
   };
 
   assert.equal(findNamedRegionScrollElement(state, "Named region"), undefined);
+});
+
+test("resolves a pointer target from inside the named region, not the document center or a sibling", () => {
+  const threadHeader = {
+    element_index: 109,
+    role: "Text",
+    label: "THREAD / ",
+    frame: { x: 830, y: 760, w: 80, h: 12 },
+    actions: ["text"],
+  };
+  const siblingHeader = {
+    element_index: 130,
+    role: "Text",
+    label: "THREAD / unrelated",
+    frame: { x: 500, y: 760, w: 80, h: 12 },
+    actions: ["text"],
+  };
+  const agentId = {
+    element_index: 110,
+    role: "Text",
+    label: "RLM-1",
+    frame: { x: 900, y: 760, w: 40, h: 12 },
+    actions: ["text"],
+  };
+  const state = {
+    tree_markdown: [
+      "- [0] Document [actions=[scroll]]",
+      '  - Group "Agent coordination thread"',
+      '    - [109] Text "THREAD / " [actions=[text]]',
+      '    - [110] Text "RLM-1" [actions=[text]]',
+      '    - [123] Button "Composition" [actions=[expand]]',
+      '  - Group "Adjacent inspector"',
+      '    - [130] Text "THREAD / unrelated" [actions=[text]]',
+    ].join("\n"),
+    elements: [threadHeader, agentId, siblingHeader],
+  };
+
+  const pointerTarget = findUtil.findNamedRegionDescendantElement(
+    state,
+    "Agent coordination thread",
+    { role: "Text", text: "THREAD /" },
+  );
+  assert.equal(pointerTarget, threadHeader);
+});
+
+test("does not resolve a matching tree descendant absent from the structured element array", () => {
+  const state = {
+    tree_markdown: [
+      '- Group "Agent coordination thread"',
+      '  - [109] Text "THREAD / " [actions=[text]]',
+    ].join("\n"),
+    elements: [],
+  };
+
+  assert.equal(
+    findUtil.findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", text: "THREAD /" }),
+    undefined,
+  );
+});
+
+test("does not resolve a matching structured element when its named region is absent", () => {
+  const state = {
+    tree_markdown: [
+      '- Group "Other region"',
+      '  - [109] Text "THREAD / " [actions=[text]]',
+    ].join("\n"),
+    elements: [{ element_index: 109, role: "Text", label: "THREAD / " }],
+  };
+
+  assert.equal(
+    findUtil.findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", text: "THREAD /" }),
+    undefined,
+  );
+});
+
+test("applies the requested role to indexed descendants inside the named region", () => {
+  const state = {
+    tree_markdown: [
+      '- Group "Agent coordination thread"',
+      '  - [109] Text "THREAD / " [actions=[text]]',
+    ].join("\n"),
+    elements: [{ element_index: 109, role: "Text", label: "THREAD / " }],
+  };
+
+  assert.equal(
+    findUtil.findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Button", text: "THREAD /" }),
+    undefined,
+  );
+});
+
+test("applies exact-name and substring-text criteria to indexed descendants", () => {
+  const state = {
+    tree_markdown: [
+      '- Group "Agent coordination thread"',
+      '  - [109] Text "THREAD / " [actions=[text]]',
+    ].join("\n"),
+    elements: [{ element_index: 109, role: "Text", label: "THREAD / " }],
+  };
+
+  assert.equal(
+    findUtil.findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", name: "different label" }),
+    undefined,
+  );
+  assert.equal(
+    findUtil.findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", text: "does not occur" }),
+    undefined,
+  );
 });

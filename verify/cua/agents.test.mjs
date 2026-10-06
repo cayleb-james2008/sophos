@@ -14,7 +14,14 @@
 
 import { getWindowState, sleep, typeText, scroll } from "./driver.mjs";
 import { navTo, takeScreenshot, elementCenter } from "./helpers.mjs";
-import { findBy, clickBy, waitFor, clickRightmost, findNamedRegionScrollElement } from "./find-util.mjs";
+import {
+  findBy,
+  clickBy,
+  waitFor,
+  clickRightmost,
+  findNamedRegionDescendantElement,
+  findNamedRegionScrollElement,
+} from "./find-util.mjs";
 import { assert, assertTextContains, assertElementNotVisible } from "./assertions.mjs";
 import { runDemoSuite } from "./demo-runner.mjs";
 
@@ -162,15 +169,43 @@ const tests = [
         Number(scrollTarget.frame?.w) > 0 && Number(scrollTarget.frame?.h) > 0,
         "Agent coordination thread scroll target has no native bounds",
       );
-      const scrollPoint = elementCenter(scrollTarget, scrollState);
+      // The actionable ancestor can be the WebView Document, whose center is
+      // over the fleet graph rather than this nested detail pane. Use an
+      // indexed descendant of the named region as the native wheel hit point.
+      // Nonzero bounds and an in-window center validate coordinates only; the
+      // post-input native CUA assertions require Composition to become visible.
+      const pointerTarget = findNamedRegionDescendantElement(
+        scrollState,
+        "Agent coordination thread",
+        { role: "Text", text: "THREAD /" },
+      );
+      assert(pointerTarget, "Agent coordination thread has no indexed thread-header pointer target");
+      assert(
+        Number(pointerTarget.frame?.w) > 0 && Number(pointerTarget.frame?.h) > 0,
+        "Agent coordination thread pointer target has no native bounds",
+      );
+      const scrollPoint = elementCenter(pointerTarget, scrollState);
       assert(
         scrollPoint.x >= 0 && scrollPoint.y >= 0 &&
           scrollPoint.x < scrollState.screenshot_width && scrollPoint.y < scrollState.screenshot_height,
-        `Agent coordination thread scroll target is outside the window (${scrollPoint.x}, ${scrollPoint.y})`,
+        `Agent coordination thread pointer target is outside the window (${scrollPoint.x}, ${scrollPoint.y})`,
       );
+      console.log("[AGENT-COMPOSITION-UIA-SCROLL]", JSON.stringify({
+        actionTarget: {
+          element_index: scrollTarget.element_index,
+          role: scrollTarget.role,
+          frame: scrollTarget.frame,
+        },
+        pointerTarget: {
+          element_index: pointerTarget.element_index,
+          role: pointerTarget.role,
+          frame: pointerTarget.frame,
+          point: scrollPoint,
+        },
+      }));
       scroll(appHandle.pid, "down", 5, appHandle.windowId, { x: scrollPoint.x, y: scrollPoint.y });
       await sleep(350);
-      takeScreenshot(appHandle.pid, "agents-composition-control-visible", appHandle.windowId);
+      takeScreenshot(appHandle.pid, "agents-composition-control-after-scroll", appHandle.windowId);
 
       const scrolled = await waitFor(scrollState, { text: "Composition" }, 8000);
       assert(scrolled, "Composition control did not appear after scrolling the Agent coordination thread");
