@@ -135,10 +135,9 @@ jobs:
 
   # cua-e2e drives the real Tauri release executable through UI Automation
   # (verify/cua/*), using the disclosed demo IPC path (no provider inference).
-  # The exact-head raw log shows the installed CUA_DRIVER_BIN was present; seven
-  # suites then failed because pixel clicks lacked same-session screenshot
-  # context, and Chat used a hard-coded developer checkout path. Keep this gate
-  # blocking and upload its screenshots even on failure.
+  # The screenshot directory includes checked-in baseline frames, so clear it
+  # in the secure clone before execution; uploaded artifacts then contain only
+  # frames produced by this current CUA attempt. Keep the gate blocking.
   cua-e2e:
     runs-on: windows-latest
 
@@ -228,6 +227,18 @@ jobs:
           if ($driverExit -ne 0) { throw "Installed cua-driver version probe failed (exit $driverExit): $driverBin" }
           Add-Content -LiteralPath $env:GITHUB_ENV -Value "CUA_DRIVER_BIN=$driverBin"
           Write-Output "Configured CUA_DRIVER_BIN=$driverBin ($versionOutput)"
+
+      - name: Clear checked-in screenshots before CUA run
+        shell: pwsh
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $screenshotDir = Join-Path (Get-Location).Path 'verify/cua/screenshots'
+          if (Test-Path -LiteralPath $screenshotDir) {
+            Remove-Item -LiteralPath $screenshotDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null
+          Write-Output 'Prepared an empty current-run screenshot directory'
 
       - name: Run cua-driver e2e suite
         # Keep failures blocking; a green result must mean all native UI suites ran.

@@ -247,3 +247,328 @@ test("pixel clicks fail closed without a window ID for screenshot context", () =
   );
   assert.deepEqual(calls, [], "no coordinate click may be sent without a screenshot-addressable window");
 });
+
+function runIsolatedCuaScript(script) {
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    encoding: "utf-8",
+    env: { ...process.env, CUA_DRIVER_BIN: "__pr11_test_stub_never_execute__" },
+    windowsHide: true,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout.trim());
+}
+
+test("hotkey fallback retries once with foreground only on structured background refusal", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    const calls = [];
+    childProcess.spawnSync = (_binary, argv, options) => {
+      const args = JSON.parse(options.input);
+      calls.push({ tool: argv[1], args });
+      if (calls.length === 1) {
+        return { status: 1, stdout: "", stderr: JSON.stringify({ code: "background_unavailable" }) };
+      }
+      return { status: 0, stdout: JSON.stringify({ accepted: true }), stderr: "" };
+    };
+    syncBuiltinESMExports();
+    const driver = await import(${JSON.stringify(driverUrl)});
+    try {
+      const value = driver.callWithForegroundFallback("hotkey", { pid: 930101, keys: ["alt", "enter"] });
+      console.log(JSON.stringify({ value, calls }));
+    } catch (error) {
+      console.log(JSON.stringify({ error: error.message, calls }));
+    }
+  `);
+
+  assert.equal(output.error, undefined, JSON.stringify(output.error));
+  assert.deepEqual(output.value, { accepted: true });
+  assert.equal(output.calls.length, 2);
+  assert.equal(output.calls[0].args.delivery_mode, undefined);
+  assert.equal(output.calls[1].args.delivery_mode, "foreground");
+});
+
+test("hotkey fallback does not escalate on a different structured refusal", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    const calls = [];
+    childProcess.spawnSync = (_binary, argv, options) => {
+      calls.push({ tool: argv[1], args: JSON.parse(options.input) });
+      return { status: 1, stdout: "", stderr: JSON.stringify({ refusal: { code: "stale_element_token" } }) };
+    };
+    syncBuiltinESMExports();
+    const driver = await import(${JSON.stringify(driverUrl)});
+    try {
+      driver.callWithForegroundFallback("hotkey", { pid: 930111, keys: ["ctrl", "k"] });
+      console.log(JSON.stringify({ calls }));
+    } catch (error) {
+      console.log(JSON.stringify({ error: error.message, calls }));
+    }
+  `);
+
+  assert.match(output.error, /stale_element_token/);
+  assert.equal(output.calls.length, 1);
+  assert.equal(output.calls[0].args.delivery_mode, undefined);
+});
+
+test("clickBy refreshes the UIA snapshot and re-finds a stale element once", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const findUtilUrl = new URL("./find-util.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    const calls = [];
+    childProcess.spawnSync = (_binary, argv, options) => {
+      const tool = argv[1];
+      const args = JSON.parse(options.input);
+      calls.push({ tool, args });
+      if (tool === "click" && args.element_token === "expired-token") {
+        return {
+          status: 1,
+          stdout: "",
+          stderr: JSON.stringify({ refusal: { code: "stale_element_token" } }),
+        };
+      }
+      if (tool === "get_window_state") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            pid: args.pid,
+            window_id: args.window_id,
+            elements: [{ role: "Button", label: "Stop generating", element_token: "fresh-token" }],
+          }),
+          stderr: "",
+        };
+      }
+      if (tool === "click" && args.element_token === "fresh-token") {
+        return { status: 0, stdout: JSON.stringify({ clicked: true }), stderr: "" };
+      }
+      return { status: 1, stdout: "", stderr: JSON.stringify({ code: "unexpected_call" }) };
+    };
+    syncBuiltinESMExports();
+    await import(${JSON.stringify(driverUrl)});
+    const { clickBy } = await import(${JSON.stringify(findUtilUrl)});
+    const state = {
+      pid: 930121,
+      window_id: 930122,
+      elements: [{ role: "Button", label: "Stop generating", element_token: "expired-token" }],
+    };
+    try {
+      const value = clickBy(930121, state, { role: "Button", name: "Stop generating" });
+      console.log(JSON.stringify({ value, calls }));
+    } catch (error) {
+      console.log(JSON.stringify({ error: error.message, calls }));
+    }
+  `);
+
+  assert.equal(output.error, undefined, JSON.stringify(output.error));
+  assert.deepEqual(output.value, { clicked: true });
+  assert.deepEqual(output.calls.map(({ tool }) => tool), ["click", "get_window_state", "click"]);
+  assert.equal(output.calls[0].args.element_token, "expired-token");
+  assert.equal(output.calls[0].args.pid, 930121);
+  assert.equal(output.calls[0].args.window_id, 930122);
+  assert.equal(output.calls[1].args.include_screenshot, false);
+  assert.equal(output.calls[1].args.pid, 930121);
+  assert.equal(output.calls[1].args.window_id, 930122);
+  assert.equal(output.calls[2].args.element_token, "fresh-token");
+  assert.equal(output.calls[2].args.pid, 930121);
+  assert.equal(output.calls[2].args.window_id, 930122);
+});
+
+test("clickBy refuses a stale-token retry when the refreshed window identity changes", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const findUtilUrl = new URL("./find-util.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    const calls = [];
+    childProcess.spawnSync = (_binary, argv, options) => {
+      const tool = argv[1];
+      const args = JSON.parse(options.input);
+      calls.push({ tool, args });
+      if (tool === "click" && args.element_token === "expired-token") {
+        return {
+          status: 1,
+          stdout: "",
+          stderr: JSON.stringify({ refusal: { code: "stale_element_token" } }),
+        };
+      }
+      if (tool === "get_window_state") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            pid: args.pid,
+            window_id: args.window_id + 1,
+            elements: [{ role: "Button", label: "Stop generating", element_token: "new-window-token" }],
+          }),
+          stderr: "",
+        };
+      }
+      if (tool === "click") {
+        return { status: 0, stdout: JSON.stringify({ clicked: true }), stderr: "" };
+      }
+      return { status: 1, stdout: "", stderr: JSON.stringify({ code: "unexpected_call" }) };
+    };
+    syncBuiltinESMExports();
+    await import(${JSON.stringify(driverUrl)});
+    const { clickBy } = await import(${JSON.stringify(findUtilUrl)});
+    const state = {
+      pid: 930131,
+      window_id: 930132,
+      elements: [{ role: "Button", label: "Stop generating", element_token: "expired-token" }],
+    };
+    try {
+      const value = clickBy(930131, state, { role: "Button", name: "Stop generating" });
+      console.log(JSON.stringify({ value, calls }));
+    } catch (error) {
+      console.log(JSON.stringify({ error: error.message, calls }));
+    }
+  `);
+
+  assert.match(output.error ?? "", /window identity changed/i);
+  assert.deepEqual(output.calls.map(({ tool }) => tool), ["click", "get_window_state"]);
+  assert.equal(output.calls[0].args.pid, 930131);
+  assert.equal(output.calls[0].args.window_id, 930132);
+  assert.equal(output.calls[1].args.pid, 930131);
+  assert.equal(output.calls[1].args.window_id, 930132);
+});
+
+test("clickBy refuses a stale-token retry when the refreshed pid changes", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const findUtilUrl = new URL("./find-util.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    const calls = [];
+    childProcess.spawnSync = (_binary, argv, options) => {
+      const tool = argv[1];
+      const args = JSON.parse(options.input);
+      calls.push({ tool, args });
+      if (tool === "click" && args.element_token === "expired-token") {
+        return { status: 1, stdout: "", stderr: JSON.stringify({ code: "stale_element_token" }) };
+      }
+      if (tool === "get_window_state") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            pid: args.pid + 1,
+            window_id: args.window_id,
+            elements: [{ role: "Button", label: "Stop generating", element_token: "other-process-token" }],
+          }),
+          stderr: "",
+        };
+      }
+      if (tool === "click") return { status: 0, stdout: JSON.stringify({ clicked: true }), stderr: "" };
+      return { status: 1, stdout: "", stderr: JSON.stringify({ code: "unexpected_call" }) };
+    };
+    syncBuiltinESMExports();
+    await import(${JSON.stringify(driverUrl)});
+    const { clickBy } = await import(${JSON.stringify(findUtilUrl)});
+    const state = { pid: 930141, window_id: 930142, elements: [{ role: "Button", label: "Stop generating", element_token: "expired-token" }] };
+    try {
+      const value = clickBy(930141, state, { role: "Button", name: "Stop generating" });
+      console.log(JSON.stringify({ value, calls }));
+    } catch (error) {
+      console.log(JSON.stringify({ error: error.message, calls }));
+    }
+  `);
+
+  assert.match(output.error ?? "", /window identity changed/i);
+  assert.deepEqual(output.calls.map(({ tool }) => tool), ["click", "get_window_state"]);
+  assert.equal(output.calls[1].args.pid, 930141);
+  assert.equal(output.calls[1].args.window_id, 930142);
+});
+
+test("clickBy refuses a stale-token retry when the refreshed identity is missing", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const findUtilUrl = new URL("./find-util.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    const calls = [];
+    childProcess.spawnSync = (_binary, argv, options) => {
+      const tool = argv[1];
+      const args = JSON.parse(options.input);
+      calls.push({ tool, args });
+      if (tool === "click" && args.element_token === "expired-token") {
+        return { status: 1, stdout: "", stderr: JSON.stringify({ code: "stale_element_token" }) };
+      }
+      if (tool === "get_window_state") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({ elements: [{ role: "Button", label: "Stop generating", element_token: "unknown-identity-token" }] }),
+          stderr: "",
+        };
+      }
+      if (tool === "click") return { status: 0, stdout: JSON.stringify({ clicked: true }), stderr: "" };
+      return { status: 1, stdout: "", stderr: JSON.stringify({ code: "unexpected_call" }) };
+    };
+    syncBuiltinESMExports();
+    await import(${JSON.stringify(driverUrl)});
+    const { clickBy } = await import(${JSON.stringify(findUtilUrl)});
+    const state = { pid: 930151, window_id: 930152, elements: [{ role: "Button", label: "Stop generating", element_token: "expired-token" }] };
+    try {
+      const value = clickBy(930151, state, { role: "Button", name: "Stop generating" });
+      console.log(JSON.stringify({ value, calls }));
+    } catch (error) {
+      console.log(JSON.stringify({ error: error.message, calls }));
+    }
+  `);
+
+  assert.match(output.error ?? "", /identity fields are missing/i);
+  assert.deepEqual(output.calls.map(({ tool }) => tool), ["click", "get_window_state"]);
+  assert.equal(output.calls[1].args.pid, 930151);
+  assert.equal(output.calls[1].args.window_id, 930152);
+});
+
+test("clickBy stops after one refreshed-token retry", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const findUtilUrl = new URL("./find-util.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    const calls = [];
+    childProcess.spawnSync = (_binary, argv, options) => {
+      const tool = argv[1];
+      const args = JSON.parse(options.input);
+      calls.push({ tool, args });
+      if (tool === "click") {
+        return { status: 1, stdout: "", stderr: JSON.stringify({ refusal: { code: "stale_element_token" } }) };
+      }
+      if (tool === "get_window_state") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            pid: args.pid,
+            window_id: args.window_id,
+            elements: [{ role: "Button", label: "Stop generating", element_token: "fresh-token" }],
+          }),
+          stderr: "",
+        };
+      }
+      return { status: 1, stdout: "", stderr: JSON.stringify({ code: "unexpected_call" }) };
+    };
+    syncBuiltinESMExports();
+    await import(${JSON.stringify(driverUrl)});
+    const { clickBy } = await import(${JSON.stringify(findUtilUrl)});
+    const state = { pid: 930161, window_id: 930162, elements: [{ role: "Button", label: "Stop generating", element_token: "expired-token" }] };
+    try {
+      const value = clickBy(930161, state, { role: "Button", name: "Stop generating" });
+      console.log(JSON.stringify({ value, calls }));
+    } catch (error) {
+      console.log(JSON.stringify({ error: error.message, calls }));
+    }
+  `);
+
+  assert.match(output.error ?? "", /stale_element_token/);
+  assert.deepEqual(output.calls.map(({ tool }) => tool), ["click", "get_window_state", "click"]);
+  assert.equal(output.calls.filter(({ tool }) => tool === "click").length, 2);
+  assert.equal(output.calls[0].args.element_token, "expired-token");
+  assert.equal(output.calls[2].args.element_token, "fresh-token");
+  assert.equal(output.calls[0].args.window_id, 930162);
+  assert.equal(output.calls[2].args.window_id, 930162);
+});

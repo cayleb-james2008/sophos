@@ -7,7 +7,7 @@
 // substring), role, and/or name — and click via element_token (UIA Invoke) or
 // a pixel click at the element's centre.
 
-import { click, clickElement as driverClickElement, getWindowState, sleep } from "./driver.mjs";
+import { click, clickElement as driverClickElement, driverErrorCode, getWindowState, sleep } from "./driver.mjs";
 import { elementCenter } from "./helpers.mjs";
 
 /**
@@ -69,16 +69,49 @@ export function clickRightmost(pid, windowState, criteria = {}) {
  * Invoke); falls back to a pixel click at the element's centre bounds.
  */
 export function clickBy(pid, windowState, criteria = {}) {
-  const el = findBy(windowState, criteria);
-  if (!el) {
-    throw new Error(`Element not found: ${JSON.stringify(criteria)}`);
+  const initialWindowId = windowState.window_id;
+  const clickMatching = (state) => {
+    const el = findBy(state, criteria);
+    if (!el) {
+      throw new Error(`Element not found: ${JSON.stringify(criteria)}`);
+    }
+    const windowId = state.window_id ?? initialWindowId;
+    if (el.element_token) {
+      return driverClickElement(pid, windowId, el.element_token);
+    }
+    const { x, y } = elementCenter(el, state);
+    return click(pid, x, y, windowId);
+  };
+
+  try {
+    return clickMatching(windowState);
+  } catch (error) {
+    // Screenshot capture and unrelated UI updates can invalidate a token after
+    // the caller took its snapshot. Re-query and re-find only on the driver's
+    // explicit stale-token refusal; all other errors remain fail-closed.
+    if (driverErrorCode(error) !== "stale_element_token") throw error;
+    if (initialWindowId === undefined || initialWindowId === null) {
+      throw new Error("Refusing stale-element retry without the original window identity", { cause: error });
+    }
+    const refreshed = getWindowState(pid, initialWindowId, { include_screenshot: false });
+    if (
+      !refreshed ||
+      typeof refreshed !== "object" ||
+      refreshed.pid === undefined ||
+      refreshed.pid === null ||
+      refreshed.window_id === undefined ||
+      refreshed.window_id === null
+    ) {
+      throw new Error("Refusing stale-element retry because refreshed identity fields are missing", { cause: error });
+    }
+    if (refreshed.pid !== pid || refreshed.window_id !== initialWindowId) {
+      throw new Error(
+        `Refusing stale-element retry because window identity changed (pid ${refreshed.pid}; window_id ${refreshed.window_id})`,
+        { cause: error },
+      );
+    }
+    return clickMatching(refreshed);
   }
-  const windowId = windowState.window_id;
-  if (el.element_token) {
-    return driverClickElement(pid, windowId, el.element_token);
-  }
-  const { x, y } = elementCenter(el, windowState);
-  return click(pid, x, y, windowId);
 }
 
 /**

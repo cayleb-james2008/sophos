@@ -117,8 +117,31 @@ export function call(tool, args = {}, invoke = spawnSync) {
  * driver's own guidance: always try background first, escalate only on the
  * structured signal.
  */
+export function driverErrorCode(error) {
+  if (typeof error?.code === "string") return error.code;
+  if (typeof error?.refusal?.code === "string") return error.refusal.code;
+
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const payloadStart = message.indexOf("{");
+  if (payloadStart < 0) return null;
+  try {
+    const payload = JSON.parse(message.slice(payloadStart));
+    if (typeof payload?.refusal?.code === "string") return payload.refusal.code;
+    return typeof payload?.code === "string" ? payload.code : null;
+  } catch {
+    return null;
+  }
+}
+
 export function callWithForegroundFallback(tool, args = {}) {
-  const first = call(tool, args);
+  let first;
+  try {
+    first = call(tool, args);
+  } catch (error) {
+    if (driverErrorCode(error) !== "background_unavailable") throw error;
+    return call(tool, { ...args, delivery_mode: "foreground" });
+  }
+
   if (first && first.code === "background_unavailable") {
     return call(tool, { ...args, delivery_mode: "foreground" });
   }

@@ -92,12 +92,14 @@ const tests = [
       const state = await goInbox(appHandle);
       // The selected peer's thread has exactly one unread incoming message.
       const before = countText(state, "UNREAD");
+      takeScreenshot(appHandle.pid, "inbox-unread-before-click", appHandle.windowId);
       assert(before >= 1, `Expected an UNREAD pill before clicking (got ${before})`);
       // Click the unread message node.
       const node = await waitFor(state, { text: "Endpoint review approved" }, 8000);
       assert(node, "Unread message node not found");
       clickBy(appHandle.pid, freshState(appHandle), { text: "Endpoint review approved" });
       await sleep(1200);
+      takeScreenshot(appHandle.pid, "inbox-unread-after-click", appHandle.windowId);
       const after = freshState(appHandle);
       // The unread pill is gone (that message flipped to read).
       const afterCount = countText(after, "UNREAD");
