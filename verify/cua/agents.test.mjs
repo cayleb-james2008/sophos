@@ -129,6 +129,20 @@ const tests = [
       // same UIA snapshot, so the composition control is both reachable and on-screen.
       const scrollState = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
       const nativeTree = String(scrollState.tree_markdown ?? "");
+      const compositionBefore = findBy(scrollState, { text: "Composition" });
+      const nativeScrollTargets = (scrollState.elements ?? [])
+        .filter((element) => Array.isArray(element.actions) && element.actions.includes("scroll"))
+        .map(({ element_index, role, frame }) => ({ element_index, role, frame }));
+      console.log("[AGENT-COMPOSITION-UIA-SNAPSHOT]", JSON.stringify({
+        screenshot: `${scrollState.screenshot_width}x${scrollState.screenshot_height}`,
+        elementCount: (scrollState.elements ?? []).length,
+        nativeScrollTargets,
+        composition: compositionBefore ? {
+          element_index: compositionBefore.element_index,
+          role: compositionBefore.role,
+          frame: compositionBefore.frame,
+        } : null,
+      }));
       assert(
         nativeTree.split(/\r?\n/).some((line) =>
           /^\s*-\s+(?:\[\d+\]\s+)?(?:Group|Pane|Region)\s+"Agent coordination thread"(?:\s|$)/.test(line),

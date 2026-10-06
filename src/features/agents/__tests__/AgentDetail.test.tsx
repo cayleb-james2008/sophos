@@ -121,6 +121,7 @@ describe("AgentDetail", () => {
   it("groups the thread composer in a named coordination region", () => {
     renderDetail();
     const region = screen.getByRole("region", { name: "Agent coordination thread" });
+    expect(region).toHaveAttribute("tabindex", "0");
     expect(region).toContainElement(screen.getByRole("button", { name: /composition/i }));
     expect(region).toContainElement(screen.getByLabelText("Message to Reviewer"));
   });

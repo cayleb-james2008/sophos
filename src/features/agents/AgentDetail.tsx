@@ -117,8 +117,14 @@ export function AgentDetail({
         </div>
       ) : null}
 
-      <div className="ag-detail__thread" role="region" aria-label="Agent coordination thread">
-        <div className="ag-detail__thread-scroll">
+      <div className="ag-detail__thread">
+        {/* Make the overflow viewport itself focusable/named for native UIA scrolling. */}
+        <div
+          className="ag-detail__thread-scroll"
+          role="region"
+          aria-label="Agent coordination thread"
+          tabIndex={0}
+        >
           <InboxThread
             agent={agent}
             messages={thread}
