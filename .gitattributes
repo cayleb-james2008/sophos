@@ -1,3 +1,4 @@
 patches/prime-agent-v0.7.0-session-lease-windows.patch -text
 patches/prime-agent-v0.7.0-worker-shutdown-fence.patch -text
+patches/prime-agent-v0.7.0-pr11-shutdown-diagnostics.patch -text
 scripts/dependency-hardening-overlay.json -text

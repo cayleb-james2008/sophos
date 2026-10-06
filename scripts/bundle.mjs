@@ -97,7 +97,7 @@ async function buildPinnedDaemon(primeAgentRoot, primeSourceRoot) {
   ], {
     cwd: join(primeAgentRoot, "packages", "coding-agent"),
     shell: false,
-    label: "Prime Agent session-lease, Windows ZIP guard, and worker-shutdown fence regression tests",
+    label: "Prime Agent session-lease, Windows ZIP guard, worker-shutdown fence, and PR11 diagnostics regression tests",
   });
   await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "Prime Agent regression tests");
   runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "tui"), label: "Prime Agent TUI build" });

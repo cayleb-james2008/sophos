@@ -1,0 +1,122 @@
+diff --git a/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts b/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
+index de7210c..450a287 100644
+--- a/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
++++ b/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
+@@ -127,0 +128,11 @@ const structuredLog = getLogger("coding-agent.daemon-supervisor");
++
++function formatShutdownDiagnosticError(error: unknown): string {
++	try {
++		if (error instanceof Error) {
++			return typeof error.stack === "string" ? error.stack : String(error.message);
++		}
++		return String(error);
++	} catch {
++		return "<unprintable thrown value>";
++	}
++}
+@@ -688,0 +700,6 @@ export class DaemonSupervisor {
++					const workerIdentity = {
++						workerId: worker.descriptor.workerId,
++						pid: worker.descriptor.pid,
++						lifecycle: worker.descriptor.lifecycle,
++					};
++					this.logShutdownDiagnostic("worker_adoption_start", workerIdentity);
+@@ -690,0 +708 @@ export class DaemonSupervisor {
++						this.logShutdownDiagnostic("worker_adoption_result", { ...workerIdentity, ok: true });
+@@ -691,0 +710,5 @@ export class DaemonSupervisor {
++						this.logShutdownDiagnostic("worker_adoption_result", {
++							...workerIdentity,
++							ok: false,
++							error: formatShutdownDiagnosticError(error),
++						});
+@@ -740,0 +764,14 @@ export class DaemonSupervisor {
++	private logShutdownDiagnostic(event: string, fields: Record<string, unknown> = {}): void {
++		try {
++			this.log(`[PR11_SHUTDOWN_DIAG] ${JSON.stringify({
++				event,
++				at: new Date().toISOString(),
++				supervisorPid: process.pid,
++				generation: this.generation,
++				...fields,
++			})}`);
++		} catch {
++			// Diagnostics must never alter shutdown control flow.
++		}
++	}
++
+@@ -1565,0 +1603,4 @@ export class DaemonSupervisor {
++				this.logShutdownDiagnostic("shutdown_command_received", {
++					commandId: command.id,
++					force: command.force === true,
++				});
+@@ -4793,0 +4835,8 @@ export class DaemonSupervisor {
++		this.logShutdownDiagnostic("shutdown_entry", {
++			exitCode,
++			stopWorkers,
++			relaunch,
++			forceWorkers,
++			closingReason: closingReason ?? null,
++			workerCount: this.workers.size,
++		});
+@@ -4810 +4859,19 @@ export class DaemonSupervisor {
+-				[...this.workers.values()].map((worker) => this.stopWorker(worker, true, forceWorkers, true)),
++				[...this.workers.values()].map(async (worker) => {
++					const workerIdentity = {
++						workerId: worker.descriptor.workerId,
++						pid: worker.descriptor.pid,
++						lifecycle: worker.descriptor.lifecycle,
++					};
++					this.logShutdownDiagnostic("worker_stop_start", workerIdentity);
++					try {
++						await this.stopWorker(worker, true, forceWorkers, true);
++						this.logShutdownDiagnostic("worker_stop_result", { ...workerIdentity, ok: true });
++					} catch (error) {
++						this.logShutdownDiagnostic("worker_stop_result", {
++							...workerIdentity,
++							ok: false,
++							error: formatShutdownDiagnosticError(error),
++						});
++						throw error;
++					}
++				}),
+@@ -4826,0 +4894 @@ export class DaemonSupervisor {
++		this.logShutdownDiagnostic("server_teardown_start", { listening: this.server?.listening ?? false });
+@@ -4827,0 +4896,2 @@ export class DaemonSupervisor {
++		this.logShutdownDiagnostic("server_teardown_result", { listening: this.server?.listening ?? false });
++		this.logShutdownDiagnostic("socket_path_cleanup_start", { ownsSocketPath: this.ownsSocketPath });
+@@ -4828,0 +4899 @@ export class DaemonSupervisor {
++		this.logShutdownDiagnostic("socket_path_cleanup_result", { ownsSocketPath: this.ownsSocketPath });
+@@ -4834 +4905,14 @@ export class DaemonSupervisor {
+-		await this.runCleanupStep("daemon socket lock", async () => lease?.release());
++		this.logShutdownDiagnostic("socket_lease_release_start", { present: lease !== undefined });
++		await this.runCleanupStep("daemon socket lock", async () => {
++			try {
++				await lease?.release();
++				this.logShutdownDiagnostic("socket_lease_release_result", { ok: true, present: lease !== undefined });
++			} catch (error) {
++				this.logShutdownDiagnostic("socket_lease_release_result", {
++					ok: false,
++					present: lease !== undefined,
++					error: formatShutdownDiagnosticError(error),
++				});
++				throw error;
++			}
++		});
+@@ -4837 +4921,14 @@ export class DaemonSupervisor {
+-		await this.runCleanupStep("daemon ownership", async () => ownership?.release());
++		this.logShutdownDiagnostic("ownership_release_start", { present: ownership !== undefined });
++		await this.runCleanupStep("daemon ownership", async () => {
++			try {
++				await ownership?.release();
++				this.logShutdownDiagnostic("ownership_release_result", { ok: true, present: ownership !== undefined });
++			} catch (error) {
++				this.logShutdownDiagnostic("ownership_release_result", {
++					ok: false,
++					present: ownership !== undefined,
++					error: formatShutdownDiagnosticError(error),
++				});
++				throw error;
++			}
++		});
+@@ -4857,0 +4955 @@ export class DaemonSupervisor {
++		this.logShutdownDiagnostic("shutdown_process_exit", { exitCode, relaunch });

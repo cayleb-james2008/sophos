@@ -9,13 +9,14 @@
 // Output: prints PASS/FAIL lines plus a final summary.
 
 import { execFileSync, spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { getSessionRecoveryAssertions } from "./session-recovery-readiness.mjs";
+import { safeDiagnosticError, traceShutdownRpc } from "./verify-shutdown-diagnostics.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REF_ROOT = resolve(
@@ -37,6 +38,49 @@ function isolatedSocketPath() {
 }
 
 const SOCKET_PATH = process.env.BRIDGE_VERIFY_SOCKET || isolatedSocketPath();
+const SHUTDOWN_EVIDENCE_DIR = process.env.BRIDGE_VERIFY_EVIDENCE_DIR
+  ? resolve(process.env.BRIDGE_VERIFY_EVIDENCE_DIR)
+  : undefined;
+const shutdownEvidence = {
+  schemaVersion: 1,
+  startedAt: new Date().toISOString(),
+  socketPath: SOCKET_PATH,
+  events: [],
+  rpc: [],
+  snapshots: [],
+  recoverySupervisors: [],
+  supervisorMilestones: [],
+  rawDaemonLogs: [],
+};
+
+function recordShutdownEvent(event, details = {}) {
+  try {
+    const entry = { event, at: new Date().toISOString(), ...details };
+    shutdownEvidence.events.push(entry);
+    console.log(`[shutdown-diagnostic] ${JSON.stringify(entry)}`);
+    return entry;
+  } catch {
+    return undefined;
+  }
+}
+
+function appendShutdownEvidence(collection, entry) {
+  try {
+    collection.push(entry);
+  } catch {
+    // Diagnostics must not interrupt the runtime under test.
+  }
+}
+
+function traceShutdownRpcSafely(target) {
+  try {
+    return traceShutdownRpc(target, shutdownEvidence.rpc);
+  } catch (error) {
+    recordShutdownEvent("shutdown_rpc_trace_install_error", safeDiagnosticError(error));
+    return () => undefined;
+  }
+}
+
 function terminateProcessTree(proc) {
   if (!proc?.pid || proc.exitCode !== null) return;
   if (process.platform === "win32") {
@@ -127,6 +171,82 @@ function readWorkerDescriptorPids() {
     // The daemon can remove its descriptor tree concurrently with diagnostics.
   }
   return workers;
+}
+
+async function persistShutdownEvidence() {
+  const configUrl = pathToFileURL(join(REF_ROOT, "dist", "config.js")).href;
+  try {
+    const { getDaemonLogPath } = await import(configUrl);
+    const daemonLogPath = getDaemonLogPath(SOCKET_PATH);
+    const files = [
+      { source: daemonLogPath, name: "daemon-supervisor.raw.log" },
+      { source: `${daemonLogPath}.old`, name: "daemon-supervisor.raw.log.old" },
+    ];
+    let currentLogText = "";
+    for (const file of files) {
+      if (!existsSync(file.source)) continue;
+      const bytes = readFileSync(file.source);
+      const text = bytes.toString("utf8");
+      if (file.name === "daemon-supervisor.raw.log") currentLogText = text;
+      const metadata = {
+        file: file.name,
+        bytes: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+      };
+      appendShutdownEvidence(shutdownEvidence.rawDaemonLogs, metadata);
+      for (const line of text.split(/\r?\n/)) {
+        const marker = "[PR11_SHUTDOWN_DIAG] ";
+        const markerAt = line.indexOf(marker);
+        if (markerAt < 0) continue;
+        try {
+          const milestone = JSON.parse(line.slice(markerAt + marker.length));
+          appendShutdownEvidence(shutdownEvidence.supervisorMilestones, {
+            logTimestamp: line.match(/^\[([^\]]+)\]/)?.[1] ?? null,
+            ...milestone,
+          });
+        } catch {
+          appendShutdownEvidence(shutdownEvidence.supervisorMilestones, { rawLine: line });
+        }
+      }
+      if (SHUTDOWN_EVIDENCE_DIR) {
+        mkdirSync(SHUTDOWN_EVIDENCE_DIR, { recursive: true });
+        writeFileSync(join(SHUTDOWN_EVIDENCE_DIR, file.name), bytes);
+      }
+    }
+    const tailLines = currentLogText.split(/\r?\n/).filter(Boolean).slice(-100);
+    const latestReplacement = [...shutdownEvidence.recoverySupervisors].reverse().find((item) =>
+      item.stage.includes("after-replacement") && item.socketSupervisor?.reachable,
+    );
+    shutdownEvidence.replacementSupervisorLogTail = {
+      capturedAt: new Date().toISOString(),
+      sourceFile: "daemon-supervisor.raw.log",
+      lineCount: tailLines.length,
+      targetSupervisor: shutdownEvidence.shutdownTargetSupervisor ?? null,
+      latestObservedReplacementSupervisor: latestReplacement?.socketSupervisor ?? null,
+    };
+    if (SHUTDOWN_EVIDENCE_DIR && tailLines.length > 0) {
+      mkdirSync(SHUTDOWN_EVIDENCE_DIR, { recursive: true });
+      writeFileSync(join(SHUTDOWN_EVIDENCE_DIR, "replacement-supervisor.log-tail.raw.txt"), `${tailLines.join("\n")}\n`);
+    }
+  } catch (error) {
+    shutdownEvidence.logCaptureError = safeDiagnosticError(error).error;
+  }
+
+  recordShutdownEvent("shutdown_evidence_captured", {
+    outputDirectory: SHUTDOWN_EVIDENCE_DIR ?? null,
+    rawLogFiles: shutdownEvidence.rawDaemonLogs.map(({ file, bytes, sha256 }) => ({ file, bytes, sha256 })),
+    supervisorMilestoneCount: shutdownEvidence.supervisorMilestones.length,
+    logCaptureError: shutdownEvidence.logCaptureError ?? shutdownEvidence.persistError ?? null,
+  });
+  shutdownEvidence.finishedAt = new Date().toISOString();
+  if (SHUTDOWN_EVIDENCE_DIR) {
+    try {
+      mkdirSync(SHUTDOWN_EVIDENCE_DIR, { recursive: true });
+      writeFileSync(join(SHUTDOWN_EVIDENCE_DIR, "shutdown-diagnostics.json"), `${JSON.stringify(shutdownEvidence, null, 2)}\n`);
+    } catch (error) {
+      shutdownEvidence.persistError = safeDiagnosticError(error).error;
+    }
+  }
 }
 
 async function inspectSupervisorIdentity() {
@@ -222,6 +342,13 @@ async function logRecoveryOwnership(stage, processHandle) {
   const socketSupervisor = await inspectSupervisorIdentity();
   const workers = readWorkerDescriptorPids().map((worker) => ({ ...worker, alive: processIsAlive(worker.pid) }));
   const processes = processTreeSnapshot([processHandle?.pid, socketSupervisor.pid, ...workers.map((worker) => worker.pid)]);
+  appendShutdownEvidence(shutdownEvidence.recoverySupervisors, {
+    at: new Date().toISOString(),
+    stage,
+    socketSupervisor,
+    processHandle: processHandle ? { pid: processHandle.pid, exitCode: processHandle.exitCode, signalCode: processHandle.signalCode } : null,
+    workers,
+  });
   console.log(`[ownership] ${JSON.stringify({
     stage,
     processHandle: processHandle ? { pid: processHandle.pid, exitCode: processHandle.exitCode, signalCode: processHandle.signalCode, alive: processIsAlive(processHandle.pid) } : null,
@@ -267,13 +394,14 @@ async function run() {
     terminateProcessTree(bridge);
     terminateProcessTree(daemon);
   };
-  async function shutdownDaemonGracefully() {
+    async function shutdownDaemonGracefully() {
     const daemonLaunchUrl = pathToFileURL(join(REF_ROOT, "dist", "cli", "daemon-launch.js")).href;
     const daemonClientUrl = pathToFileURL(join(REF_ROOT, "dist", "modes", "daemon", "daemon-client.js")).href;
     const { shutdownDaemonAndWait, shutdownConnectedDaemonAndWait } = await import(daemonLaunchUrl);
     const { DaemonClient } = await import(daemonClientUrl);
     const client = new DaemonClient(SOCKET_PATH);
     let identity;
+    let restoreInstanceTrace = () => undefined;
     try {
       await client.connect(1000);
       const hello = await client.waitForHello(2000).catch(() => undefined);
@@ -282,18 +410,45 @@ async function run() {
         ...(Number.isInteger(hello?.supervisorPid) ? { pid: hello.supervisorPid } : {}),
         ...(typeof hello?.supervisorProcessStartId === "string" ? { processStartId: hello.supervisorProcessStartId } : {}),
       };
-      return {
-        stopped: await shutdownConnectedDaemonAndWait(client, SOCKET_PATH, 10000, hello),
-        identity,
-      };
-    } catch {
+      shutdownEvidence.shutdownTargetSupervisor = identity;
+      restoreInstanceTrace = traceShutdownRpcSafely(client);
+      recordShutdownEvent("shutdown_rpc_path_selected", { path: "connected-client", supervisor: identity });
+      const stopped = await shutdownConnectedDaemonAndWait(client, SOCKET_PATH, 10000, hello);
+      recordShutdownEvent("graceful_shutdown_wait_result", { path: "connected-client", stopped, supervisor: identity });
+      return { stopped, identity, path: "connected-client" };
+    } catch (error) {
+      recordShutdownEvent("shutdown_connected_path_error", {
+        supervisor: identity ?? { reachable: false },
+        ...safeDiagnosticError(error),
+      });
       client.close();
-      return { stopped: await shutdownDaemonAndWait(SOCKET_PATH, 10000), identity: identity ?? { reachable: false } };
+      const restorePrototypeTrace = traceShutdownRpcSafely(Object.getPrototypeOf(client));
+      try {
+        recordShutdownEvent("shutdown_rpc_path_selected", {
+          path: "reconnect-client",
+          supervisor: identity ?? { reachable: false },
+        });
+        const stopped = await shutdownDaemonAndWait(SOCKET_PATH, 10000);
+        recordShutdownEvent("graceful_shutdown_wait_result", {
+          path: "reconnect-client",
+          stopped,
+          supervisor: identity ?? { reachable: false },
+        });
+        return { stopped, identity: identity ?? { reachable: false }, path: "reconnect-client" };
+      } finally {
+        restorePrototypeTrace();
+      }
     } finally {
+      restoreInstanceTrace();
       client.close();
     }
   }
   const cleanup = async () => {
+    recordShutdownEvent("cleanup_start", {
+      daemonLauncherHandlePresent: Boolean(daemon),
+      daemonLauncherPid: daemon?.pid ?? null,
+      processExitedDerivedFromAbsentHandle: !daemon,
+    });
     try { bridge?.stdin.end(); } catch {}
     let bridgeStopped = !bridge || bridge.exitCode !== null || bridge.signalCode !== null;
     if (!bridgeStopped) bridgeStopped = await waitForExit(bridge, 5000);
@@ -311,18 +466,44 @@ async function run() {
       daemonStopped = shutdownResult.stopped;
       if (daemonStopped) daemonProcessStopped = await waitForExit(daemon, 5000);
     } catch (error) {
-      shutdownError = error instanceof Error ? error.message : String(error);
+      shutdownError = safeDiagnosticError(error).error;
+      recordShutdownEvent("graceful_shutdown_error", { error: shutdownError });
     }
+    shutdownEvidence.shutdownResult = {
+      path: shutdownResult?.path ?? null,
+      stopped: shutdownResult?.stopped ?? false,
+      supervisor: shutdownResult?.identity ?? { reachable: false },
+    };
     let shutdownDiagnostics;
     let fallbackTerminationNeeded = false;
     if (!daemonStopped || !daemonProcessStopped) {
       fallbackTerminationNeeded = true;
       shutdownDiagnostics = await snapshotShutdownState(daemon, shutdownResult?.identity);
+      appendShutdownEvidence(shutdownEvidence.snapshots, { stage: "before-fallback", at: new Date().toISOString(), data: shutdownDiagnostics });
+      recordShutdownEvent("pre_fallback_snapshot", {
+        daemonLauncherHandlePresent: Boolean(daemon),
+        daemonLauncherPid: daemon?.pid ?? null,
+        supervisor: shutdownResult?.identity ?? { reachable: false },
+        workers: shutdownDiagnostics.workers,
+        processes: shutdownDiagnostics.processes,
+      });
       terminateProcessTree(daemon);
       daemonProcessStopped = await waitForExit(daemon, 5000);
       shutdownDiagnostics.afterFallback = await snapshotShutdownState(daemon, shutdownResult?.identity);
+      appendShutdownEvidence(shutdownEvidence.snapshots, {
+        stage: "after-fallback",
+        at: new Date().toISOString(),
+        data: shutdownDiagnostics.afterFallback,
+      });
+      recordShutdownEvent("post_fallback_snapshot", {
+        daemonLauncherHandlePresent: Boolean(daemon),
+        daemonLauncherPid: daemon?.pid ?? null,
+        supervisor: shutdownResult?.identity ?? { reachable: false },
+        workers: shutdownDiagnostics.afterFallback.workers,
+        processes: shutdownDiagnostics.afterFallback.processes,
+      });
     }
-    return {
+    const result = {
       bridgeStopped,
       daemonStopped: daemonStopped && daemonProcessStopped && !fallbackTerminationNeeded,
       gracefulDaemonStopped: daemonStopped,
@@ -331,6 +512,21 @@ async function run() {
       shutdownError,
       shutdownDiagnostics,
     };
+    shutdownEvidence.cleanupResult = {
+      ...result,
+      shutdownDiagnostics: result.shutdownDiagnostics,
+    };
+    recordShutdownEvent("cleanup_result", {
+      daemonStopped: result.daemonStopped,
+      gracefulResult: result.gracefulDaemonStopped,
+      processExited: result.daemonProcessStopped,
+      fallback: result.fallbackTerminationNeeded,
+      bridgeStopped: result.bridgeStopped,
+      daemonLauncherHandlePresent: Boolean(daemon),
+      processExitedDerivedFromAbsentHandle: !daemon,
+      shutdownError: result.shutdownError,
+    });
+    return result;
   };
   const onSignal = () => {
     forceCleanup();
@@ -349,6 +545,7 @@ async function run() {
       `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
+    await persistShutdownEvidence();
     return;
   }
 
@@ -769,6 +966,7 @@ async function run() {
       `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
+    await persistShutdownEvidence();
   }
 
   const passed = results.filter((r) => r.ok).length;

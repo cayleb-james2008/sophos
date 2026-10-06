@@ -66,14 +66,23 @@ const workerShutdownFencePatch = Buffer.from(
   + " export const archiveGuard = true;\n"
   + "+export const shutdownFence = true;\n",
 );
+const shutdownDiagnosticsPatch = Buffer.from(
+  "diff --git a/packages/coding-agent/src/core/session-lease.ts b/packages/coding-agent/src/core/session-lease.ts\n"
+  + "--- a/packages/coding-agent/src/core/session-lease.ts\n"
+  + "+++ b/packages/coding-agent/src/core/session-lease.ts\n"
+  + "@@ -4 +4,2 @@\n"
+  + " export const shutdownFence = true;\n"
+  + "+export const shutdownDiagnostics = true;\n",
+);
 
 const reviewedPatchSequence = [
   { name: "session-lease", bytes: leasePatch, sha256: sha256(leasePatch), unidiffZero: false },
   { name: "windows-zip-guard", bytes: zipGuardPatch, sha256: sha256(zipGuardPatch), unidiffZero: true },
   { name: "worker-shutdown-fence", bytes: workerShutdownFencePatch, sha256: sha256(workerShutdownFencePatch), unidiffZero: true },
+  { name: "shutdown-diagnostics", bytes: shutdownDiagnosticsPatch, sha256: sha256(shutdownDiagnosticsPatch), unidiffZero: false },
 ];
 
-test("applies the session-lease, Windows ZIP guard, and worker-shutdown patches in order", async (t) => {
+test("applies session-lease, Windows ZIP guard, worker-shutdown, and diagnostics patches in order", async (t) => {
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, { recursive: true, force: true }));
 
@@ -81,7 +90,7 @@ test("applies the session-lease, Windows ZIP guard, and worker-shutdown patches 
 
   assert.equal(
     await readFile(fixture.source, "utf8"),
-    'export const state = "base";\nexport const lease = true;\nexport const archiveGuard = true;\nexport const shutdownFence = true;\n',
+    'export const state = "base";\nexport const lease = true;\nexport const archiveGuard = true;\nexport const shutdownFence = true;\nexport const shutdownDiagnostics = true;\n',
   );
   assert.equal(runGit(["rev-parse", "HEAD"], fixture.root).length, 40, "the pinned source commit remains unchanged");
   assert.deepEqual(
@@ -94,12 +103,11 @@ test("rejects a mismatched later patch digest before changing the build checkout
   const fixture = await makeFixture();
   t.after(() => rm(fixture.root, { recursive: true, force: true }));
   const badSequence = [
-    reviewedPatchSequence[0],
-    reviewedPatchSequence[1],
-    { ...reviewedPatchSequence[2], sha256: "0".repeat(64) },
+    ...reviewedPatchSequence.slice(0, -1),
+    { ...reviewedPatchSequence.at(-1), sha256: "0".repeat(64) },
   ];
 
-  assert.throws(() => applyReviewedSourcePatches(fixture.root, badSequence), /worker-shutdown-fence.*SHA-256 mismatch/);
+  assert.throws(() => applyReviewedSourcePatches(fixture.root, badSequence), /shutdown-diagnostics.*SHA-256 mismatch/);
   assert.equal(await readFile(fixture.source, "utf8"), 'export const state = "base";\n');
   assert.equal(runGit(["status", "--porcelain"], fixture.root), "");
 });
@@ -140,6 +148,10 @@ test("Windows release workflows bootstrap a SHA-pinned, ACL-validated private ch
   for (const name of testSteps) {
     assert.ok(findStepBlock(testJob, name).includes("working-directory: ${{ env.SAFE_WINDOWS_REPO }}"), `${name} runs from the validated checkout`);
   }
+  const uploadShutdownDiagnostics = findStepBlock(testJob, "Upload PR11 graceful-shutdown diagnostics");
+  assert.ok(uploadShutdownDiagnostics.includes("if: always()")
+    && uploadShutdownDiagnostics.includes("verify/shutdown-evidence")
+    && uploadShutdownDiagnostics.includes("e2e-report.json"), "raw PR11 shutdown evidence is uploaded even after test failure");
   const cuaSteps = ["Install dependencies", "Build frontend", "Build actual pinned runtime resources", "Install cua-driver", "Run cua-driver e2e suite"];
   for (const name of cuaSteps) {
     assert.ok(findStepBlock(cuaJob, name).includes("working-directory: ${{ env.SAFE_WINDOWS_REPO }}"), `${name} runs from the validated checkout`);
@@ -165,7 +177,7 @@ test("the real bundler prepares and builds the composed security overlay", () =>
   assert.ok(!bundleSource.includes("preparePrimeAgentBuildTree(WORKTREE, primeSource.path)"));
 });
 
-test("accepts only exact composed Prime Agent lease, Windows ZIP guard, and worker-shutdown provenance", () => {
+test("accepts only exact composed Prime Agent lease, Windows ZIP guard, worker-shutdown, and diagnostics provenance", () => {
   const provenance = {
     ...PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED,
     sourceDirectory: "/tmp/prime-agent",
@@ -182,7 +194,11 @@ test("accepts only exact composed Prime Agent lease, Windows ZIP guard, and work
   }), false);
   assert.equal(matchesPrimeAgentSecurityBuildProvenance({
     ...provenance,
-    patchOrder: ["windows-zip-guard", "session-lease", "worker-shutdown-fence"],
+    shutdownDiagnosticsPatchSha256: "0".repeat(64),
+  }), false);
+  assert.equal(matchesPrimeAgentSecurityBuildProvenance({
+    ...provenance,
+    patchOrder: ["windows-zip-guard", "session-lease", "worker-shutdown-fence", "shutdown-diagnostics"],
   }), false);
 });
 
@@ -198,7 +214,7 @@ test("the real bundle runs all composed Prime Agent security regression suites",
   assert.ok(bundleSource.includes("verifyPrimeAgentSecurityBuildTree(projectRoot, primeAgentRoot, primeSourceRoot)"));
   const install = bundleSource.indexOf('label: "Prime Agent locked dependency install (normal lifecycle)"');
   const verify = bundleSource.indexOf('verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "npm ci")');
-  const tests = bundleSource.indexOf('label: "Prime Agent session-lease, Windows ZIP guard, and worker-shutdown fence regression tests"');
+  const tests = bundleSource.indexOf('label: "Prime Agent session-lease, Windows ZIP guard, worker-shutdown fence, and PR11 diagnostics regression tests"');
   assert.ok(install >= 0 && verify > install && tests > verify, "build output is reverified after npm ci and before tests");
   for (const stage of ["Prime Agent regression tests", "TUI build", "AI build", "agent-core build", "daemon build"]) {
     assert.ok(bundleSource.includes(`verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "${stage}")`));
@@ -257,6 +273,7 @@ test("hash-pinned overlay policy files keep their committed bytes on Windows che
   assert.match(gitattributes, /^scripts\/dependency-hardening-overlay\.json -text$/m);
   assert.match(gitattributes, /^patches\/prime-agent-v0\.7\.0-session-lease-windows\.patch -text$/m);
   assert.match(gitattributes, /^patches\/prime-agent-v0\.7\.0-worker-shutdown-fence\.patch -text$/m);
+  assert.match(gitattributes, /^patches\/prime-agent-v0\.7\.0-pr11-shutdown-diagnostics\.patch -text$/m);
 });
 
 test("checked-out worker-shutdown patch retains the exact reviewed bytes", async () => {
@@ -266,6 +283,26 @@ test("checked-out worker-shutdown patch retains the exact reviewed bytes", async
   const patch = patchBytes.toString("utf8");
   assert.ok(patch.includes("getSupervisorLaunchLockDirectory"), "Windows named-pipe recovery lock uses filesystem storage");
   assert.ok(patch.includes("keeps the replacement lock in filesystem storage for named-pipe sockets"), "the source regression remains in the patch");
+});
+
+test("checked-out PR11 diagnostics patch pins only named supervisor milestones", async () => {
+  const patchBytes = await readFile(new URL("../patches/prime-agent-v0.7.0-pr11-shutdown-diagnostics.patch", import.meta.url));
+  assert.equal(patchBytes.length, PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED.shutdownDiagnosticsPatchBytes);
+  assert.equal(sha256(patchBytes), PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED.shutdownDiagnosticsPatchSha256);
+  assert.ok(securityBuildSource.includes('{ name: "shutdown-diagnostics", bytes: inputs.shutdownDiagnosticsPatchBytes, sha256: EXPECTED.shutdownDiagnosticsPatchSha256, unidiffZero: true }'));
+  const patch = patchBytes.toString("utf8");
+  for (const milestone of [
+    "shutdown_command_received", "shutdown_entry", "worker_adoption_start", "worker_adoption_result",
+    "worker_stop_start", "worker_stop_result", "server_teardown_start", "server_teardown_result",
+    "socket_lease_release_start", "socket_lease_release_result", "ownership_release_start", "ownership_release_result",
+  ]) {
+    assert.ok(patch.includes(milestone), `instrumented supervisor milestone exists: ${milestone}`);
+  }
+  assert.ok(patch.includes("await this.stopWorker(worker, true, forceWorkers, true);"), "the existing worker-stop call and arguments remain unchanged");
+  assert.ok(patch.includes("Diagnostics must never alter shutdown control flow."), "logging failures are swallowed by the diagnostic helper");
+  assert.ok(patch.includes("formatShutdownDiagnosticError") && patch.includes("<unprintable thrown value>"), "error formatting cannot replace the original rejection");
+  const changedLines = patch.split("\n").filter((line) => /^[+-](?![+-])/.test(line));
+  assert.ok(!changedLines.some((line) => /timeout|assertion|fallback/i.test(line)), "diagnostic patch does not change timeout, assertion, or fallback policy");
 });
 
 test("Windows supervisor-monitor fixture uses platform temp and deterministic drain admission", async () => {

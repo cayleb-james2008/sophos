@@ -92,6 +92,7 @@ test("failed graceful shutdown captures supervisor and adopted-worker ownership 
   const fallback = cleanupBlock.indexOf("terminateProcessTree(daemon)");
 
   assert.ok(snapshot >= 0 && fallback > snapshot, "process and worker snapshots must be captured before fallback termination");
+  assert.ok(cleanupBlock.includes("shutdownError = safeDiagnosticError(error).error"), "error formatting must not bypass the fallback path");
   assert.match(verifySource, /async function inspectSupervisorIdentity\(\)/);
   assert.match(verifySource, /function readWorkerDescriptorPids\(\)/);
   assert.match(verifySource, /function snapshotShutdownState\(/);
@@ -104,5 +105,95 @@ test("forced fallback cannot convert a failed graceful shutdown into a passing a
 
   assert.ok(cleanupBlock.includes("let fallbackTerminationNeeded = false"));
   assert.ok(cleanupBlock.includes("fallbackTerminationNeeded = true"));
+  assert.ok(cleanupBlock.includes("daemonLauncherHandlePresent: Boolean(daemon)"));
+  assert.ok(cleanupBlock.includes("processExitedDerivedFromAbsentHandle: !daemon"));
   assert.ok(cleanupBlock.includes("daemonStopped: daemonStopped && daemonProcessStopped && !fallbackTerminationNeeded"));
+});
+
+test("shutdown RPC tracing preserves the original request, response, and thrown error", async () => {
+  const { traceShutdownRpc } = await import("./verify-shutdown-diagnostics.mjs");
+  const calls = [];
+  const shutdownResponse = { success: true, type: "shutdown" };
+  const shutdownFailure = new Error("RPC transport closed");
+  const client = {
+    async request(command, options) {
+      calls.push({ command, options });
+      if (command.type === "shutdown") {
+        if (calls.filter((call) => call.command.type === "shutdown").length === 1) return shutdownResponse;
+        throw shutdownFailure;
+      }
+      return { success: true, type: command.type };
+    },
+  };
+  const trace = [];
+  const restore = traceShutdownRpc(client, trace, () => "2026-10-06T00:00:00.000Z");
+  try {
+    const listCommand = { type: "list" };
+    const listOptions = { timeoutMs: 100 };
+    assert.deepEqual(await client.request(listCommand, listOptions), { success: true, type: "list" });
+    assert.deepEqual(calls[0], { command: listCommand, options: listOptions });
+    assert.strictEqual(await client.request({ type: "shutdown" }), shutdownResponse);
+    await assert.rejects(client.request({ type: "shutdown" }), (error) => error === shutdownFailure);
+  } finally {
+    restore();
+  }
+  assert.deepEqual(trace, [
+    { event: "shutdown_rpc_request", at: "2026-10-06T00:00:00.000Z", command: { type: "shutdown" } },
+    { event: "shutdown_rpc_response", at: "2026-10-06T00:00:00.000Z", response: shutdownResponse },
+    { event: "shutdown_rpc_request", at: "2026-10-06T00:00:00.000Z", command: { type: "shutdown" } },
+    { event: "shutdown_rpc_error", at: "2026-10-06T00:00:00.000Z", error: "RPC transport closed", name: "Error", stack: shutdownFailure.stack },
+  ]);
+});
+
+test("shutdown RPC tracing can observe requests made by clients constructed after instrumentation", async () => {
+  const { traceShutdownRpc } = await import("./verify-shutdown-diagnostics.mjs");
+  const prototype = {
+    async request(command) {
+      return { type: command.type, tag: this.tag };
+    },
+  };
+  const trace = [];
+  const restore = traceShutdownRpc(prototype, trace, () => "2026-10-06T00:00:00.000Z");
+  try {
+    const client = Object.assign(Object.create(prototype), { tag: "new-client" });
+    assert.deepEqual(await client.request({ type: "shutdown" }), { type: "shutdown", tag: "new-client" });
+  } finally {
+    restore();
+  }
+  assert.deepEqual(trace.map((entry) => entry.event), ["shutdown_rpc_request", "shutdown_rpc_response"]);
+});
+
+test("shutdown tracing remains fail-open if trace storage rejects writes", async () => {
+  const { traceShutdownRpc } = await import("./verify-shutdown-diagnostics.mjs");
+  const response = { success: true, type: "shutdown" };
+  let calls = 0;
+  const client = { async request() { calls += 1; return response; } };
+  const restore = traceShutdownRpc(client, Object.freeze([]), () => {
+    throw new Error("clock unavailable");
+  });
+  try {
+    assert.strictEqual(await client.request({ type: "shutdown" }), response);
+    assert.equal(calls, 1);
+  } finally {
+    restore();
+  }
+});
+
+test("error diagnostics cannot replace an unprintable RPC rejection", async () => {
+  const { traceShutdownRpc } = await import("./verify-shutdown-diagnostics.mjs");
+  const thrown = { toString() { throw new Error("broken error formatter"); } };
+  const client = { async request() { throw thrown; } };
+  const trace = [];
+  const restore = traceShutdownRpc(client, trace, () => "2026-10-06T00:00:00.000Z");
+  try {
+    await assert.rejects(client.request({ type: "shutdown" }), (error) => error === thrown);
+  } finally {
+    restore();
+  }
+  assert.deepEqual(trace[1], {
+    event: "shutdown_rpc_error",
+    at: "2026-10-06T00:00:00.000Z",
+    error: "<unprintable thrown value>",
+    name: "unknown",
+  });
 });

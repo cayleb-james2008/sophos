@@ -133,6 +133,18 @@ jobs:
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node verify/e2e.mjs
 
+      - name: Upload PR11 graceful-shutdown diagnostics
+        if: always() && env.SAFE_WINDOWS_REPO != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr11-graceful-shutdown-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.SAFE_WINDOWS_REPO }}/verify/shutdown-evidence/**
+            ${{ env.SAFE_WINDOWS_REPO }}/verify/e2e-report.json
+            ${{ env.SAFE_WINDOWS_REPO }}/verify/e2e-evidence.txt
+          if-no-files-found: warn
+          retention-days: 14
+
   # cua-e2e drives the real Tauri release executable through UI Automation
   # (verify/cua/*), using the disclosed demo IPC path (no provider inference).
   # The screenshot directory includes checked-in baseline frames, so clear it

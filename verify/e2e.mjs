@@ -113,9 +113,9 @@ async function main() {
         }
       }
       const overlayMatches = recordedOverlayMatches && overlayBuildError === null;
-      record("provenance: composed Prime Agent lease, Windows ZIP guard, and worker-shutdown fence", overlayMatches,
+      record("provenance: composed Prime Agent lease, Windows ZIP guard, worker-shutdown fence, and PR11 diagnostics", overlayMatches,
         overlayMatches
-          ? `lease=${overlay.sessionLeasePatchSha256} ZIP=${overlay.windowsZipGuardPatchSha256} shutdown=${overlay.workerShutdownFencePatchSha256} order=${overlay.patchOrder.join(" -> ")}`
+          ? `lease=${overlay.sessionLeasePatchSha256} ZIP=${overlay.windowsZipGuardPatchSha256} shutdown=${overlay.workerShutdownFencePatchSha256} diagnostics=${overlay.shutdownDiagnosticsPatchSha256} order=${overlay.patchOrder.join(" -> ")}`
           : overlayBuildError ?? "bundle overlay metadata does not match the reviewed composed source patches");
     } catch (error) {
       record("provenance: pinned Prime Agent source", false, String(error));
@@ -172,6 +172,7 @@ async function main() {
       PI_OFFLINE: "1",
       REF: join(RESOURCES, "daemon"),
       BRIDGE: BRIDGE_CLI,
+      BRIDGE_VERIFY_EVIDENCE_DIR: join(REPO, "verify", "shutdown-evidence"),
       BRIDGE_VERIFY_RECOVERY: "1",
       BRIDGE_VERIFY_SESSION_CWD: sessionCwd,
     };

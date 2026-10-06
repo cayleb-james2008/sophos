@@ -40,6 +40,8 @@ const EXPECTED = Object.freeze({
   zipGuardPatchBytes: 7632,
   workerShutdownFencePatchSha256: "b00fe6e14e7c349cc7794a392be9f698c8a02731d727c3a59865f207dba87b64",
   workerShutdownFencePatchBytes: 6936,
+  shutdownDiagnosticsPatchSha256: "660ddc7cc0c882c44013d449c1dcbdb36baccfd730ba4d42096575eac33a439c",
+  shutdownDiagnosticsPatchBytes: 5101,
   overlayId: "prime-agent-v070-windows-session-lease-v1",
   overrides: {
     undici: "7.29.1",
@@ -54,14 +56,16 @@ const EXPECTED_TRACKED_CHANGES = [
   "package.json",
   "packages/coding-agent/src/core/session-lease.ts",
   "packages/coding-agent/src/modes/daemon/daemon-mode.ts",
+  "packages/coding-agent/src/modes/daemon/daemon-supervisor.ts",
   "packages/coding-agent/src/utils/tools-manager.ts",
   "packages/coding-agent/test/daemon-supervisor-monitor.test.ts",
   "packages/coding-agent/test/tools-manager.test.ts",
 ].sort();
-const EXPECTED_PATCH_ORDER = Object.freeze(["session-lease", "windows-zip-guard", "worker-shutdown-fence"]);
+const EXPECTED_PATCH_ORDER = Object.freeze(["session-lease", "windows-zip-guard", "worker-shutdown-fence", "shutdown-diagnostics"]);
 const ALLOWED_PATCH_OUTPUTS = new Set([
   "packages/coding-agent/src/core/session-lease.ts",
   "packages/coding-agent/src/modes/daemon/daemon-mode.ts",
+  "packages/coding-agent/src/modes/daemon/daemon-supervisor.ts",
   "packages/coding-agent/src/utils/tools-manager.ts",
   "packages/coding-agent/test/daemon-supervisor-monitor.test.ts",
   "packages/coding-agent/test/tools-manager.test.ts",
@@ -69,6 +73,7 @@ const ALLOWED_PATCH_OUTPUTS = new Set([
 const EXPECTED_BUILD_SOURCE_HASHES = Object.freeze({
   "packages/coding-agent/src/core/session-lease.ts": "006802f39f6de128e6b7f418e9fb3b2793ef73410d1247db562ce5dcbe7a0349",
   "packages/coding-agent/src/modes/daemon/daemon-mode.ts": "da4be802d0d6499b9a922a3fca7643ae36483baf4245d2799bafe185b75d9e16",
+  "packages/coding-agent/src/modes/daemon/daemon-supervisor.ts": "6ecdbfe5e1f041cb7aee10b1dc354e635461f82337c7425bbe6ce2785031bbf2",
   "packages/coding-agent/src/utils/tools-manager.ts": "8936f99a387c3426bf4f2210cc1178fec1dcc2605cccab5d93127054340c7064",
   "packages/coding-agent/test/daemon-supervisor-monitor.test.ts": "97ee4b24c6327957f203d1d2406aba4113ce1baeacf256d249fbbc5f6af09fce",
   "packages/coding-agent/test/tools-manager.test.ts": "0956ee19088f761770601ff1c00212717c6a7276dd733dc3079c05d4235e8b75",
@@ -210,12 +215,12 @@ function assertExpectedSourceIdentity(checkout) {
 }
 
 function assertPatchRecords(patches) {
-  if (!Array.isArray(patches) || patches.length !== 3) {
-    throw new Error("the security composition requires exactly three reviewed source patches");
+  if (!Array.isArray(patches) || patches.length !== EXPECTED_PATCH_ORDER.length) {
+    throw new Error(`the security composition requires exactly ${EXPECTED_PATCH_ORDER.length} reviewed source patches`);
   }
   const names = patches.map((patch) => patch?.name);
   if (!isDeepStrictEqual(names, EXPECTED_PATCH_ORDER)) {
-    throw new Error("reviewed source patches must be ordered session-lease then Windows ZIP guard");
+    throw new Error("reviewed source patches must follow the pinned lease, Windows ZIP, worker-shutdown, and diagnostics order");
   }
   for (const patch of patches) {
     if (!Buffer.isBuffer(patch.bytes)) throw new Error(`${patch.name} patch bytes must be a Buffer`);
@@ -282,6 +287,11 @@ async function loadReviewedInputs(projectRoot) {
     ["patches", "prime-agent-v0.7.0-worker-shutdown-fence.patch"],
     "Prime Agent worker-shutdown fence patch",
   );
+  const shutdownDiagnosticsPatchPath = await assertRegularFileNoSymlink(
+    projectRoot,
+    ["patches", "prime-agent-v0.7.0-pr11-shutdown-diagnostics.patch"],
+    "PR11 graceful-shutdown diagnostics patch",
+  );
 
   const manifestBytes = await readFile(manifestPath);
   if (sha256(manifestBytes) !== EXPECTED.overlayManifestSha256) {
@@ -329,6 +339,11 @@ async function loadReviewedInputs(projectRoot) {
     || sha256(workerShutdownFencePatchBytes) !== EXPECTED.workerShutdownFencePatchSha256) {
     throw new Error("worker-shutdown fence patch SHA-256 or size mismatch");
   }
+  const shutdownDiagnosticsPatchBytes = await readFile(shutdownDiagnosticsPatchPath);
+  if (shutdownDiagnosticsPatchBytes.length !== EXPECTED.shutdownDiagnosticsPatchBytes
+    || sha256(shutdownDiagnosticsPatchBytes) !== EXPECTED.shutdownDiagnosticsPatchSha256) {
+    throw new Error("PR11 shutdown diagnostics patch SHA-256 or size mismatch");
+  }
   if (sha256(lockBytes) !== EXPECTED.overlayLockSha256) {
     throw new Error("canonical dependency overlay lock SHA-256 mismatch");
   }
@@ -340,6 +355,7 @@ async function loadReviewedInputs(projectRoot) {
     leasePatchBytes,
     zipGuardPatchBytes,
     workerShutdownFencePatchBytes,
+    shutdownDiagnosticsPatchBytes,
   };
 }
 
@@ -359,6 +375,8 @@ function expectedMarker(inputs) {
     windowsZipGuardPatchBytes: EXPECTED.zipGuardPatchBytes,
     workerShutdownFencePatchSha256: EXPECTED.workerShutdownFencePatchSha256,
     workerShutdownFencePatchBytes: EXPECTED.workerShutdownFencePatchBytes,
+    shutdownDiagnosticsPatchSha256: EXPECTED.shutdownDiagnosticsPatchSha256,
+    shutdownDiagnosticsPatchBytes: EXPECTED.shutdownDiagnosticsPatchBytes,
     patchOrder: [...EXPECTED_PATCH_ORDER],
   };
 }
@@ -547,6 +565,7 @@ export async function preparePrimeAgentSecurityBuildTree(projectRoot, pinnedSour
       { name: "session-lease", bytes: inputs.leasePatchBytes, sha256: EXPECTED.leasePatchSha256, unidiffZero: false },
       { name: "windows-zip-guard", bytes: inputs.zipGuardPatchBytes, sha256: EXPECTED.zipGuardPatchSha256, unidiffZero: true },
       { name: "worker-shutdown-fence", bytes: inputs.workerShutdownFencePatchBytes, sha256: EXPECTED.workerShutdownFencePatchSha256, unidiffZero: true },
+      { name: "shutdown-diagnostics", bytes: inputs.shutdownDiagnosticsPatchBytes, sha256: EXPECTED.shutdownDiagnosticsPatchSha256, unidiffZero: true },
     ];
     applyReviewedSourcePatches(buildRoot, patches);
     const output = await assertBuildOutputFiles(buildRoot, null, inputs.lockBytes);
