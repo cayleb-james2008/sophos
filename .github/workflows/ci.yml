@@ -240,15 +240,40 @@ jobs:
           New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null
           Write-Output 'Prepared an empty current-run screenshot directory'
 
-      - name: Run cua-driver e2e suite
-        # Keep failures blocking; a green result must mean all native UI suites ran.
+      - name: Run diagnostic A/B probe and blocking CUA suite
+        # The native probe records A/B telemetry only; the unchanged run-all
+        # suite still owns the blocking visibility, input, click, and panel checks.
+        # Always run both commands so a probe failure cannot hide suite results.
+        shell: pwsh
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
-        run: node verify/cua/run-all.mjs
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $previousDriverTimeout = $env:CUA_DRIVER_COMMAND_TIMEOUT_MS
+          $env:CUA_DRIVER_COMMAND_TIMEOUT_MS = '30000'
+          try {
+            node verify/cua/composition-wheel-probe.mjs
+            $probeExit = $LASTEXITCODE
+            Write-Output "Composition A/B probe exit=$probeExit"
+          } finally {
+            if ($null -eq $previousDriverTimeout) {
+              Remove-Item Env:CUA_DRIVER_COMMAND_TIMEOUT_MS -ErrorAction SilentlyContinue
+            } else {
+              $env:CUA_DRIVER_COMMAND_TIMEOUT_MS = $previousDriverTimeout
+            }
+          }
+          node verify/cua/run-all.mjs
+          $suiteExit = $LASTEXITCODE
+          Write-Output "Blocking native CUA suite exit=$suiteExit"
+          if ($probeExit -ne 0 -or $suiteExit -ne 0) {
+            throw "Composition A/B probe exit=$probeExit; blocking CUA suite exit=$suiteExit"
+          }
 
       - name: Upload CUA screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cua-e2e-screenshots-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ env.SAFE_WINDOWS_REPO }}/verify/cua/screenshots/*.png
+          path: |
+            ${{ env.SAFE_WINDOWS_REPO }}/verify/cua/screenshots/*.png
+            ${{ env.SAFE_WINDOWS_REPO }}/verify/cua/screenshots/composition-wheel-probe.json
           if-no-files-found: error

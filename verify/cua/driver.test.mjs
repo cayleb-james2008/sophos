@@ -259,6 +259,24 @@ function runIsolatedCuaScript(script) {
   return JSON.parse(result.stdout.trim());
 }
 
+test("applies an opt-in timeout to CUA driver calls and leaves normal calls unchanged", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    process.env.CUA_DRIVER_COMMAND_TIMEOUT_MS = "37000";
+    const driver = await import(${JSON.stringify(driverUrl)});
+    const timeouts = [];
+    const invoke = (_binary, _argv, options) => {
+      timeouts.push(options.timeout ?? null);
+      return { status: 0, stdout: "{}", stderr: "" };
+    };
+    driver.call("list_windows", {}, invoke);
+    delete process.env.CUA_DRIVER_COMMAND_TIMEOUT_MS;
+    driver.call("list_windows", {}, invoke);
+    console.log(JSON.stringify(timeouts));
+  `);
+  assert.deepEqual(output, [37000, null]);
+});
+
 test("hotkey fallback retries once with foreground only on structured background refusal", () => {
   const driverUrl = new URL("./driver.mjs", import.meta.url).href;
   const output = runIsolatedCuaScript(`

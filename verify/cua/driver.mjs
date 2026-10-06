@@ -47,6 +47,14 @@ export const DRIVER_BIN = resolveDriverBin();
 // parallel suite processes isolated while remaining constant within a suite.
 export const CUA_SESSION = process.env.CUA_SESSION || `sophos-${process.pid}`;
 const screenshotContexts = new Set();
+
+/** Apply a diagnostic-only subprocess deadline when explicitly requested. */
+function driverCommandOptions(options) {
+  const timeoutMs = Number(process.env.CUA_DRIVER_COMMAND_TIMEOUT_MS);
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return options;
+  return { ...options, timeout: timeoutMs };
+}
+
 const SCREENSHOT_DIR = join(dirname(fileURLToPath(import.meta.url)), "screenshots");
 /**
  * All v0.33.4 tool schemas accept an optional public session label. Include it
@@ -76,11 +84,11 @@ export function call(tool, args = {}, invoke = spawnSync) {
   // The next pixel click must obtain a fresh screenshot in the same session.
   if (tool !== "get_window_state") screenshotContexts.clear();
   const payload = sessionScopedPayload(tool, args);
-  const result = invoke(DRIVER_BIN, ["call", tool], {
+  const result = invoke(DRIVER_BIN, ["call", tool], driverCommandOptions({
     input: JSON.stringify(payload),
     encoding: "utf-8",
     windowsHide: true,
-  });
+  }));
 
   if (result.error) {
     throw new Error(`cua-driver call ${tool} failed to spawn: ${result.error.message}`);
@@ -158,7 +166,7 @@ export function callWithForegroundFallback(tool, args = {}) {
  */
 export function startDaemon() {
   screenshotContexts.clear();
-  const status = spawnSync(DRIVER_BIN, ["status"], { encoding: "utf-8", windowsHide: true });
+  const status = spawnSync(DRIVER_BIN, ["status"], driverCommandOptions({ encoding: "utf-8", windowsHide: true }));
   if (status.stdout && /daemon is running/i.test(status.stdout)) {
     return { alreadyRunning: true };
   }
@@ -172,7 +180,7 @@ export function startDaemon() {
 
   // Poll until the daemon answers.
   for (let i = 0; i < 40; i++) {
-    const s = spawnSync(DRIVER_BIN, ["status"], { encoding: "utf-8", windowsHide: true });
+    const s = spawnSync(DRIVER_BIN, ["status"], driverCommandOptions({ encoding: "utf-8", windowsHide: true }));
     if (s.stdout && /daemon is running/i.test(s.stdout)) {
       return { alreadyRunning: false };
     }
@@ -187,7 +195,7 @@ export function startDaemon() {
 
 /** Stop the cua-driver daemon. Returns the driver's status output. */
 export function stopDaemon() {
-  const result = spawnSync(DRIVER_BIN, ["stop"], { encoding: "utf-8", windowsHide: true });
+  const result = spawnSync(DRIVER_BIN, ["stop"], driverCommandOptions({ encoding: "utf-8", windowsHide: true }));
   screenshotContexts.clear();
   return result.stdout || result.stderr || "";
 }
