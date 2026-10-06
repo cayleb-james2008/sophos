@@ -16,9 +16,10 @@
 // (UIA Invoke) whenever the element exposes one — they need no coordinates.
 
 import { spawnSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { win32 } from "node:path";
+import { dirname, join, win32 } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** Resolve cua-driver from an explicit override or the current user's install. */
 export function resolveDriverBin({
@@ -41,6 +42,24 @@ export function resolveDriverBin({
 }
 
 export const DRIVER_BIN = resolveDriverBin();
+// One-shot CLI calls need a stable public session label to share screenshot
+// context across the observation/action boundary. The process ID keeps
+// parallel suite processes isolated while remaining constant within a suite.
+export const CUA_SESSION = process.env.CUA_SESSION || `sophos-${process.pid}`;
+const screenshotContexts = new Set();
+const SCREENSHOT_DIR = join(dirname(fileURLToPath(import.meta.url)), "screenshots");
+/**
+ * All v0.33.4 tool schemas accept an optional public session label. Include it
+ * on every one-shot call so snapshots and every subsequent action share one run.
+ */
+export function sessionScopedPayload(_tool, args = {}, session = CUA_SESSION) {
+  if (args.session != null) return args;
+  return { ...args, session };
+}
+
+function screenshotContextKey(pid, windowId, session) {
+  return `${session}:${pid}:${windowId}`;
+}
 
 /** Small sleep helper (ms). */
 export function sleep(ms) {
@@ -52,9 +71,13 @@ export function sleep(ms) {
  * Returns the parsed JSON result. Throws on non-zero exit or a plain-text
  * error payload (the driver reports some failures as text, not JSON).
  */
-export function call(tool, args = {}) {
-  const result = spawnSync(DRIVER_BIN, ["call", tool], {
-    input: JSON.stringify(args),
+export function call(tool, args = {}, invoke = spawnSync) {
+  // Any action may change the screen behind a cached coordinate snapshot.
+  // The next pixel click must obtain a fresh screenshot in the same session.
+  if (tool !== "get_window_state") screenshotContexts.clear();
+  const payload = sessionScopedPayload(tool, args);
+  const result = invoke(DRIVER_BIN, ["call", tool], {
+    input: JSON.stringify(payload),
     encoding: "utf-8",
     windowsHide: true,
   });
@@ -111,6 +134,7 @@ export function callWithForegroundFallback(tool, args = {}) {
  * up it is left untouched. Returns `{ alreadyRunning }`.
  */
 export function startDaemon() {
+  screenshotContexts.clear();
   const status = spawnSync(DRIVER_BIN, ["status"], { encoding: "utf-8", windowsHide: true });
   if (status.stdout && /daemon is running/i.test(status.stdout)) {
     return { alreadyRunning: true };
@@ -141,6 +165,7 @@ export function startDaemon() {
 /** Stop the cua-driver daemon. Returns the driver's status output. */
 export function stopDaemon() {
   const result = spawnSync(DRIVER_BIN, ["stop"], { encoding: "utf-8", windowsHide: true });
+  screenshotContexts.clear();
   return result.stdout || result.stderr || "";
 }
 
@@ -162,8 +187,19 @@ export function listWindows(opts = {}) {
  * `elements` (structured array with `element_index`, `element_token`, `role`,
  * `label`, `frame`, `enabled`, …), `tree_markdown`, `pid` and `window_id`.
  */
-export function getWindowState(pid, windowId, opts = {}) {
-  return call("get_window_state", { pid, window_id: windowId, ...opts });
+export function getWindowState(pid, windowId, opts = {}, invoke = call) {
+  const session = opts.session ?? CUA_SESSION;
+  const result = invoke("get_window_state", { pid, window_id: windowId, ...opts, session });
+  const contextKey = screenshotContextKey(pid, windowId, session);
+  if (
+    opts.include_screenshot === true ||
+    (opts.include_screenshot !== false && opts.screenshot_out_file)
+  ) {
+    screenshotContexts.add(contextKey);
+  } else {
+    screenshotContexts.delete(contextKey);
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,9 +212,36 @@ export function getWindowState(pid, windowId, opts = {}) {
  * elements — pixel clicks are for canvas / custom-drawn surfaces.
  */
 export function click(pid, x, y, windowId) {
-  const args = { pid, x, y };
-  if (windowId) args.window_id = windowId;
-  return call("click", args);
+  return clickWithScreenshotContext(pid, x, y, windowId, CUA_SESSION, call);
+}
+
+/**
+ * Pixel actions require a screenshot-bearing snapshot owned by the same CUA
+ * session. Refresh it on demand when the caller's most recent UIA read omitted
+ * its screenshot; this preserves the coordinate action instead of silently
+ * weakening or dropping UI coverage.
+ */
+export function clickWithScreenshotContext(
+  pid,
+  x,
+  y,
+  windowId,
+  session = CUA_SESSION,
+  invoke = call,
+  screenshotOutFile,
+) {
+  if (!windowId) {
+    throw new Error("Pixel clicks require a windowId to capture same-session screenshot context");
+  }
+  const contextKey = screenshotContextKey(pid, windowId, session);
+  if (!screenshotContexts.has(contextKey)) {
+    const capturePath = screenshotOutFile ?? join(SCREENSHOT_DIR, `click-context-${process.pid}-${pid}.png`);
+    mkdirSync(dirname(capturePath), { recursive: true });
+    getWindowState(pid, windowId, { include_screenshot: true, screenshot_out_file: capturePath, session }, invoke);
+  }
+  const args = { pid, x, y, session };
+  args.window_id = windowId;
+  return invoke("click", args);
 }
 
 /**
@@ -188,7 +251,7 @@ export function click(pid, x, y, windowId) {
  * web-content elements.
  */
 export function clickElement(pid, windowId, elementToken) {
-  return call("click", { pid, window_id: windowId, element_token: elementToken });
+  return call("click", { pid, window_id: windowId, element_token: elementToken, session: CUA_SESSION });
 }
 
 /**
@@ -253,7 +316,7 @@ export function bringToFront(pid, windowId) {
  * get_window_state response, which includes `screenshot_file_path`.
  */
 export function screenshot(pid, windowId, outPath) {
-  return call("get_window_state", { pid, window_id: windowId, screenshot_out_file: outPath });
+  return getWindowState(pid, windowId, { include_screenshot: true, screenshot_out_file: outPath });
 }
 
 /**

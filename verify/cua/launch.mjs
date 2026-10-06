@@ -20,14 +20,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Workspace root (two levels up from verify/cua/). */
 export const WORKSPACE_ROOT = path.resolve(__dirname, "..", "..");
 
+/** Resolve a release/debug build path under the actual checked-out workspace. */
+export function resolveAppBuildPath(workspaceRoot = WORKSPACE_ROOT, configuration = "release") {
+  if (configuration !== "debug" && configuration !== "release") {
+    throw new Error(`Unsupported app build configuration: ${configuration}`);
+  }
+  return path.join(
+    workspaceRoot,
+    "src-tauri",
+    "target",
+    configuration,
+    "prime-agent-windows.exe",
+  );
+}
+
 /** Default path to the Sophos desktop app release build. */
-export const DEFAULT_APP_PATH = path.join(
-  WORKSPACE_ROOT,
-  "src-tauri",
-  "target",
-  "release",
-  "prime-agent-windows.exe",
-);
+export const DEFAULT_APP_PATH = resolveAppBuildPath(WORKSPACE_ROOT, "release");
 
 /** The app's process name (from list_windows `app_name`). */
 export const APP_PROCESS_NAME = "prime-agent-windows.exe";

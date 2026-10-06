@@ -6,7 +6,7 @@ import test from "node:test";
 import { chmod, mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import * as hardening from "./prepare-dependency-overlay.mjs";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { delimiter, dirname, join, win32 } from "node:path";
 import { applyExactOverrides, assertLockDeltaIsScoped, assertResolvedLock, assertOverrideReviewMetadata, assertOverrideConstraintsMatchLock, assertRegistryMetadataMatchesPins, prepareDependencyOverlay } from "./prepare-dependency-overlay.mjs";
 
 const overlay = {
@@ -25,6 +25,27 @@ const overlay = {
     },
   },
 };
+
+function assertOwnDos83Alias(sourceRoot, shortPath) {
+  const aliasLeafName = win32.basename(shortPath);
+  const sourceLeafName = win32.basename(sourceRoot);
+  assert.match(aliasLeafName, /^[A-Z0-9]{1,6}~\d+$/i, `the fixture's own directory must have a DOS short-name suffix; returned ${shortPath}`);
+  assert.ok(aliasLeafName.length <= 8, `the fixture's leaf alias must fit the 8-character 8.3 base-name limit; returned ${shortPath}`);
+  assert.notEqual(aliasLeafName.toLowerCase(), sourceLeafName.toLowerCase(), "the fixture's leaf alias must differ from its long name");
+  assert.notEqual(shortPath.toLowerCase(), sourceRoot.toLowerCase(), "the fixture path must differ from its DOS alias");
+  return aliasLeafName;
+}
+
+test("8.3 fixture rejects an aliased ancestor or an overlong short-name leaf", () => {
+  const sourceRoot = String.raw`C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\sophos-short-name-source-x`;
+  const fixtureAlias = String.raw`C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\SOPHOS~1`;
+  assert.equal(assertOwnDos83Alias(sourceRoot, fixtureAlias), "SOPHOS~1");
+  assert.throws(() => assertOwnDos83Alias(sourceRoot, sourceRoot), /DOS short-name suffix/i);
+  assert.throws(
+    () => assertOwnDos83Alias(sourceRoot, String.raw`C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\SOPHOS~123`),
+    /8-character/i,
+  );
+});
 
 test("canonicalizes CRLF overlay lock bytes only when the reviewed SHA-256 matches", async () => {
   const lfBytes = Buffer.from('{"lockfileVersion":3}\n', "utf8");
@@ -347,63 +368,47 @@ test("supports Windows only through its separately validated ACL policy", () => 
 test("accepts a non-reparse 8.3 path alias for a secure Windows source root", { skip: process.platform !== "win32" }, async (t) => {
   const sourceRoot = await mkdtemp(join(tmpdir(), "sophos-short-name-source-"));
   const normalized = (path) => path.toLowerCase();
+  let helperDirectory;
   try {
-    const programFiles = process.env.ProgramFiles ?? "C:\\Program Files";
     const systemRoot = process.env.SystemRoot ?? process.env.WINDIR ?? "C:\\Windows";
-    const pwsh = join(programFiles, "PowerShell", "7", "pwsh.exe");
-    const powershell = existsSync(pwsh)
-      ? pwsh
-      : join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-    const pathPayload = Buffer.from(sourceRoot, "utf8").toString("base64");
-    const script = `
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
-$source = @'
-using System.Runtime.InteropServices;
-using System.Text;
-public static class SophosPathAliasNative {
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    public static extern uint GetShortPathName(string longPath, StringBuilder shortPath, uint capacity);
-}
-'@
-Add-Type -TypeDefinition $source
-$longPath = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${pathPayload}'))
-$buffer = [System.Text.StringBuilder]::new(32768)
-$length = [SophosPathAliasNative]::GetShortPathName($longPath, $buffer, [uint32]$buffer.Capacity)
-if ($length -eq 0 -or $length -ge $buffer.Capacity) {
-    $errorCode = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-    throw "GetShortPathName failed: Win32 error $errorCode"
-}
-[Console]::WriteLine($buffer.ToString())
-`;
-    const encodedScript = Buffer.from(script, "utf16le").toString("base64");
-    const shortPathResult = spawnSync(powershell, [
-      "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodedScript,
-    ], {
+    const cscript = join(systemRoot, "System32", "cscript.exe");
+    assert.ok(existsSync(cscript), "Windows Script Host is required to query a native DOS short path");
+    helperDirectory = await mkdtemp(join(tmpdir(), "sophos-short-name-helper-"));
+    const helperScriptPath = join(helperDirectory, "get-short-path.js");
+    const helperOutputPath = join(helperDirectory, "short-path.txt");
+    const helperScript = [
+      'var fso = new ActiveXObject("Scripting.FileSystemObject");',
+      "var folder = fso.GetFolder(WScript.Arguments.Item(0));",
+      "var output = fso.CreateTextFile(WScript.Arguments.Item(1), true, true);",
+      "output.WriteLine(folder.ShortPath);",
+      "output.Close();",
+      "",
+    ].join("\r\n");
+    await writeFile(helperScriptPath, helperScript, { flag: "wx" });
+    const shortPathResult = spawnSync(cscript, ["//NoLogo", "//B", helperScriptPath, sourceRoot, helperOutputPath], {
       encoding: "utf8",
       windowsHide: true,
-      timeout: 15_000,
+      timeout: 5_000,
       maxBuffer: 1024 * 1024,
       env: {
         SystemRoot: systemRoot,
         WINDIR: systemRoot,
-        ProgramFiles: programFiles,
         TEMP: process.env.TEMP ?? tmpdir(),
         TMP: process.env.TMP ?? tmpdir(),
         USERPROFILE: process.env.USERPROFILE ?? "",
-        PATH: [dirname(powershell), join(systemRoot, "System32")].join(delimiter),
+        PATH: [dirname(cscript), join(systemRoot, "System32")].join(delimiter),
       },
     });
     assert.equal(shortPathResult.error, undefined, shortPathResult.error?.message);
     assert.equal(shortPathResult.status, 0, shortPathResult.stderr || shortPathResult.stdout);
-    const shortPath = shortPathResult.stdout.trim();
+    const shortPath = (await readFile(helperOutputPath, "utf16le")).replace(/^\uFEFF/, "").trim();
     assert.ok(shortPath, "GetShortPathName must return the native short path for the fixture");
-    const hasDosShortName = shortPath.split(String.fromCharCode(92)).some((component) => /^.{1,6}~\d+$/i.test(component));
-    if (!hasDosShortName || normalized(shortPath) === normalized(sourceRoot)) {
-      t.skip("the native Windows volume does not expose an 8.3 alias for this fixture");
-      return;
-    }
+    const aliasLeafName = assertOwnDos83Alias(sourceRoot, shortPath);
+    const sourceLeafName = win32.basename(sourceRoot);
+    assert.match(aliasLeafName, /^[A-Z0-9]{1,6}~\d+$/i, `the fixture's own directory must have a DOS short-name suffix; returned ${shortPath}`);
+    assert.ok(aliasLeafName.length <= 8, `the fixture's leaf alias must fit the 8-character 8.3 base-name limit; returned ${shortPath}`);
+    assert.notEqual(normalized(aliasLeafName), normalized(sourceLeafName), "the fixture's leaf alias must differ from its long name");
+    assert.notEqual(normalized(shortPath), normalized(sourceRoot), "the fixture path must differ from its DOS alias");
     const physicalPath = await realpath(sourceRoot);
     assert.equal(normalized(await realpath(shortPath)), normalized(physicalPath), "the DOS alias must resolve to the exact long-name directory");
     t.diagnostic(`8.3 alias resolves to a non-reparse directory: ${shortPath} -> ${physicalPath}`);
@@ -414,6 +419,7 @@ if ($length -eq 0 -or $length -ge $buffer.Capacity) {
     const secureProjectRoot = await hardening.assertSecureProjectRoot(shortPath);
     assert.equal(normalized(secureProjectRoot), normalized(physicalPath), "the trusted project path may be canonicalized after the reparse check");
   } finally {
+    if (helperDirectory) await rm(helperDirectory, { recursive: true, force: true });
     await rm(sourceRoot, { recursive: true, force: true });
   }
 });
@@ -432,6 +438,10 @@ test("rejects an actual reparse-point ancestor by its Windows attributes", { ski
     await assert.rejects(
       hardening.assertSecureSourceRoot(sourceThroughJunction, "native Windows junction fixture"),
       /reparse point/i,
+    );
+    await assert.rejects(
+      hardening.assertSecureProjectRoot(sourceThroughJunction),
+      /reparse point|non-reparse/i,
     );
   } finally {
     await rm(workspace, { recursive: true, force: true });

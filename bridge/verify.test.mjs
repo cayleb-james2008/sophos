@@ -19,7 +19,9 @@ test("supervisor recovery stops only the old supervisor so Windows session worke
   assert.doesNotMatch(recoveryBlock, /terminateProcessTree\(oldDaemon\)/);
   assert.ok(recoveryBlock.includes("const oldSupervisorIdentity = await logRecoveryOwnership("));
   assert.ok(recoveryBlock.includes("waitForProcessIdentityExit(oldSupervisorIdentity)"));
-  assert.ok(recoveryBlock.includes("waitForSupervisorReplacement(oldSupervisorIdentity)"));
+  assert.ok(recoveryBlock.includes("const recoveryDeadline = Date.now() + 45_000;"));
+  assert.ok(recoveryBlock.includes("waitForSupervisorReplacement(oldSupervisorIdentity, Math.max(0, recoveryDeadline - Date.now()))"));
+  assert.ok(recoveryBlock.includes("Date.now() < recoveryDeadline && connectedAfterReplacement()"));
   assert.doesNotMatch(recoveryBlock, /await startDaemon\(\)/, "a second queued start can acquire the socket after the intended supervisor exits");
 
   const supervisorStopStart = verifySource.indexOf("async function terminateSupervisorOnly(identity) {");

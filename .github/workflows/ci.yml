@@ -135,11 +135,10 @@ jobs:
 
   # cua-e2e drives the real Tauri release executable through UI Automation
   # (verify/cua/*), using the disclosed demo IPC path (no provider inference).
-  # Raw PR11 logs show 0/8 suites: install reported a runner-local binary, but
-  # the wrapper received no CUA_DRIVER_BIN and used its developer-path fallback.
-  # startDaemon() discarded child stdio, so this is a concrete config defect,
-  # not proof the hosted desktop session is usable. Keep this gate blocking; a
-  # fresh run must execute every suite before native UI acceptance.
+  # The exact-head raw log shows the installed CUA_DRIVER_BIN was present; seven
+  # suites then failed because pixel clicks lacked same-session screenshot
+  # context, and Chat used a hard-coded developer checkout path. Keep this gate
+  # blocking and upload its screenshots even on failure.
   cua-e2e:
     runs-on: windows-latest
 
@@ -234,3 +233,11 @@ jobs:
         # Keep failures blocking; a green result must mean all native UI suites ran.
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node verify/cua/run-all.mjs
+
+      - name: Upload CUA screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cua-e2e-screenshots-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SAFE_WINDOWS_REPO }}/verify/cua/screenshots/*.png
+          if-no-files-found: error

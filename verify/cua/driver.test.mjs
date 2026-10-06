@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { join, win32 } from "node:path";
 
 import * as driver from "./driver.mjs";
+import * as launch from "./launch.mjs";
 
 test("uses the explicit CUA_DRIVER_BIN override verbatim", () => {
   const configured = String.raw`D:\Tools\Cua\cua-driver.exe`;
@@ -108,4 +109,141 @@ test("recognizes an explicitly configured executable as installed", () => {
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.trim(), "true");
+});
+
+test("pixel clicks acquire screenshot context and reuse one session label", () => {
+  assert.equal(typeof driver.CUA_SESSION, "string");
+  assert.equal(typeof driver.clickWithScreenshotContext, "function");
+  const calls = [];
+  const invoke = (tool, args) => {
+    calls.push({ tool, args });
+    return {};
+  };
+  const session = `${driver.CUA_SESSION}-pixel-click-regression`;
+  const pid = 930001;
+  const windowId = 930002;
+
+  driver.getWindowState(pid, windowId, { include_screenshot: false, session }, invoke);
+  calls.length = 0;
+  const screenshotPath = join(tmpdir(), "cua-click-context-regression.png");
+  driver.clickWithScreenshotContext(pid, 123, 456, windowId, session, invoke, screenshotPath);
+
+  assert.deepEqual(calls, [
+    {
+      tool: "get_window_state",
+      args: { pid, window_id: windowId, include_screenshot: true, screenshot_out_file: screenshotPath, session },
+    },
+    {
+      tool: "click",
+      args: { pid, x: 123, y: 456, window_id: windowId, session },
+    },
+  ]);
+});
+
+test("pixel clicks never assume an implicit screenshot default", () => {
+  const calls = [];
+  const invoke = (tool, args) => {
+    calls.push({ tool, args });
+    return {};
+  };
+  const session = `${driver.CUA_SESSION}-implicit-screenshot-regression`;
+  const pid = 930011;
+  const windowId = 930012;
+  driver.getWindowState(pid, windowId, { session }, invoke);
+  calls.length = 0;
+  const screenshotPath = join(tmpdir(), "cua-unknown-default.png");
+  driver.clickWithScreenshotContext(pid, 10, 20, windowId, session, invoke, screenshotPath);
+  assert.deepEqual(calls.map(({ tool }) => tool), ["get_window_state", "click"]);
+  assert.equal(calls[0].args.include_screenshot, true);
+  assert.equal(calls[0].args.session, session);
+  assert.equal(calls[0].args.screenshot_out_file, screenshotPath);
+});
+
+test("one-shot input actions carry a stable session and refresh stale click context", () => {
+  assert.equal(typeof driver.sessionScopedPayload, "function");
+  const session = `${driver.CUA_SESSION}-action-regression`;
+  const calls = [];
+  const invoke = (_binary, argv, options) => {
+    calls.push({ tool: argv[1], args: JSON.parse(options.input) });
+    return { status: 0, stdout: "{}", stderr: "" };
+  };
+  const actions = [
+    ["get_window_state", { pid: 940001, window_id: 940002, include_screenshot: true }],
+    ["click", { pid: 940001, window_id: 940002, x: 1, y: 2 }],
+    ["type_text", { pid: 940001, window_id: 940002, text: "draft", element_token: "snapshot-token" }],
+    ["press_key", { pid: 940001, window_id: 940002, key: "enter" }],
+    ["hotkey", { pid: 940001, window_id: 940002, keys: ["ctrl", "a"] }],
+    ["scroll", { pid: 940001, window_id: 940002, direction: "down", amount: 2 }],
+    ["bring_to_front", { pid: 940001, window_id: 940002 }],
+  ];
+
+  for (const [tool, args] of actions) {
+    driver.call(tool, { ...args, session }, invoke);
+  }
+  for (const { args } of calls) assert.equal(args.session, session);
+
+  const listWindowsCall = driver.call("list_windows", {}, invoke);
+  assert.equal(calls.at(-1).args.session, driver.CUA_SESSION, "all v0.33.4 tool calls share the default run session");
+  assert.deepEqual(listWindowsCall, {});
+
+  const pid = 940011;
+  const windowId = 940012;
+  driver.getWindowState(pid, windowId, { include_screenshot: true, session }, (_tool, _args) => ({}));
+  driver.call("type_text", { pid, window_id: windowId, text: "update", session }, invoke);
+  calls.length = 0;
+  const screenshotPath = join(tmpdir(), "cua-after-input-regression.png");
+  driver.clickWithScreenshotContext(pid, 10, 20, windowId, session, (_tool, args) => {
+    calls.push({ tool: _tool, args });
+    return {};
+  }, screenshotPath);
+  assert.deepEqual(calls.map(({ tool }) => tool), ["get_window_state", "click"]);
+  assert.equal(calls[0].args.session, session);
+  assert.equal(calls[0].args.include_screenshot, true);
+  assert.equal(calls[0].args.screenshot_out_file, screenshotPath);
+  assert.equal(calls[1].args.session, session);
+});
+
+test("resolves release and debug app paths under the supplied workspace", () => {
+  assert.equal(typeof launch.resolveAppBuildPath, "function");
+  const workspace = join(tmpdir(), "sophos-cua-workspace-fixture");
+  assert.equal(
+    launch.resolveAppBuildPath(workspace, "release"),
+    join(workspace, "src-tauri", "target", "release", "prime-agent-windows.exe"),
+  );
+  assert.equal(
+    launch.resolveAppBuildPath(workspace, "debug"),
+    join(workspace, "src-tauri", "target", "debug", "prime-agent-windows.exe"),
+  );
+});
+
+test("startDaemon clears the context cache before any already-running early return", () => {
+  const source = readFileSync(new URL("./driver.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("export function startDaemon()");
+  const end = source.indexOf("export function stopDaemon()", start);
+  assert.ok(start >= 0 && end > start, "the daemon start function must remain present");
+  const body = source.slice(start, end);
+  assert.match(body, /screenshotContexts\.clear\(\)/);
+  assert.ok(
+    body.indexOf("screenshotContexts.clear()") < body.indexOf("return { alreadyRunning: true };"),
+    "cached screenshot context must not survive a daemon that was restarted externally",
+  );
+});
+
+test("stopping the CUA daemon invalidates cached screenshot context", () => {
+  const source = readFileSync(new URL("./driver.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("export function stopDaemon()");
+  const end = source.indexOf("export function listWindows", start);
+  assert.ok(start >= 0 && end > start, "the daemon stop function must remain present");
+  assert.match(source.slice(start, end), /screenshotContexts\.clear\(\)/);
+});
+
+test("pixel clicks fail closed without a window ID for screenshot context", () => {
+  const calls = [];
+  assert.throws(
+    () => driver.clickWithScreenshotContext(950001, 10, 20, undefined, "missing-window-context", (tool, args) => {
+      calls.push({ tool, args });
+    }),
+    /windowId/i,
+  );
+  assert.deepEqual(calls, [], "no coordinate click may be sent without a screenshot-addressable window");
 });
