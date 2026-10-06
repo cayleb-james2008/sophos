@@ -13,8 +13,8 @@
 //   - Agent switcher selects a peer and shows that peer's thread
 //   - Send a relay message from the composer
 
-import { getWindowState, sleep, typeText } from "./driver.mjs";
-import { takeScreenshot, getTextContent } from "./helpers.mjs";
+import { click, getWindowState, sleep, typeText } from "./driver.mjs";
+import { elementCenter, takeScreenshot, getTextContent } from "./helpers.mjs";
 import { findBy, clickBy, waitFor } from "./find-util.mjs";
 import { assert, assertTextContains } from "./assertions.mjs";
 import { runDemoSuite } from "./demo-runner.mjs";
@@ -94,10 +94,26 @@ const tests = [
       const before = countText(state, "UNREAD");
       takeScreenshot(appHandle.pid, "inbox-unread-before-click", appHandle.windowId);
       assert(before >= 1, `Expected an UNREAD pill before clicking (got ${before})`);
-      // Click the unread message node.
-      const node = await waitFor(state, { text: "Endpoint review approved" }, 8000);
+      // Require a real, sized canvas before interacting. WebView2 can expose
+      // node text in its UIA tree even when the flex canvas has collapsed.
+      const visible = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+      const canvas = findBy(visible, { text: "Message flow canvas" });
+      assert(canvas, "Inbox message-flow canvas is missing from UI Automation");
+      assert(
+        Number(canvas.frame?.h) >= 240,
+        `Inbox message-flow canvas must be at least 240px high (got ${canvas.frame?.h ?? "no frame"})`,
+      );
+      // Click the rendered node's pixel center, not merely UIA Invoke on its
+      // accessible name, so this exercises the visible graph interaction.
+      const node = findBy(visible, { text: "Endpoint review approved" });
       assert(node, "Unread message node not found");
-      clickBy(appHandle.pid, freshState(appHandle), { text: "Endpoint review approved" });
+      assert(Number(node.frame?.w) > 0 && Number(node.frame?.h) > 0, "Unread message node has no visible bounds");
+      const { x, y } = elementCenter(node, visible);
+      assert(
+        x >= 0 && y >= 0 && x < visible.screenshot_width && y < visible.screenshot_height,
+        `Unread message node center is outside the app screenshot (${x}, ${y})`,
+      );
+      click(appHandle.pid, x, y, appHandle.windowId);
       await sleep(1200);
       takeScreenshot(appHandle.pid, "inbox-unread-after-click", appHandle.windowId);
       const after = freshState(appHandle);

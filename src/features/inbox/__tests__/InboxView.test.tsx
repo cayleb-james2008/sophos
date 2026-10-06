@@ -103,6 +103,13 @@ describe("InboxView", () => {
     expect(screen.getByText("Helper")).toBeInTheDocument();
   });
 
+  it("exposes the selected message-flow canvas as a named group", async () => {
+    render(<InboxView />);
+    const canvas = await screen.findByRole("group", { name: "Message flow canvas" });
+
+    expect(canvas).toContainElement(screen.getByTestId("inbox-graph"));
+  });
+
   it("renders an unread badge on the peer chip with unread messages", async () => {
     render(<InboxView />);
     await waitFor(() => expect(screen.getByRole("button", { name: /Worker/ })).toBeInTheDocument());
