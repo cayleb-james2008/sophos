@@ -124,9 +124,10 @@ const tests = [
     name: "Composition knobs open the thinking + skills panel",
     fn: async (appHandle) => {
       await goAgents(appHandle);
-      // The detail thread can extend below the short native window. Scroll its
-      // named region, using the indexed native scroll element exposed in that
-      // same UIA snapshot, so the composition control is both reachable and on-screen.
+      // Resolve the native scroll path for the named thread from this same
+      // snapshot. WebView2 may expose the thread as an unindexed Group with no
+      // scroll action; then its nearest indexed scrollable ancestor is the
+      // actionable path to bring the off-screen composition control into view.
       const scrollState = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
       const nativeTree = String(scrollState.tree_markdown ?? "");
       const compositionBefore = findBy(scrollState, { text: "Composition" });
@@ -149,14 +150,19 @@ const tests = [
         ),
         "Agent coordination thread region is missing from the native UIA tree",
       );
-      const threadPane = findNamedRegionScrollElement(scrollState, "Agent coordination thread");
-      if (!threadPane) console.log("[AGENT-COMPOSITION-UIA-TREE]", scrollState.tree_markdown ?? "<tree missing>");
-      assert(threadPane, "Agent coordination thread has no indexed native scroll target");
+      const scrollTarget = findNamedRegionScrollElement(scrollState, "Agent coordination thread");
+      if (!scrollTarget) console.log("[AGENT-COMPOSITION-UIA-TREE]", scrollState.tree_markdown ?? "<tree missing>");
+      assert(scrollTarget, "Agent coordination thread has no indexed scroll target in its native tree path");
+      console.log("[AGENT-COMPOSITION-UIA-RESOLVED]", JSON.stringify({
+        element_index: scrollTarget.element_index,
+        role: scrollTarget.role,
+        frame: scrollTarget.frame,
+      }));
       assert(
-        Number(threadPane.frame?.w) > 0 && Number(threadPane.frame?.h) > 0,
+        Number(scrollTarget.frame?.w) > 0 && Number(scrollTarget.frame?.h) > 0,
         "Agent coordination thread scroll target has no native bounds",
       );
-      const scrollPoint = elementCenter(threadPane, scrollState);
+      const scrollPoint = elementCenter(scrollTarget, scrollState);
       assert(
         scrollPoint.x >= 0 && scrollPoint.y >= 0 &&
           scrollPoint.x < scrollState.screenshot_width && scrollPoint.y < scrollState.screenshot_height,
@@ -179,10 +185,10 @@ const tests = [
       );
       console.log("[AGENT-COMPOSITION-UIA]", JSON.stringify({
         scrollTarget: {
-          element_index: threadPane.element_index,
-          role: threadPane.role,
-          label: threadPane.label,
-          frame: threadPane.frame,
+          element_index: scrollTarget.element_index,
+          role: scrollTarget.role,
+          label: scrollTarget.label,
+          frame: scrollTarget.frame,
         },
         composition: {
           element_index: composition.element_index,

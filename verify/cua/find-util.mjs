@@ -29,37 +29,55 @@ function hasScrollAction(node) {
   return /\bactions=\[[^\]]*\bscroll\b/.test(node.metadata);
 }
 
+function indexedScrollTarget(node, byIndex) {
+  if (node.index == null || !hasScrollAction(node)) return undefined;
+  const element = byIndex(node.index);
+  return Array.isArray(element?.actions) && element.actions.includes("scroll") ? element : undefined;
+}
+
 /**
- * Resolve a named semantic region to the indexed UIA element that actually
- * owns its scroll action. WebView2 may render `role=region` as an unindexed
- * Group in tree_markdown while exposing its scrollable child Pane in the
- * structured elements array. Keep lookup within the named subtree; do not
- * assume the region label itself is an indexed/actionable element.
+ * Resolve a named semantic region to an indexed UIA scroll target. WebView2
+ * may render `role=region` as an unindexed Group in `tree_markdown`; when no
+ * indexed scrollable descendant exists, the nearest indexed scrollable
+ * ancestor (often the Document) is the actionable path to bring the region on
+ * screen. Return the structured element from this same snapshot so callers use
+ * its native frame and verified scroll action rather than guessing bounds from text.
  */
 export function findNamedRegionScrollElement(windowState, regionName) {
   const lines = String(windowState?.tree_markdown ?? "").split(/\r?\n/);
   const elements = windowState?.elements ?? [];
-  const regionLine = lines.findIndex((line) => {
-    const node = parseTreeNode(line);
-    return node && ["Group", "Pane", "Region"].includes(node.role) && node.label === regionName;
-  });
-  if (regionLine < 0) return undefined;
-
-  const region = parseTreeNode(lines[regionLine]);
   const byIndex = (index) => elements.find((element) => Number(element.element_index) === index);
+  const stack = [];
+  let regionEntry;
 
-  if (region.index != null && hasScrollAction(region)) {
-    const element = byIndex(region.index);
-    if (element) return element;
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    const node = parseTreeNode(lines[lineIndex]);
+    if (!node) continue;
+    while (stack.length && stack[stack.length - 1].indent >= node.indent) stack.pop();
+
+    if (["Group", "Pane", "Region"].includes(node.role) && node.label === regionName) {
+      regionEntry = { lineIndex, node, ancestors: [...stack] };
+      break;
+    }
+    stack.push(node);
   }
+  if (!regionEntry) return undefined;
+
+  const { lineIndex: regionLine, node: region, ancestors } = regionEntry;
+  const regionElement = indexedScrollTarget(region, byIndex);
+  if (regionElement) return regionElement;
 
   for (let i = regionLine + 1; i < lines.length; i += 1) {
     const candidate = parseTreeNode(lines[i]);
     if (!candidate) continue;
     if (candidate.indent <= region.indent) break;
     if (!["Group", "Pane", "Region"].includes(candidate.role)) continue;
-    if (candidate.index == null || !hasScrollAction(candidate)) continue;
-    const element = byIndex(candidate.index);
+    const element = indexedScrollTarget(candidate, byIndex);
+    if (element) return element;
+  }
+
+  for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+    const element = indexedScrollTarget(ancestors[i], byIndex);
     if (element) return element;
   }
   return undefined;
