@@ -335,6 +335,25 @@ export function bringToFront(pid, windowId) {
 }
 
 /**
+ * Activate the target window before a foreground wheel action. `launch_app`
+ * deliberately uses SW_SHOWNOACTIVATE, while the Windows scroll foreground
+ * route sends global input at the requested screen point without activating
+ * the target. Return both native results so callers can assert activation and
+ * must still verify the post-scroll UI state.
+ */
+export async function scrollAfterBringToFront(pid, direction, amount, windowId, opts = {}) {
+  const { settleMs = 350, ...scrollOpts } = opts;
+  await sleep(settleMs);
+  const activation = bringToFront(pid, windowId);
+  if (activation?.landed_on_target !== true) return { activation, result: null };
+  const result = scroll(pid, direction, amount, windowId, {
+    ...scrollOpts,
+    delivery_mode: "foreground",
+  });
+  return { activation, result };
+}
+
+/**
  * Capture a screenshot of a window to `outPath` (PNG). Returns the parsed
  * get_window_state response, which includes `screenshot_file_path`.
  */

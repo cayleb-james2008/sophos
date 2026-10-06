@@ -290,6 +290,89 @@ test("hotkey fallback retries once with foreground only on structured background
   assert.equal(output.calls[1].args.delivery_mode, "foreground");
 });
 
+test("foreground scroll brings the exact window forward before sending the wheel", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    const calls = [];
+    childProcess.spawnSync = (_binary, argv, options) => {
+      const tool = argv[1];
+      const args = JSON.parse(options.input);
+      calls.push({ tool, args });
+      if (tool === "bring_to_front") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({ landed_on_target: true, target_hwnd: "0x1234", now_fg_hwnd: "0x1234" }),
+          stderr: "",
+        };
+      }
+      if (tool === "scroll") {
+        return {
+          status: 0,
+          stdout: JSON.stringify({ delivery: { mode: "foreground" }, effect: "unverifiable", route: "global_input" }),
+          stderr: "",
+        };
+      }
+      return { status: 1, stdout: "", stderr: JSON.stringify({ code: "unexpected_call" }) };
+    };
+    syncBuiltinESMExports();
+    const driver = await import(${JSON.stringify(driverUrl)});
+    try {
+      const value = await driver.scrollAfterBringToFront(930201, "down", 5, 930202, { x: 914, y: 764, settleMs: 0 });
+      console.log(JSON.stringify({ value, calls }));
+    } catch (error) {
+      console.log(JSON.stringify({ error: error.message, calls }));
+    }
+  `);
+
+  assert.equal(output.error, undefined, JSON.stringify(output.error));
+  assert.deepEqual(output.calls.map(({ tool }) => tool), ["bring_to_front", "scroll"]);
+  assert.equal(output.calls[0].args.pid, 930201);
+  assert.equal(output.calls[0].args.window_id, 930202);
+  assert.equal(typeof output.calls[0].args.session, "string");
+  assert.equal(output.calls[1].args.pid, 930201);
+  assert.equal(output.calls[1].args.window_id, 930202);
+  assert.equal(output.calls[1].args.direction, "down");
+  assert.equal(output.calls[1].args.amount, 5);
+  assert.equal(output.calls[1].args.x, 914);
+  assert.equal(output.calls[1].args.y, 764);
+  assert.equal(output.calls[1].args.delivery_mode, "foreground");
+  assert.equal(output.value.activation.landed_on_target, true);
+  assert.equal(output.value.result.route, "global_input");
+});
+
+test("foreground scroll refuses global input when target activation is not confirmed", () => {
+  const driverUrl = new URL("./driver.mjs", import.meta.url).href;
+  const output = runIsolatedCuaScript(`
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    const calls = [];
+    childProcess.spawnSync = (_binary, argv, options) => {
+      const tool = argv[1];
+      const args = JSON.parse(options.input);
+      calls.push({ tool, args });
+      if (tool === "bring_to_front") {
+        return { status: 0, stdout: JSON.stringify({ landed_on_target: false }), stderr: "" };
+      }
+      return { status: 0, stdout: JSON.stringify({ route: "global_input" }), stderr: "" };
+    };
+    syncBuiltinESMExports();
+    const driver = await import(${JSON.stringify(driverUrl)});
+    try {
+      const value = await driver.scrollAfterBringToFront(930211, "down", 5, 930212, { x: 914, y: 764, settleMs: 0 });
+      console.log(JSON.stringify({ value, calls }));
+    } catch (error) {
+      console.log(JSON.stringify({ error: error.message, calls }));
+    }
+  `);
+
+  assert.equal(output.error, undefined, JSON.stringify(output.error));
+  assert.equal(output.value.activation.landed_on_target, false);
+  assert.equal(output.value.result, null);
+  assert.deepEqual(output.calls.map(({ tool }) => tool), ["bring_to_front"]);
+});
+
 test("hotkey fallback does not escalate on a different structured refusal", () => {
   const driverUrl = new URL("./driver.mjs", import.meta.url).href;
   const output = runIsolatedCuaScript(`

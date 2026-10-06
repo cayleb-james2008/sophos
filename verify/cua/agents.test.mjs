@@ -12,8 +12,8 @@
 //   - Send message to agent
 //   - Composition knobs (thinking level + skills)
 
-import { getWindowState, sleep, typeText, scroll } from "./driver.mjs";
-import { navTo, takeScreenshot, elementCenter } from "./helpers.mjs";
+import { getWindowState, sleep, typeText, scrollAfterBringToFront } from "./driver.mjs";
+import { navTo, takeScreenshot, elementCenter, toWindowLocal } from "./helpers.mjs";
 import {
   findBy,
   clickBy,
@@ -28,6 +28,19 @@ import { runDemoSuite } from "./demo-runner.mjs";
 /** Read a fresh window state for the app handle. */
 function freshState(appHandle) {
   return getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: false });
+}
+
+/** Convert a native UIA frame into the screenshot's window-local coordinates. */
+function windowLocalBounds(element, windowState) {
+  const frame = element?.frame;
+  if (!frame) return null;
+  const left = toWindowLocal(Number(frame.x), Number(frame.y), windowState);
+  const right = toWindowLocal(Number(frame.x) + Number(frame.w), Number(frame.y) + Number(frame.h), windowState);
+  return { x: left.x, y: left.y, right: right.x, bottom: right.y };
+}
+
+function boundsInsideScreenshot(bounds, width, height) {
+  return Boolean(bounds) && bounds.x >= 0 && bounds.y >= 0 && bounds.right <= width && bounds.bottom <= height;
 }
 
 /** Navigate to the Agents view and wait for it to render. */
@@ -149,8 +162,20 @@ const tests = [
           element_index: compositionBefore.element_index,
           role: compositionBefore.role,
           frame: compositionBefore.frame,
+          bounds: windowLocalBounds(compositionBefore, scrollState),
         } : null,
       }));
+      assert(compositionBefore, "Composition control is missing before scrolling");
+      assert(
+        Number(compositionBefore.frame?.w) > 0 && Number(compositionBefore.frame?.h) > 0,
+        "Composition control has no native bounds before scrolling",
+      );
+      const compositionBeforeBounds = windowLocalBounds(compositionBefore, scrollState);
+      assert(
+        !boundsInsideScreenshot(compositionBeforeBounds, scrollState.screenshot_width, scrollState.screenshot_height),
+        "Composition control is already fully in the window; this test no longer exercises native scrolling",
+      );
+      takeScreenshot(appHandle.pid, "agents-composition-control-before-scroll", appHandle.windowId);
       assert(
         nativeTree.split(/\r?\n/).some((line) =>
           /^\s*-\s+(?:\[\d+\]\s+)?(?:Group|Pane|Region)\s+"Agent coordination thread"(?:\s|$)/.test(line),
@@ -203,11 +228,22 @@ const tests = [
           point: scrollPoint,
         },
       }));
-      const scrollResult = scroll(appHandle.pid, "down", 5, appHandle.windowId, {
-        x: scrollPoint.x,
-        y: scrollPoint.y,
-        delivery_mode: "foreground",
-      });
+      const { activation, result: scrollResult } = await scrollAfterBringToFront(
+        appHandle.pid,
+        "down",
+        5,
+        appHandle.windowId,
+        {
+          x: scrollPoint.x,
+          y: scrollPoint.y,
+        },
+      );
+      console.log("[AGENT-COMPOSITION-UIA-ACTIVATION]", JSON.stringify(activation));
+      assert(
+        activation?.landed_on_target === true &&
+          activation?.target_hwnd === activation?.now_fg_hwnd,
+        `Sophos window was not confirmed foreground before global wheel input (${JSON.stringify(activation)})`,
+      );
       console.log("[AGENT-COMPOSITION-UIA-SCROLL-RESULT]", JSON.stringify({
         requested: {
           delivery_mode: "foreground",
@@ -217,14 +253,34 @@ const tests = [
         },
         result: scrollResult,
       }));
+      assert(
+        scrollResult?.delivery?.mode === "foreground" &&
+          scrollResult?.route === "global_input" &&
+          /SendInput wheel/i.test(String(scrollResult?.summary ?? "")),
+        `Composition scroll did not use native foreground wheel input (${JSON.stringify(scrollResult)})`,
+      );
       await sleep(350);
       takeScreenshot(appHandle.pid, "agents-composition-control-after-scroll", appHandle.windowId);
 
-      const scrolled = await waitFor(scrollState, { text: "Composition" }, 8000);
-      assert(scrolled, "Composition control did not appear after scrolling the Agent coordination thread");
+      const visibilityDeadline = Date.now() + 8000;
+      let compositionVisibleAfterScroll = false;
+      while (Date.now() < visibilityDeadline) {
+        const observation = freshState(appHandle);
+        const candidate = findBy(observation, { text: "Composition" });
+        if (candidate) {
+          const bounds = windowLocalBounds(candidate, scrollState);
+          if (boundsInsideScreenshot(bounds, scrollState.screenshot_width, scrollState.screenshot_height)) {
+            compositionVisibleAfterScroll = true;
+            break;
+          }
+        }
+        await sleep(250);
+      }
+      assert(compositionVisibleAfterScroll, "Composition control did not enter the window after native scrolling");
       const ready = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
       const composition = findBy(ready, { text: "Composition" });
       const buttonCenter = composition ? elementCenter(composition, ready) : null;
+      const compositionBounds = composition ? windowLocalBounds(composition, ready) : null;
       console.log("[AGENT-COMPOSITION-UIA-AFTER-SCROLL]", JSON.stringify({
         screenshot: `${ready.screenshot_width}x${ready.screenshot_height}`,
         elementCount: (ready.elements ?? []).length,
@@ -233,13 +289,22 @@ const tests = [
           role: composition.role,
           frame: composition.frame,
           center: buttonCenter,
+          bounds: compositionBounds,
         } : null,
       }));
       assert(composition, "Composition control disappeared from the fresh native UIA snapshot");
       assert(
+        Number(composition.frame?.w) > 0 && Number(composition.frame?.h) > 0,
+        "Composition control has no native bounds after scrolling",
+      );
+      assert(
         buttonCenter.x >= 0 && buttonCenter.y >= 0 &&
           buttonCenter.x < ready.screenshot_width && buttonCenter.y < ready.screenshot_height,
         `Composition control is outside the window after scrolling (${buttonCenter.x}, ${buttonCenter.y})`,
+      );
+      assert(
+        boundsInsideScreenshot(compositionBounds, ready.screenshot_width, ready.screenshot_height),
+        `Composition control bounds are not fully visible after scrolling (${JSON.stringify(compositionBounds)})`,
       );
       console.log("[AGENT-COMPOSITION-UIA]", JSON.stringify({
         scrollTarget: {
