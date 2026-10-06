@@ -97,6 +97,17 @@ const tests = [
       // Require a real, sized canvas before interacting. WebView2 can expose
       // node text in its UIA tree even when the flex canvas has collapsed.
       const visible = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+      const uiaCandidates = (visible.elements || [])
+        .filter((element) => /message flow canvas|endpoint review approved|inbox/i.test(String(element.label || "")))
+        .map(({ element_index, role, label, frame }) => ({ element_index, role, label, frame }));
+      console.log("[INBOX-UIA]", JSON.stringify({
+        screenshot: `${visible.screenshot_width}x${visible.screenshot_height}`,
+        elementCount: visible.elements?.length ?? 0,
+        candidates: uiaCandidates,
+      }));
+      console.log("[INBOX-UIA-TREE-BEGIN]");
+      console.log(visible.tree_markdown ?? "<tree_markdown missing>");
+      console.log("[INBOX-UIA-TREE-END]");
       const canvas = findBy(visible, { text: "Message flow canvas" });
       assert(canvas, "Inbox message-flow canvas is missing from UI Automation");
       assert(

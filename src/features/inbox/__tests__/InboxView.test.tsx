@@ -103,9 +103,9 @@ describe("InboxView", () => {
     expect(screen.getByText("Helper")).toBeInTheDocument();
   });
 
-  it("exposes the selected message-flow canvas as a named group", async () => {
+  it("exposes the selected message-flow canvas as a named region", async () => {
     render(<InboxView />);
-    const canvas = await screen.findByRole("group", { name: "Message flow canvas" });
+    const canvas = await screen.findByRole("region", { name: "Message flow canvas" });
 
     expect(canvas).toContainElement(screen.getByTestId("inbox-graph"));
   });
