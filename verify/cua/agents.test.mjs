@@ -203,7 +203,20 @@ const tests = [
           point: scrollPoint,
         },
       }));
-      scroll(appHandle.pid, "down", 5, appHandle.windowId, { x: scrollPoint.x, y: scrollPoint.y });
+      const scrollResult = scroll(appHandle.pid, "down", 5, appHandle.windowId, {
+        x: scrollPoint.x,
+        y: scrollPoint.y,
+        delivery_mode: "foreground",
+      });
+      console.log("[AGENT-COMPOSITION-UIA-SCROLL-RESULT]", JSON.stringify({
+        requested: {
+          delivery_mode: "foreground",
+          direction: "down",
+          amount: 5,
+          point: scrollPoint,
+        },
+        result: scrollResult,
+      }));
       await sleep(350);
       takeScreenshot(appHandle.pid, "agents-composition-control-after-scroll", appHandle.windowId);
 
@@ -211,8 +224,18 @@ const tests = [
       assert(scrolled, "Composition control did not appear after scrolling the Agent coordination thread");
       const ready = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
       const composition = findBy(ready, { text: "Composition" });
+      const buttonCenter = composition ? elementCenter(composition, ready) : null;
+      console.log("[AGENT-COMPOSITION-UIA-AFTER-SCROLL]", JSON.stringify({
+        screenshot: `${ready.screenshot_width}x${ready.screenshot_height}`,
+        elementCount: (ready.elements ?? []).length,
+        composition: composition ? {
+          element_index: composition.element_index,
+          role: composition.role,
+          frame: composition.frame,
+          center: buttonCenter,
+        } : null,
+      }));
       assert(composition, "Composition control disappeared from the fresh native UIA snapshot");
-      const buttonCenter = elementCenter(composition, ready);
       assert(
         buttonCenter.x >= 0 && buttonCenter.y >= 0 &&
           buttonCenter.x < ready.screenshot_width && buttonCenter.y < ready.screenshot_height,
