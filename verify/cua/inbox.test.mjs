@@ -15,7 +15,7 @@
 
 import { click, getWindowState, sleep, typeText } from "./driver.mjs";
 import { elementCenter, takeScreenshot, getTextContent } from "./helpers.mjs";
-import { findBy, clickBy, waitFor } from "./find-util.mjs";
+import { findBy, clickBy, waitFor, findNamedRegionScrollElement } from "./find-util.mjs";
 import { assert, assertTextContains } from "./assertions.mjs";
 import { runDemoSuite } from "./demo-runner.mjs";
 
@@ -98,8 +98,10 @@ const tests = [
       // node text in its UIA tree even when the flex canvas has collapsed.
       const visible = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
       const uiaCandidates = (visible.elements || [])
-        .filter((element) => /message flow canvas|endpoint review approved|inbox/i.test(String(element.label || "")))
-        .map(({ element_index, role, label, frame }) => ({ element_index, role, label, frame }));
+        .filter((element) =>
+          /endpoint review approved|inbox/i.test(String(element.label || "")) || element.role === "Pane",
+        )
+        .map(({ element_index, role, label, frame, actions }) => ({ element_index, role, label, frame, actions }));
       console.log("[INBOX-UIA]", JSON.stringify({
         screenshot: `${visible.screenshot_width}x${visible.screenshot_height}`,
         elementCount: visible.elements?.length ?? 0,
@@ -108,11 +110,28 @@ const tests = [
       console.log("[INBOX-UIA-TREE-BEGIN]");
       console.log(visible.tree_markdown ?? "<tree_markdown missing>");
       console.log("[INBOX-UIA-TREE-END]");
-      const canvas = findBy(visible, { text: "Message flow canvas" });
-      assert(canvas, "Inbox message-flow canvas is missing from UI Automation");
+      const nativeTree = String(visible.tree_markdown ?? "");
+      assert(
+        nativeTree.split(/\r?\n/).some((line) =>
+          /^\s*-\s+(?:\[\d+\]\s+)?(?:Group|Pane|Region)\s+"Message flow canvas"(?:\s|$)/.test(line),
+        ),
+        "Inbox message-flow region is missing from the native UIA tree",
+      );
+      // The native tree exposes the ARIA region as an unindexed Group, then
+      // its scrollable geometry as indexed Pane [34]. Resolve that Pane from
+      // this same snapshot instead of looking for the Group's label in the
+      // flattened actionable-elements array.
+      const canvas = findNamedRegionScrollElement(visible, "Message flow canvas");
+      assert(canvas, "Named Inbox UIA region has no indexed native scroll/bounds element");
+      console.log("[INBOX-UIA-CANVAS]", JSON.stringify({
+        element_index: canvas.element_index,
+        role: canvas.role,
+        label: canvas.label,
+        frame: canvas.frame,
+      }));
       assert(
         Number(canvas.frame?.h) >= 240,
-        `Inbox message-flow canvas must be at least 240px high (got ${canvas.frame?.h ?? "no frame"})`,
+        `Inbox message-flow canvas Pane must be at least 240px high (got ${canvas.frame?.h ?? "no frame"})`,
       );
       // Click the rendered node's pixel center, not merely UIA Invoke on its
       // accessible name, so this exercises the visible graph interaction.

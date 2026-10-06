@@ -46,11 +46,11 @@ const tests = [
     name: "reads the UIA tree (nav buttons present)",
     fn: async (appHandle) => {
       const initial = freshState(appHandle);
-      // The native window can be discoverable before WebView2 finishes
-      // exposing its first UIA tree. Wait for the primary nav control with a
-      // fixed bound, then still require every expected nav button below.
-      const chatButton = await waitForElement(initial, { role: "Button", name: "Chat" }, 8000);
-      assert(chatButton, "Chat nav button did not appear within 8s");
+      // The native window can be discoverable before WebView2 finishes its
+      // cold first render. Poll fresh UIA snapshots within a bounded readiness
+      // window, then still require every expected navigation button below.
+      const chatButton = await waitForElement(initial, { role: "Button", name: "Chat" }, 20000);
+      assert(chatButton, "Chat nav button did not appear within 20s");
       const state = freshState(appHandle);
       assert(state.elements && state.elements.length > 0, "UIA tree is empty");
       for (const view of ["Chat", "Sessions", "Agents", "Inbox", "Settings"]) {

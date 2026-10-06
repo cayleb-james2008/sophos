@@ -12,9 +12,9 @@
 //   - Send message to agent
 //   - Composition knobs (thinking level + skills)
 
-import { getWindowState, sleep, typeText } from "./driver.mjs";
-import { navTo, takeScreenshot } from "./helpers.mjs";
-import { findBy, clickBy, waitFor, clickRightmost } from "./find-util.mjs";
+import { getWindowState, sleep, typeText, scroll } from "./driver.mjs";
+import { navTo, takeScreenshot, elementCenter } from "./helpers.mjs";
+import { findBy, clickBy, waitFor, clickRightmost, findNamedRegionScrollElement } from "./find-util.mjs";
 import { assert, assertTextContains, assertElementNotVisible } from "./assertions.mjs";
 import { runDemoSuite } from "./demo-runner.mjs";
 
@@ -123,9 +123,63 @@ const tests = [
   {
     name: "Composition knobs open the thinking + skills panel",
     fn: async (appHandle) => {
-      const state = await goAgents(appHandle);
-      // Click the Composition button.
-      clickBy(appHandle.pid, state, { text: "Composition" });
+      await goAgents(appHandle);
+      // The detail thread can extend below the short native window. Scroll its
+      // named region, using the indexed native scroll element exposed in that
+      // same UIA snapshot, so the composition control is both reachable and on-screen.
+      const scrollState = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+      const nativeTree = String(scrollState.tree_markdown ?? "");
+      assert(
+        nativeTree.split(/\r?\n/).some((line) =>
+          /^\s*-\s+(?:\[\d+\]\s+)?(?:Group|Pane|Region)\s+"Agent coordination thread"(?:\s|$)/.test(line),
+        ),
+        "Agent coordination thread region is missing from the native UIA tree",
+      );
+      const threadPane = findNamedRegionScrollElement(scrollState, "Agent coordination thread");
+      if (!threadPane) console.log("[AGENT-COMPOSITION-UIA-TREE]", scrollState.tree_markdown ?? "<tree missing>");
+      assert(threadPane, "Agent coordination thread has no indexed native scroll target");
+      assert(
+        Number(threadPane.frame?.w) > 0 && Number(threadPane.frame?.h) > 0,
+        "Agent coordination thread scroll target has no native bounds",
+      );
+      const scrollPoint = elementCenter(threadPane, scrollState);
+      assert(
+        scrollPoint.x >= 0 && scrollPoint.y >= 0 &&
+          scrollPoint.x < scrollState.screenshot_width && scrollPoint.y < scrollState.screenshot_height,
+        `Agent coordination thread scroll target is outside the window (${scrollPoint.x}, ${scrollPoint.y})`,
+      );
+      scroll(appHandle.pid, "down", 5, appHandle.windowId, { x: scrollPoint.x, y: scrollPoint.y });
+      await sleep(350);
+      takeScreenshot(appHandle.pid, "agents-composition-control-visible", appHandle.windowId);
+
+      const scrolled = await waitFor(scrollState, { text: "Composition" }, 8000);
+      assert(scrolled, "Composition control did not appear after scrolling the Agent coordination thread");
+      const ready = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+      const composition = findBy(ready, { text: "Composition" });
+      assert(composition, "Composition control disappeared from the fresh native UIA snapshot");
+      const buttonCenter = elementCenter(composition, ready);
+      assert(
+        buttonCenter.x >= 0 && buttonCenter.y >= 0 &&
+          buttonCenter.x < ready.screenshot_width && buttonCenter.y < ready.screenshot_height,
+        `Composition control is outside the window after scrolling (${buttonCenter.x}, ${buttonCenter.y})`,
+      );
+      console.log("[AGENT-COMPOSITION-UIA]", JSON.stringify({
+        scrollTarget: {
+          element_index: threadPane.element_index,
+          role: threadPane.role,
+          label: threadPane.label,
+          frame: threadPane.frame,
+        },
+        composition: {
+          element_index: composition.element_index,
+          role: composition.role,
+          label: composition.label,
+          frame: composition.frame,
+        },
+        screenshot: `${ready.screenshot_width}x${ready.screenshot_height}`,
+      }));
+      // Click the visible native Composition control.
+      clickBy(appHandle.pid, ready, { text: "Composition" });
       await sleep(800);
       const after = freshState(appHandle);
       // The composition panel shows thinking level + skills (case-insensitive

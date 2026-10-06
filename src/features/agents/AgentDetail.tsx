@@ -117,21 +117,23 @@ export function AgentDetail({
         </div>
       ) : null}
 
-      <div className="ag-detail__thread">
-        <InboxThread
-          agent={agent}
-          messages={thread}
-          unreadCount={unreadCount}
-          onMarkRead={onMarkRead}
-          onMarkAllRead={onMarkAllRead}
-        />
-        <AgentComposer
-          agent={agent}
-          draft={draft}
-          setDraft={setDraft}
-          sending={sending}
-          onSend={onSend}
-        />
+      <div className="ag-detail__thread" role="region" aria-label="Agent coordination thread">
+        <div className="ag-detail__thread-scroll">
+          <InboxThread
+            agent={agent}
+            messages={thread}
+            unreadCount={unreadCount}
+            onMarkRead={onMarkRead}
+            onMarkAllRead={onMarkAllRead}
+          />
+          <AgentComposer
+            agent={agent}
+            draft={draft}
+            setDraft={setDraft}
+            sending={sending}
+            onSend={onSend}
+          />
+        </div>
       </div>
     </aside>
   );

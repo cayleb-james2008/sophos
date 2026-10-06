@@ -118,6 +118,13 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Reviewing the merge")).toBeInTheDocument();
   });
 
+  it("groups the thread composer in a named coordination region", () => {
+    renderDetail();
+    const region = screen.getByRole("region", { name: "Agent coordination thread" });
+    expect(region).toContainElement(screen.getByRole("button", { name: /composition/i }));
+    expect(region).toContainElement(screen.getByLabelText("Message to Reviewer"));
+  });
+
   it("shows the runtime model fallback when the agent has no model", () => {
     renderDetail({ agent: { ...AGENT, model: undefined }, runtimeModel: "fallback-model" });
     expect(screen.getByText("fallback-model")).toBeInTheDocument();

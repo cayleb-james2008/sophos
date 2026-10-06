@@ -10,6 +10,61 @@
 import { click, clickElement as driverClickElement, driverErrorCode, getWindowState, sleep } from "./driver.mjs";
 import { elementCenter } from "./helpers.mjs";
 
+function parseTreeNode(line) {
+  const prefix = String(line).match(/^(\s*)-\s+(.*)$/);
+  if (!prefix) return null;
+  const match = prefix[2].match(
+    /^(?:\[(\d+)\]\s+)?([A-Za-z][A-Za-z0-9_-]*)(?:\s+"([^"]*)")?(?:\s+(.*))?$/,
+  );
+  return {
+    indent: prefix[1].length,
+    index: match?.[1] == null ? null : Number(match[1]),
+    role: match?.[2] ?? null,
+    label: match?.[3] ?? "",
+    metadata: match?.[4] ?? "",
+  };
+}
+
+function hasScrollAction(node) {
+  return /\bactions=\[[^\]]*\bscroll\b/.test(node.metadata);
+}
+
+/**
+ * Resolve a named semantic region to the indexed UIA element that actually
+ * owns its scroll action. WebView2 may render `role=region` as an unindexed
+ * Group in tree_markdown while exposing its scrollable child Pane in the
+ * structured elements array. Keep lookup within the named subtree; do not
+ * assume the region label itself is an indexed/actionable element.
+ */
+export function findNamedRegionScrollElement(windowState, regionName) {
+  const lines = String(windowState?.tree_markdown ?? "").split(/\r?\n/);
+  const elements = windowState?.elements ?? [];
+  const regionLine = lines.findIndex((line) => {
+    const node = parseTreeNode(line);
+    return node && ["Group", "Pane", "Region"].includes(node.role) && node.label === regionName;
+  });
+  if (regionLine < 0) return undefined;
+
+  const region = parseTreeNode(lines[regionLine]);
+  const byIndex = (index) => elements.find((element) => Number(element.element_index) === index);
+
+  if (region.index != null && hasScrollAction(region)) {
+    const element = byIndex(region.index);
+    if (element) return element;
+  }
+
+  for (let i = regionLine + 1; i < lines.length; i += 1) {
+    const candidate = parseTreeNode(lines[i]);
+    if (!candidate) continue;
+    if (candidate.indent <= region.indent) break;
+    if (!["Group", "Pane", "Region"].includes(candidate.role)) continue;
+    if (candidate.index == null || !hasScrollAction(candidate)) continue;
+    const element = byIndex(candidate.index);
+    if (element) return element;
+  }
+  return undefined;
+}
+
 /**
  * Find an element in a window state's UIA tree matching the criteria.
  * Criteria: `{ text, role, name }` — `name` is an exact label match, `role` an
