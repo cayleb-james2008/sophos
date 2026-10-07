@@ -62,47 +62,57 @@ dependencies, no admin rights needed.
 
 | Step | What |
 |---|---|
-| **1. Download** | Grab the latest `Sophos_<version>_x64-setup.exe` from the [Releases](https://gitlab.com/caylebalvarez-james/sophos/-/releases) page (the manifests in this repo are at 0.7.2 — match the installer name to the release you download). |
+| **1. Download** | Choose an installer from [GitHub Releases](https://github.com/cayleb-james2008/sophos/releases) and verify its tagged version before downloading. |
 | **2. Install** | Run the `.exe`. Sophos installs to `~\AppData\Local\Sophos`. No admin required. |
 | **3. Launch** | Open **Sophos**. The bundled Node runtime + daemon + bridge start automatically. |
-| **4. Add a provider** | Go to **Settings → Providers** and add an LLM provider (API key or local model). |
-| **5. Chat** | Start a new session and begin. |
+| **4. Configure a model** | Go to **Settings → Providers** and configure a supported hosted provider or local model. Use credentials you control. |
+| **5. Start a session** | Open a normal app session and send a prompt. A real reply depends on the provider or local model you configured. |
+
+> **Release/source version (checked 7 October 2026):** The latest listed
+> GitHub installer is v0.2.0; this master source snapshot is 0.7.2. Do not
+> assume an installer matches the tested source. The legacy [GitLab Releases
+> page](https://gitlab.com/caylebalvarez-james/sophos/-/releases) is retained,
+> but current installer availability there was not verified.
 
 > **Zero manual dependencies.** The installer bundles the portable Node
 > runtime, the daemon `dist/`, the bridge `dist/`, and the shared
 > `node_modules/` — everything the app needs to run.
 
+> **Demo mode:** The UI demo and CUA test mode use `MockIpcClient` with
+> simulated sessions, agents, and chat replies. They are for exercising the
+> interface; a simulated reply does not verify a provider call or a real agent
+> workflow.
+
 ---
 
-## What works today
+## Verification snapshot — 2026-09-21
 
-Sophos is Windows-only by design. This is what was verified, and where:
+Sophos targets Windows. This dated snapshot is pinned to [`master` at
+`d430165`](https://github.com/cayleb-james2008/sophos/commit/d43016518a6d7a95b507b3e0ba21248e053e7000),
+not a live status page. The run below passed its blocking checks, while two
+best-effort runtime steps did not pass. It does not establish a provider-backed
+session or an end-to-end user outcome.
 
-| Area | Status | How verified |
+| Check | Recorded result | What it establishes |
 |---|---|---|
-| Frontend type-check (`npx tsc --noEmit`) | ✅ Passes on Linux | Run on this Linux host (see POLISH-NOTES.md) |
-| Frontend unit tests (`npx vitest run`) | ⚠️ 1116/1118 pass on Linux | Needs a Node 26 flag (see note below); 2 failures remain (see POLISH-NOTES.md) |
-| Local updater harness (`npm run test:updater`) | ⚠️ 20/24 on a fresh checkout | Passes only where `npm run updater:keys` has generated the local signing key (see note below) |
-| Live update-feed check (`node verify/live-feed.mjs`) | ✅ Passes with network | Fetches the live GitLab feed and verifies the Ed25519 signature (20/20) |
-| Native installer build (`npm run tauri build`) | ❌ Needs Windows | NSIS + `node.exe` runtime bundling; cannot run on Linux |
-| `node verify/e2e.mjs` (bundle + daemon round-trip) | ❌ Needs Windows | Boots `resources/node/*/node.exe`, uses named pipes and `taskkill` |
-| cua-driver UI suite (`npm run test:cua`) | ❌ Needs Windows | Drives the real app via UIA accessibility automation + WebView2 |
+| Hosted blocking checks ([test job](https://github.com/cayleb-james2008/sophos/actions/runs/35620248670/job/106401211085)) | ✅ Pass — type-check, 1,118/1,118 unit tests across 127 files, updater harness 35/35, live-feed check 20/20 plus one informational result | GitHub-hosted Windows 2025 runner with Node 22, at the pinned commit. The updater run generated an ephemeral test key outside the checkout. |
+| Bundled daemon end-to-end verifier | ⚠️ Attempted; failed because the gitignored runtime bundle was absent | `continue-on-error` makes this best-effort; it did not block the green `test` job. |
+| Hosted desktop/CUA job ([job log](https://github.com/cayleb-james2008/sophos/actions/runs/35620248670/job/106401210395)) | ⚠️ Job summary is green; the inner UI run failed before tests, with 0/8 suites passed because the CUA driver daemon did not become ready | Frontend and Tauri executable builds completed. The UI step is `continue-on-error`; CI launches in demo mode with mock IPC and simulated data, and no UI suite ran in this recorded attempt. |
+| Undated local Linux report ([POLISH-NOTES.md](POLISH-NOTES.md)) | ⚠️ Node 26.7.0 run: 1,116/1,118 tests with `--localstorage-file`; updater harness 20/24 | The note records two `OnboardingWizard` failures and a missing gitignored signing key on a fresh checkout. It does not identify the exact tested source commit. |
+| Local Linux report dated 2026-09-18 ([OVERHAUL-NOTES.md](OVERHAUL-NOTES.md)) | ✅ Node 26.7.0 `npm test`: 1,118/1,118 after a test-setup fix; ⚠️ updater harness 21/24 | The note attributes the updater failures to the missing gitignored signing key. It does not identify the exact tested source commit. |
+| Windows 10 VM launch smoke ([OVERHAUL-NOTES.md](OVERHAUL-NOTES.md)) | ⚠️ App executable reported still running after 12 seconds | Launch-only evidence; it did not exercise installation, a complete session, or a provider-backed result. |
 
-Building from source and running the app require Windows 10/11 (see
-[Build from source](#build-from-source)). On Linux, the frontend checks above
-are the supported verification path.
+The repository documents a Windows 10/11 build and runtime path (see
+[Build from source](#build-from-source)). The recorded CI CUA step builds a
+Tauri executable, not an installer, and this snapshot contains no completed
+installer-install or provider-backed full-session verification. The CUA job's
+demo configuration would use simulated data even if its UI suites ran.
 
-> **Environment notes (Linux).** CI targets Node 22 on Windows. This host
-> runs Node v26.7.0, where `globalThis.localStorage` is `undefined` unless
-> `--localstorage-file` is passed, so it shadows the jsdom `localStorage`
-> the tests rely on. Plain `npx vitest run`: 50 failed / 1068 passed
-> (1118 total). With `NODE_OPTIONS=--localstorage-file=/tmp/sophos-ls.json`:
-> **2 failed / 1116 passed** — the 2 residuals are both in
-> `OnboardingWizard.test.tsx` (wizard triggers a document navigation under
-> jsdom: "Not implemented: navigation to another Document"). The updater
-> harness scores 20/24 on a fresh checkout because the private signing key
-> (`scripts/updater.key`) is deliberately gitignored — generate it with
-> `npm run updater:keys` (never commit it) for the full pass.
+These local reports use different commands and have different results. Neither
+identifies its exact tested source commit, so do not attribute those figures
+to the pinned hosted CI snapshot. Neither was rerun for this README candidate.
+The hosted run's updater harness used a temporary CI keypair and did not require
+or expose a production signing key.
 
 ---
 
