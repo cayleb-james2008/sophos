@@ -38,11 +38,10 @@ function indexedScrollTarget(node, byIndex) {
 /**
  * Resolve a named semantic region to an indexed UIA element that advertises a
  * scroll action. WebView2 may render `role=region` as an unindexed Group in
- * `tree_markdown`; when no indexed scrollable descendant exists, the nearest
- * indexed scrollable ancestor (often the Document) is the native action path.
- * This action element is not necessarily a valid pointer hit target: its frame
- * may be outside the named region, so use a same-snapshot descendant's frame
- * for the wheel coordinates.
+ * `tree_markdown`; when the region has no indexed scrollable descendant, the
+ * nearest indexed scrollable ancestor (often the Document) is the native action
+ * target. Preserve its `element_token` from this snapshot for the driver's UIA
+ * ScrollPattern route rather than deriving pointer coordinates.
  */
 export function findNamedRegionScrollElement(windowState, regionName) {
   const lines = String(windowState?.tree_markdown ?? "").split(/\r?\n/);

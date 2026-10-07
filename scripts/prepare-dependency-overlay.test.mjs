@@ -9,6 +9,8 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join, win32 } from "node:path";
 import { applyExactOverrides, assertLockDeltaIsScoped, assertResolvedLock, assertOverrideReviewMetadata, assertOverrideConstraintsMatchLock, assertRegistryMetadataMatchesPins, prepareDependencyOverlay } from "./prepare-dependency-overlay.mjs";
 
+const prepareSource = await readFile(new URL("./prepare-dependency-overlay.mjs", import.meta.url), "utf8");
+
 const overlay = {
   overrides: {
     "undici": {
@@ -25,6 +27,16 @@ const overlay = {
     },
   },
 };
+
+test("Windows dependency-overlay project roots require the private ACL scope", () => {
+  const start = prepareSource.indexOf("export async function assertSecureProjectRoot(projectRoot) {");
+  const end = prepareSource.indexOf("\n}", start);
+  assert.ok(start >= 0 && end > start, "project-root validation is present");
+  const rootValidator = prepareSource.slice(start, end);
+  assert.equal((rootValidator.match(/scope: \"private\"/g) ?? []).length, 2,
+    "both the requested and canonical Windows project root must reject untrusted create-file/create-directory rights");
+  assert.doesNotMatch(rootValidator, /scope: \"ancestor\"/);
+});
 
 function assertOwnDos83Alias(sourceRoot, shortPath) {
   const aliasLeafName = win32.basename(shortPath);

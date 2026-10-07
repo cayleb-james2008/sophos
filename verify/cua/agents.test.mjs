@@ -30,6 +30,24 @@ function freshState(appHandle) {
   return getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: false });
 }
 
+function centerIsInScreenshot(element, state) {
+  if (!element || !Number.isFinite(state.screenshot_width) || !Number.isFinite(state.screenshot_height)) return false;
+  const center = elementCenter(element, state);
+  return center.x >= 0 && center.y >= 0
+    && center.x < state.screenshot_width && center.y < state.screenshot_height;
+}
+
+async function waitForCenterInScreenshot(appHandle, criteria, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const state = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+    const element = findBy(state, criteria);
+    if (centerIsInScreenshot(element, state)) return { state, element };
+    await sleep(250);
+  }
+  return null;
+}
+
 /** Navigate to the Agents view and wait for it to render. */
 async function goAgents(appHandle) {
   // Navigate to Chat first so AgentsView remounts (resets attach state).
@@ -169,26 +187,9 @@ const tests = [
         Number(scrollTarget.frame?.w) > 0 && Number(scrollTarget.frame?.h) > 0,
         "Agent coordination thread scroll target has no native bounds",
       );
-      // The actionable ancestor can be the WebView Document, whose center is
-      // over the fleet graph rather than this nested detail pane. Use an
-      // indexed descendant of the named region as the native wheel hit point.
-      // Nonzero bounds and an in-window center validate coordinates only; the
-      // post-input native CUA assertions require Composition to become visible.
-      const pointerTarget = findNamedRegionDescendantElement(
-        scrollState,
-        "Agent coordination thread",
-        { role: "Text", text: "THREAD /" },
-      );
-      assert(pointerTarget, "Agent coordination thread has no indexed thread-header pointer target");
       assert(
-        Number(pointerTarget.frame?.w) > 0 && Number(pointerTarget.frame?.h) > 0,
-        "Agent coordination thread pointer target has no native bounds",
-      );
-      const scrollPoint = elementCenter(pointerTarget, scrollState);
-      assert(
-        scrollPoint.x >= 0 && scrollPoint.y >= 0 &&
-          scrollPoint.x < scrollState.screenshot_width && scrollPoint.y < scrollState.screenshot_height,
-        `Agent coordination thread pointer target is outside the window (${scrollPoint.x}, ${scrollPoint.y})`,
+        typeof scrollTarget.element_token === "string" && scrollTarget.element_token.length > 0,
+        "Agent coordination thread scroll target has no native element token",
       );
       console.log("[AGENT-COMPOSITION-UIA-SCROLL]", JSON.stringify({
         actionTarget: {
@@ -196,32 +197,54 @@ const tests = [
           role: scrollTarget.role,
           frame: scrollTarget.frame,
         },
-        pointerTarget: {
-          element_index: pointerTarget.element_index,
-          role: pointerTarget.role,
-          frame: pointerTarget.frame,
-          point: scrollPoint,
-        },
       }));
-      const scrollResult = scroll(appHandle.pid, "down", 5, appHandle.windowId, {
-        x: scrollPoint.x,
-        y: scrollPoint.y,
-        delivery_mode: "foreground",
+      const scrollResult = scroll(appHandle.pid, "down", 1, appHandle.windowId, {
+        element_token: scrollTarget.element_token,
       });
       console.log("[AGENT-COMPOSITION-UIA-SCROLL-RESULT]", JSON.stringify({
         requested: {
-          delivery_mode: "foreground",
           direction: "down",
-          amount: 5,
-          point: scrollPoint,
+          amount: 1,
+          target_element_index: scrollTarget.element_index,
+          route: "uia_scroll_pattern",
         },
         result: scrollResult,
       }));
       await sleep(350);
+      let visibleComposition = await waitForCenterInScreenshot(appHandle, { text: "Composition" }, 1500);
+      if (!visibleComposition) {
+        // The nested HTML region can be an unindexed UIA Group. In that case
+        // the only indexed ScrollPattern may belong to the WebView Document,
+        // so retain an in-region foreground-wheel fallback and verify it from
+        // a fresh native snapshot rather than assuming the Document moved it.
+        const fallbackState = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+        const pointerTarget = findNamedRegionDescendantElement(
+          fallbackState,
+          "Agent coordination thread",
+          { role: "Text", text: "THREAD /" },
+        );
+        assert(pointerTarget, "Agent coordination thread has no indexed in-region fallback pointer target");
+        const scrollPoint = elementCenter(pointerTarget, fallbackState);
+        assert(
+          scrollPoint.x >= 0 && scrollPoint.y >= 0 &&
+            scrollPoint.x < fallbackState.screenshot_width && scrollPoint.y < fallbackState.screenshot_height,
+          `Agent coordination thread fallback target is outside the window (${scrollPoint.x}, ${scrollPoint.y})`,
+        );
+        const fallbackResult = scroll(appHandle.pid, "down", 5, appHandle.windowId, {
+          x: scrollPoint.x,
+          y: scrollPoint.y,
+          delivery_mode: "foreground",
+        });
+        console.log("[AGENT-COMPOSITION-UIA-SCROLL-FALLBACK]", JSON.stringify({
+          target_element_index: pointerTarget.element_index,
+          point: scrollPoint,
+          result: fallbackResult,
+        }));
+        await sleep(350);
+        visibleComposition = await waitForCenterInScreenshot(appHandle, { text: "Composition" }, 8000);
+      }
       takeScreenshot(appHandle.pid, "agents-composition-control-after-scroll", appHandle.windowId);
-
-      const scrolled = await waitFor(scrollState, { text: "Composition" }, 8000);
-      assert(scrolled, "Composition control did not appear after scrolling the Agent coordination thread");
+      assert(visibleComposition, "Composition control did not become visible after scrolling the Agent coordination thread");
       const ready = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
       const composition = findBy(ready, { text: "Composition" });
       const buttonCenter = composition ? elementCenter(composition, ready) : null;
@@ -236,9 +259,7 @@ const tests = [
         } : null,
       }));
       assert(composition, "Composition control disappeared from the fresh native UIA snapshot");
-      assert(
-        buttonCenter.x >= 0 && buttonCenter.y >= 0 &&
-          buttonCenter.x < ready.screenshot_width && buttonCenter.y < ready.screenshot_height,
+      assert(centerIsInScreenshot(composition, ready),
         `Composition control is outside the window after scrolling (${buttonCenter.x}, ${buttonCenter.y})`,
       );
       console.log("[AGENT-COMPOSITION-UIA]", JSON.stringify({

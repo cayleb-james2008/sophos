@@ -76,6 +76,29 @@ async function terminateSupervisorOnly(identity) {
   }
 }
 
+async function terminateProcessIdentityTree(identity) {
+  if (!Number.isInteger(identity?.pid) || identity.pid <= 0) return false;
+  if (typeof identity.processStartId !== "string" || identity.processStartId.length === 0) return false;
+  const sessionLeaseUrl = pathToFileURL(join(REF_ROOT, "dist", "core", "session-lease.js")).href;
+  const { getProcessStartId } = await import(sessionLeaseUrl);
+  const currentStartId = getProcessStartId(identity.pid);
+  if (!currentStartId || currentStartId !== identity.processStartId) return false;
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill", ["/PID", String(identity.pid), "/T", "/F"], { stdio: "ignore" });
+      return true;
+    } catch {
+      return !processIsAlive(identity.pid);
+    }
+  }
+  try {
+    process.kill(identity.pid, "SIGTERM");
+    return true;
+  } catch {
+    return !processIsAlive(identity.pid);
+  }
+}
+
 function record(label, ok, detail) {
   results.push({ label, ok, detail });
   console.log(`${ok ? "PASS" : "FAIL"}  ${label}${detail ? " — " + detail : ""}`);
@@ -102,7 +125,7 @@ function processIsAlive(pid) {
   }
 }
 
-function readWorkerDescriptorPids() {
+function readWorkerDescriptorPids(socketPath = SOCKET_PATH) {
   const home = process.env.HOME ?? process.env.USERPROFILE ?? tmpdir();
   const descriptorRoot = join(home, ".prime", "agent", "daemon-workers");
   if (!existsSync(descriptorRoot)) return [];
@@ -115,8 +138,14 @@ function readWorkerDescriptorPids() {
         if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
         try {
           const descriptor = JSON.parse(readFileSync(join(directoryPath, entry.name), "utf8"));
-          if (typeof descriptor.workerId === "string" && Number.isInteger(descriptor.pid) && descriptor.pid > 0) {
-            workers.push({ pid: descriptor.pid, lifecycle: typeof descriptor.lifecycle === "string" ? descriptor.lifecycle : "unknown" });
+          if (descriptor.supervisorSocketPath === socketPath
+            && typeof descriptor.workerId === "string" && Number.isInteger(descriptor.pid) && descriptor.pid > 0) {
+            workers.push({
+              workerId: descriptor.workerId,
+              pid: descriptor.pid,
+              ...(typeof descriptor.processStartId === "string" ? { processStartId: descriptor.processStartId } : {}),
+              lifecycle: typeof descriptor.lifecycle === "string" ? descriptor.lifecycle : "unknown",
+            });
           }
         } catch {
           // A descriptor may be atomically replaced while diagnostics are reading it.
@@ -156,6 +185,32 @@ async function waitForProcessIdentityExit(identity, timeoutMs = 5000) {
     await sleep(100);
   }
   return !processIsAlive(identity.pid);
+}
+
+async function waitForOwnedShutdownProcesses(supervisorIdentity, timeoutMs = 5000) {
+  const currentSupervisor = await inspectSupervisorIdentity();
+  const workers = readWorkerDescriptorPids();
+  const identities = [supervisorIdentity, currentSupervisor, ...workers]
+    .filter((identity) => Number.isInteger(identity?.pid) && identity.pid > 0)
+    .filter((identity, index, all) => all.findIndex((candidate) =>
+      candidate.pid === identity.pid && candidate.processStartId === identity.processStartId) === index);
+  const exited = await Promise.all(identities.map((identity) => waitForProcessIdentityExit(identity, timeoutMs)));
+  if (exited.some((didExit) => !didExit)) return false;
+  const [remainingSupervisor, remainingWorkers] = await Promise.all([
+    inspectSupervisorIdentity(),
+    Promise.resolve(readWorkerDescriptorPids()),
+  ]);
+  return !remainingSupervisor.reachable && !remainingWorkers.some((worker) => processIsAlive(worker.pid));
+}
+
+async function terminateShutdownOwnedProcesses(snapshot) {
+  const identities = [snapshot?.postGracefulSocket, snapshot?.gracefulSupervisor,
+    ...(snapshot?.workers ?? []).filter((worker) => worker.alive)];
+  const uniqueIdentities = identities
+    .filter((identity) => Number.isInteger(identity?.pid) && identity.pid > 0)
+    .filter((identity, index, all) => all.findIndex((candidate) =>
+      candidate.pid === identity.pid && candidate.processStartId === identity.processStartId) === index);
+  await Promise.all(uniqueIdentities.map((identity) => terminateProcessIdentityTree(identity)));
 }
 
 function isReplacementIdentity(current, previous) {
@@ -309,17 +364,23 @@ async function run() {
     try {
       shutdownResult = await shutdownDaemonGracefully();
       daemonStopped = shutdownResult.stopped;
-      if (daemonStopped) daemonProcessStopped = await waitForExit(daemon, 5000);
+      if (daemonStopped) {
+        daemonProcessStopped = await waitForExit(daemon, 5000)
+          && await waitForOwnedShutdownProcesses(shutdownResult.identity, 5000);
+      }
     } catch (error) {
       shutdownError = error instanceof Error ? error.message : String(error);
+      daemonProcessStopped = false;
     }
     let shutdownDiagnostics;
     let fallbackTerminationNeeded = false;
     if (!daemonStopped || !daemonProcessStopped) {
       fallbackTerminationNeeded = true;
       shutdownDiagnostics = await snapshotShutdownState(daemon, shutdownResult?.identity);
+      await terminateShutdownOwnedProcesses(shutdownDiagnostics);
       terminateProcessTree(daemon);
-      daemonProcessStopped = await waitForExit(daemon, 5000);
+      daemonProcessStopped = await waitForExit(daemon, 5000)
+        && await waitForOwnedShutdownProcesses(undefined, 5000);
       shutdownDiagnostics.afterFallback = await snapshotShutdownState(daemon, shutdownResult?.identity);
     }
     return {

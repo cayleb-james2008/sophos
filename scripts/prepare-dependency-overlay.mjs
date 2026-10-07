@@ -458,14 +458,14 @@ export async function assertSecureProjectRoot(projectRoot) {
   if (info.isSymbolicLink() || !info.isDirectory()) {
     throw new Error(`dependency overlay project root must be a non-reparse real directory: ${projectInput}`);
   }
-  await assertSecureWindowsPath(projectInput, "dependency overlay project root", { scope: "ancestor", targetType: "directory" });
+  await assertSecureWindowsPath(projectInput, "dependency overlay project root", { scope: "private", targetType: "directory" });
   const physical = await realpath(projectInput);
   const physicalInfo = await lstat(physical);
   if (physicalInfo.isSymbolicLink() || !physicalInfo.isDirectory()
     || physicalInfo.dev !== info.dev || physicalInfo.ino !== info.ino) {
     throw new Error(`dependency overlay project root changed during Windows ACL validation: ${projectInput}`);
   }
-  await assertSecureWindowsPath(physical, "dependency overlay project root", { scope: "ancestor", targetType: "directory" });
+  await assertSecureWindowsPath(physical, "dependency overlay project root", { scope: "private", targetType: "directory" });
   return physical;
 }
 

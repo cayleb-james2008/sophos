@@ -76,6 +76,17 @@ test("permits create-only rights on an existing ancestor but rejects replacement
   }
 });
 
+test("private project roots reject untrusted create-file and create-directory ACEs", () => {
+  const path = String.raw`D:\a\sophos`;
+  for (const rights of [2, 4]) {
+    const record = aclRecord(path, [{ sid: USERS, type: "Allow", rights, inherited: true,
+      inheritanceFlags: "ContainerInherit", propagationFlags: "None" }]);
+    assert.doesNotThrow(() => windowsAcl.assertWindowsAclRecord(record, path, "existing ancestor", { scope: "ancestor" }));
+    assert.throws(() => windowsAcl.assertWindowsAclRecord(record, path, "project root", { scope: "private" }), /write-capable rights/i,
+      `project root must reject create right ${rights}`);
+  }
+});
+
 test("rejects reparse points, untrusted owners, null DACLs, noncanonical ACLs, and non-NTFS volumes", () => {
   const path = "D:\\\\private\\\\workspace";
   const cases = [

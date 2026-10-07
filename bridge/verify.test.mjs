@@ -93,8 +93,28 @@ test("failed graceful shutdown captures supervisor and adopted-worker ownership 
 
   assert.ok(snapshot >= 0 && fallback > snapshot, "process and worker snapshots must be captured before fallback termination");
   assert.match(verifySource, /async function inspectSupervisorIdentity\(\)/);
-  assert.match(verifySource, /function readWorkerDescriptorPids\(\)/);
+  assert.match(verifySource, /function readWorkerDescriptorPids\(socketPath = SOCKET_PATH\)/);
   assert.match(verifySource, /function snapshotShutdownState\(/);
+});
+
+test("shutdown fallback targets the current socket owner and only its verified session workers", () => {
+  const cleanupStart = verifySource.indexOf("const cleanup = async () => {");
+  const cleanupEnd = verifySource.indexOf("const onSignal", cleanupStart);
+  const cleanupBlock = verifySource.slice(cleanupStart, cleanupEnd);
+  const ownershipCleanup = cleanupBlock.indexOf("await terminateShutdownOwnedProcesses(shutdownDiagnostics)");
+  const launcherFallback = cleanupBlock.indexOf("terminateProcessTree(daemon)");
+
+  assert.ok(ownershipCleanup >= 0 && ownershipCleanup < launcherFallback,
+    "fallback must terminate socket/descriptor-owned processes before relying on the original launcher handle");
+  assert.match(verifySource, /function readWorkerDescriptorPids\(socketPath = SOCKET_PATH\)/);
+  assert.match(verifySource, /descriptor\.supervisorSocketPath === socketPath/,
+    "worker cleanup must not touch another daemon's descriptors under a non-isolated HOME");
+  assert.match(verifySource, /typeof descriptor\.processStartId === \"string\"/);
+  assert.match(verifySource, /async function terminateProcessIdentityTree\(identity\)/);
+  assert.match(verifySource, /currentStartId !== identity\.processStartId/,
+    "fallback must verify a process-start identity before signaling a descriptor PID");
+  assert.match(verifySource, /\[\"\/PID\", String\(identity\.pid\), \"\/T\", \"\/F\"\]/,
+    "verified process-tree cleanup must stop the session worker's owned descendants too");
 });
 
 test("forced fallback cannot convert a failed graceful shutdown into a passing assertion", () => {
@@ -105,4 +125,5 @@ test("forced fallback cannot convert a failed graceful shutdown into a passing a
   assert.ok(cleanupBlock.includes("let fallbackTerminationNeeded = false"));
   assert.ok(cleanupBlock.includes("fallbackTerminationNeeded = true"));
   assert.ok(cleanupBlock.includes("daemonStopped: daemonStopped && daemonProcessStopped && !fallbackTerminationNeeded"));
+  assert.match(cleanupBlock, /shutdownError = error instanceof Error \? error\.message : String\(error\);\s*daemonProcessStopped = false;/);
 });

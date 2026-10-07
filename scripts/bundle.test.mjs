@@ -120,9 +120,12 @@ test("production install reproduces a missing dev-only root-prepare command and 
       "the root prepare must fail specifically because the dev-only husky command is unavailable",
     );
     assert.deepEqual(await readFile(lockPath), lockBytes, "the reproduced lifecycle failure must not alter the reviewed lock bytes");
+    await rm(marker, { force: true });
 
     const candidateCi = runNpm(["ci", "--omit=dev", "--ignore-scripts", "--offline", "--no-audit", "--no-fund"]);
     assert.equal(candidateCi.status, 0, candidateCi.output);
+    assert.equal(existsSync(marker), false, "the script-suppressed production install must not satisfy the later lifecycle assertion");
+    await rm(marker, { force: true });
     const candidateRebuild = runNpm(["rebuild", "--omit=dev", "--offline", "--no-audit", "--no-fund"]);
     assert.equal(candidateRebuild.status, 0, candidateRebuild.output);
     assert.equal(await readFile(marker, "utf8"), "ran", "production dependency postinstall must run after script-suppressed tree construction");

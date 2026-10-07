@@ -319,7 +319,7 @@ export function hotkey(pid, keys, windowId, opts = {}) {
  */
 export function scroll(pid, direction, amount, windowId, opts = {}) {
   const args = { pid, direction, amount, ...opts };
-  if (windowId) args.window_id = windowId;
+  if (windowId && !opts.element_token) args.window_id = windowId;
   return callWithForegroundFallback("scroll", args);
 }
 
