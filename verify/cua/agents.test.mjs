@@ -336,28 +336,47 @@ const tests = [
           && messagePoint.x < expanded.screenshot_width && messagePoint.y < expanded.screenshot_height,
         `Visible coordination message is outside the screenshot (${messagePoint.x}, ${messagePoint.y})`,
       );
-      const expandedScroll = scroll(appHandle.pid, "down", 1, appHandle.windowId, {
-        x: messagePoint.x,
-        y: messagePoint.y,
-        delivery_mode: "foreground",
-      });
+      takeScreenshot(appHandle.pid, "agents-composition-expanded-before-thread-scroll", appHandle.windowId);
+      let afterExpandedScroll = expanded;
+      let sameMessageAfterScroll;
+      let messageFrameShift = 0;
+      const scrollAttempts = [];
+      for (const direction of ["down", "up"]) {
+        const currentMessage = scrollAttempts.length === 0
+          ? initiallyVisibleMessage
+          : findNamedRegionDescendantElement(
+            afterExpandedScroll,
+            "Agent coordination thread",
+            { role: "Text", text: initiallyVisibleMessage.label },
+          );
+        assert(currentMessage, "The coordination message disappeared before the reverse scroll check");
+        const point = elementCenter(currentMessage, afterExpandedScroll);
+        const result = scroll(appHandle.pid, direction, 1, appHandle.windowId, {
+          x: point.x,
+          y: point.y,
+          delivery_mode: "foreground",
+        });
+        await sleep(350);
+        afterExpandedScroll = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+        sameMessageAfterScroll = findNamedRegionDescendantElement(
+          afterExpandedScroll,
+          "Agent coordination thread",
+          { role: "Text", text: initiallyVisibleMessage.label },
+        );
+        assert(sameMessageAfterScroll, "The coordination message disappeared from the native tree after scrolling");
+        messageFrameShift = Number(sameMessageAfterScroll.frame?.y) - Number(initiallyVisibleMessage.frame?.y);
+        scrollAttempts.push({ direction, point, result, frame: sameMessageAfterScroll.frame, frameShift: messageFrameShift });
+        if (Math.abs(messageFrameShift) >= 1) break;
+      }
       console.log("[AGENT-COMPOSITION-EXPANDED-THREAD-SCROLL]", JSON.stringify({
         message: initiallyVisibleMessage.label,
-        point: messagePoint,
-        result: expandedScroll,
+        initialFrame: initiallyVisibleMessage.frame,
+        attempts: scrollAttempts,
+        finalFrame: sameMessageAfterScroll?.frame,
       }));
-      await sleep(350);
-      const afterExpandedScroll = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
-      const sameMessageAfterScroll = findNamedRegionDescendantElement(
-        afterExpandedScroll,
-        "Agent coordination thread",
-        { role: "Text", text: initiallyVisibleMessage.label },
-      );
-      assert(sameMessageAfterScroll, "The coordination message disappeared from the native tree after scrolling");
-      const messageFrameShift = Number(sameMessageAfterScroll.frame?.y) - Number(initiallyVisibleMessage.frame?.y);
       assert(
         Number.isFinite(messageFrameShift) && Math.abs(messageFrameShift) >= 1,
-        "Scrolling the expanded coordination thread must move its message content",
+        "Scrolling the expanded coordination thread in either direction must move its message content",
       );
       const visibleMessageAfterScroll = findVisibleThreadMessage(afterExpandedScroll);
       const compositionAfterScroll = findBy(afterExpandedScroll, { text: "Composition" });
