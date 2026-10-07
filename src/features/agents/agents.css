@@ -326,7 +326,7 @@
 .ag-detail__id { margin-left: auto; font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.3); letter-spacing: 0.12em; white-space: nowrap; }
 
 .ag-detail__body {
-  flex: none;
+  flex: 1 1 auto;
   max-height: 38%;
   min-height: 0;
   overflow: auto;
@@ -375,8 +375,11 @@
 .ag-detail__receipt { flex: none; padding: 7px 22px; border-top: 1px solid var(--pa-border); color: rgba(var(--pa-paper-rgb), 0.68); font: 11px/1.4 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; }
 
 .ag-detail { overflow-y: auto; }
-.ag-detail__thread { flex: 1 0 260px; min-height: 0; display: flex; flex-direction: column; }
-.ag-detail__thread-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+/* Keep the collapsed composer, its bottom gap, and a 40px thread viewport
+   intact; telemetry yields first when the inspector is short. */
+.ag-detail__thread { flex: 1 1 260px; min-height: 211px; display: grid; grid-template-rows: minmax(40px, 1fr) auto; }
+.ag-detail__thread:has(.ag-composer--expanded) { min-height: 359px; }
+.ag-detail__thread-scroll { min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
 
 /* ---- Thread / messages ---- */
 .ag-thread { min-width: 0; min-height: 0; display: flex; flex-direction: column; flex: 1; }
@@ -448,8 +451,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  /* Keep 40px for the thread viewport and account for the 19px bottom margin. */
-  max-height: min(calc(100% - 59px), 300px);
+  /* The outer inspector scrolls if needed; don't clip textarea or Send. */
+  max-height: 300px;
   overflow: hidden;
 }
 .ag-composer--expanded > .ag-composer__label,
