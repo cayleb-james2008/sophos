@@ -60,11 +60,44 @@ async function waitForCenterInScreenshot(appHandle, criteria, timeoutMs) {
 }
 
 function findVisibleThreadMessage(state) {
-  for (const text of ["Endpoint review approved", "Please check the new schema"]) {
-    const element = findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", text });
-    if (element && frameIsFullyInScreenshot(element, state)) return element;
-  }
-  return undefined;
+  // WebView2 can keep clipped descendants in the UIA tree with frame bounds
+  // that are still inside the overall window. Bound visibility to the actual
+  // thread slot, between its header and the following composer.
+  const header = findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", text: "THREAD /" });
+  const composerLabel = findBy(state, { text: "MESSAGE TO" });
+  const sendControl = findBy(state, { text: "Send" });
+  const threadTop = header?.frame
+    ? Number(header.frame.y) + Number(header.frame.h)
+    : Number.NEGATIVE_INFINITY;
+  const composerTop = [composerLabel?.frame?.y, sendControl?.frame?.y]
+    .map(Number)
+    .filter(Number.isFinite)
+    .reduce((top, y) => Math.min(top, y), Number.POSITIVE_INFINITY);
+  const candidates = ["Please check the new schema", "Endpoint review approved"].map((text) => ({
+    text,
+    element: findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", text }),
+  }));
+  const insideThreadViewport = (frame) => Number.isFinite(threadTop)
+    && Number.isFinite(composerTop)
+    && Number.isFinite(frame?.y)
+    && Number.isFinite(frame?.h)
+    && frame.y >= threadTop
+    && frame.y + frame.h <= composerTop;
+  const visible = candidates.find(({ element }) => {
+    return frameIsFullyInScreenshot(element, state) && insideThreadViewport(element?.frame);
+  });
+  console.log("[AGENT-COMPOSITION-THREAD-MESSAGE-CANDIDATES]", JSON.stringify({
+    threadTop,
+    composerTop,
+    candidates: candidates.map(({ text, element }) => ({
+      text,
+      frame: element?.frame,
+      fullyInScreenshot: frameIsFullyInScreenshot(element, state),
+      insideThreadViewport: insideThreadViewport(element?.frame),
+    })),
+    visible: visible?.text ?? null,
+  }));
+  return visible?.element;
 }
 
 /** Navigate to the Agents view and wait for it to render. */
