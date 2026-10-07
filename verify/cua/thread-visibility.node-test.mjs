@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { composerBoundsFromElements, frameWithinVerticalBounds } from "./thread-visibility.mjs";
+import { findNamedRegionScrollElement } from "./find-util.mjs";
 
 function frame(y, h) {
   return { x: 10, y, w: 80, h };
@@ -57,4 +58,47 @@ test("fails closed when the composer label or actual Send Button is unavailable"
     validLabel,
     { ...validButton, frame: frame(210, 24) },
   ]), undefined);
+});
+
+test("strict named-region scroll lookup does not fall back to a scrollable ancestor", () => {
+  const state = {
+    tree_markdown: [
+      '- Window "Sophos"',
+      '  - [10] Pane "Agent coordination thread" [actions=[scroll]]',
+      '    - Group "Agent coordination messages"',
+      '      - [12] Text "Please check the new schema" [actions=[text]]',
+    ].join("\n"),
+    elements: [
+      { element_index: 10, role: "Pane", label: "Agent coordination thread", actions: ["scroll"], element_token: "outer" },
+      { element_index: 12, role: "Text", label: "Please check the new schema", actions: ["text"] },
+    ],
+  };
+
+  assert.equal(findNamedRegionScrollElement(state, "Agent coordination messages")?.element_token, "outer");
+  assert.equal(
+    findNamedRegionScrollElement(state, "Agent coordination messages", { allowAncestors: false }),
+    undefined,
+  );
+});
+
+test("strict named-region scroll lookup accepts a scrollable descendant inside the region", () => {
+  const state = {
+    tree_markdown: [
+      '- Window "Sophos"',
+      '  - [10] Pane "Agent detail" [actions=[scroll]]',
+      '    - Group "Agent coordination messages"',
+      '      - [11] Pane [actions=[scroll]]',
+      '        - [12] Text "Please check the new schema" [actions=[text]]',
+    ].join("\n"),
+    elements: [
+      { element_index: 10, role: "Pane", label: "Agent detail", actions: ["scroll"], element_token: "outer" },
+      { element_index: 11, role: "Pane", label: "", actions: ["scroll"], element_token: "inner" },
+      { element_index: 12, role: "Text", label: "Please check the new schema", actions: ["text"] },
+    ],
+  };
+
+  assert.equal(
+    findNamedRegionScrollElement(state, "Agent coordination messages", { allowAncestors: false })?.element_token,
+    "inner",
+  );
 });

@@ -38,12 +38,13 @@ function indexedScrollTarget(node, byIndex) {
 /**
  * Resolve a named semantic region to an indexed UIA element that advertises a
  * scroll action. WebView2 may render `role=region` as an unindexed Group in
- * `tree_markdown`; when the region has no indexed scrollable descendant, the
- * nearest indexed scrollable ancestor (often the Document) is the native action
- * target. Preserve its `element_token` from this snapshot for the driver's UIA
- * ScrollPattern route rather than deriving pointer coordinates.
+ * `tree_markdown`; when `allowAncestors` is true and the region has no indexed
+ * scrollable descendant, the nearest indexed scrollable ancestor (often the
+ * Document) is the native action target. Region-specific callers should set
+ * `allowAncestors: false` so they cannot mistake a parent scroller for the
+ * named region's own ScrollPattern. Preserve the token from this snapshot.
  */
-export function findNamedRegionScrollElement(windowState, regionName) {
+export function findNamedRegionScrollElement(windowState, regionName, { allowAncestors = true } = {}) {
   const lines = String(windowState?.tree_markdown ?? "").split(/\r?\n/);
   const elements = windowState?.elements ?? [];
   const byIndex = (index) => elements.find((element) => Number(element.element_index) === index);
@@ -76,9 +77,11 @@ export function findNamedRegionScrollElement(windowState, regionName) {
     if (element) return element;
   }
 
-  for (let i = ancestors.length - 1; i >= 0; i -= 1) {
-    const element = indexedScrollTarget(ancestors[i], byIndex);
-    if (element) return element;
+  if (allowAncestors) {
+    for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+      const element = indexedScrollTarget(ancestors[i], byIndex);
+      if (element) return element;
+    }
   }
   return undefined;
 }

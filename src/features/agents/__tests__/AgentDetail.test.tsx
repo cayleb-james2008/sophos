@@ -118,12 +118,15 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Reviewing the merge")).toBeInTheDocument();
   });
 
-  it("keeps the composer outside the scrollable coordination region", () => {
+  it("keeps the composer outside the scrollable coordination region and focuses its messages viewport", () => {
     renderDetail();
     const region = screen.getByRole("region", { name: "Agent coordination thread" });
+    const messages = screen.getByRole("region", { name: "Agent coordination messages" });
     const compositionButton = screen.getByRole("button", { name: /composition/i });
     const messageInput = screen.getByLabelText("Message to Reviewer");
-    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).not.toHaveAttribute("tabindex", "0");
+    expect(messages).toHaveAttribute("tabindex", "0");
+    expect(region).toContainElement(messages);
     expect(region).not.toContainElement(compositionButton);
     expect(region).not.toContainElement(messageInput);
   });

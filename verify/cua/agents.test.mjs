@@ -382,21 +382,61 @@ const tests = [
             { role: "Text", text: initiallyVisibleMessage.label },
           );
         assert(currentMessage, "The coordination message disappeared before the reverse scroll check");
-        const threadScrollTarget = findNamedRegionScrollElement(currentState, "Agent coordination messages");
-        if (!threadScrollTarget || threadScrollTarget.role === "Document") {
+        const threadScrollTarget = findNamedRegionScrollElement(
+          currentState,
+          "Agent coordination messages",
+          { allowAncestors: false },
+        );
+        if (!threadScrollTarget) {
           console.log("[AGENT-COMPOSITION-MESSAGE-SCROLL-TREE]", currentState.tree_markdown ?? "<tree missing>");
         }
-        assert(
-          threadScrollTarget && threadScrollTarget.role !== "Document",
-          "Agent coordination messages must expose their own native ScrollPattern target",
-        );
-        assert(
-          typeof threadScrollTarget.element_token === "string" && threadScrollTarget.element_token.length > 0,
-          "Agent coordination messages native ScrollPattern target has no element token",
-        );
-        const result = scroll(appHandle.pid, direction, 1, appHandle.windowId, {
-          element_token: threadScrollTarget.element_token,
-        });
+        let actionTarget;
+        let result;
+        if (threadScrollTarget) {
+          assert(
+            typeof threadScrollTarget.element_token === "string" && threadScrollTarget.element_token.length > 0,
+            "Agent coordination messages native ScrollPattern target has no element token",
+          );
+          actionTarget = {
+            route: "uia_scroll_pattern",
+            element_index: threadScrollTarget.element_index,
+            role: threadScrollTarget.role,
+            frame: threadScrollTarget.frame,
+          };
+          result = scroll(appHandle.pid, direction, 1, appHandle.windowId, {
+            element_token: threadScrollTarget.element_token,
+          });
+        } else {
+          const header = findNamedRegionDescendantElement(currentState, "Agent coordination thread", {
+            role: "Text",
+            text: "THREAD /",
+          });
+          const composer = composerBoundsFromElements(currentState.elements);
+          const threadTop = header?.frame
+            ? Number(header.frame.y) + Number(header.frame.h)
+            : Number.NaN;
+          assert(
+            frameWithinVerticalBounds(currentMessage.frame, threadTop, composer?.top),
+            "Foreground wheel fallback requires a message fully inside the thread viewport",
+          );
+          const point = elementCenter(currentMessage, currentState);
+          assert(
+            point.x >= 0 && point.y >= 0
+              && point.x < currentState.screenshot_width
+              && point.y < currentState.screenshot_height,
+            `Thread message wheel target is outside the screenshot (${point.x}, ${point.y})`,
+          );
+          actionTarget = {
+            route: "foreground_wheel_inside_message",
+            point,
+            messageFrame: currentMessage.frame,
+          };
+          result = scroll(appHandle.pid, direction, 1, appHandle.windowId, {
+            x: point.x,
+            y: point.y,
+            delivery_mode: "foreground",
+          });
+        }
         await sleep(350);
         afterExpandedScroll = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
         sameMessageAfterScroll = findNamedRegionDescendantElement(
@@ -408,11 +448,7 @@ const tests = [
         messageFrameShift = Number(sameMessageAfterScroll.frame?.y) - Number(initiallyVisibleMessage.frame?.y);
         scrollAttempts.push({
           direction,
-          target: {
-            element_index: threadScrollTarget.element_index,
-            role: threadScrollTarget.role,
-            frame: threadScrollTarget.frame,
-          },
+          target: actionTarget,
           result,
           frame: sameMessageAfterScroll.frame,
           frameShift: messageFrameShift,
@@ -432,7 +468,7 @@ const tests = [
       );
       const visibleMessageAfterScroll = findVisibleThreadMessage(afterExpandedScroll);
       const compositionAfterScroll = findBy(afterExpandedScroll, { text: "Composition" });
-      const sendAfterScroll = findBy(afterExpandedScroll, { text: "Send" });
+      const sendAfterScroll = findBy(afterExpandedScroll, { role: "Button", text: "Send" });
       assert(visibleMessageAfterScroll, "A coordination-thread message must remain readable after scrolling");
       assert(
         compositionAfterScroll && frameIsFullyInScreenshot(compositionAfterScroll, afterExpandedScroll),

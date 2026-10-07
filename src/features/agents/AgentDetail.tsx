@@ -119,12 +119,11 @@ export function AgentDetail({
       ) : null}
 
       <div className="ag-detail__thread">
-        {/* Make the overflow viewport itself focusable/named for native UIA scrolling. */}
+        {/* Keep the inspector thread landmark; the nested messages viewport owns keyboard scrolling. */}
         <div
           className="ag-detail__thread-scroll"
           role="region"
           aria-label="Agent coordination thread"
-          tabIndex={0}
         >
           <InboxThread
             agent={agent}
