@@ -326,7 +326,7 @@
 .ag-detail__id { margin-left: auto; font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; color: rgba(var(--pa-paper-rgb), 0.3); letter-spacing: 0.12em; white-space: nowrap; }
 
 .ag-detail__body {
-  flex: none;
+  flex: 1 1 auto;
   max-height: 38%;
   min-height: 0;
   overflow: auto;
@@ -370,11 +370,32 @@
   overflow-wrap: anywhere;
 }
 .ag-detail__rowvalue--mono { letter-spacing: 0.02em; }
+.ag-detail__state {
+  min-width: 0;
+  padding: 9px 26px;
+  border-top: 1px solid var(--pa-border);
+  color: rgba(var(--pa-paper-rgb), 0.55);
+  font: 11px/1.4 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+}
+.ag-detail__state small {
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.08em;
+}
+.ag-detail__state > div { margin-top: 4px; overflow-wrap: anywhere; }
+.ag-detail__state b { margin-right: 6px; color: var(--pa-green); }
 
 .ag-detail__actions { flex: none; display: flex; gap: 9px; padding: 12px 22px; border-top: 1px solid var(--pa-border); }
 .ag-detail__receipt { flex: none; padding: 7px 22px; border-top: 1px solid var(--pa-border); color: rgba(var(--pa-paper-rgb), 0.68); font: 11px/1.4 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; }
 
-.ag-detail__thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ag-detail { overflow-y: auto; }
+/* Keep the composer and a readable thread viewport in the inspector; its
+   telemetry/session body is the scrollable region that yields first. */
+.ag-detail__thread { flex: 1 1 260px; min-height: 211px; display: grid; grid-template-rows: minmax(40px, 1fr) auto; }
+.ag-detail__thread:has(.ag-composer--expanded) { min-height: 359px; }
+.ag-detail__thread-scroll { min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
 
 /* ---- Thread / messages ---- */
 .ag-thread { min-width: 0; min-height: 0; display: flex; flex-direction: column; flex: 1; }
@@ -434,12 +455,31 @@
 
 /* ---- Composer ---- */
 .ag-composer {
+  flex: none;
   margin: 0 20px 19px;
   padding: 11px 13px 10px;
   background: var(--pa-card);
   border: 1px solid var(--pa-border-strong);
   border-radius: var(--pa-radius-md);
   box-shadow: none;
+}
+.ag-composer--expanded {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* The outer inspector scrolls if needed; don't clip textarea or Send. */
+  max-height: 300px;
+  overflow: hidden;
+}
+.ag-composer--expanded > .ag-composer__label,
+.ag-composer--expanded > .ag-compbtn,
+.ag-composer--expanded > .ag-composer__area,
+.ag-composer--expanded > .ag-composer__foot { flex: none; }
+.ag-composer--expanded > .ag-comp {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .ag-composer:focus-within { border-color: rgba(var(--pa-green-rgb), 0.4); box-shadow: 0 0 0 2px rgba(var(--pa-green-rgb), 0.12); }
 .ag-composer__label { display: flex; justify-content: space-between; color: rgba(var(--pa-paper-rgb), 0.45); font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; letter-spacing: 0.06em; margin-bottom: 6px; }
@@ -608,3 +648,22 @@
 }
 .ag-graphblank__retry:hover { color: var(--pa-paper); border-color: var(--pa-green); }
 .ag-sendbtn { white-space: nowrap; }
+
+/* On short native windows, keep the inspector header/actions compact and cap
+   telemetry to a scrollable 64px slice so the thread/composer stay in-view.
+   Reserve 140px for the thread (72px header + 68px messages), cap the expanded
+   composer at 240px, and reduce message padding to preserve readable content. */
+@media (max-height: 800px) {
+  .ag-detail__head { height: 68px; }
+  .ag-detail__body { max-height: 64px; }
+  .ag-detail__actions { padding-top: 6px; padding-bottom: 6px; }
+  .ag-detail__thread {
+    min-height: 292px;
+    grid-template-rows: minmax(140px, 1fr) auto;
+  }
+  .ag-detail__thread:has(.ag-composer--expanded) { min-height: 380px; }
+  .ag-composer--expanded { max-height: 240px; }
+  .ag-thread__messages { padding: 8px 16px; gap: 10px; }
+  .ag-message__label { margin: 0 4px 4px; }
+  .ag-message__bubble { padding: 8px 10px; }
+}

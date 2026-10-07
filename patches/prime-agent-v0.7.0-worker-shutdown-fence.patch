@@ -1,0 +1,138 @@
+diff --git a/packages/coding-agent/src/modes/daemon/daemon-mode.ts b/packages/coding-agent/src/modes/daemon/daemon-mode.ts
+index dfebcdf..0d70e20 100644
+--- a/packages/coding-agent/src/modes/daemon/daemon-mode.ts
++++ b/packages/coding-agent/src/modes/daemon/daemon-mode.ts
+@@ -374,0 +375,5 @@ interface BoundSupervisorGenerationClaim {
++export function getSupervisorLaunchLockDirectory(supervisorSocketPath: string, agentDir: string): string {
++	const key = createHash("sha256").update(supervisorSocketPath).digest("hex").slice(0, 12);
++	return join(resolve(agentDir), ".supervisor-launch", `${key}.lock`);
++}
++
+@@ -758,2 +763 @@ export class AgentDaemon {
+-		const key = createHash("sha256").update(supervisorSocketPath).digest("hex").slice(0, 12);
+-		const lockDirectory = join(dirname(supervisorSocketPath), `.supervisor-launch-${key}.lock`);
++		const lockDirectory = getSupervisorLaunchLockDirectory(supervisorSocketPath, this.agentDir);
+@@ -761,0 +766 @@ export class AgentDaemon {
++			mkdirSync(dirname(lockDirectory), { recursive: true, mode: 0o700 });
+@@ -802 +807 @@ export class AgentDaemon {
+-			if (await this.canConnectToSupervisor(supervisorSocketPath)) {
++			if (await this.canConnectToSupervisor(supervisorSocketPath) || this.shuttingDown) {
+@@ -805 +810 @@ export class AgentDaemon {
+-			if (await isDaemonShutdownAdmissionActive()) {
++			if (await isDaemonShutdownAdmissionActive() || this.shuttingDown) {
+diff --git a/packages/coding-agent/test/daemon-supervisor-monitor.test.ts b/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
+index c05afc0..42d5bb5 100644
+--- a/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
++++ b/packages/coding-agent/test/daemon-supervisor-monitor.test.ts
+@@ -6 +6 @@ import { tmpdir } from "node:os";
+-import { join } from "node:path";
++import { join, relative } from "node:path";
+@@ -12,0 +13 @@ import { DaemonClient } from "../src/modes/daemon/daemon-client.js";
++import * as daemonMode from "../src/modes/daemon/daemon-mode.js";
+@@ -35 +36 @@ const workerLaunchTestState = vi.hoisted(() => ({
+-	fixtureMode: "worker" as "worker" | "close-gate" | "rollback-gate" | "successful-gate",
++	fixtureMode: "worker" as "worker" | "close-gate" | "rollback-gate" | "successful-gate" | "idle",
+@@ -94,0 +96,6 @@ vi.mock("../src/cli/subprocess-launch.js", async (importOriginal) => {
++			if (workerLaunchTestState.fixtureMode === "idle") {
++				return {
++					command: process.execPath,
++					args: ["--eval", "setInterval(() => {}, 1000)"],
++				};
++			}
+@@ -120 +127,3 @@ interface SupervisorMonitorHarness {
+-	options: { worker: object };
++	options: { worker: object; defaultSessionConfig: { cwd: string } };
++	agentDir: string;
++	socketPath: string;
+@@ -264 +273,3 @@ function createHarness(canConnect: () => Promise<boolean>): SupervisorMonitorHar
+-		options: { worker: {} },
++		options: { worker: {}, defaultSessionConfig: { cwd: process.cwd() } },
++		agentDir: registryDir,
++		socketPath: "",
+@@ -273,0 +285,15 @@ describe("daemon worker supervisor monitoring", () => {
++	it("keeps the replacement lock in filesystem storage for named-pipe sockets", () => {
++		const agentDir = mkdtempSync(join(tmpdir(), "supervisor-launch-lock-"));
++		try {
++			const socketPath = ["", "", ".", "pipe", `prime-agent-daemon-${process.pid}`].join("\\");
++			const getLockDirectory = Reflect.get(daemonMode, "getSupervisorLaunchLockDirectory");
++			expect(typeof getLockDirectory).toBe("function");
++			if (typeof getLockDirectory !== "function") return;
++			const lockDirectory = Reflect.apply(getLockDirectory, undefined, [socketPath, agentDir]) as string;
++			const relativeLockDirectory = relative(agentDir, lockDirectory);
++			expect(relativeLockDirectory).not.toMatch(/^(?:\.\.(?:[/\\]|$)|[/\\])/);
++		} finally {
++			rmSync(agentDir, { recursive: true, force: true });
++		}
++	});
++
+@@ -978,0 +1005,27 @@ describe("daemon worker supervisor monitoring", () => {
++	it("does not launch a replacement supervisor if shutdown starts during the availability probe", async () => {
++		let resolveProbe: (available: boolean) => void = () => undefined;
++		const probe = new Promise<boolean>((resolve) => {
++			resolveProbe = resolve;
++		});
++		const daemon = createHarness(() => probe);
++		const registryDir = process.env[supervisorRegistryDirEnv];
++		if (!registryDir) throw new Error("Supervisor registry test directory was not set");
++		workerLaunchTestState.capture = true;
++		workerLaunchTestState.fixtureMode = "idle";
++		workerLaunchTestState.gateMarkerPath = join(registryDir, "spawned");
++		const launchReplacementSupervisor = Object.getOwnPropertyDescriptor(
++			AgentDaemon.prototype,
++			"launchReplacementSupervisor",
++		)?.value as ((this: SupervisorMonitorHarness, socketPath: string) => Promise<void>) | undefined;
++		if (!launchReplacementSupervisor) throw new Error("Replacement-supervisor launch method was not found");
++
++		const socketPath = join(registryDir, "supervisor.sock");
++		daemon.socketPath = socketPath;
++		const launch = launchReplacementSupervisor.call(daemon, socketPath);
++		daemon.shuttingDown = true;
++		resolveProbe(false);
++		await launch;
++
++		expect(workerLaunchTestState.spawned).toHaveLength(0);
++	});
++
+@@ -1964,2 +2017,4 @@ describe("daemon worker supervisor monitoring", () => {
+-		const root = mkdtempSync(`/tmp/prime-update-drain-${process.pid}-`);
+-		const socketPath = join(root, "supervisor.sock");
++		const root = mkdtempSync(join(tmpdir(), `prime-update-drain-${process.pid}-`));
++		const socketPath = process.platform === "win32"
++			? `\\\\.\\pipe\\prime-agent-update-drain-${process.pid}`
++			: join(root, "supervisor.sock");
+@@ -1970,0 +2026,11 @@ describe("daemon worker supervisor monitoring", () => {
++		const mutationDrain = Reflect.get(supervisor, "mutationDrain") as MutationDrainLatch;
++		mutationDrain.begin();
++		mutationDrain.begin();
++		let heldMutations = 2;
++		let prepare: Promise<unknown> | undefined;
++		const releaseMutations = () => {
++			while (heldMutations > 0) {
++				mutationDrain.end();
++				heldMutations--;
++			}
++		};
+@@ -1975,3 +2041,4 @@ describe("daemon worker supervisor monitoring", () => {
+-			const prepare = client.request({ type: "prepare_update_restart" });
+-			expect(await client.request({ type: "abort", activeSessionId: "missing" })).not.toMatchObject({
+-				error: "Daemon is preparing an update restart",
++			prepare = client.request({ type: "prepare_update_restart" });
++			await vi.waitFor(() => expect(Reflect.get(supervisor, "updateRestartPhase")).toBe("draining"), { timeout: 5000 });
++			expect(await client.request({ type: "abort", activeSessionId: "missing" })).toMatchObject({
++				error: "Unknown active session: missing",
+@@ -1978,0 +2046 @@ describe("daemon worker supervisor monitoring", () => {
++			releaseMutations();
+@@ -1983,0 +2052,2 @@ describe("daemon worker supervisor monitoring", () => {
++			releaseMutations();
++			if (prepare) await prepare.catch(() => undefined);
+diff --git a/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts b/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
+--- a/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
++++ b/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
+@@ -4497,0 +4498 @@
++		gracefulTimeoutMs = 2000,
+@@ -4561 +4562 @@
+-		const gracefulDeadline = Date.now() + (force ? 500 : 2000);
++		const gracefulDeadline = Date.now() + (force ? 500 : gracefulTimeoutMs);
+@@ -4810 +4811 @@
+-				[...this.workers.values()].map((worker) => this.stopWorker(worker, true, forceWorkers, true)),
++				[...this.workers.values()].map((worker) => this.stopWorker(worker, true, forceWorkers, true, false, undefined, 30000)),

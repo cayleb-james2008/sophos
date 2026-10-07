@@ -20,11 +20,12 @@
 //     - Export
 
 import { getWindowState, sleep, typeText, pressKey, hotkey, click, bringToFront, listWindows, call, startDaemon, stopDaemon } from "./driver.mjs";
+import { existsSync } from "node:fs";
 import { navTo, takeScreenshot, getTextContent, elementCenter, SCREENSHOT_DIR } from "./helpers.mjs";
 import { findBy, findAll, clickBy, waitFor } from "./find-util.mjs";
 import { assert, assertTextContains } from "./assertions.mjs";
 import { enableWebContentAccessibility } from "./demo-launch.mjs";
-import { waitForWindow } from "./launch.mjs";
+import { DEFAULT_APP_PATH, WORKSPACE_ROOT, resolveAppBuildPath, waitForWindow } from "./launch.mjs";
 import { spawn } from "node:child_process";
 
 /** Read a fresh window state for the app handle. If the handle went stale
@@ -459,11 +460,8 @@ const tests = [
 // build path (prefer the debug build, which is not contended by sibling workers
 // building the release exe) so the e2e is stable.
 
-import { existsSync } from "node:fs";
-
-const WORKSPACE = "C:/Users/Cayleb/Desktop/workspace/sophos";
-const DEBUG_APP = `${WORKSPACE}/src-tauri/target/debug/prime-agent-windows.exe`;
-const RELEASE_APP = `${WORKSPACE}/src-tauri/target/release/prime-agent-windows.exe`;
+const DEBUG_APP = resolveAppBuildPath(WORKSPACE_ROOT, "debug");
+const RELEASE_APP = DEFAULT_APP_PATH;
 
 /** Launch the chosen app path in demo mode; returns { pid, windowId }.
  * Launches the exe directly (Medium integrity, so our daemon can drive it) and

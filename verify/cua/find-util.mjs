@@ -7,8 +7,125 @@
 // substring), role, and/or name — and click via element_token (UIA Invoke) or
 // a pixel click at the element's centre.
 
-import { click, clickElement as driverClickElement, getWindowState, sleep } from "./driver.mjs";
+import { click, clickElement as driverClickElement, driverErrorCode, getWindowState, sleep } from "./driver.mjs";
 import { elementCenter } from "./helpers.mjs";
+
+function parseTreeNode(line) {
+  const prefix = String(line).match(/^(\s*)-\s+(.*)$/);
+  if (!prefix) return null;
+  const match = prefix[2].match(
+    /^(?:\[(\d+)\]\s+)?([A-Za-z][A-Za-z0-9_-]*)(?:\s+"([^"]*)")?(?:\s+(.*))?$/,
+  );
+  return {
+    indent: prefix[1].length,
+    index: match?.[1] == null ? null : Number(match[1]),
+    role: match?.[2] ?? null,
+    label: match?.[3] ?? "",
+    metadata: match?.[4] ?? "",
+  };
+}
+
+function hasScrollAction(node) {
+  return /\bactions=\[[^\]]*\bscroll\b/.test(node.metadata);
+}
+
+function indexedScrollTarget(node, byIndex) {
+  if (node.index == null || !hasScrollAction(node)) return undefined;
+  const element = byIndex(node.index);
+  return Array.isArray(element?.actions) && element.actions.includes("scroll") ? element : undefined;
+}
+
+/**
+ * Resolve a named semantic region to an indexed UIA element that advertises a
+ * scroll action. WebView2 may render `role=region` as an unindexed Group in
+ * `tree_markdown`; when `allowAncestors` is true and the region has no indexed
+ * scrollable descendant, the nearest indexed scrollable ancestor (often the
+ * Document) is the native action target. Region-specific callers should set
+ * `allowAncestors: false` so they cannot mistake a parent scroller for the
+ * named region's own ScrollPattern. Preserve the token from this snapshot.
+ */
+export function findNamedRegionScrollElement(windowState, regionName, { allowAncestors = true } = {}) {
+  const lines = String(windowState?.tree_markdown ?? "").split(/\r?\n/);
+  const elements = windowState?.elements ?? [];
+  const byIndex = (index) => elements.find((element) => Number(element.element_index) === index);
+  const stack = [];
+  let regionEntry;
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    const node = parseTreeNode(lines[lineIndex]);
+    if (!node) continue;
+    while (stack.length && stack[stack.length - 1].indent >= node.indent) stack.pop();
+
+    if (["Group", "Pane", "Region"].includes(node.role) && node.label === regionName) {
+      regionEntry = { lineIndex, node, ancestors: [...stack] };
+      break;
+    }
+    stack.push(node);
+  }
+  if (!regionEntry) return undefined;
+
+  const { lineIndex: regionLine, node: region, ancestors } = regionEntry;
+  const regionElement = indexedScrollTarget(region, byIndex);
+  if (regionElement) return regionElement;
+
+  for (let i = regionLine + 1; i < lines.length; i += 1) {
+    const candidate = parseTreeNode(lines[i]);
+    if (!candidate) continue;
+    if (candidate.indent <= region.indent) break;
+    if (!["Group", "Pane", "Region"].includes(candidate.role)) continue;
+    const element = indexedScrollTarget(candidate, byIndex);
+    if (element) return element;
+  }
+
+  if (allowAncestors) {
+    for (let i = ancestors.length - 1; i >= 0; i -= 1) {
+      const element = indexedScrollTarget(ancestors[i], byIndex);
+      if (element) return element;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Find a structured element that is actually inside a named native-tree
+ * region. A scrollable ancestor such as the WebView Document may be actionable
+ * but its center can lie in an unrelated sibling panel; callers can use this
+ * element's frame as an in-region pointer target for wheel input. Returns the
+ * first tree-order match; callers must validate its native frame and fail
+ * closed when it is missing or outside the window rather than guessing.
+ */
+export function findNamedRegionDescendantElement(windowState, regionName, criteria = {}) {
+  const lines = String(windowState?.tree_markdown ?? "").split(/\r?\n/);
+  const byIndex = new Map();
+  for (const element of windowState?.elements ?? []) {
+    const index = Number(element.element_index);
+    if (Number.isInteger(index) && !byIndex.has(index)) byIndex.set(index, element);
+  }
+
+  let regionIndent = null;
+  const textNeedle = criteria.text ? String(criteria.text).toLowerCase() : null;
+  for (const line of lines) {
+    const node = parseTreeNode(line);
+    if (!node) continue;
+
+    if (regionIndent === null) {
+      if (["Group", "Pane", "Region"].includes(node.role) && node.label === regionName) {
+        regionIndent = node.indent;
+      }
+      continue;
+    }
+
+    if (node.indent <= regionIndent) break;
+    if (node.index == null) continue;
+    const element = byIndex.get(node.index);
+    if (!element) continue;
+    if (criteria.role && element.role !== criteria.role) continue;
+    if (criteria.name && element.label !== criteria.name) continue;
+    if (textNeedle && !String(element.label ?? "").toLowerCase().includes(textNeedle)) continue;
+    return element;
+  }
+  return undefined;
+}
 
 /**
  * Find an element in a window state's UIA tree matching the criteria.
@@ -69,16 +186,49 @@ export function clickRightmost(pid, windowState, criteria = {}) {
  * Invoke); falls back to a pixel click at the element's centre bounds.
  */
 export function clickBy(pid, windowState, criteria = {}) {
-  const el = findBy(windowState, criteria);
-  if (!el) {
-    throw new Error(`Element not found: ${JSON.stringify(criteria)}`);
+  const initialWindowId = windowState.window_id;
+  const clickMatching = (state) => {
+    const el = findBy(state, criteria);
+    if (!el) {
+      throw new Error(`Element not found: ${JSON.stringify(criteria)}`);
+    }
+    const windowId = state.window_id ?? initialWindowId;
+    if (el.element_token) {
+      return driverClickElement(pid, windowId, el.element_token);
+    }
+    const { x, y } = elementCenter(el, state);
+    return click(pid, x, y, windowId);
+  };
+
+  try {
+    return clickMatching(windowState);
+  } catch (error) {
+    // Screenshot capture and unrelated UI updates can invalidate a token after
+    // the caller took its snapshot. Re-query and re-find only on the driver's
+    // explicit stale-token refusal; all other errors remain fail-closed.
+    if (driverErrorCode(error) !== "stale_element_token") throw error;
+    if (initialWindowId === undefined || initialWindowId === null) {
+      throw new Error("Refusing stale-element retry without the original window identity", { cause: error });
+    }
+    const refreshed = getWindowState(pid, initialWindowId, { include_screenshot: false });
+    if (
+      !refreshed ||
+      typeof refreshed !== "object" ||
+      refreshed.pid === undefined ||
+      refreshed.pid === null ||
+      refreshed.window_id === undefined ||
+      refreshed.window_id === null
+    ) {
+      throw new Error("Refusing stale-element retry because refreshed identity fields are missing", { cause: error });
+    }
+    if (refreshed.pid !== pid || refreshed.window_id !== initialWindowId) {
+      throw new Error(
+        `Refusing stale-element retry because window identity changed (pid ${refreshed.pid}; window_id ${refreshed.window_id})`,
+        { cause: error },
+      );
+    }
+    return clickMatching(refreshed);
   }
-  const windowId = windowState.window_id;
-  if (el.element_token) {
-    return driverClickElement(pid, windowId, el.element_token);
-  }
-  const { x, y } = elementCenter(el, windowState);
-  return click(pid, x, y, windowId);
 }
 
 /**

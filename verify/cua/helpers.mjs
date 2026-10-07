@@ -11,6 +11,7 @@
 // centre bounds for elements without a token (e.g. canvas surfaces).
 
 import path from "node:path";
+import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   getWindowState,
@@ -125,7 +126,8 @@ export function takeScreenshot(pid, name, windowId) {
   const wid = windowId ?? findSophosWindow()?.windowId;
   if (!wid) throw new Error(`takeScreenshot: no Sophos window for pid ${pid}`);
   const outPath = path.join(SCREENSHOT_DIR, `${name}.png`);
-  getWindowState(pid, wid, { screenshot_out_file: outPath });
+  mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  getWindowState(pid, wid, { include_screenshot: true, screenshot_out_file: outPath });
   return outPath;
 }
 

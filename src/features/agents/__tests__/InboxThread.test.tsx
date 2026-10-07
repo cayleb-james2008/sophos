@@ -63,6 +63,14 @@ describe("InboxThread", () => {
     expect(screen.getByText("YOU")).toBeInTheDocument();
   });
 
+  it("exposes the scrollable messages as a named, keyboard-focusable region", () => {
+    renderThread();
+    const viewport = screen.getByRole("region", { name: "Agent coordination messages" });
+    expect(viewport).toHaveAttribute("tabindex", "0");
+    expect(viewport).toHaveTextContent("Hello from the child");
+    expect(viewport).toHaveTextContent("Please proceed");
+  });
+
   it("labels unread incoming messages with UNREAD", () => {
     renderThread();
     expect(screen.getByText(/UNREAD/i)).toBeInTheDocument();

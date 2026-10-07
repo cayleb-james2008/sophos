@@ -158,7 +158,7 @@ export function InboxView() {
 
       {/* Message-flow graph + composer */}
       <section className="inbox__console inbox__console--graph">
-        <div className="inbox__graphwrap">
+        <div className="inbox__graphwrap" role="region" aria-label="Message flow canvas">
           {selected ? (
             <InboxGraph
               peerId={selected}

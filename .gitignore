@@ -77,3 +77,4 @@ generator-state.json
 
 # Smoke test screenshots
 verify/screenshots/
+verify/cua/screenshots/

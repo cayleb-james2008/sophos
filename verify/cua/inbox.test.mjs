@@ -13,9 +13,9 @@
 //   - Agent switcher selects a peer and shows that peer's thread
 //   - Send a relay message from the composer
 
-import { getWindowState, sleep, typeText } from "./driver.mjs";
-import { takeScreenshot, getTextContent } from "./helpers.mjs";
-import { findBy, clickBy, waitFor } from "./find-util.mjs";
+import { click, getWindowState, sleep, typeText } from "./driver.mjs";
+import { elementCenter, takeScreenshot, getTextContent } from "./helpers.mjs";
+import { findBy, clickBy, waitFor, findNamedRegionScrollElement } from "./find-util.mjs";
 import { assert, assertTextContains } from "./assertions.mjs";
 import { runDemoSuite } from "./demo-runner.mjs";
 
@@ -92,12 +92,60 @@ const tests = [
       const state = await goInbox(appHandle);
       // The selected peer's thread has exactly one unread incoming message.
       const before = countText(state, "UNREAD");
+      takeScreenshot(appHandle.pid, "inbox-unread-before-click", appHandle.windowId);
       assert(before >= 1, `Expected an UNREAD pill before clicking (got ${before})`);
-      // Click the unread message node.
-      const node = await waitFor(state, { text: "Endpoint review approved" }, 8000);
+      // Require a real, sized canvas before interacting. WebView2 can expose
+      // node text in its UIA tree even when the flex canvas has collapsed.
+      const visible = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+      const uiaCandidates = (visible.elements || [])
+        .filter((element) =>
+          /endpoint review approved|inbox/i.test(String(element.label || "")) || element.role === "Pane",
+        )
+        .map(({ element_index, role, label, frame, actions }) => ({ element_index, role, label, frame, actions }));
+      console.log("[INBOX-UIA]", JSON.stringify({
+        screenshot: `${visible.screenshot_width}x${visible.screenshot_height}`,
+        elementCount: visible.elements?.length ?? 0,
+        candidates: uiaCandidates,
+      }));
+      console.log("[INBOX-UIA-TREE-BEGIN]");
+      console.log(visible.tree_markdown ?? "<tree_markdown missing>");
+      console.log("[INBOX-UIA-TREE-END]");
+      const nativeTree = String(visible.tree_markdown ?? "");
+      assert(
+        nativeTree.split(/\r?\n/).some((line) =>
+          /^\s*-\s+(?:\[\d+\]\s+)?(?:Group|Pane|Region)\s+"Message flow canvas"(?:\s|$)/.test(line),
+        ),
+        "Inbox message-flow region is missing from the native UIA tree",
+      );
+      // The native tree exposes the ARIA region as an unindexed Group, then
+      // its scrollable geometry as indexed Pane [34]. Resolve that Pane from
+      // this same snapshot instead of looking for the Group's label in the
+      // flattened actionable-elements array.
+      const canvas = findNamedRegionScrollElement(visible, "Message flow canvas");
+      assert(canvas, "Named Inbox UIA region has no indexed native scroll/bounds element");
+      console.log("[INBOX-UIA-CANVAS]", JSON.stringify({
+        element_index: canvas.element_index,
+        role: canvas.role,
+        label: canvas.label,
+        frame: canvas.frame,
+      }));
+      assert(
+        Number(canvas.frame?.h) >= 240,
+        `Inbox message-flow canvas Pane must be at least 240px high (got ${canvas.frame?.h ?? "no frame"})`,
+      );
+      // Click the rendered node's pixel center, not merely UIA Invoke on its
+      // accessible name, so this exercises the visible graph interaction.
+      const node = findBy(visible, { text: "Endpoint review approved" });
       assert(node, "Unread message node not found");
-      clickBy(appHandle.pid, freshState(appHandle), { text: "Endpoint review approved" });
+      assert(Number(node.frame?.w) > 0 && Number(node.frame?.h) > 0, "Unread message node has no visible bounds");
+      const { x, y } = elementCenter(node, visible);
+      assert(
+        x >= 0 && y >= 0 && x < visible.screenshot_width && y < visible.screenshot_height,
+        `Unread message node center is outside the app screenshot (${x}, ${y})`,
+      );
+      click(appHandle.pid, x, y, appHandle.windowId);
       await sleep(1200);
+      takeScreenshot(appHandle.pid, "inbox-unread-after-click", appHandle.windowId);
       const after = freshState(appHandle);
       // The unread pill is gone (that message flipped to read).
       const afterCount = countText(after, "UNREAD");

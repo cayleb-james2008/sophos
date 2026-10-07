@@ -100,7 +100,7 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
   };
 
   return (
-    <div className="ag-composer">
+    <div className={showComposition ? "ag-composer ag-composer--expanded" : "ag-composer"}>
       <div className="ag-composer__label">
         <span>
           MESSAGE TO <b>{target}</b>

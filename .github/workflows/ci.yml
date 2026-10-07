@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -27,16 +29,52 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Prepare a secure Windows source checkout
+        shell: pwsh
+        run: |
+          $privateParent = (node -p "require('node:fs').mkdtempSync(require('node:path').join(require('node:fs').realpathSync(require('node:os').tmpdir()), 'sophos-secure-'))").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $privateParent) { throw 'Could not create a unique checkout root under canonical Node system TEMP' }
+          $safeRepo = Join-Path $privateParent 'repo'
+          if (Test-Path -LiteralPath $safeRepo) { throw 'Refusing to reuse a secure checkout path' }
+          # GITHUB_REPOSITORY is the base repository on pull_request events and
+          # the pushing repository on branch events; fetch only the pinned event ref/SHA below.
+          $serverUrl = [Uri]$env:GITHUB_SERVER_URL
+          $repositorySlug = $env:GITHUB_REPOSITORY
+          if ($serverUrl.Scheme -ne 'https' -or $repositorySlug -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid GitHub event repository URL' }
+          $repositoryUrl = "$($serverUrl.AbsoluteUri.TrimEnd('/'))/$repositorySlug.git"
+          git clone --quiet --depth=1 --no-tags --no-checkout --no-hardlinks $repositoryUrl $safeRepo
+          if ($LASTEXITCODE -ne 0) { throw 'Anonymous Sophos source clone failed' }
+          git -C $safeRepo config core.autocrlf false
+          if ($LASTEXITCODE -ne 0) { throw 'Could not disable Git line-ending conversion in secure checkout' }
+          git -C $safeRepo fetch --quiet --no-tags --depth=1 origin $env:GITHUB_REF
+          if ($LASTEXITCODE -ne 0) { throw "Could not fetch event ref $env:GITHUB_REF" }
+          git -C $safeRepo checkout --quiet --detach $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Could not check out event SHA $env:GITHUB_SHA" }
+          $actualSha = (git -C $safeRepo rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actualSha -ne $env:GITHUB_SHA) { throw "Secure checkout SHA mismatch: $actualSha" }
+          $dirty = git -C $safeRepo status --porcelain --untracked-files=all
+          if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Secure checkout is not clean after the pinned checkout' }
+          Push-Location $safeRepo
+          try {
+            node --input-type=module -e 'import("./scripts/prepare-dependency-overlay.mjs").then(({ assertSecureProjectRoot }) => assertSecureProjectRoot(process.cwd()).then((root) => console.log("Validated secure project root: " + root))).catch((error) => { console.error(error); process.exitCode = 1; })'
+            if ($LASTEXITCODE -ne 0) { throw 'Secure Windows project-root ACL validation failed' }
+          } finally { Pop-Location }
+          Add-Content -Path $env:GITHUB_ENV -Value "SAFE_WINDOWS_REPO=$safeRepo"
+          Write-Output "Pinned secure checkout: $actualSha"
+
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm ci
 
       - name: Type-check
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npx tsc --noEmit
 
       - name: Unit tests
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npx vitest run
 
       - name: Updater harness (config + keys + signature crypto)
@@ -45,6 +83,7 @@ jobs:
         # signing key pair hygiene, Ed25519 signature crypto (incl. tamper
         # rejection), and the local dummy feed. Pure local Node, so a failure
         # must red the build.
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm run test:updater
 
       - name: Live update-feed integrity check
@@ -54,34 +93,42 @@ jobs:
         # the bytes with the configured pubkey, reject tampering). A broken
         # feed means the auto-updater is broken for every user, so a failure
         # must red the build. Network-dependent (hits the live GitLab feed).
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node verify/live-feed.mjs
 
       - name: Runtime helper and fail-closed gate regression tests
-        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs verify/e2e-home-cleanup.test.mjs scripts/bundle.test.mjs bridge/verify.test.mjs
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs scripts/prepare-dependency-overlay.test.mjs scripts/prepare-prime-agent-security-build.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs verify/e2e-home-cleanup.test.mjs scripts/bundle.test.mjs bridge/verify.test.mjs bridge/startup-gate.test.mjs verify/cua/driver.test.mjs
 
       - name: Platform provenance and Tauri resource tests
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node --test scripts/native-runtime-platform.test.mjs scripts/bundle-platform.test.mjs scripts/tauri-license-resource.test.mjs scripts/tauri-package-license.test.mjs
 
-      # Build all ignored runtime inputs from a fresh checkout. The bundler
-      # verifies the exact public Prime Agent tag/commit/license, performs
-      # normal npm lifecycle installation, builds daemon + bridge, and fetches
-      # the hash-pinned official Windows Node executable before staging.
+      # Build ignored runtime inputs from the event-SHA-pinned private checkout
+      # under canonical system TEMP; the bundler revalidates the ACL and every
+      # upstream source/patch/lock hash before staging.
       - name: Build complete runtime bundle
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node scripts/bundle.mjs
 
       - name: Load production Windows native modules
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node scripts/verify-native-runtime.mjs
 
       - name: Focused JSON-RPC wire regression
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node bridge/verify-rpc-errors.test.mjs
 
       - name: Build guarded Tauri MSI
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node scripts/build-windows-installer.mjs
 
       - name: Verify MIT notice is inside the built MSI
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node scripts/verify-tauri-package.mjs
 
       - name: Verify bridge compatibility with the pinned daemon
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm --prefix bridge run test:kernel-compat
 
       # Exercise the real staged daemon + bridge together over the platform's
@@ -89,29 +136,14 @@ jobs:
       # upstream commit, packaged Node checksum, runtime dependencies, and daemon
       # reconnect behavior. TCP fallback is explicitly not assumed.
       - name: End-to-end verification
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node verify/e2e.mjs
 
-  # cua-e2e — drives the REAL Sophos desktop app (Tauri v2 release build) via
-  # the cua-driver CLI and UIA accessibility automation (verify/cua/*). These
-  # tests run in DEMO MODE (the `--demo` flag skips the daemon + sidecar and
-  # injects window.__SOPHOS_DEMO__ = true, so the frontend uses the
-  # MockIpcClient with simulated Sessions/Agents data).
-  #
-  # HONEST STATUS (2026-09-21): the cua-driver daemon cannot start on
-  # GitHub-hosted windows-latest runners — they run non-interactive (session 0,
-  # no desktop), and `cua-driver serve` exits immediately there, so every run
-  # fails in startDaemon() before any suite runs. Verified across all four runs
-  # of this workflow (every cua-e2e conclusion to date is FAILURE, including
-  # runs that predate any local changes), with the driver's own stderr captured
-  # in the logs. The build steps above DO run and are kept: they prove the
-  # release exe compiles on real Windows from a clean checkout.
-  #
-  # The suite itself is real: it was executed on an interactive Windows 10
-  # Enterprise LTSC VM (QEMU/KVM) on 2026-09-18/2026-09-21, where the built exe
-  # launched and stayed running (see OVERHAUL-NOTES.md, "Windows runtime test").
-  # Until a runner class with a desktop session is available, this job is
-  # best-effort (continue-on-error) rather than permanently red; the build
-  # compilation result still gates the job's exit code.
+  # cua-e2e drives the real Tauri release executable through UI Automation
+  # (verify/cua/*), using the disclosed demo IPC path (no provider inference).
+  # The screenshot directory includes checked-in baseline frames, so clear it
+  # in the secure clone before execution; uploaded artifacts then contain only
+  # frames produced by this current CUA attempt. Keep the gate blocking.
   cua-e2e:
     runs-on: windows-latest
 
@@ -122,6 +154,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -129,7 +163,41 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Prepare a secure Windows source checkout
+        shell: pwsh
+        run: |
+          $privateParent = (node -p "require('node:fs').mkdtempSync(require('node:path').join(require('node:fs').realpathSync(require('node:os').tmpdir()), 'sophos-secure-'))").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $privateParent) { throw 'Could not create a unique checkout root under canonical Node system TEMP' }
+          $safeRepo = Join-Path $privateParent 'repo'
+          if (Test-Path -LiteralPath $safeRepo) { throw 'Refusing to reuse a secure checkout path' }
+          # GITHUB_REPOSITORY is the base repository on pull_request events and
+          # the pushing repository on branch events; fetch only the pinned event ref/SHA below.
+          $serverUrl = [Uri]$env:GITHUB_SERVER_URL
+          $repositorySlug = $env:GITHUB_REPOSITORY
+          if ($serverUrl.Scheme -ne 'https' -or $repositorySlug -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid GitHub event repository URL' }
+          $repositoryUrl = "$($serverUrl.AbsoluteUri.TrimEnd('/'))/$repositorySlug.git"
+          git clone --quiet --depth=1 --no-tags --no-checkout --no-hardlinks $repositoryUrl $safeRepo
+          if ($LASTEXITCODE -ne 0) { throw 'Anonymous Sophos source clone failed' }
+          git -C $safeRepo config core.autocrlf false
+          if ($LASTEXITCODE -ne 0) { throw 'Could not disable Git line-ending conversion in secure checkout' }
+          git -C $safeRepo fetch --quiet --no-tags --depth=1 origin $env:GITHUB_REF
+          if ($LASTEXITCODE -ne 0) { throw "Could not fetch event ref $env:GITHUB_REF" }
+          git -C $safeRepo checkout --quiet --detach $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Could not check out event SHA $env:GITHUB_SHA" }
+          $actualSha = (git -C $safeRepo rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actualSha -ne $env:GITHUB_SHA) { throw "Secure checkout SHA mismatch: $actualSha" }
+          $dirty = git -C $safeRepo status --porcelain --untracked-files=all
+          if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Secure checkout is not clean after the pinned checkout' }
+          Push-Location $safeRepo
+          try {
+            node --input-type=module -e 'import("./scripts/prepare-dependency-overlay.mjs").then(({ assertSecureProjectRoot }) => assertSecureProjectRoot(process.cwd()).then((root) => console.log("Validated secure project root: " + root))).catch((error) => { console.error(error); process.exitCode = 1; })'
+            if ($LASTEXITCODE -ne 0) { throw 'Secure Windows project-root ACL validation failed' }
+          } finally { Pop-Location }
+          Add-Content -Path $env:GITHUB_ENV -Value "SAFE_WINDOWS_REPO=$safeRepo"
+          Write-Output "Pinned secure checkout: $actualSha"
+
       - name: Install dependencies
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm ci
 
       - name: Set up Rust toolchain
@@ -137,11 +205,13 @@ jobs:
 
       - name: Build frontend
         # tsc && vite build — emits dist/ that the Tauri shell embeds.
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm run build
 
       - name: Build actual pinned runtime resources
         # Even the simulated UI build uses real pinned resources and the upstream
         # MIT notice. No placeholder runtime is counted as packaging evidence.
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node scripts/bundle.mjs
 
       - name: Build Tauri release exe
@@ -151,20 +221,46 @@ jobs:
         # NOT run `npx tauri build`, which would try to bundle installers and
         # needs the gitignored resources/ directory. The raw exe is all the
         # cua-driver e2e tests need.
-        working-directory: src-tauri
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}/src-tauri
         run: cargo build --release
 
       - name: Install cua-driver
-        # The cua-driver binary is installed to
-        # %LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe and found
-        # by verify/cua/driver.mjs (overridable via CUA_DRIVER_BIN).
+        # Pin the installed executable path for the next step. Hosted runners
+        # use a per-job profile (for example runneradmin), not the developer's
+        # local C:\Users\Cayleb profile.
         shell: pwsh
-        run: irm https://cua.ai/driver/install.ps1 | iex
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: |
+          irm https://cua.ai/driver/install.ps1 | iex
+          $driverBin = Join-Path $env:LOCALAPPDATA 'Programs\Cua\cua-driver\bin\cua-driver.exe'
+          if (-not (Test-Path -LiteralPath $driverBin -PathType Leaf)) { throw "Installed cua-driver binary is missing: $driverBin" }
+          $versionOutput = & $driverBin --version
+          $driverExit = $LASTEXITCODE
+          if ($driverExit -ne 0) { throw "Installed cua-driver version probe failed (exit $driverExit): $driverBin" }
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value "CUA_DRIVER_BIN=$driverBin"
+          Write-Output "Configured CUA_DRIVER_BIN=$driverBin ($versionOutput)"
+
+      - name: Clear checked-in screenshots before CUA run
+        shell: pwsh
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $screenshotDir = Join-Path (Get-Location).Path 'verify/cua/screenshots'
+          if (Test-Path -LiteralPath $screenshotDir) {
+            Remove-Item -LiteralPath $screenshotDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $screenshotDir -Force | Out-Null
+          Write-Output 'Prepared an empty current-run screenshot directory'
 
       - name: Run cua-driver e2e suite
-        # Best-effort: the driver daemon needs an interactive desktop session
-        # (see the job-level note above); the build steps above still gate this
-        # job's exit code. Run `npm run test:cua` on an interactive Windows host
-        # to exercise the full suite.
+        # Keep failures blocking; a green result must mean all native UI suites ran.
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node verify/cua/run-all.mjs
-        continue-on-error: true
+
+      - name: Upload CUA screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cua-e2e-screenshots-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SAFE_WINDOWS_REPO }}/verify/cua/screenshots/*.png
+          if-no-files-found: error
