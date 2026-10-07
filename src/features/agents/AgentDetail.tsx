@@ -89,11 +89,12 @@ export function AgentDetail({
             <Row icon={<ClockIcon size={14} />} label="Agent id" value={agent.id} mono />
             {agent.summary ? <Row icon={<LayersIcon size={14} />} label="Summary" value={agent.summary} /> : null}
             {sessionState ? <Row icon={<LayersIcon size={14} />} label="Child state" value={`${sessionState.status}${sessionState.activity ? ` · ${sessionState.activity}` : ""}${sessionState.tokenCount ? ` · ${sessionState.tokenCount} tokens` : ""}`} /> : null}
+            {/* Keep verbose live transcript data inside the bounded scroller so it cannot push the thread composer below the viewport. */}
+            {sessionState ? <div className="ag-detail__state">
+              <small>LIVE SESSION STATE · {sessionState.transcript.length} messages</small>
+              {sessionState.transcript.slice(-3).map((message) => <div key={message.id}><b>{message.role}</b><span>{message.content || "(tool activity)"}</span></div>)}
+            </div> : null}
           </div>
-          {sessionState ? <div className="ag-detail__state">
-            <small>LIVE SESSION STATE · {sessionState.transcript.length} messages</small>
-            {sessionState.transcript.slice(-3).map((message) => <div key={message.id}><b>{message.role}</b><span>{message.content || "(tool activity)"}</span></div>)}
-          </div> : null}
 
           {/* Actions */}
           <div className="ag-detail__actions">

@@ -370,13 +370,29 @@
   overflow-wrap: anywhere;
 }
 .ag-detail__rowvalue--mono { letter-spacing: 0.02em; }
+.ag-detail__state {
+  min-width: 0;
+  padding: 9px 26px;
+  border-top: 1px solid var(--pa-border);
+  color: rgba(var(--pa-paper-rgb), 0.55);
+  font: 11px/1.4 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+}
+.ag-detail__state small {
+  display: block;
+  margin-bottom: 6px;
+  color: rgba(var(--pa-paper-rgb), 0.45);
+  font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+  letter-spacing: 0.08em;
+}
+.ag-detail__state > div { margin-top: 4px; overflow-wrap: anywhere; }
+.ag-detail__state b { margin-right: 6px; color: var(--pa-green); }
 
 .ag-detail__actions { flex: none; display: flex; gap: 9px; padding: 12px 22px; border-top: 1px solid var(--pa-border); }
 .ag-detail__receipt { flex: none; padding: 7px 22px; border-top: 1px solid var(--pa-border); color: rgba(var(--pa-paper-rgb), 0.68); font: 11px/1.4 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; }
 
 .ag-detail { overflow-y: auto; }
-/* Keep the collapsed composer, its bottom gap, and a 40px thread viewport
-   intact; telemetry yields first when the inspector is short. */
+/* Keep the composer and a readable thread viewport in the inspector; its
+   telemetry/session body is the scrollable region that yields first. */
 .ag-detail__thread { flex: 1 1 260px; min-height: 211px; display: grid; grid-template-rows: minmax(40px, 1fr) auto; }
 .ag-detail__thread:has(.ag-composer--expanded) { min-height: 359px; }
 .ag-detail__thread-scroll { min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
@@ -632,3 +648,18 @@
 }
 .ag-graphblank__retry:hover { color: var(--pa-paper); border-color: var(--pa-green); }
 .ag-sendbtn { white-space: nowrap; }
+
+/* On short native windows, reserve 140px for the thread (72px header + 68px
+   messages) and cap the expanded composer at 240px. Reduce inner message
+   padding so at least one demo/user message remains readable in that viewport. */
+@media (max-height: 800px) {
+  .ag-detail__thread {
+    min-height: 292px;
+    grid-template-rows: minmax(140px, 1fr) auto;
+  }
+  .ag-detail__thread:has(.ag-composer--expanded) { min-height: 399px; }
+  .ag-composer--expanded { max-height: 240px; }
+  .ag-thread__messages { padding: 8px 16px; gap: 10px; }
+  .ag-message__label { margin: 0 4px 4px; }
+  .ag-message__bubble { padding: 8px 10px; }
+}

@@ -149,7 +149,9 @@ describe("AgentDetail", () => {
 
   it("renders the live session state block with transcript length", () => {
     renderDetail({ sessionState: STATE });
-    expect(screen.getByText(/LIVE SESSION STATE · 2 messages/i)).toBeInTheDocument();
+    const stateLabel = screen.getByText(/LIVE SESSION STATE · 2 messages/i);
+    expect(stateLabel).toBeInTheDocument();
+    expect(stateLabel.closest(".ag-detail__body")).not.toBeNull();
     // Tool activity content falls back to a placeholder label.
     expect(screen.getByText("(tool activity)")).toBeInTheDocument();
   });

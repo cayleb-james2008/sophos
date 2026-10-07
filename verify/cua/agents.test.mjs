@@ -59,6 +59,14 @@ async function waitForCenterInScreenshot(appHandle, criteria, timeoutMs) {
   return null;
 }
 
+function findVisibleThreadMessage(state) {
+  for (const text of ["Endpoint review approved", "Please check the new schema"]) {
+    const element = findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", text });
+    if (element && frameIsFullyInScreenshot(element, state)) return element;
+  }
+  return undefined;
+}
+
 /** Navigate to the Agents view and wait for it to render. */
 async function goAgents(appHandle) {
   // Navigate to Chat first so AgentsView remounts (resets attach state).
@@ -179,8 +187,8 @@ const tests = [
         } : null,
       }));
       assert(
-        compositionBefore && centerIsInScreenshot(compositionBefore, scrollState),
-        "Composition control must remain visible without scrolling the Agent coordination thread",
+        compositionBefore && frameIsFullyInScreenshot(compositionBefore, scrollState),
+        "Composition control must remain fully visible without scrolling the Agent coordination thread",
       );
       assert(
         nativeTree.split(/\r?\n/).some((line) =>
@@ -305,11 +313,65 @@ const tests = [
         send: sendControl ? { role: sendControl.role, frame: sendControl.frame } : null,
       }));
       assert(expanded.screenshot_height > 680, "Expanded-composer bounds require a window taller than the short-window fallback threshold");
+      const compositionExpanded = findBy(expanded, { text: "Composition" });
+      assert(
+        compositionExpanded && frameIsFullyInScreenshot(compositionExpanded, expanded),
+        "The full Composition control must remain on-screen when the panel is expanded",
+      );
       assert(
         sendControl && frameIsFullyInScreenshot(sendControl, expanded),
         "The full Send button must remain on-screen when the composition panel is expanded",
       );
-      takeScreenshot(appHandle.pid, "agents-composition", appHandle.windowId);
+      const initiallyVisibleMessage = findVisibleThreadMessage(expanded);
+      if (!initiallyVisibleMessage) {
+        console.log("[AGENT-COMPOSITION-EXPANDED-THREAD-TREE]", expanded.tree_markdown ?? "<tree missing>");
+      }
+      assert(
+        initiallyVisibleMessage,
+        "At least one coordination-thread message must be readable immediately with Composition expanded",
+      );
+      const messagePoint = elementCenter(initiallyVisibleMessage, expanded);
+      assert(
+        messagePoint.x >= 0 && messagePoint.y >= 0
+          && messagePoint.x < expanded.screenshot_width && messagePoint.y < expanded.screenshot_height,
+        `Visible coordination message is outside the screenshot (${messagePoint.x}, ${messagePoint.y})`,
+      );
+      const expandedScroll = scroll(appHandle.pid, "down", 1, appHandle.windowId, {
+        x: messagePoint.x,
+        y: messagePoint.y,
+        delivery_mode: "foreground",
+      });
+      console.log("[AGENT-COMPOSITION-EXPANDED-THREAD-SCROLL]", JSON.stringify({
+        message: initiallyVisibleMessage.label,
+        point: messagePoint,
+        result: expandedScroll,
+      }));
+      await sleep(350);
+      const afterExpandedScroll = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+      const sameMessageAfterScroll = findNamedRegionDescendantElement(
+        afterExpandedScroll,
+        "Agent coordination thread",
+        { role: "Text", text: initiallyVisibleMessage.label },
+      );
+      assert(sameMessageAfterScroll, "The coordination message disappeared from the native tree after scrolling");
+      const messageFrameShift = Number(sameMessageAfterScroll.frame?.y) - Number(initiallyVisibleMessage.frame?.y);
+      assert(
+        Number.isFinite(messageFrameShift) && Math.abs(messageFrameShift) >= 1,
+        "Scrolling the expanded coordination thread must move its message content",
+      );
+      const visibleMessageAfterScroll = findVisibleThreadMessage(afterExpandedScroll);
+      const compositionAfterScroll = findBy(afterExpandedScroll, { text: "Composition" });
+      const sendAfterScroll = findBy(afterExpandedScroll, { text: "Send" });
+      assert(visibleMessageAfterScroll, "A coordination-thread message must remain readable after scrolling");
+      assert(
+        compositionAfterScroll && frameIsFullyInScreenshot(compositionAfterScroll, afterExpandedScroll),
+        "Composition must remain fully visible while the expanded coordination thread scrolls",
+      );
+      assert(
+        sendAfterScroll && frameIsFullyInScreenshot(sendAfterScroll, afterExpandedScroll),
+        "Send must remain fully visible while the expanded coordination thread scrolls",
+      );
+      takeScreenshot(appHandle.pid, "agents-composition-expanded-thread-scroll", appHandle.windowId);
     },
   },
 ];
