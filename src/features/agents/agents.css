@@ -649,15 +649,19 @@
 .ag-graphblank__retry:hover { color: var(--pa-paper); border-color: var(--pa-green); }
 .ag-sendbtn { white-space: nowrap; }
 
-/* On short native windows, reserve 140px for the thread (72px header + 68px
-   messages) and cap the expanded composer at 240px. Reduce inner message
-   padding so at least one demo/user message remains readable in that viewport. */
+/* On short native windows, keep the inspector header/actions compact and cap
+   telemetry to a scrollable 64px slice so the thread/composer stay in-view.
+   Reserve 140px for the thread (72px header + 68px messages), cap the expanded
+   composer at 240px, and reduce message padding to preserve readable content. */
 @media (max-height: 800px) {
+  .ag-detail__head { height: 68px; }
+  .ag-detail__body { max-height: 64px; }
+  .ag-detail__actions { padding-top: 6px; padding-bottom: 6px; }
   .ag-detail__thread {
     min-height: 292px;
     grid-template-rows: minmax(140px, 1fr) auto;
   }
-  .ag-detail__thread:has(.ag-composer--expanded) { min-height: 399px; }
+  .ag-detail__thread:has(.ag-composer--expanded) { min-height: 380px; }
   .ag-composer--expanded { max-height: 240px; }
   .ag-thread__messages { padding: 8px 16px; gap: 10px; }
   .ag-message__label { margin: 0 4px 4px; }
