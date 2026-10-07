@@ -118,12 +118,14 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Reviewing the merge")).toBeInTheDocument();
   });
 
-  it("groups the thread composer in a named coordination region", () => {
+  it("keeps the composer outside the scrollable coordination region", () => {
     renderDetail();
     const region = screen.getByRole("region", { name: "Agent coordination thread" });
+    const compositionButton = screen.getByRole("button", { name: /composition/i });
+    const messageInput = screen.getByLabelText("Message to Reviewer");
     expect(region).toHaveAttribute("tabindex", "0");
-    expect(region).toContainElement(screen.getByRole("button", { name: /composition/i }));
-    expect(region).toContainElement(screen.getByLabelText("Message to Reviewer"));
+    expect(region).not.toContainElement(compositionButton);
+    expect(region).not.toContainElement(messageInput);
   });
 
   it("shows the runtime model fallback when the agent has no model", () => {

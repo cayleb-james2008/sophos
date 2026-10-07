@@ -132,14 +132,14 @@ export function AgentDetail({
             onMarkRead={onMarkRead}
             onMarkAllRead={onMarkAllRead}
           />
-          <AgentComposer
-            agent={agent}
-            draft={draft}
-            setDraft={setDraft}
-            sending={sending}
-            onSend={onSend}
-          />
         </div>
+        <AgentComposer
+          agent={agent}
+          draft={draft}
+          setDraft={setDraft}
+          sending={sending}
+          onSend={onSend}
+        />
       </div>
     </aside>
   );

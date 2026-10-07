@@ -16,6 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 import { getSessionRecoveryAssertions } from "./session-recovery-readiness.mjs";
+import { startBridgeAfterDaemonStartup } from "./startup-gate.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REF_ROOT = resolve(
@@ -297,15 +298,20 @@ function parseLines(buffer, onLine) {
   return buffer;
 }
 
-async function startDaemon() {
+async function startDaemon(onSpawn, signal) {
   const diagnostics = [];
   const proc = spawn(process.execPath, [DAEMON_CLI, "--mode", "daemon", "--daemon-socket", SOCKET_PATH, "--offline"], {
     stdio: ["ignore", "pipe", "pipe"],
   });
+  onSpawn?.(proc);
   proc.stdout.on("data", (chunk) => diagnostics.push(`[daemon] ${chunk.toString()}`));
   proc.stderr.on("data", (chunk) => diagnostics.push(`[daemon-err] ${chunk.toString()}`));
   // Give the supervisor and its session worker time to bind and handshake.
-  await sleep(8000);
+  try {
+    await sleep(8000, undefined, { signal });
+  } catch (error) {
+    if (!signal?.aborted || error?.name !== "AbortError") throw error;
+  }
   return { proc, diagnostics };
 }
 
@@ -313,14 +319,36 @@ async function run() {
   console.log(`BRIDGE_VERIFY_SOCKET=${SOCKET_PATH}`);
   console.log("=== Bridge verification harness ===\n");
 
-  const firstDaemon = await startDaemon();
-  let daemon = firstDaemon.proc;
-  const daemonDiagnostics = [...firstDaemon.diagnostics];
+  let daemon;
+  const daemonDiagnostics = [];
   let bridge;
-  const forceCleanup = () => {
+  let cleanupPromise;
+  let signalCleanupPromise;
+  let signalReceived = false;
+  const startupAbort = new AbortController();
+  const runCancelledError = () => {
+    const error = new Error("bridge verification interrupted by shutdown");
+    error.name = "RunCancelledError";
+    return error;
+  };
+  const waitForRun = async (milliseconds) => {
+    if (startupAbort.signal.aborted) throw runCancelledError();
+    try {
+      await sleep(milliseconds, undefined, { signal: startupAbort.signal });
+    } catch (error) {
+      if (startupAbort.signal.aborted && error?.name === "AbortError") throw runCancelledError();
+      throw error;
+    }
+  };
+  const forceCleanup = async () => {
     try { bridge?.stdin.end(); } catch {}
+    const snapshot = await snapshotShutdownState(daemon);
+    await terminateShutdownOwnedProcesses(snapshot);
     terminateProcessTree(bridge);
     terminateProcessTree(daemon);
+    await waitForExit(bridge, 2000);
+    await waitForExit(daemon, 2000);
+    await waitForOwnedShutdownProcesses(undefined, 2000);
   };
   async function shutdownDaemonGracefully() {
     const daemonLaunchUrl = pathToFileURL(join(REF_ROOT, "dist", "cli", "daemon-launch.js")).href;
@@ -338,12 +366,12 @@ async function run() {
         ...(typeof hello?.supervisorProcessStartId === "string" ? { processStartId: hello.supervisorProcessStartId } : {}),
       };
       return {
-        stopped: await shutdownConnectedDaemonAndWait(client, SOCKET_PATH, 10000, hello),
+        stopped: await shutdownConnectedDaemonAndWait(client, SOCKET_PATH, 45000, hello),
         identity,
       };
     } catch {
       client.close();
-      return { stopped: await shutdownDaemonAndWait(SOCKET_PATH, 10000), identity: identity ?? { reachable: false } };
+      return { stopped: await shutdownDaemonAndWait(SOCKET_PATH, 45000), identity: identity ?? { reachable: false } };
     } finally {
       client.close();
     }
@@ -393,19 +421,54 @@ async function run() {
       shutdownDiagnostics,
     };
   };
-  const onSignal = () => {
-    forceCleanup();
-    process.exit(130);
+  const startCleanup = () => {
+    startupAbort.abort();
+    cleanupPromise ??= cleanup();
+    return cleanupPromise;
   };
-  process.once("SIGINT", onSignal);
-  process.once("SIGTERM", onSignal);
+  const onSignal = () => {
+    signalReceived = true;
+    if (signalCleanupPromise) {
+      void forceCleanup()
+        .catch((error) => console.error("[signal-cleanup] forced cleanup failed:", error))
+        .finally(() => process.exit(130));
+      return;
+    }
+    signalCleanupPromise = (async () => {
+      try {
+        const state = await startCleanup();
+        if (!state.bridgeStopped || !state.daemonStopped || !state.daemonProcessStopped) {
+          await forceCleanup();
+        }
+      } catch (error) {
+        console.error("[signal-cleanup] graceful cleanup failed:", error);
+        await forceCleanup().catch((forceError) => console.error("[signal-cleanup] forced cleanup failed:", forceError));
+      }
+      process.exit(130);
+    })();
+  };
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
   try {
-    bridge = spawn(process.execPath, [BRIDGE, "--daemon-socket", SOCKET_PATH], {
-      stdio: ["pipe", "pipe", "pipe"],
+    const startupCompleted = await startBridgeAfterDaemonStartup({
+      signal: startupAbort.signal,
+      startDaemon: async () => {
+        const started = await startDaemon((proc) => { daemon = proc; }, startupAbort.signal);
+        daemonDiagnostics.push(...started.diagnostics);
+      },
+      startBridge: () => {
+        bridge = spawn(process.execPath, [BRIDGE, "--daemon-socket", SOCKET_PATH], {
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      },
     });
+    if (!startupCompleted || startupAbort.signal.aborted) {
+      await startCleanup();
+      return;
+    }
   } catch (err) {
-    record("spawn bridge", false, err.message);
-    const cleanupState = await cleanup();
+    record("spawn daemon and bridge", false, err.message);
+    const cleanupState = await startCleanup();
     record("graceful shutdown releases the isolated session HOME", cleanupState.daemonStopped && cleanupState.bridgeStopped,
       `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
     process.off("SIGINT", onSignal);
@@ -442,19 +505,42 @@ async function run() {
     return new Promise((resolve, reject) => {
       const id = String(cmd.id ?? Math.random());
       const wire = { ...cmd, id };
-      const timer = setTimeout(() => reject(new Error(`timeout waiting for response to ${cmd.method}`)), 8000);
-      const check = setInterval(() => {
+      let settled = false;
+      let timer;
+      let check;
+      const cleanupWait = () => {
+        clearTimeout(timer);
+        clearInterval(check);
+        startupAbort.signal.removeEventListener("abort", onAbort);
+      };
+      const finish = (handler, value) => {
+        if (settled) return;
+        settled = true;
+        cleanupWait();
+        handler(value);
+      };
+      const onAbort = () => finish(reject, runCancelledError());
+      timer = setTimeout(() => finish(reject, new Error(`timeout waiting for response to ${cmd.method}`)), 8000);
+      check = setInterval(() => {
         if (responses.has(id)) {
-          clearTimeout(timer);
-          clearInterval(check);
-          resolve(responses.get(id));
+          finish(resolve, responses.get(id));
         }
       }, 20);
-      bridge.stdin.write(JSON.stringify(wire) + "\n");
+      if (startupAbort.signal.aborted) {
+        onAbort();
+        return;
+      }
+      startupAbort.signal.addEventListener("abort", onAbort, { once: true });
+      try {
+        bridge.stdin.write(JSON.stringify(wire) + "\n");
+      } catch (error) {
+        finish(reject, error);
+      }
     });
   }
 
   function sendRaw(line) {
+    if (startupAbort.signal.aborted) throw runCancelledError();
     bridge.stdin.write(line + "\n");
   }
 
@@ -462,7 +548,7 @@ async function run() {
     // Wait for the bridge to emit its initial connecting event.
     const start = Date.now();
     while (!events.some((e) => e.type === "connection_status" && e.status.kind === "connecting") && Date.now() - start < 4000) {
-      await sleep(50);
+      await waitForRun(50);
     }
     record("emits connecting event on startup", events.some((e) => e.type === "connection_status" && e.status.kind === "connecting"));
 
@@ -475,14 +561,14 @@ async function run() {
     // 2. Wait for the connected event
     const t0 = Date.now();
     while (!events.some((e) => e.type === "connection_status" && e.status.kind === "connected") && Date.now() - t0 < 10000) {
-      await sleep(50);
+      await waitForRun(50);
     }
     const connectedEventSeen = events.some((e) => e.type === "connection_status" && e.status.kind === "connected");
 
     // 3. Wait for the snapshot event
     const t1 = Date.now();
     while (!events.some((e) => e.type === "snapshot") && Date.now() - t1 < 4000) {
-      await sleep(50);
+      await waitForRun(50);
     }
     record("emits snapshot event after attach",
       events.some((e) => e.type === "snapshot"));
@@ -515,7 +601,7 @@ async function run() {
         `oldPid=${oldSupervisorIdentity.pid ?? "unknown"} newPid=${replacementIdentity.pid ?? "unknown"}`);
       const reconnectDeadline = Date.now() + 45_000;
       while (!events.slice(reconnectingStart).some((e) => e.type === "connection_status" && e.status.kind === "connected") && Date.now() < reconnectDeadline) {
-        await sleep(50);
+        await waitForRun(50);
       }
       const recovered = events.slice(reconnectingStart).some((e) => e.type === "connection_status" && e.status.kind === "connected");
       record("bridge reconnects after daemon replacement", recovered);
@@ -584,21 +670,21 @@ async function run() {
     const parseResponseStart = responseFrames.length;
     sendRaw("not-json-at-all{");
     const parseDeadline = Date.now() + 5000;
-    while (responseFrames.length < parseResponseStart + 1 && Date.now() < parseDeadline) await sleep(20);
+    while (responseFrames.length < parseResponseStart + 1 && Date.now() < parseDeadline) await waitForRun(20);
     const parseResponses = responseFrames.slice(parseResponseStart);
     const parseErrorResp = parseResponses[0];
     record("malformed JSON returns parse error with null id",
       parseResponses.length === 1 && parseErrorResp.error?.code === -32700
         && Object.hasOwn(parseErrorResp, "id") && parseErrorResp.id === null,
       `responses=${JSON.stringify(parseResponses)}`);
-    await sleep(300);
+    await waitForRun(300);
     record("bridge survives malformed JSON line", bridge.exitCode === null, `pid alive=${bridge.exitCode === null}`);
 
     // 14. A real object without method must receive one -32600/null-id response.
     const invalidRequestStart = responseFrames.length;
     sendRaw(JSON.stringify({ jsonrpc: "2.0", id: "invalid-no-method" }));
     const invalidRequestDeadline = Date.now() + 5000;
-    while (responseFrames.length < invalidRequestStart + 1 && Date.now() < invalidRequestDeadline) await sleep(20);
+    while (responseFrames.length < invalidRequestStart + 1 && Date.now() < invalidRequestDeadline) await waitForRun(20);
     const invalidRequestFrames = responseFrames.slice(invalidRequestStart);
     const invalidRequestResp = invalidRequestFrames[0];
     record("object without method returns invalid request with null id",
@@ -616,7 +702,7 @@ async function run() {
     const nullIdResponseStart = responseFrames.length;
     sendRaw(JSON.stringify({ id: null, method: "getState", params: {} }));
     const nullIdDeadline = Date.now() + 5000;
-    while (responseFrames.length < nullIdResponseStart + 1 && Date.now() < nullIdDeadline) await sleep(20);
+    while (responseFrames.length < nullIdResponseStart + 1 && Date.now() < nullIdDeadline) await waitForRun(20);
     const nullIdFrames = responseFrames.slice(nullIdResponseStart);
     const nullIdResp = nullIdFrames[0];
     record("present null id returns one successful response",
@@ -627,7 +713,7 @@ async function run() {
     // 17. Only an absent ID denotes a notification; assert no response frame.
     const notificationResponseStart = responseFrames.length;
     sendRaw(JSON.stringify({ method: "getState", params: {} }));
-    await sleep(300);
+    await waitForRun(300);
     const notificationResponses = responseFrames.slice(notificationResponseStart);
     record("notification (no id) produces no response line",
       notificationResponses.length === 0,
@@ -738,7 +824,7 @@ async function run() {
       let recoveryPollCount = 0;
       while (replacementReady && createdSessionListing?.id && Date.now() < recoveryDeadline) {
         if (!connectedAfterReplacement()) {
-          await sleep(50);
+          await waitForRun(50);
           continue;
         }
         connectedEventObservedAt ??= Date.now();
@@ -759,7 +845,7 @@ async function run() {
           expectedActiveSessionId: createdSessionId,
           expectedSessionListingId: createdSessionListing.id,
         }).ready) break;
-        if (Date.now() < recoveryDeadline) await sleep(250);
+        if (Date.now() < recoveryDeadline) await waitForRun(250);
       }
       if (!connectedEventObservedAt && Date.now() < recoveryDeadline && connectedAfterReplacement()) {
         connectedEventObservedAt = Date.now();
@@ -822,9 +908,9 @@ async function run() {
       `err=${fork1.error ? fork1.error.code + " " + fork1.error.message : "none"}`);
 
   } catch (err) {
-    record("test harness", false, err.message);
+    if (err?.name !== "RunCancelledError") record("test harness", false, err.message);
   } finally {
-    const cleanupState = await cleanup();
+    const cleanupState = await startCleanup();
     record("graceful daemon shutdown releases adopted session workers before HOME removal",
       cleanupState.daemonStopped && cleanupState.bridgeStopped,
       `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
@@ -832,6 +918,7 @@ async function run() {
     process.off("SIGTERM", onSignal);
   }
 
+  if (signalReceived) return;
   const passed = results.filter((r) => r.ok).length;
   const total = results.length;
   if (passed !== total) {

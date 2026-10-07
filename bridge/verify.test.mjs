@@ -56,6 +56,37 @@ test("bridge reconnect waits for the worker-owned replacement supervisor instead
   assert.doesNotMatch(recoveryBlock, /await startDaemon\(\)/, "a queued daemon process can bind after the monitor-owned supervisor shuts down");
 });
 
+test("signal cleanup awaits the same owned-process shutdown path as normal cleanup", () => {
+  const signalStart = verifySource.indexOf("const onSignal = () => {");
+  const signalEnd = verifySource.indexOf('process.on("SIGINT", onSignal)', signalStart);
+  assert.ok(signalStart >= 0 && signalEnd > signalStart, "signal handler is present");
+  const signalBlock = verifySource.slice(signalStart, signalEnd);
+  assert.match(signalBlock, /startCleanup\(\)/, "signal handling must await the shared graceful shutdown promise");
+  assert.match(signalBlock, /await forceCleanup\(\)/, "failed or repeated signal cleanup must stop verified socket/worker-owned processes");
+  assert.match(signalBlock, /process\.exit\(130\)/, "the interrupted verifier exits only after cleanup settles");
+
+  const forceStart = verifySource.indexOf("const forceCleanup = async () => {");
+  const forceEnd = verifySource.indexOf("async function shutdownDaemonGracefully", forceStart);
+  assert.ok(forceStart >= 0 && forceEnd > forceStart, "identity-aware forced cleanup helper is defined");
+  const forceBlock = verifySource.slice(forceStart, forceEnd);
+  assert.ok(forceBlock.includes("snapshotShutdownState(daemon"));
+  assert.ok(forceBlock.includes("await terminateShutdownOwnedProcesses(snapshot)"));
+  assert.ok(forceBlock.includes("await waitForOwnedShutdownProcesses(undefined"));
+});
+
+test("shutdown aborts daemon startup and gates bridge/test startup", () => {
+  const startupStart = verifySource.indexOf("const startupCompleted = await startBridgeAfterDaemonStartup({");
+  const startupEnd = verifySource.indexOf("} catch (err) {", startupStart);
+  assert.ok(startupStart >= 0 && startupEnd > startupStart, "daemon and bridge startup are guarded as one lifecycle");
+  const startupBlock = verifySource.slice(startupStart, startupEnd);
+  assert.ok(startupBlock.includes("startupAbort.signal"), "the daemon startup wait receives the cancellation signal");
+  assert.match(startupBlock, /startBridge:\s*\(\) =>/);
+  assert.match(startupBlock, /if \(!startupCompleted \|\| startupAbort\.signal\.aborted\)/);
+  assert.match(startupBlock, /await startCleanup\(\);\s*return;/);
+  assert.ok(verifySource.includes("startupAbort.abort()"), "starting cleanup cancels startup and in-flight test waits");
+  assert.ok(verifySource.includes('if (err?.name !== "RunCancelledError")'), "signal cancellation is not recorded as a test failure");
+});
+
 test("normal verifier cleanup gracefully stops adopted workers before the isolated HOME is removed", () => {
   const cleanupStart = verifySource.indexOf("const cleanup = async () => {");
   const cleanupEnd = verifySource.indexOf("const onSignal", cleanupStart);
@@ -67,7 +98,9 @@ test("normal verifier cleanup gracefully stops adopted workers before the isolat
   const gracefulStart = verifySource.indexOf("async function shutdownDaemonGracefully() {");
   const gracefulEnd = verifySource.indexOf("\n}", gracefulStart);
   assert.ok(gracefulStart >= 0 && gracefulEnd > gracefulStart, "graceful shutdown helper is present");
-  assert.ok(verifySource.slice(gracefulStart, gracefulEnd).includes("shutdownDaemonAndWait(SOCKET_PATH, 10000)"));
+  const gracefulBlock = verifySource.slice(gracefulStart, gracefulEnd);
+  assert.ok(gracefulBlock.includes("shutdownConnectedDaemonAndWait(client, SOCKET_PATH, 45000, hello)"));
+  assert.ok(gracefulBlock.includes("shutdownDaemonAndWait(SOCKET_PATH, 45000)"));
   assert.ok(verifySource.includes('record("graceful daemon shutdown releases adopted session workers before HOME removal"'));
 });
 

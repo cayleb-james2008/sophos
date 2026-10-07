@@ -125,3 +125,14 @@ index c05afc0..42d5bb5 100644
 @@ -1983,0 +2052,2 @@ describe("daemon worker supervisor monitoring", () => {
 +			releaseMutations();
 +			if (prepare) await prepare.catch(() => undefined);
+diff --git a/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts b/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
+--- a/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
++++ b/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
+@@ -4497,0 +4498 @@
++		gracefulTimeoutMs = 2000,
+@@ -4561 +4562 @@
+-		const gracefulDeadline = Date.now() + (force ? 500 : 2000);
++		const gracefulDeadline = Date.now() + (force ? 500 : gracefulTimeoutMs);
+@@ -4810 +4811 @@
+-				[...this.workers.values()].map((worker) => this.stopWorker(worker, true, forceWorkers, true)),
++				[...this.workers.values()].map((worker) => this.stopWorker(worker, true, forceWorkers, true, false, undefined, 30000)),

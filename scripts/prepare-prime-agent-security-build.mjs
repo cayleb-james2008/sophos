@@ -38,8 +38,8 @@ const EXPECTED = Object.freeze({
   leasePatchedSourceSha256: "006802f39f6de128e6b7f418e9fb3b2793ef73410d1247db562ce5dcbe7a0349",
   zipGuardPatchSha256: "e06fa63df26c0e52e699459a0adf284cb032dc88828abc20bfa5a220de681b48",
   zipGuardPatchBytes: 7632,
-  workerShutdownFencePatchSha256: "b00fe6e14e7c349cc7794a392be9f698c8a02731d727c3a59865f207dba87b64",
-  workerShutdownFencePatchBytes: 6936,
+  workerShutdownFencePatchSha256: "f1174763e86459193b78b438b71c85629d4658d0d5612b37e831ab18eff69a84",
+  workerShutdownFencePatchBytes: 7652,
   overlayId: "prime-agent-v070-windows-session-lease-v1",
   overrides: {
     undici: "7.29.1",
@@ -54,6 +54,7 @@ const EXPECTED_TRACKED_CHANGES = [
   "package.json",
   "packages/coding-agent/src/core/session-lease.ts",
   "packages/coding-agent/src/modes/daemon/daemon-mode.ts",
+  "packages/coding-agent/src/modes/daemon/daemon-supervisor.ts",
   "packages/coding-agent/src/utils/tools-manager.ts",
   "packages/coding-agent/test/daemon-supervisor-monitor.test.ts",
   "packages/coding-agent/test/tools-manager.test.ts",
@@ -62,6 +63,7 @@ const EXPECTED_PATCH_ORDER = Object.freeze(["session-lease", "windows-zip-guard"
 const ALLOWED_PATCH_OUTPUTS = new Set([
   "packages/coding-agent/src/core/session-lease.ts",
   "packages/coding-agent/src/modes/daemon/daemon-mode.ts",
+  "packages/coding-agent/src/modes/daemon/daemon-supervisor.ts",
   "packages/coding-agent/src/utils/tools-manager.ts",
   "packages/coding-agent/test/daemon-supervisor-monitor.test.ts",
   "packages/coding-agent/test/tools-manager.test.ts",
@@ -69,6 +71,7 @@ const ALLOWED_PATCH_OUTPUTS = new Set([
 const EXPECTED_BUILD_SOURCE_HASHES = Object.freeze({
   "packages/coding-agent/src/core/session-lease.ts": "006802f39f6de128e6b7f418e9fb3b2793ef73410d1247db562ce5dcbe7a0349",
   "packages/coding-agent/src/modes/daemon/daemon-mode.ts": "da4be802d0d6499b9a922a3fca7643ae36483baf4245d2799bafe185b75d9e16",
+  "packages/coding-agent/src/modes/daemon/daemon-supervisor.ts": "7eef860b0cb2a316486e49aa23c88c701fad52bad35da4fb59f50b4bd6471c68",
   "packages/coding-agent/src/utils/tools-manager.ts": "8936f99a387c3426bf4f2210cc1178fec1dcc2605cccab5d93127054340c7064",
   "packages/coding-agent/test/daemon-supervisor-monitor.test.ts": "97ee4b24c6327957f203d1d2406aba4113ce1baeacf256d249fbbc5f6af09fce",
   "packages/coding-agent/test/tools-manager.test.ts": "0956ee19088f761770601ff1c00212717c6a7276dd733dc3079c05d4235e8b75",

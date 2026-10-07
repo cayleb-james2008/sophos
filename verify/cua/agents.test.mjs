@@ -13,7 +13,7 @@
 //   - Composition knobs (thinking level + skills)
 
 import { getWindowState, sleep, typeText, scroll } from "./driver.mjs";
-import { navTo, takeScreenshot, elementCenter } from "./helpers.mjs";
+import { navTo, takeScreenshot, elementCenter, toWindowLocal } from "./helpers.mjs";
 import {
   findBy,
   clickBy,
@@ -35,6 +35,17 @@ function centerIsInScreenshot(element, state) {
   const center = elementCenter(element, state);
   return center.x >= 0 && center.y >= 0
     && center.x < state.screenshot_width && center.y < state.screenshot_height;
+}
+
+function frameIsFullyInScreenshot(element, state) {
+  const frame = element?.frame;
+  if (!frame || ![frame.x, frame.y, frame.w, frame.h].every(Number.isFinite) || frame.w <= 0 || frame.h <= 0) {
+    return false;
+  }
+  const topLeft = toWindowLocal(frame.x, frame.y, state);
+  const bottomRight = toWindowLocal(frame.x + frame.w, frame.y + frame.h, state);
+  return topLeft.x >= 0 && topLeft.y >= 0
+    && bottomRight.x <= state.screenshot_width && bottomRight.y <= state.screenshot_height;
 }
 
 async function waitForCenterInScreenshot(appHandle, criteria, timeoutMs) {
@@ -146,13 +157,11 @@ const tests = [
   },
 
   {
-    name: "Composition knobs open the thinking + skills panel",
+    name: "Composition controls stay visible and open the thinking + skills panel",
     fn: async (appHandle) => {
       await goAgents(appHandle);
-      // Resolve the native scroll path for the named thread from this same
-      // snapshot. WebView2 may expose the thread as an unindexed Group with no
-      // scroll action; then its nearest indexed scrollable ancestor is the
-      // actionable path to bring the off-screen composition control into view.
+      // Keep the composer outside the thread's scroll viewport so its controls
+      // remain available when the selected agent's thread is taller than the window.
       const scrollState = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
       const nativeTree = String(scrollState.tree_markdown ?? "");
       const compositionBefore = findBy(scrollState, { text: "Composition" });
@@ -169,6 +178,10 @@ const tests = [
           frame: compositionBefore.frame,
         } : null,
       }));
+      assert(
+        compositionBefore && centerIsInScreenshot(compositionBefore, scrollState),
+        "Composition control must remain visible without scrolling the Agent coordination thread",
+      );
       assert(
         nativeTree.split(/\r?\n/).some((line) =>
           /^\s*-\s+(?:\[\d+\]\s+)?(?:Group|Pane|Region)\s+"Agent coordination thread"(?:\s|$)/.test(line),
@@ -244,7 +257,7 @@ const tests = [
         visibleComposition = await waitForCenterInScreenshot(appHandle, { text: "Composition" }, 8000);
       }
       takeScreenshot(appHandle.pid, "agents-composition-control-after-scroll", appHandle.windowId);
-      assert(visibleComposition, "Composition control did not become visible after scrolling the Agent coordination thread");
+      assert(visibleComposition, "Composition control became hidden while the Agent coordination thread scrolled");
       const ready = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
       const composition = findBy(ready, { text: "Composition" });
       const buttonCenter = composition ? elementCenter(composition, ready) : null;
@@ -285,6 +298,17 @@ const tests = [
       // find: the labels render uppercase via CSS).
       assert(findBy(after, { text: "thinking" }), "Thinking level control not shown");
       assert(findBy(after, { text: "skill" }), "Skills control not shown");
+      const expanded = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
+      const sendControl = findBy(expanded, { text: "Send" });
+      console.log("[AGENT-COMPOSITION-SEND-BOUNDS]", JSON.stringify({
+        screenshot: `${expanded.screenshot_width}x${expanded.screenshot_height}`,
+        send: sendControl ? { role: sendControl.role, frame: sendControl.frame } : null,
+      }));
+      assert(expanded.screenshot_height > 680, "Expanded-composer bounds require a window taller than the short-window fallback threshold");
+      assert(
+        sendControl && frameIsFullyInScreenshot(sendControl, expanded),
+        "The full Send button must remain on-screen when the composition panel is expanded",
+      );
       takeScreenshot(appHandle.pid, "agents-composition", appHandle.windowId);
     },
   },

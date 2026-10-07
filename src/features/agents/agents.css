@@ -374,7 +374,8 @@
 .ag-detail__actions { flex: none; display: flex; gap: 9px; padding: 12px 22px; border-top: 1px solid var(--pa-border); }
 .ag-detail__receipt { flex: none; padding: 7px 22px; border-top: 1px solid var(--pa-border); color: rgba(var(--pa-paper-rgb), 0.68); font: 11px/1.4 "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; }
 
-.ag-detail__thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ag-detail { overflow-y: auto; }
+.ag-detail__thread { flex: 1 0 260px; min-height: 0; display: flex; flex-direction: column; }
 .ag-detail__thread-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
 
 /* ---- Thread / messages ---- */
@@ -435,12 +436,31 @@
 
 /* ---- Composer ---- */
 .ag-composer {
+  flex: none;
   margin: 0 20px 19px;
   padding: 11px 13px 10px;
   background: var(--pa-card);
   border: 1px solid var(--pa-border-strong);
   border-radius: var(--pa-radius-md);
   box-shadow: none;
+}
+.ag-composer--expanded {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Keep 40px for the thread viewport and account for the 19px bottom margin. */
+  max-height: min(calc(100% - 59px), 300px);
+  overflow: hidden;
+}
+.ag-composer--expanded > .ag-composer__label,
+.ag-composer--expanded > .ag-compbtn,
+.ag-composer--expanded > .ag-composer__area,
+.ag-composer--expanded > .ag-composer__foot { flex: none; }
+.ag-composer--expanded > .ag-comp {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .ag-composer:focus-within { border-color: rgba(var(--pa-green-rgb), 0.4); box-shadow: 0 0 0 2px rgba(var(--pa-green-rgb), 0.12); }
 .ag-composer__label { display: flex; justify-content: space-between; color: rgba(var(--pa-paper-rgb), 0.45); font: 9px "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace; letter-spacing: 0.06em; margin-bottom: 6px; }

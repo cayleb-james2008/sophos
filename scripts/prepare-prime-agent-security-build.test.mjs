@@ -266,6 +266,9 @@ test("checked-out worker-shutdown patch retains the exact reviewed bytes", async
   const patch = patchBytes.toString("utf8");
   assert.ok(patch.includes("getSupervisorLaunchLockDirectory"), "Windows named-pipe recovery lock uses filesystem storage");
   assert.ok(patch.includes("keeps the replacement lock in filesystem storage for named-pipe sockets"), "the source regression remains in the patch");
+  assert.ok(patch.includes("gracefulTimeoutMs = 2000"), "ordinary worker stops keep their existing grace period");
+  assert.ok(patch.includes("forceWorkers, true, false, undefined, 30000"), "daemon shutdown allows adopted session workers time to archive and exit");
+  assert.ok(patch.includes("force ? 500 : gracefulTimeoutMs"), "the longer timeout is applied only to unforced graceful worker shutdown");
 });
 
 test("Windows supervisor-monitor fixture uses platform temp and deterministic drain admission", async () => {

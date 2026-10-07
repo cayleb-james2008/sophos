@@ -41,7 +41,13 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or -not $privateParent) { throw 'Could not create a unique checkout root under canonical Node system TEMP' }
           $safeRepo = Join-Path $privateParent 'repo'
           if (Test-Path -LiteralPath $safeRepo) { throw 'Refusing to reuse a secure checkout path' }
-          git clone --quiet --depth=1 --no-tags --no-checkout --no-hardlinks https://github.com/cayleb-james2008/sophos.git $safeRepo
+          # GITHUB_REPOSITORY is the base repository on pull_request events and
+          # the pushing repository on branch events; fetch only the pinned event ref/SHA below.
+          $serverUrl = [Uri]$env:GITHUB_SERVER_URL
+          $repositorySlug = $env:GITHUB_REPOSITORY
+          if ($serverUrl.Scheme -ne 'https' -or $repositorySlug -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid GitHub event repository URL' }
+          $repositoryUrl = "$($serverUrl.AbsoluteUri.TrimEnd('/'))/$repositorySlug.git"
+          git clone --quiet --depth=1 --no-tags --no-checkout --no-hardlinks $repositoryUrl $safeRepo
           if ($LASTEXITCODE -ne 0) { throw 'Anonymous Sophos source clone failed' }
           git -C $safeRepo config core.autocrlf false
           if ($LASTEXITCODE -ne 0) { throw 'Could not disable Git line-ending conversion in secure checkout' }
@@ -59,7 +65,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Secure Windows project-root ACL validation failed' }
           } finally { Pop-Location }
           Add-Content -Path $env:GITHUB_ENV -Value "SAFE_WINDOWS_REPO=$safeRepo"
-          Write-Output "Pinned secure Windows checkout: $actualSha"
+          Write-Output "Pinned secure checkout: $actualSha"
 
       - name: Build dependency overlay under private Windows NTFS ACLs
         shell: pwsh
