@@ -24,6 +24,7 @@ import {
 } from "./find-util.mjs";
 import { assert, assertTextContains, assertElementNotVisible } from "./assertions.mjs";
 import { runDemoSuite } from "./demo-runner.mjs";
+import { composerBoundsFromElements, frameWithinVerticalBounds } from "./thread-visibility.mjs";
 
 /** Read a fresh window state for the app handle. */
 function freshState(appHandle) {
@@ -64,31 +65,27 @@ function findVisibleThreadMessage(state) {
   // that are still inside the overall window. Bound visibility to the actual
   // thread slot, between its header and the following composer.
   const header = findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", text: "THREAD /" });
-  const composerLabel = findBy(state, { text: "MESSAGE TO" });
-  const sendControl = findBy(state, { text: "Send" });
+  const composer = composerBoundsFromElements(state.elements);
   const threadTop = header?.frame
     ? Number(header.frame.y) + Number(header.frame.h)
-    : Number.NEGATIVE_INFINITY;
-  const composerTop = [composerLabel?.frame?.y, sendControl?.frame?.y]
-    .map(Number)
-    .filter(Number.isFinite)
-    .reduce((top, y) => Math.min(top, y), Number.POSITIVE_INFINITY);
+    : Number.NaN;
+  const composerTop = composer?.top;
   const candidates = ["Please check the new schema", "Endpoint review approved"].map((text) => ({
     text,
     element: findNamedRegionDescendantElement(state, "Agent coordination thread", { role: "Text", text }),
   }));
-  const insideThreadViewport = (frame) => Number.isFinite(threadTop)
-    && Number.isFinite(composerTop)
-    && Number.isFinite(frame?.y)
-    && Number.isFinite(frame?.h)
-    && frame.y >= threadTop
-    && frame.y + frame.h <= composerTop;
+  const insideThreadViewport = (frame) => frameWithinVerticalBounds(frame, threadTop, composerTop);
   const visible = candidates.find(({ element }) => {
     return frameIsFullyInScreenshot(element, state) && insideThreadViewport(element?.frame);
   });
   console.log("[AGENT-COMPOSITION-THREAD-MESSAGE-CANDIDATES]", JSON.stringify({
     threadTop,
     composerTop,
+    composerLabelFrame: composer?.messageLabel?.frame ?? null,
+    sendButton: composer?.sendButton ? {
+      role: composer.sendButton.role,
+      frame: composer.sendButton.frame,
+    } : null,
     candidates: candidates.map(({ text, element }) => ({
       text,
       frame: element?.frame,
@@ -340,11 +337,12 @@ const tests = [
       assert(findBy(after, { text: "thinking" }), "Thinking level control not shown");
       assert(findBy(after, { text: "skill" }), "Skills control not shown");
       const expanded = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
-      const sendControl = findBy(expanded, { text: "Send" });
+      const sendControl = findBy(expanded, { role: "Button", text: "Send" });
       console.log("[AGENT-COMPOSITION-SEND-BOUNDS]", JSON.stringify({
         screenshot: `${expanded.screenshot_width}x${expanded.screenshot_height}`,
         send: sendControl ? { role: sendControl.role, frame: sendControl.frame } : null,
       }));
+      if (!sendControl) console.log("[AGENT-COMPOSITION-EXPANDED-COMPOSER-TREE]", expanded.tree_markdown ?? "<tree missing>");
       assert(expanded.screenshot_height > 680, "Expanded-composer bounds require a window taller than the short-window fallback threshold");
       const compositionExpanded = findBy(expanded, { text: "Composition" });
       assert(
@@ -375,19 +373,29 @@ const tests = [
       let messageFrameShift = 0;
       const scrollAttempts = [];
       for (const direction of ["down", "up"]) {
+        const currentState = afterExpandedScroll;
         const currentMessage = scrollAttempts.length === 0
           ? initiallyVisibleMessage
           : findNamedRegionDescendantElement(
-            afterExpandedScroll,
+            currentState,
             "Agent coordination thread",
             { role: "Text", text: initiallyVisibleMessage.label },
           );
         assert(currentMessage, "The coordination message disappeared before the reverse scroll check");
-        const point = elementCenter(currentMessage, afterExpandedScroll);
+        const threadScrollTarget = findNamedRegionScrollElement(currentState, "Agent coordination messages");
+        if (!threadScrollTarget || threadScrollTarget.role === "Document") {
+          console.log("[AGENT-COMPOSITION-MESSAGE-SCROLL-TREE]", currentState.tree_markdown ?? "<tree missing>");
+        }
+        assert(
+          threadScrollTarget && threadScrollTarget.role !== "Document",
+          "Agent coordination messages must expose their own native ScrollPattern target",
+        );
+        assert(
+          typeof threadScrollTarget.element_token === "string" && threadScrollTarget.element_token.length > 0,
+          "Agent coordination messages native ScrollPattern target has no element token",
+        );
         const result = scroll(appHandle.pid, direction, 1, appHandle.windowId, {
-          x: point.x,
-          y: point.y,
-          delivery_mode: "foreground",
+          element_token: threadScrollTarget.element_token,
         });
         await sleep(350);
         afterExpandedScroll = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
@@ -398,7 +406,17 @@ const tests = [
         );
         assert(sameMessageAfterScroll, "The coordination message disappeared from the native tree after scrolling");
         messageFrameShift = Number(sameMessageAfterScroll.frame?.y) - Number(initiallyVisibleMessage.frame?.y);
-        scrollAttempts.push({ direction, point, result, frame: sameMessageAfterScroll.frame, frameShift: messageFrameShift });
+        scrollAttempts.push({
+          direction,
+          target: {
+            element_index: threadScrollTarget.element_index,
+            role: threadScrollTarget.role,
+            frame: threadScrollTarget.frame,
+          },
+          result,
+          frame: sameMessageAfterScroll.frame,
+          frameShift: messageFrameShift,
+        });
         if (Math.abs(messageFrameShift) >= 1) break;
       }
       console.log("[AGENT-COMPOSITION-EXPANDED-THREAD-SCROLL]", JSON.stringify({
@@ -407,6 +425,7 @@ const tests = [
         attempts: scrollAttempts,
         finalFrame: sameMessageAfterScroll?.frame,
       }));
+      takeScreenshot(appHandle.pid, "agents-composition-expanded-thread-scroll-attempt", appHandle.windowId);
       assert(
         Number.isFinite(messageFrameShift) && Math.abs(messageFrameShift) >= 1,
         "Scrolling the expanded coordination thread in either direction must move its message content",
