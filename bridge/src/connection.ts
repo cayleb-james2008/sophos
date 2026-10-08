@@ -1297,6 +1297,8 @@ export class ConnectionHolder {
   private readonly events: ConnectionHolderEvents;
   private readonly socketPath: string;
   private readonly preferredSessionId: string | undefined;
+  /** Session currently attached by this holder; recovery must preserve its identity. */
+  private activeSessionId: string | undefined;
   /** One live watcher per child session; entries own their unsubscribe/close lifecycle. */
   private readonly childWatches = new Map<string, ChildWatch>();
   private reconnectPromise: Promise<void> | undefined;
@@ -1360,13 +1362,13 @@ export class ConnectionHolder {
     }
   }
 
-  private async tryConnectOnce(allowPreferredSession = true, emitFailure = true): Promise<void> {
+  private async tryConnectOnce(allowPreferredSession = true, emitFailure = true, recoverySessionId?: string): Promise<void> {
     this.client = new DaemonClient(this.socketPath);
     try {
       await this.client.connect();
       // attach() requires an activeSessionId. Discover an existing session
       // via `list`, or create one if there are none.
-      const activeSessionId = await this.discoverOrCreateSession(undefined, allowPreferredSession);
+      const activeSessionId = recoverySessionId ?? await this.discoverOrCreateSession(undefined, allowPreferredSession);
       this.conn = await DaemonAgentConnection.attach(this.client, activeSessionId, {
         closeClientOnDispose: true,
         reconnectTimeoutMs: 8_000,
@@ -1381,12 +1383,14 @@ export class ConnectionHolder {
       if (!this.conn) {
         throw new Error("attach returned no connection");
       }
+      this.activeSessionId = activeSessionId;
       this.unsubscribe = this.conn.subscribe((evt) => this.handleEvent(evt));
       // Grab an initial snapshot so subsequent getState() is populated.
       let snapshotOk = true;
       try {
         this.snapshot = await this.conn.getInitialSnapshot();
         this.latestState = this.snapshot.state;
+        this.activeSessionId = this.latestState.activeSessionId ?? activeSessionId;
       } catch (err) {
         snapshotOk = false;
         // Snapshot failures are not fatal — the connection itself is up.
@@ -1765,6 +1769,7 @@ export class ConnectionHolder {
     if (typeof newId !== "string" || newId.length === 0) {
       throw new Error("daemon create returned no activeSessionId");
     }
+    this.activeSessionId = newId;
     // Tear down the current attach BEFORE issuing the re-attach: the daemon
     // may refuse two attaches from the same client at the same time.
     await this.disposeConnectionOnly();
@@ -1794,11 +1799,13 @@ export class ConnectionHolder {
       throw err;
     }
     if (!this.conn) throw new Error("re-attach returned no connection");
+    this.activeSessionId = newId;
     this.unsubscribe = this.conn.subscribe((evt) => this.handleEvent(evt));
     let snapshotOk = true;
     try {
       this.snapshot = await this.conn.getInitialSnapshot();
       this.latestState = this.snapshot.state;
+      this.activeSessionId = this.latestState.activeSessionId ?? newId;
     } catch (err) {
       snapshotOk = false;
       if (typeof process !== "undefined" && process.stderr) {
@@ -1832,6 +1839,7 @@ export class ConnectionHolder {
   private async reconnectFromClosed(reason: string): Promise<void> {
     if (this.stopping || this.reconnectPromise) return;
     const recovery = (async () => {
+      const recoverySessionId = this.activeSessionId ?? this.latestState?.activeSessionId ?? this.preferredSessionId;
       this.setStatus("reconnecting", reason);
       this.events.onEvent({ type: "connection_status", status: { kind: "reconnecting" } });
       await this.disposeConnectionOnly();
@@ -1841,7 +1849,7 @@ export class ConnectionHolder {
       let lastError = reason;
       while (!this.stopping && Date.now() < deadline) {
         try {
-          await this.tryConnectOnce(false, false);
+          await this.tryConnectOnce(false, false, recoverySessionId);
           return;
         } catch (error) {
           lastError = error instanceof Error ? error.message : String(error);
@@ -1957,6 +1965,7 @@ export class ConnectionHolder {
         // previous parent connection and must not leak across sessions.
         void this.closeAllChildWatches("parent session replaced");
         this.latestState = evt.state;
+        this.activeSessionId = evt.state.activeSessionId ?? this.activeSessionId;
         void this.emitEnrichedSnapshot("snapshot");
         return;
       }
@@ -1967,6 +1976,7 @@ export class ConnectionHolder {
         void this.closeAllChildWatches("parent connection resynced");
         this.snapshot = evt.snapshot;
         this.latestState = evt.snapshot.state;
+        this.activeSessionId = this.latestState.activeSessionId ?? this.activeSessionId;
         void this.emitEnrichedSnapshot("resynced");
         return;
       }

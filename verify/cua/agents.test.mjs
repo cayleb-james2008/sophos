@@ -377,7 +377,9 @@ const tests = [
         `Visible coordination message is outside the screenshot (${messagePoint.x}, ${messagePoint.y})`,
       );
       takeScreenshot(appHandle.pid, "agents-composition-expanded-before-thread-scroll", appHandle.windowId);
-      let afterExpandedScroll = expanded;
+      // Screenshot capture obtains a fresh native UIA snapshot; the element
+      // tokens from `expanded` are now stale and must not be used for actions.
+      let afterExpandedScroll = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });
       let sameMessageAfterScroll;
       let messageFrameShift = 0;
       const scrollAttempts = [];
