@@ -87,7 +87,7 @@ This status is for merged `master` commit
 | Staged daemon/bridge E2E | Pass: 50/50 checks | Windows named pipes on hosted CI; real pinned Prime Agent v0.7.0 runtime. Recovery used one isolated loopback mock-provider request, not live inference |
 | Windows package build | Pass | Hosted workflow built the guarded MSI and verified the bundled MIT notice; the candidate MSI was not installed |
 | Public updater package | Pass | Hosted Windows CI verified the v0.7.2 feed signature/tamper rejection, installed the signed NSIS package in a fresh profile, and smoke-tested the installed non-demo binary. Package SHA-256: `04ee6d7e2bb7c0d6651c5e2de39fa01d9654602c4ddba8dd5777b92c06816584` |
-| Native Windows CUA | Pass: 8/8 suites | Hosted `windows-latest`, source-built release executable; Smoke, Sessions, Agents, Chat, Inbox, Settings, Shell, and Studio. Three keyboard-delivery subchecks were skipped because background WebView2 does not reliably receive synthetic keyboard input; unit coverage remains. |
+| Native Windows CUA | Pass: 8/8 suites | Hosted `windows-latest`, source-built release executable using the disclosed demo IPC path (no live provider inference); Smoke, Sessions, Agents, Chat, Inbox, Settings, Shell, and Studio. Three keyboard-delivery subchecks were skipped because background WebView2 does not reliably receive synthetic keyboard input; unit coverage remains. |
 | Post-merge Windows CI | Pass | GitHub Actions run `37729936409` on exact master commit above; both `test` and `cua-e2e` jobs passed. Exact PR-head push/PR runs `37726530234` and `37726535910` also passed. |
 
 The GitLab Releases page currently lists v0.6.0 as its latest tagged release,
