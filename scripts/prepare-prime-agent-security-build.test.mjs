@@ -168,7 +168,7 @@ test("Windows release workflows bootstrap a SHA-pinned, ACL-validated private ch
     return source.slice(start, next < 0 ? source.length : next);
   };
   const cuaJobOffset = windowsCiWorkflow.indexOf("  cua-e2e:");
-  assert.ok(cuaJobOffset > 0, "CI defines the best-effort CUA job");
+  assert.ok(cuaJobOffset > 0, "CI defines the blocking native CUA job");
   const testJob = windowsCiWorkflow.slice(0, cuaJobOffset);
   const cuaJob = windowsCiWorkflow.slice(cuaJobOffset);
   const prepTest = findStepBlock(testJob, "Prepare a secure Windows source checkout");

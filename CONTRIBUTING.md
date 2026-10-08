@@ -136,7 +136,8 @@ on another OS.
    why, and note any manual verification performed.
 6. **CI must pass.** The workflow builds the full pinned runtime from a fresh
    source checkout and runs the daemon/bridge end-to-end verifier as a required
-   Windows job. The CUA UI job remains best-effort because GitHub-hosted Windows
-   runners do not provide an interactive desktop session.
+   Windows job. Native CUA is also a blocking Windows job; it exercises both
+   the signed public updater installation and the checkout release executable.
+   Do not treat diagnostic-only runs or skipped native checks as acceptance.
 
 Thank you for contributing to Sophos.
