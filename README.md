@@ -77,36 +77,43 @@ the verification boundary.
 ## Verification status
 
 I keep local source checks separate from Windows installer and UI acceptance.
-This status is for merged `master` commit
-`6c9f803d3ea13c1747c6ca5c163d051c8ed124ac` (2026-10-08):
+This acceptance snapshot covers PR #14's merged product/runtime candidate,
+`ee1a5d80356dbf8039479e9594d130471b4031f6` (2026-10-08); the follow-up
+standalone lifecycle developer-tool repair is separate and does not alter the
+packaged runtime:
 
 | Area | Result | Scope |
 |---|---|---|
-| `npm run test` | Pass: 1,126 Vitest tests and 69 Node checks | Fresh Linux clone of merged source; no Windows UI implied |
-| `npm run build` | Pass | Fresh Linux clone; TypeScript and Vite production build |
+| `npm run test` | Pass | Exact merged-master Windows CI run `37737840508`, including unit tests and runtime regression suites |
+| `npm run build` | Pass | Exact merged-master Windows CI run; frontend and pinned runtime bundle built |
 | Staged daemon/bridge E2E | Pass: 50/50 checks | Windows named pipes on hosted CI; real pinned Prime Agent v0.7.0 runtime. Recovery used one isolated loopback mock-provider request, not live inference |
-| Windows package build | Pass | Hosted workflow built the guarded MSI and verified the bundled MIT notice; the candidate MSI was not installed |
-| Public updater package | Pass | Hosted Windows CI verified the v0.7.2 feed signature/tamper rejection, installed the signed NSIS package in a fresh profile, and smoke-tested the installed non-demo binary. Package SHA-256: `04ee6d7e2bb7c0d6651c5e2de39fa01d9654602c4ddba8dd5777b92c06816584` |
-| Native Windows CUA | Pass: 8/8 suites | Hosted `windows-latest`, source-built release executable using the disclosed demo IPC path (no live provider inference); Smoke, Sessions, Agents, Chat, Inbox, Settings, Shell, and Studio. Three keyboard-delivery subchecks were skipped because background WebView2 does not reliably receive synthetic keyboard input; unit coverage remains. |
-| Post-merge Windows CI | Pass | GitHub Actions run `37729936409` on exact master commit above; both `test` and `cua-e2e` jobs passed. Exact PR-head push/PR runs `37726530234` and `37726535910` also passed. |
+| Guarded Windows MSI | Pass: build, notice, compatibility | Hosted workflow built the guarded MSI, checked the embedded MIT notice and pinned-daemon compatibility; candidate MSI was not installed |
+| Signed updater-feed installer | Pass: 22 checks, 0 failures, 1 informational | Public v0.7.2 installer signature verified and tampering rejected; installed in a fresh profile. SHA-256: `04ee6d7e2bb7c0d6651c5e2de39fa01d9654602c4ddba8dd5777b92c06816584`. This feed package is not proven to contain this source revision. |
+| Public-installer UI smoke | Pass: 7/7 | Fresh-profile smoke on the installed non-demo v0.7.2 binary; provider setup and inference were not invoked |
+| Native Windows CUA | Pass: 8/8 suites, 0 failed | Hosted `windows-latest`, source-built release executable using the disclosed demo IPC path (no live provider inference); Smoke, Sessions, Agents, Chat, Inbox, Settings, Shell, and Studio. Three keyboard-delivery subchecks were skipped because background WebView2 does not reliably receive synthetic keyboard input; unit coverage remains. |
+| Post-merge Windows CI | Pass | GitHub Actions run `37737840508` on exact merged commit `ee1a5d80356dbf8039479e9594d130471b4031f6`; both `test` and `cua-e2e` jobs passed. Exact PR #14 head push/PR runs `37733772986` and `37733777458` also passed. |
+| Standalone lifecycle verifier | Pass in local follow-up; not part of this merged candidate | A separate staged-only repair resolved the compile-only `partial-json` dependency-layout failure; Linux standalone and full staged E2E each passed 50/50 on this source base. The repair is not yet part of this merge and local results do not establish hosted Windows lifecycle acceptance. |
 
 The GitLab Releases page currently lists v0.6.0 as its latest tagged release,
-while the separately signed updater feed announces a v0.7.2 package; they are
-different publication records, and that package may not match this source
-tree. The CI install/smoke evidence applies to the updater-feed package, not
-to an installed candidate MSI or a new Sophos release. Earlier PR #11 failures
-were corrected and superseded by the exact-head and post-merge Windows runs
-listed above.
+while the separately signed updater feed announces a v0.7.2 package; these are
+different publication records, and CI did not prove that the feed package
+contains this source tree. The CI install/smoke evidence applies to the signed
+updater-feed package, not to an installed candidate MSI or a new Sophos release.
+Earlier PR #11 failures and the historical 47/50 CUA result on its old parent
+were superseded by the exact-head and post-merge runs listed above. The stale
+UIA identity after reconnect was fixed and the merged-master 50/50 recovery E2E
+and native Agents CUA both passed.
 
 The pinned Prime Agent production dependency graph still has five high npm
 audit records (zero critical): two unresolved `extract-zip` symlink/path
 advisories and an FTP/proxy dependency advisory whose compatible clean upgrade
-requires an untested major-version change. The ZIP helper auto-install path is
-disabled; no clean-audit claim is made. The ordinary developer
-`verify:lifecycle` command also still fails in its compile-only upstream
-package copy because `partial-json` is absent; staged runtime, lifecycle
-coverage, Windows E2E, and RPC checks are separate and passed within their
-documented scopes.
+requires an untested major-version change. Root development dependencies also
+retain audit findings. The ZIP helper auto-install path is disabled; no clean-
+audit claim is made. The staged standalone lifecycle command's compile-only
+package-layout defect is addressed in a separate, non-runtime tooling follow-up.
+Its direct standalone verification is Linux-local; the Windows package/E2E
+evidence above does not substitute for a hosted Windows invocation of that
+developer command.
 
 ---
 

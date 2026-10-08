@@ -6,7 +6,7 @@
   "description": "Sophos — a Windows-native port of Prime Intellect's Prime Agent. Credits: PrimeIntellect-ai/prime-agent (upstream).",
   "scripts": {
     "dev": "vite",
-    "test": "vitest run && node --test verify/cua/thread-visibility.node-test.mjs verify/cua/driver.test.mjs verify/cua/inbox-import.test.mjs verify/live-feed-download.test.mjs bridge/session-recovery-readiness.test.mjs bridge/recovery-probe.test.mjs bridge/verify.test.mjs verify/e2e-mock-provider.test.mjs",
+    "test": "vitest run && node --test verify/cua/thread-visibility.node-test.mjs verify/cua/driver.test.mjs verify/cua/inbox-import.test.mjs verify/live-feed-download.test.mjs bridge/session-recovery-readiness.test.mjs bridge/recovery-probe.test.mjs bridge/verify.test.mjs bridge/verify-lifecycle.test.mjs verify/live-bounded-spend-test.test.mjs verify/e2e-mock-provider.test.mjs",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "build": "tsc && vite build",

@@ -2,3 +2,5 @@ patches/prime-agent-v0.7.0-session-lease-windows.patch -text
 patches/prime-agent-v0.7.0-linux-worker-socket-path.patch -text
 patches/prime-agent-v0.7.0-worker-shutdown-fence.patch -text
 scripts/dependency-hardening-overlay.json -text
+# Historical source is preserved byte-for-byte, including original CRLF.
+verify/archive/live-bounded-spend-test.mjs.txt -text -diff
