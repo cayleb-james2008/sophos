@@ -158,8 +158,11 @@ test("wrapper-only SIGTERM reaches its owned verifier and preserves diagnostic H
   let home;
   try {
     await writeFile(join(root, "bridge", "verify.mjs"), `
-      console.log("PROBE_CHILD=" + JSON.stringify({ pid: process.pid, home: process.env.HOME }));
       process.on("SIGTERM", () => { console.log("CHILD_CLEANUP_REACHED"); process.exit(130); });
+      // Readiness means the signal handler is installed, not merely spawned.
+      // Yield once to keep this true even across asynchronous fixture startup.
+      await new Promise(resolve => setImmediate(resolve));
+      console.log("PROBE_CHILD=" + JSON.stringify({ pid: process.pid, home: process.env.HOME }));
       setInterval(() => {}, 1000);
     `);
     const parent = spawn(process.execPath, [join(root, "bridge", "verify-lifecycle.mjs")], {

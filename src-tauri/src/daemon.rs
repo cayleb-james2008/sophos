@@ -19,17 +19,8 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
-
 use crate::engine_log::{spawn_reader, EngineLogSink, Proc, Stream};
 use crate::job::Job;
-
-/// Windows flag: do not create a console window for the child. Without this,
-/// spawning a console node process from a GUI app flashes a terminal window
-/// on every spawn (and every crash-loop restart).
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Owns the daemon child process and its lifecycle.
 pub struct DaemonManager {
@@ -96,12 +87,8 @@ impl DaemonManager {
         // interpreter path. Do not inject a guessed override here: a stale or
         // partial venv would disable bootstrap and leave the app without a
         // kernel. The child is still hidden so GUI startup stays silent.
-        #[cfg(windows)]
-        cmd.creation_flags(CREATE_NO_WINDOW);
-        match cmd.spawn() {
+        match self.job.spawn(&mut cmd) {
             Ok(mut child) => {
-                self.job.assign(&child);
-
                 // Capture stdout and stderr, forward to the frontend.
                 if let Some(sink) = self.log_sink.lock().unwrap().as_ref() {
                     if let Some(stdout) = child.stdout.take() {
@@ -117,6 +104,7 @@ impl DaemonManager {
                 eprintln!("[daemon] spawned (default local socket):{preload_desc} {node_path} {cli_path} --mode daemon");
             }
             Err(e) => {
+                self.running.store(false, Ordering::SeqCst);
                 eprintln!("[daemon] failed to spawn: {e}");
                 if let Some(sink) = self.log_sink.lock().unwrap().as_ref() {
                     sink.push(

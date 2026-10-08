@@ -276,10 +276,10 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let handle = app.handle().clone();
-            let job = Arc::new(Job::new().unwrap_or_else(|| {
-                eprintln!("[job] failed to create job object; orphans possible on hard kill");
-                Job::null()
-            }));
+            let job = Arc::new(Job::new().map_err(|error| {
+                eprintln!("[job] containment unavailable; refusing engine startup: {error}");
+                error
+            })?);
             // Demo mode: launched with `--demo` (cua-driver e2e) or
             // SOPHOS_DEMO_MODE=1. The app skips the daemon + sidecar and the
             // frontend uses the MockIpcClient, so the full UI is demonstrable
