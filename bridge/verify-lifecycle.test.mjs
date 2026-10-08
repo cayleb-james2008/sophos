@@ -26,10 +26,12 @@ async function fixture() {
     await cp(join(repo, "verify", name), join(root, "verify", name));
   }
   await put("package.json", '{"type":"module"}');
+  await put("bridge/package.json", '{"type":"module","dependencies":{"@earendil-works/pi-ai":"*"}}');
   await put("bridge/verify-lifecycle.mjs", source);
   if (existsSync(join(repo, "bridge", "lifecycle-runtime.mjs"))) {
     await cp(join(repo, "bridge", "lifecycle-runtime.mjs"), join(root, "bridge", "lifecycle-runtime.mjs"));
   }
+  await cp(join(repo, "bridge", "lifecycle-cancellation.mjs"), join(root, "bridge", "lifecycle-cancellation.mjs"));
   // Compile-only copies reproduce the bundler's bridge layout: not runnable.
   await put("bridge/dist/bridge/src/connection.js", 'import "@earendil-works/pi-ai";');
   await put("bridge/node_modules/@earendil-works/pi-ai/package.json", '{"type":"module","main":"index.js"}');
@@ -38,6 +40,7 @@ async function fixture() {
     upstream: { ...PRIME_AGENT_PIN, overlay: { ...PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED,
       sourceDirectory: ".deps/prime-agent", buildDirectory: ".deps/prime-agent-security" } },
   }));
+  await put("resources/daemon/package.json", '{"name":"fixture-daemon","dependencies":{"@earendil-works/pi-ai":"*"}}');
   await put("resources/daemon/dist/cli.js", "// fixture only; no daemon inference");
   await put("resources/bridge/dist/bridge/src/index.js", "// fixture entry");
   await put("resources/bridge/dist/bridge/src/connection.js", `
@@ -109,6 +112,20 @@ test("staged dependency resolution fails closed instead of using an ancestor pac
     const result = run(root);
     assert.notEqual(result.status, 0, result.stdout);
     assert.match(result.stderr, /resolves outside resources\/node_modules/);
+    assert.doesNotMatch(result.stdout, /UNSTAGED_ROOT_DEPENDENCY_LOADED|FIXTURE_HOME|lifecycle recovery used/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("staged bridge and daemon entry dependencies cannot fall back to project node_modules", { skip: process.platform === "win32" && "synthetic fixture uses host Node and POSIX path semantics" }, async () => {
+  const root = await fixture();
+  try {
+    await rm(join(root, "resources", "node_modules", "@earendil-works", "pi-ai"), { recursive: true, force: true });
+    await mkdir(join(root, "node_modules", "@earendil-works", "pi-ai"), { recursive: true });
+    await writeFile(join(root, "node_modules", "@earendil-works", "pi-ai", "package.json"), '{"type":"module","main":"index.js"}');
+    await writeFile(join(root, "node_modules", "@earendil-works", "pi-ai", "index.js"), 'export const value = "full-closure"; console.log("UNSTAGED_ROOT_DEPENDENCY_LOADED");');
+    const result = run(root);
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /@earendil-works\/pi-ai.*resolves outside resources\/node_modules/);
     assert.doesNotMatch(result.stdout, /UNSTAGED_ROOT_DEPENDENCY_LOADED|FIXTURE_HOME|lifecycle recovery used/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

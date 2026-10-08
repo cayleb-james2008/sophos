@@ -5,6 +5,18 @@ import test from "node:test";
 const verifySource = await readFile(new URL("./verify.mjs", import.meta.url), "utf8");
 const lifecycleSource = await readFile(new URL("./verify-lifecycle.mjs", import.meta.url), "utf8");
 
+test("cross-platform lifecycle IPC cancellation routes to the verifier's awaited cleanup handler", () => {
+  assert.ok(lifecycleSource.includes('stdio: ["inherit", "inherit", "inherit", "ipc"]'));
+  assert.ok(lifecycleSource.includes("requestLifecycleCancellation(activeChild, signal)"));
+  assert.ok(verifySource.includes('process.on("message", onLifecycleCancellation)'));
+  assert.ok(verifySource.includes("if (isLifecycleCancellationMessage(message)) onSignal()"));
+  const signalStart = verifySource.indexOf("const onSignal = () => {");
+  const signalEnd = verifySource.indexOf('process.on("SIGINT", onSignal)', signalStart);
+  const signalHandler = verifySource.slice(signalStart, signalEnd);
+  assert.match(signalHandler, /await startCleanup\(\)/);
+  assert.match(signalHandler, /await forceCleanup\(\)/);
+});
+
 test("recovery probe requires successful isolated model selection before dispatching its prompt", () => {
   const recoveryMarker = 'if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {';
   const recoveryStart = verifySource.lastIndexOf(recoveryMarker);

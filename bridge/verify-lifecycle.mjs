@@ -12,6 +12,7 @@ import { removeTemporaryHomeWithRetry } from "../verify/e2e-home-cleanup.mjs";
 import { selectE2ENode } from "../verify/runtime-executable.mjs";
 import { validateNodeExecutable } from "../scripts/node-runtime.mjs";
 import { NODE_RUNTIME_PIN } from "../scripts/runtime-pins.mjs";
+import { requestLifecycleCancellation } from "./lifecycle-cancellation.mjs";
 import {
   E2E_MOCK_MODEL_ID,
   E2E_MOCK_PROVIDER_ID,
@@ -33,7 +34,7 @@ function forwardInterruption(signal) {
   }
   interruptionSignal = signal;
   if (!activeChild || activeChild.exitCode !== null || activeChild.signalCode !== null) return;
-  activeChild.kill(signal);
+  if (!requestLifecycleCancellation(activeChild, signal)) activeChild.kill("SIGKILL");
   forceKillTimer = setTimeout(() => {
     if (activeChild && activeChild.exitCode === null && activeChild.signalCode === null) activeChild.kill("SIGKILL");
   }, CHILD_GRACE_MS);
@@ -85,7 +86,7 @@ async function run() {
     if (interruptionSignal) throw new Error(`lifecycle verifier interrupted by ${interruptionSignal}`);
     const child = spawn(node, [VERIFY], {
       cwd: isolatedHome,
-      stdio: "inherit",
+      stdio: ["inherit", "inherit", "inherit", "ipc"],
       env: childEnv,
     });
     activeChild = child;
