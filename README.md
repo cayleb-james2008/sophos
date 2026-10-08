@@ -76,23 +76,37 @@ the verification boundary.
 
 ## Verification status
 
-I keep Linux source checks separate from Windows installer and UI acceptance.
-The latest local run on the integrated candidate used Linux and Node v26.7.0:
+I keep local source checks separate from Windows installer and UI acceptance.
+This status is for merged `master` commit
+`6c9f803d3ea13c1747c6ca5c163d051c8ed124ac` (2026-10-08):
 
 | Area | Result | Scope |
 |---|---|---|
-| `npm run test` | Pass: 1,126 Vitest tests and 36 Node checks | Local Linux run; no Windows UI implied |
-| `npm run build` | Pass | TypeScript and Vite build on Linux |
-| Staged daemon/bridge E2E | Pass: 50/50 checks | Real pinned Prime Agent v0.7.0 runtime over a Unix socket; recovery uses an isolated loopback mock provider, not live inference |
-| Public updater feed | Pass: signature and tamper checks | Downloaded the v0.7.2 package (98,197,077 bytes; SHA-256 `04ee6d7e2bb7c0d6651c5e2de39fa01d9654602c4ddba8dd5777b92c06816584`); not installed on this Linux host |
-| CUA helper tests | Pass: 61/61 | Local driver/helper tests; not native desktop acceptance |
-| Windows installer, fresh public-package install, and native CUA | Pending on the integrated candidate | GitHub Actions is configured to build/inspect the MSI, install the exact signed feed package, run a fresh-profile non-demo smoke, and test the source-built app through UIA. Wait for the exact-head result before claiming acceptance. |
+| `npm run test` | Pass: 1,126 Vitest tests and 69 Node checks | Fresh Linux clone of merged source; no Windows UI implied |
+| `npm run build` | Pass | Fresh Linux clone; TypeScript and Vite production build |
+| Staged daemon/bridge E2E | Pass: 50/50 checks | Windows named pipes on hosted CI; real pinned Prime Agent v0.7.0 runtime. Recovery used one isolated loopback mock-provider request, not live inference |
+| Windows package build | Pass | Hosted workflow built the guarded MSI and verified the bundled MIT notice; the candidate MSI was not installed |
+| Public updater package | Pass | Hosted Windows CI verified the v0.7.2 feed signature/tamper rejection, installed the signed NSIS package in a fresh profile, and smoke-tested the installed non-demo binary. Package SHA-256: `04ee6d7e2bb7c0d6651c5e2de39fa01d9654602c4ddba8dd5777b92c06816584` |
+| Native Windows CUA | Pass: 8/8 suites | Hosted `windows-latest`, source-built release executable; Smoke, Sessions, Agents, Chat, Inbox, Settings, Shell, and Studio. Three keyboard-delivery subchecks were skipped because background WebView2 does not reliably receive synthetic keyboard input; unit coverage remains. |
+| Post-merge Windows CI | Pass | GitHub Actions run `37729936409` on exact master commit above; both `test` and `cua-e2e` jobs passed. Exact PR-head push/PR runs `37726530234` and `37726535910` also passed. |
 
-The earlier PR #11 head had real Windows CUA and PR-event E2E failures; its
-locally corrected integration candidate has not yet replaced those results
-with a fresh hosted Windows run. Linux checks prove source/runtime behavior on
-this host only; they do not validate WebView2, installer execution, or native
-UI Automation.
+The GitLab Releases page currently lists v0.6.0 as its latest tagged release,
+while the separately signed updater feed announces a v0.7.2 package; they are
+different publication records, and that package may not match this source
+tree. The CI install/smoke evidence applies to the updater-feed package, not
+to an installed candidate MSI or a new Sophos release. Earlier PR #11 failures
+were corrected and superseded by the exact-head and post-merge Windows runs
+listed above.
+
+The pinned Prime Agent production dependency graph still has five high npm
+audit records (zero critical): two unresolved `extract-zip` symlink/path
+advisories and an FTP/proxy dependency advisory whose compatible clean upgrade
+requires an untested major-version change. The ZIP helper auto-install path is
+disabled; no clean-audit claim is made. The ordinary developer
+`verify:lifecycle` command also still fails in its compile-only upstream
+package copy because `partial-json` is absent; staged runtime, lifecycle
+coverage, Windows E2E, and RPC checks are separate and passed within their
+documented scopes.
 
 ---
 
