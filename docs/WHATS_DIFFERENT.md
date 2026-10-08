@@ -42,8 +42,7 @@ links the exact CI evidence and preserves earlier failed runs and their limits.
   the current-source MSI was installed or that the feed matches this tree.
 - **Shell prerequisites:** bundling Node does not remove every development or
   upstream tool prerequisite. The README still lists Git for Windows and
-  supported Python for source development; Git Bash removal is not an
-  established feature.
+  daemon prerequisites; Git Bash removal is not an established feature.
 - **Live behavior and scores:** historical scripts, screenshots and research
   scores do not make every product claim verified today. No live provider
   session, account, spend, production readiness or universal compatibility is
