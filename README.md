@@ -6,18 +6,18 @@
 
 **A Windows-native coding agent. Own your intelligence.**
 
-Sophos brings [Prime Intellect's](https://www.primeintellect.ai/) open-source
-coding agent to Windows as a polished desktop app — Tauri v2 (Rust) shell,
-Node bridge sidecar, and a React frontend styled after the Prime Intellect
-design language: Geist typography, terminal-green accents, sharp corners,
-near-black surfaces.
+I’m building Sophos to bring [Prime Intellect’s](https://www.primeintellect.ai/)
+open-source Prime Agent coding agent to Windows as a desktop app. I work on the
+Tauri v2/Rust shell, React UI, packaging, and reliability layers around the
+upstream runtime. Prime Intellect created the agent runtime, daemon, and bridge;
+Sophos pins their public v0.7.0 source and includes the upstream MIT notice.
 
-**Windows-only.** Sophos is built for developers on Windows 10/11 who want
-the Prime Agent coding agent as a native desktop app instead of a terminal.
-To try it, download the latest installer from the
-[Releases page](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
-and follow [Quick start](#quick-start--download--run) below — no manual
-dependencies, no admin rights needed.
+**Windows-only.** I’m building Sophos for Windows 10/11 developers who want
+Prime Agent in a desktop app instead of a terminal. The GitLab Releases page
+currently lists v0.6.0 as its latest tagged release; the signed updater feed
+separately announces a v0.7.2 package. Those are different publication
+records. See [Quick start](#quick-start--download--run) for both links and
+the verification boundary.
 
 [![Tauri](https://img.shields.io/badge/Tauri-v2-blue?logo=tauri)](https://v2.tauri.app/)
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react)](https://react.dev/)
@@ -25,7 +25,7 @@ dependencies, no admin rights needed.
 [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![Download](https://img.shields.io/badge/Download-Releases-85ed75?logo=gitlab)](https://gitlab.com/caylebalvarez-james/sophos/-/releases)
 
-**Credits:** This is a Windows port of [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent). All credit for the agent runtime, daemon, and bridge belongs to the Prime Intellect team.
+**Upstream credit:** [PrimeIntellect-ai/prime-agent](https://github.com/PrimeIntellect-ai/prime-agent) provides the agent runtime, daemon, and bridge. Sophos packages that MIT-licensed upstream; the desktop shell and UI are this project’s work.
 
 </div>
 
@@ -62,47 +62,37 @@ dependencies, no admin rights needed.
 
 | Step | What |
 |---|---|
-| **1. Download** | Grab the latest `Sophos_<version>_x64-setup.exe` from the [Releases](https://gitlab.com/caylebalvarez-james/sophos/-/releases) page (the manifests in this repo are at 0.7.2 — match the installer name to the release you download). |
-| **2. Install** | Run the `.exe`. Sophos installs to `~\AppData\Local\Sophos`. No admin required. |
+| **1. Download** | Choose the latest tagged installer from [GitLab Releases](https://gitlab.com/caylebalvarez-james/sophos/-/releases) (currently v0.6.0), or the separate [v0.7.2 signed updater-feed package](https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.7.2/Sophos_0.7.2_x64-setup.exe). The feed package is not a tagged release and may not match this source tree. |
+| **2. Install** | Run the `.exe`. The installer is configured for a per-user install; see the current Windows workflow for fresh-install verification status. |
 | **3. Launch** | Open **Sophos**. The bundled Node runtime + daemon + bridge start automatically. |
 | **4. Add a provider** | Go to **Settings → Providers** and add an LLM provider (API key or local model). |
 | **5. Chat** | Start a new session and begin. |
 
-> **Zero manual dependencies.** The installer bundles the portable Node
-> runtime, the daemon `dist/`, the bridge `dist/`, and the shared
-> `node_modules/` — everything the app needs to run.
+> **Bundled runtime.** The Windows package is built to include the portable
+> Node runtime, daemon, bridge, and shared `node_modules/`. The current
+> candidate’s installer/UI acceptance is tracked separately from Linux checks.
 
 ---
 
-## What works today
+## Verification status
 
-Sophos is Windows-only by design. This is what was verified, and where:
+I keep Linux source checks separate from Windows installer and UI acceptance.
+The latest local run on the integrated candidate used Linux and Node v26.7.0:
 
-| Area | Status | How verified |
+| Area | Result | Scope |
 |---|---|---|
-| Frontend type-check (`npx tsc --noEmit`) | ✅ Passes on Linux | Run on this Linux host (see POLISH-NOTES.md) |
-| Frontend unit tests (`npx vitest run`) | ⚠️ 1116/1118 pass on Linux | Needs a Node 26 flag (see note below); 2 failures remain (see POLISH-NOTES.md) |
-| Local updater harness (`npm run test:updater`) | ⚠️ 20/24 on a fresh checkout | Passes only where `npm run updater:keys` has generated the local signing key (see note below) |
-| Live update-feed check (`node verify/live-feed.mjs`) | ✅ Passes with network | Fetches the live GitLab feed and verifies the Ed25519 signature (20/20) |
-| Native installer build (`npm run tauri build`) | ❌ Needs Windows | NSIS + `node.exe` runtime bundling; cannot run on Linux |
-| `node verify/e2e.mjs` (bundle + daemon round-trip) | ❌ Needs Windows | Boots `resources/node/*/node.exe`, uses named pipes and `taskkill` |
-| cua-driver UI suite (`npm run test:cua`) | ❌ Needs Windows | Drives the real app via UIA accessibility automation + WebView2 |
+| `npm run test` | Pass: 1,126 Vitest tests and 36 Node checks | Local Linux run; no Windows UI implied |
+| `npm run build` | Pass | TypeScript and Vite build on Linux |
+| Staged daemon/bridge E2E | Pass: 50/50 checks | Real pinned Prime Agent v0.7.0 runtime over a Unix socket; recovery uses an isolated loopback mock provider, not live inference |
+| Public updater feed | Pass: signature and tamper checks | Downloaded the v0.7.2 package (98,197,077 bytes; SHA-256 `04ee6d7e2bb7c0d6651c5e2de39fa01d9654602c4ddba8dd5777b92c06816584`); not installed on this Linux host |
+| CUA helper tests | Pass: 61/61 | Local driver/helper tests; not native desktop acceptance |
+| Windows installer, fresh public-package install, and native CUA | Pending on the integrated candidate | GitHub Actions is configured to build/inspect the MSI, install the exact signed feed package, run a fresh-profile non-demo smoke, and test the source-built app through UIA. Wait for the exact-head result before claiming acceptance. |
 
-Building from source and running the app require Windows 10/11 (see
-[Build from source](#build-from-source)). On Linux, the frontend checks above
-are the supported verification path.
-
-> **Environment notes (Linux).** CI targets Node 22 on Windows. This host
-> runs Node v26.7.0, where `globalThis.localStorage` is `undefined` unless
-> `--localstorage-file` is passed, so it shadows the jsdom `localStorage`
-> the tests rely on. Plain `npx vitest run`: 50 failed / 1068 passed
-> (1118 total). With `NODE_OPTIONS=--localstorage-file=/tmp/sophos-ls.json`:
-> **2 failed / 1116 passed** — the 2 residuals are both in
-> `OnboardingWizard.test.tsx` (wizard triggers a document navigation under
-> jsdom: "Not implemented: navigation to another Document"). The updater
-> harness scores 20/24 on a fresh checkout because the private signing key
-> (`scripts/updater.key`) is deliberately gitignored — generate it with
-> `npm run updater:keys` (never commit it) for the full pass.
+The earlier PR #11 head had real Windows CUA and PR-event E2E failures; its
+locally corrected integration candidate has not yet replaced those results
+with a fresh hosted Windows run. Linux checks prove source/runtime behavior on
+this host only; they do not validate WebView2, installer execution, or native
+UI Automation.
 
 ---
 
@@ -255,39 +245,60 @@ Save required to see the effect.
 | **Node.js** | build frontend + bridge | 22+ |
 | **Rust** | compile the Tauri shell | 1.90+ |
 | **Tauri CLI** | `npm run tauri` | 2.x |
-| **NSIS** | build the `.exe` installer | see [Troubleshooting](#troubleshooting) |
+| **Tauri Windows prerequisites** | build a native package | [Tauri v2 requirements](https://v2.tauri.app/start/prerequisites/) |
 | **Git for Windows** | provides `bash` for the daemon | any recent |
 
 ### Build steps
 
 ```bash
-# 1. Stage the runtime layout (daemon dist, bridge dist, node, node_modules)
-#    + build the frontend/bridge:
+# Start at the repository root. This command installs the frontend dependencies,
+# clones the exact Prime Agent source pin into ignored .deps/ if needed, installs
+# that source's locked dependencies with normal lifecycle scripts, compiles the
+# upstream daemon + bridge, stages verified runtime inputs, and builds the UI.
+npm ci
 node scripts/bundle.mjs
 
-# 2. Build the native installer:
-npm run tauri build
-# → src-tauri/target/release/bundle/nsis/Sophos_<version>_x64-setup.exe
-#   (native binary at src-tauri/target/release/prime-agent-windows.exe)
+# Run the real daemon/bridge offline protocol smoke test with isolated HOME.
+# On Windows it uses the verified bundled node.exe; on Linux it uses the host
+# Node executable and Unix-domain socket. Recovery uses an isolated loopback
+# mock provider so the test does not make live model requests.
+node verify/e2e.mjs
+
+# Guarded Windows MSI build (requires Windows x64 + Rust/Tauri prerequisites).
+node scripts/build-windows-installer.mjs
+node scripts/verify-tauri-package.mjs
+# The verifier extracts the MSI and checks the bundled upstream MIT notice.
 ```
 
-The `bundle.mjs` manifest is written to `resources/.bundle-manifest.json`.
-Flags: `--no-frontend`, `--no-bridge`, `--no-node-modules`, `--layout-check-only`, `--help`.
+The first `bundle.mjs` run needs network access to clone the pinned public
+Prime Agent source, install locked npm dependencies, and obtain the hash-verified
+official Node runtime. It does not call a model/provider API and needs no API
+keys. Prime Agent publishes its source in a monorepo rather than publishing the
+`@earendil-works/pi-*` package tarballs to npm; run the root bundler before
+installing/building `bridge/` on its own. The bundle command also validates an
+operator-supplied `PRIME_AGENT_REF` against the exact origin, tag commit, version,
+MIT license, and clean-worktree state before using it.
+
+The `bundle.mjs` manifest is written to `resources/.bundle-manifest.json` and records the native dependency build host, architecture, Windows target, build mode, and release eligibility. Default Windows release staging is accepted only on a real Windows x64 host. Linux/macOS may use `--diagnostic` for source/Unix-socket diagnostics; that provenance is permanently ineligible for the Windows installer, and `scripts/build-windows-installer.mjs` fails closed unless it validates a Windows-release manifest.
+
+Flags: `--no-frontend`, `--no-bridge`, `--no-node-modules`, `--layout-check-only`, `--diagnostic`, `--help`.
+
+The Windows CI workflow is configured to load ZeroMQ, Koffi, and the Windows clipboard addon using the bundled Windows Node binary, build the MSI through the guarded release entrypoint, then administratively extract the MSI and compare its `daemon/LICENSE` beside the installed `prime-agent-windows.exe` byte-for-byte with the staged upstream `resources/daemon/LICENSE`. These checks require a successful Windows runner; Linux results do not substitute for native or installer evidence.
 
 ### Environment variables
 
 | Var | Purpose | Default |
 |---|---|---|
-| `PRIME_AGENT_REF` | daemon source checkout (read-only) | `…\workspace\prime-agent-ref` |
-| `PRIME_NODE_MODULES` | portable node_modules source | installed app's `node_modules/` |
-| `PRIME_NODE_RUNTIME` | portable Node runtime source | installed app's `node/` |
-| `PRIME_DAEMON_TCP` | `1` = force TCP transport (if named pipes are blocked) | unset |
+| `PRIME_AGENT_REF` | optional Prime Agent source checkout | `.deps/prime-agent (pinned v0.7.0, MIT)` |
+| `PRIME_NODE_RUNTIME` | verified `node.exe` override | official Node v24.18.0 win-x64 download (SHA-256 checked) |
+| `PRIME_DAEMON_TCP` | Unsupported by pinned Prime Agent v0.7.0; Sophos does not set it | not set |
+| `daemonTcp` (`settings.json`) | Legacy persisted field ignored by the Rust shell; it cannot enable TCP | ignored |
 
 ### Verify
 
 ```bash
 node scripts/bundle.mjs
-node verify/e2e.mjs          # bundle + layout + daemon TCP round-trip
+node verify/e2e.mjs          # staged bundle + real bridge/daemon JSON-RPC + recovery
 ```
 
 Reports: `verify/e2e-report.json`, `verify/e2e-evidence.txt`.
@@ -301,9 +312,10 @@ At runtime the Tauri resource dir contains (this is what
 
 ```
 <resource dir>/
-  node/node.exe                 # portable Node 22+ runtime
+  node/node-v24.18.0-win-x64/node.exe  # official runtime, SHA-256 pinned
   daemon/dist/cli.js            # coding-agent --mode daemon entry
   daemon/package.json
+  daemon/LICENSE               # pinned upstream Prime Agent MIT notice
   bridge/dist/bridge/src/index.js  # JSON-RPC sidecar entry
   node_modules/                 # shared dependency tree
 ```
@@ -312,50 +324,40 @@ At runtime the Tauri resource dir contains (this is what
 |---|---|
 | `resources/daemon/dist` | `daemon/dist` |
 | `resources/daemon/package.json` | `daemon/package.json` |
+| `resources/daemon/LICENSE` | `daemon/LICENSE` |
 | `resources/bridge/dist` | `bridge/dist` |
 | `resources/node_modules` | `node_modules` |
 | `resources/node/node-v24.18.0-win-x64` | `node` |
 
 ---
 
-## Named-pipe wedge & TCP fallback
+## TCP fallback compatibility blocker
 
-On some Windows machines `CreateNamedPipeW` returns `ERROR_INVALID_NAME` for
-every caller, while TCP loopback keeps working.
-
-| Mechanism | Effect |
-|---|---|
-| `PRIME_DAEMON_TCP=1` | daemon + client use `tcp://127.0.0.1:48100` |
-| `--daemon-socket tcp://127.0.0.1:48130` | explicit TCP endpoint |
-
-The E2E harness tries named-pipe first and falls back to TCP automatically.
+The previously documented TCP fallback is not supported by the selected public
+Prime Agent dependency. At commit `be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387`,
+`DaemonSupervisor.listen()` calls Node's `net.Server.listen(this.socketPath)`
+with no `tcp://` parsing or `PRIME_DAEMON_TCP` handling. Supplying
+`--daemon-socket tcp://127.0.0.1:<port>` therefore does not create a TCP listener.
+The Settings control is disabled and explicitly labels TCP unsupported; a legacy
+`daemonTcp: true` value in `settings.json` is ignored by Rust. Both daemon and
+bridge launch using the pinned runtime's supported default local socket.
+The Linux verifier exercises the real daemon and bridge over a Unix-domain
+socket; Windows named-pipe and native installer behavior require a Windows run.
+Do not rely on TCP until a compatible upstream release or a reviewed transport
+implementation is tested end-to-end.
 
 ---
 
 ## Troubleshooting
 
-**`npm run tauri build` fails at `makensis` (MAX_PATH).**
-
-The NSIS `makensis` step may abort on a deeply-nested `@mistralai` resource
-path exceeding Windows `MAX_PATH` (260 chars). This is **non-blocking** — the
-native binary, frontend, and bundle are all built; only the final `.exe`
-wrapper fails.
-
-> **Last reported end-to-end build: 2026-08-08** from this worktree
-> (installer under `src-tauri/target/release/bundle/nsis/`). Not re-verified
-> on this Linux host — the native installer only builds on Windows.
-> The blocker only triggers when the staged path pushes the deepest
-> `@mistralai` file past 260 chars — the `prime-agent-windows` worktree path
-> in use at the time kept it at ~221 chars. If you ever hit it, shorten the
-> worktree path or apply a workaround below.
-
-Workarounds:
-
-1. Strip `.d.ts`/`.d.ts.map`/`.map` files from `resources/node_modules/`
-   before bundling (runtime-irrelevant — TypeScript types are dev-only).
-2. Enable Windows long-paths (Group Policy → Enable Win32 long paths) and
-   rebuild with NSIS 3.x long-path support.
-3. Stage the bundle closer to the repo root (shorter path → under 260 chars).
+The guarded installer entrypoint builds an MSI only from a verified Windows-x64
+release bundle and refuses Linux diagnostic provenance. Run
+`node scripts/build-windows-installer.mjs`, then
+`node scripts/verify-tauri-package.mjs` to inspect the package notice. A
+successful MSI build and notice check do not prove installation; the GitHub
+workflow separately installs the exact signed package announced by the public
+updater feed and runs a fresh-profile app smoke. That public NSIS package is a
+different artifact from the candidate MSI.
 
 **Daemon: `DaemonSupervisorAlreadyRunningError`.**
 

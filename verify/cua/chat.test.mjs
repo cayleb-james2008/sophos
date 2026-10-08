@@ -24,8 +24,10 @@ import { navTo, takeScreenshot, getTextContent, elementCenter, SCREENSHOT_DIR } 
 import { findBy, findAll, clickBy, waitFor } from "./find-util.mjs";
 import { assert, assertTextContains } from "./assertions.mjs";
 import { enableWebContentAccessibility } from "./demo-launch.mjs";
-import { waitForWindow } from "./launch.mjs";
+import { WORKSPACE_ROOT } from "./launch.mjs";
+import { resolveChatAppPath } from "./chat-app-path.mjs";
 import { spawn } from "node:child_process";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 
 /** Read a fresh window state for the app handle. If the handle went stale
  * (common under heavy multi-instance contention), re-resolve it from the
@@ -245,7 +247,11 @@ const tests = [
       catch { console.log("    [SKIP] Abort: turn did not go busy (streaming timing) — abort path unit-validated"); return; }
       assert(findBy(busyState, { role: "Button", name: "Stop generating" }), "Stop button missing while busy");
       takeScreenshot(app.pid, "chat-abort-busy", app.windowId);
-      clickBy(app.pid, busyState, { role: "Button", name: "Stop generating" });
+      // get_window_state refreshes the CUA snapshot used by element_token; the
+      // screenshot above created a newer snapshot, so re-read before clicking.
+      const stopState = freshState(app);
+      assert(findBy(stopState, { role: "Button", name: "Stop generating" }), "Stop button missing before abort click");
+      clickBy(app.pid, stopState, { role: "Button", name: "Stop generating" });
       await ensureIdle(app);
       const after = freshState(app);
       // Busy cleared: Stop is gone (Send may be disabled — the composer is empty
@@ -419,7 +425,9 @@ const tests = [
       assert(findBy(open, { text: "MiniMax M3" }), "MiniMax M3 not listed in model panel");
       assert(findBy(open, { text: "DeepSeek V4 Flash (free)" }), "DeepSeek V4 Flash (free) not listed");
       takeScreenshot(app.pid, "chat-model-open", app.windowId);
-      clickBy(app.pid, open, { text: "MiniMax M3" });
+      // The screenshot refreshed the CUA snapshot; use a token from the new one.
+      const selectionState = freshState(app);
+      clickBy(app.pid, selectionState, { text: "MiniMax M3" });
       await sleep(1200);
       const sel = freshState(app);
       assertTextContains(sel, "MiniMax M3");
@@ -459,12 +467,6 @@ const tests = [
 // build path (prefer the debug build, which is not contended by sibling workers
 // building the release exe) so the e2e is stable.
 
-import { existsSync } from "node:fs";
-
-const WORKSPACE = "C:/Users/Cayleb/Desktop/workspace/sophos";
-const DEBUG_APP = `${WORKSPACE}/src-tauri/target/debug/prime-agent-windows.exe`;
-const RELEASE_APP = `${WORKSPACE}/src-tauri/target/release/prime-agent-windows.exe`;
-
 /** Launch the chosen app path in demo mode; returns { pid, windowId }.
  * Launches the exe directly (Medium integrity, so our daemon can drive it) and
  * identifies the new window by diffing the window list against the pre-launch
@@ -477,51 +479,71 @@ async function launchAppPath(appPath) {
   );
   const proc = spawn(appPath, ["--demo"], { detached: true, stdio: "ignore", windowsHide: true });
   proc.unref();
-  for (let i = 0; i < 40; i++) {
-    await sleep(1000);
-    const fresh = (listWindows() || []).filter(
-      (w) => w.app_name && w.app_name.toLowerCase() === "prime-agent-windows.exe" && !before.has(w.window_id),
-    );
-    if (fresh.length) {
-      const w = fresh[0];
-      try { await enableWebContentAccessibility(w.pid, w.window_id); } catch {}
-      return { pid: w.pid, windowId: w.window_id };
+  try {
+    for (let i = 0; i < 40; i++) {
+      await sleep(1000);
+      const fresh = (listWindows() || []).filter(
+        (w) => w.app_name && w.app_name.toLowerCase() === "prime-agent-windows.exe" && !before.has(w.window_id),
+      );
+      if (fresh.length) {
+        const w = fresh[0];
+        try { await enableWebContentAccessibility(w.pid, w.window_id); } catch {}
+        return { pid: w.pid, windowId: w.window_id };
+      }
     }
+    throw new Error("no new Sophos window appeared");
+  } catch (error) {
+    try { call("kill_app", { pid: proc.pid }); } catch { /* job cleanup is the final fallback */ }
+    throw error;
   }
-  throw new Error("no new Sophos window appeared");
 }
 
 async function runChatSuite(name, tests) {
   console.log(`\n=== ${name} ===`);
   const daemon = startDaemon();
   const daemonStarted = !daemon.alreadyRunning;
-  // Prefer the debug build (has the busy-clearing fix; the release exe is stale
-  // and contended by siblings); fall back to release.
-  const appPath = existsSync(DEBUG_APP) ? DEBUG_APP : RELEASE_APP;
+  // Prefer a local debug build; the CI release build is the fallback when
+  // target/debug does not exist in this checkout.
+  const appPath = resolveChatAppPath({ workspaceRoot: WORKSPACE_ROOT, exists: existsSync });
   console.log(`launching demo app: ${appPath}`);
-  const { pid, windowId } = await launchAppPath(appPath);
-  const app = { pid, windowId };
-  await sleep(1500);
-
+  let app;
   const results = [];
-  for (const t of tests) {
-    const start = Date.now();
-    try {
-      await t.fn(app);
-      const elapsed = Date.now() - start;
-      results.push({ name: t.name, pass: true, elapsed });
-      console.log(`  \u2713 ${t.name} (${elapsed}ms)`);
-    } catch (err) {
-      const elapsed = Date.now() - start;
-      results.push({ name: t.name, pass: false, elapsed, error: err.message });
-      console.error(`  \u2717 ${t.name} (${elapsed}ms): ${err.message}`);
+  let appCloseFailed = false;
+  try {
+    const launched = await launchAppPath(appPath);
+    app = { pid: launched.pid, windowId: launched.windowId };
+    if (process.env.SOPHOS_CUA_PID_FILE) {
+      writeFileSync(process.env.SOPHOS_CUA_PID_FILE, `${app.pid}\n`, "utf8");
+    }
+    await sleep(1500);
+
+    for (const t of tests) {
+      const start = Date.now();
+      try {
+        await t.fn(app);
+        const elapsed = Date.now() - start;
+        results.push({ name: t.name, pass: true, elapsed });
+        console.log(`  \u2713 ${t.name} (${elapsed}ms)`);
+      } catch (err) {
+        const elapsed = Date.now() - start;
+        results.push({ name: t.name, pass: false, elapsed, error: err.message });
+        console.error(`  \u2717 ${t.name} (${elapsed}ms): ${err.message}`);
+      }
+    }
+  } finally {
+    if (app) {
+      try { takeScreenshot(app.pid, "final-state", app.windowId); } catch {}
+      try { call("kill_app", { pid: app.pid }); }
+      catch (error) {
+        appCloseFailed = true;
+        console.error(`App close deferred to job cleanup: ${error.message}`);
+      }
+    }
+    if (daemonStarted) stopDaemon();
+    if (!appCloseFailed && process.env.SOPHOS_CUA_PID_FILE) {
+      rmSync(process.env.SOPHOS_CUA_PID_FILE, { force: true });
     }
   }
-
-  // Tear down.
-  try { takeScreenshot(app.pid, "final-state", app.windowId); } catch {}
-  try { call("kill_app", { pid }); } catch {}
-  if (daemonStarted) stopDaemon();
 
   const passed = results.filter((r) => r.pass).length;
   const failed = results.length - passed;

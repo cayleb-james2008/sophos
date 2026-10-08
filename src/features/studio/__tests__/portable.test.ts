@@ -4,7 +4,7 @@
 // id. Covers serialize / parse / merge / round-trip plus the honest degrade of
 // the file-I/O layer where no native or browser file API exists.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { describeImportOutcome, type CustomProfileImportResult } from "../../profiles/profiles";
 import { CODE_MODE_TOOLS } from "../../code/toolRegistry";
 import { sanitizeCustomProfile, type CustomProfile } from "../store";
@@ -235,12 +235,21 @@ describe("round-trip — export then import reproduces the same profile", () => 
   });
 
   it("is stable — serializing the parsed profile yields the same profile content", () => {
-    const original = validProfile();
-    const first = serializeCustomProfile(original);
-    const parsed = parseCustomProfileFile(first);
-    if (!parsed.ok) throw new Error("expected a valid parse");
-    const second = serializeCustomProfile(parsed.profile);
-    expect(JSON.parse(second)).toEqual(JSON.parse(first));
+    // exportedAt belongs to each export; pin Date so this full-envelope
+    // assertion tests round-trip content rather than a millisecond race.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    try {
+      const original = validProfile();
+      const first = serializeCustomProfile(original);
+      const parsed = parseCustomProfileFile(first);
+      if (!parsed.ok) throw new Error("expected a valid parse");
+      const second = serializeCustomProfile(parsed.profile);
+      expect(JSON.parse(first).exportedAt).toBe("2026-01-01T00:00:00.000Z");
+      expect(JSON.parse(second)).toEqual(JSON.parse(first));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

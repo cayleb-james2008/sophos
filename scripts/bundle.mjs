@@ -1,310 +1,367 @@
 #!/usr/bin/env node
 /**
- * bundle.mjs — Prime Agent Desktop Windows packaging bundle.
+ * Reproducible Sophos runtime bundler.
  *
- * Stages the exact runtime layout that `src-tauri/src/settings.rs`
- * `resolve_runtime_paths()` expects under the Tauri *resource dir*, and that
- * `src-tauri/tauri.conf.json` then bundles into the app:
- *
- *   <resource dir>/
- *     node/node.exe            <- portable Node 22+ runtime
- *     daemon/dist/cli.js       <- Prime Agent coding-agent daemon entry
- *     daemon/package.json      <- daemon package manifest (for `pkg` resolution)
- *     bridge/dist/bridge/src/
- *       index.js               <- Node bridge sidecar entry
- *       connection.js
- *       rpc.js
- *     node_modules/            <- shared dep tree (daemon + bridge resolve here)
- *
- * The staging directory is `resources/` (the existing packaging convention
- * already wired into `src-tauri/tauri.conf.json` under `bundle.resources`; the
- * tracked `resources/node/node-v24.18.0-win-x64` runtime lives there too, so we
- * reuse it rather than duplicating ~90 MB into a second `dist-app/` dir).
- *
- * Pipeline:
- *   1. ensure deps (frontend + bridge node_modules)
- *   2. build frontend  -> dist/            (npm run build)
- *   3. build bridge    -> bridge/dist/     (tsc)
- *   4. stage daemon    -> resources/daemon (copy dist from the read-only ref checkout)
- *   5. stage node      -> resources/node   (verify existing / copy fallback)
- *   6. stage node_modules -> resources/node_modules (copy from a portable source)
- *   7. stage bridge dist -> resources/bridge
- *   8. assert layout   (mirrors settings.rs resolve_runtime_paths)
- *   9. print manifest  (JSON) + write resources/.bundle-manifest.json
- *
- * Env / flags:
- *   PRIME_AGENT_REF=<path>      daemon source checkout (default: Desktop\...\prime-agent-ref)
- *   PRIME_NODE_MODULES=<path>   source for the shared node_modules (default: AppData\...\Prime Agent\node_modules)
- *   PRIME_NODE_RUNTIME=<path>   source node.zip or node dir (default: tracked resources/node)
- *   --no-frontend               skip the frontend build (reuse existing dist/)
- *   --no-bridge                 skip the bridge build (reuse existing bridge/dist)
- *   --rebuild-daemon            attempt an in-sandbox rebuild of the daemon bundle
- *                                 from source (default: copy the ref checkout's dist,
- *                                  which is kept read-only and is the verified-good build)
- *   --no-node-modules           skip the (large) node_modules staging step
- *   --layout-check-only         stop after assembling/validating the layout
- *
- * NOTE: prime-agent-ref is treated as READ-ONLY. We never write into it.
+ * Inputs are locked by scripts/runtime-pins.json: Prime Agent v0.7.0 at an
+ * immutable public Git commit, and the official Node for Windows executable
+ * validated against the SHA-256 published in the Node distribution manifest.
+ * The build uses the checked-in generated model catalog; it does not call
+ * provider/model-catalog APIs or require credentials.
  */
-
-import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, copyFile, mkdir, mkdtemp, readFile, realpath, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { ensureNodeRuntime } from "./node-runtime.mjs";
+import { ensurePrimeAgentRef, resolvePrimeAgentRef } from "./prime-agent-ref.mjs";
+import {
+  preparePrimeAgentSecurityBuildTree,
+  resolvePrimeAgentSecurityWorkPaths,
+  verifyPrimeAgentSecurityBuildTree,
+} from "./prepare-prime-agent-security-build.mjs";
+import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "./runtime-pins.mjs";
+import { validateDaemonRuntimePackage } from "./daemon-runtime-package.mjs";
+import { assertWindowsReleaseProvenance, createNativeBuildProvenance } from "./native-runtime-platform.mjs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const WORKTREE = resolve(__dirname, "..");
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const WORKTREE = resolve(SCRIPT_DIR, "..");
 const RESOURCES = join(WORKTREE, "resources");
-const PRIME_AGENT_REF =
-  process.env.PRIME_AGENT_REF ||
-  "C:/Users/Cayleb/Desktop/workspace/prime-agent-ref";
-const WORKTREE_PARENT = dirname(WORKTREE);
-const PRIME_AGENT_REF_JUNCTION = join(WORKTREE_PARENT, "prime-agent-ref");
-
-// Portable sources (ships with the machine / existing install).
-const APPDATA_ROOT = "C:/Users/Cayleb/AppData/Local/Prime Agent";
-const DEFAULT_NODE_MODULES_SRC = process.env.PRIME_NODE_MODULES ||
-  join(APPDATA_ROOT, "node_modules");
-const DEFAULT_NODE_RUNTIME_SRC = process.env.PRIME_NODE_RUNTIME ||
-  join(APPDATA_ROOT, "node");
-
+const MANIFEST_PATH = join(RESOURCES, ".bundle-manifest.json");
+const BRIDGE_DIR = join(WORKTREE, "bridge");
 const COLORS = { green: "\x1b[32m", red: "\x1b[31m", yellow: "\x1b[33m", cyan: "\x1b[36m", gray: "\x1b[90m", reset: "\x1b[0m" };
-const log = (c, ...a) => console.log(COLORS[c] || "", ...a, COLORS.reset);
+const log = (color, ...values) => console.log(COLORS[color] ?? "", ...values, COLORS.reset);
 
-function run(cmd, args, opts = {}) {
-  const label = `[${opts.label || cmd}] ${cmd} ${args.join(" ")}`;
-  log("cyan", "▶", label);
-  const res = spawnSync(cmd, args, { stdio: "inherit", shell: process.platform === "win32", ...opts });
-  if (res.status !== 0) {
-    log("red", "  ✗", `${cmd} failed (exit ${res.status})`);
-  }
-  return res;
+function run(command, args, { label = command, ...options } = {}) {
+  log("cyan", "▶", `${label}: ${command} ${args.join(" ")}`);
+  const result = spawnSync(command, args, {
+    cwd: WORKTREE,
+    stdio: "inherit",
+    shell: process.platform === "win32",
+    windowsHide: true,
+    ...options,
+  });
+  if (result.error) throw new Error(`${label} could not start: ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`${label} failed (exit ${result.status})`);
+  return result;
 }
 
-async function ensurePrimeAgentRefSymlink() {
-  // The bridge's package.json depends on `file:../../prime-agent-ref/...`,
-  // which resolves to <WORKTREE_PARENT>/prime-agent-ref. Create a junction
-  // there pointing at the read-only checkout so `npm install` in bridge/ works.
-  let need = false;
+async function countFiles(path) {
+  let count = 0;
+  const entries = await readdir(path, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const child = join(path, entry.name);
+    if (entry.isFile()) count += 1;
+    else if (entry.isDirectory()) count += await countFiles(child);
+  }
+  return count;
+}
+
+async function sizeOf(path) {
+  let bytes = 0;
+  const entries = await readdir(path, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const child = join(path, entry.name);
+    if (entry.isFile()) bytes += (await stat(child)).size;
+    else if (entry.isDirectory()) bytes += await sizeOf(child);
+  }
+  return bytes;
+}
+
+function requirePath(path, label) {
+  if (!existsSync(path)) throw new Error(`${label} is missing: ${path}`);
+}
+
+function runNpm(args, options = {}) {
+  return run("npm", args, options);
+}
+
+async function verifyPrimeAgentBuildStage(projectRoot, primeAgentRoot, primeSourceRoot, stage) {
   try {
-    const s = await stat(PRIME_AGENT_REF_JUNCTION);
-    // real directory (junction) — good
-    void s;
-  } catch {
-    need = true;
+    return await verifyPrimeAgentSecurityBuildTree(projectRoot, primeAgentRoot, primeSourceRoot);
+  } catch (error) {
+    throw new Error(`Prime Agent security build verification failed after ${stage}: ${error.message}`);
   }
-  if (need) {
-    log("yellow", "⚡ creating junction", PRIME_AGENT_REF_JUNCTION, "->", PRIME_AGENT_REF);
-    if (!existsSync(PRIME_AGENT_REF)) {
-      throw new Error(`reference checkout not found: ${PRIME_AGENT_REF}`);
-    }
-    const res = spawnSync("cmd", ["/c", "mklink", "/J", PRIME_AGENT_REF_JUNCTION.replace(/\//g, "\\"), PRIME_AGENT_REF.replace(/\//g, "\\")], { stdio: "inherit", shell: true });
-    if (res.status !== 0) {
-      throw new Error(`failed to create prime-agent-ref junction (${res.status})`);
-    }
-  }
-  log("green", "  ✓ prime-agent-ref junction present");
 }
 
-async function countFiles(p) {
-  let n = 0;
-  const entries = await readdir(p, { withFileTypes: true }).catch(() => []);
-  for (const e of entries) {
-    if (e.isFile()) n++;
-    else if (e.isDirectory()) n += await countFiles(join(p, e.name));
-  }
-  return n;
+async function buildPinnedDaemon(primeAgentRoot, primeSourceRoot) {
+  runNpm(["ci"], { cwd: primeAgentRoot, label: "Prime Agent locked dependency install (normal lifecycle)" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "npm ci");
+  run(process.execPath, [
+    join(primeAgentRoot, "node_modules", "vitest", "vitest.mjs"),
+    "--run",
+    "test/daemon-supervisor-monitor.test.ts",
+    "test/session-lease.test.ts",
+    "test/tools-manager.test.ts",
+  ], {
+    cwd: join(primeAgentRoot, "packages", "coding-agent"),
+    shell: false,
+    label: "Prime Agent session-lease, Windows ZIP guard, worker-shutdown fence, and Linux worker-socket path regression tests",
+  });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "Prime Agent regression tests");
+  runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "tui"), label: "Prime Agent TUI build" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "TUI build");
+  // pi-ai's normal build refreshes its model catalog from external vendor APIs.
+  // Sophos uses the catalog committed at the pinned source revision instead.
+  runNpm(["exec", "--prefix", ".", "--", "tsgo", "-p", "packages/ai/tsconfig.build.json"], {
+    cwd: primeAgentRoot,
+    label: "Prime Agent AI build (pinned checked-in catalog)",
+  });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "AI build");
+  runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "agent"), label: "Prime Agent agent-core build" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "agent-core build");
+  runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "coding-agent"), label: "Prime Agent daemon build" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "daemon build");
+
+  const daemonDist = join(primeAgentRoot, "packages", "coding-agent", "dist");
+  requirePath(join(daemonDist, "cli.js"), "built Prime Agent daemon CLI");
+  requirePath(join(daemonDist, "bundle", "cli.js"), "built Prime Agent bundled CLI");
+  return daemonDist;
 }
-async function sizeOf(p) {
-  let total = 0;
-  const entries = await readdir(p, { withFileTypes: true }).catch(() => []);
-  for (const e of entries) {
-    if (e.isFile()) total += (await stat(join(p, e.name))).size;
-    else if (e.isDirectory()) total += await sizeOf(join(p, e.name));
+
+async function stageUpstreamPackages(primeAgentRoot, targetNodeModules) {
+  const packageRoot = join(primeAgentRoot, "packages");
+  const scopeRoot = join(targetNodeModules, "@earendil-works");
+  await rm(scopeRoot, { recursive: true, force: true });
+  await mkdir(scopeRoot, { recursive: true });
+  const packages = [
+    { source: "agent", name: "pi-agent-core" },
+    { source: "ai", name: "pi-ai" },
+    { source: "coding-agent", name: "pi-coding-agent" },
+    { source: "tui", name: "pi-tui" },
+  ];
+  for (const item of packages) {
+    const source = join(packageRoot, item.source);
+    const destination = join(scopeRoot, item.name);
+    const packageJson = join(source, "package.json");
+    const dist = join(source, "dist");
+    const metadata = JSON.parse(await readFile(packageJson, "utf8"));
+    if (metadata.version !== PRIME_AGENT_PIN.version) {
+      throw new Error(`@earendil-works/${item.name} version ${metadata.version} does not match pinned ${PRIME_AGENT_PIN.version}`);
+    }
+    requirePath(dist, `built upstream package @earendil-works/${item.name}`);
+    await mkdir(destination, { recursive: true });
+    await copyFile(packageJson, join(destination, "package.json"));
+    await cp(dist, join(destination, "dist"), { recursive: true, dereference: true });
   }
-  return total;
+  return packages.map(({ name }) => `@earendil-works/${name}`);
+}
+
+function printHelp() {
+  console.log(`Usage: node scripts/bundle.mjs [options]
+
+Builds the frontend, pinned Prime Agent daemon, TypeScript bridge and Windows
+Node runtime, then stages the self-contained Tauri resource layout.
+
+Default mode is Windows-release staging and requires a real Windows x64 host.
+Use --diagnostic on other hosts to build source diagnostics only; those resources
+are marked ineligible for a Windows installer.
+
+Options:
+  --no-frontend       reuse an existing frontend dist/
+  --no-bridge         reuse an existing bridge/dist/
+  --no-node-modules   skip dependency staging (layout validation will fail)
+  --layout-check-only assemble and validate, without creating an installer
+  --diagnostic        permit host-native source diagnostics; never releaseable
+  --help              show this help
+
+Environment:
+  PRIME_AGENT_REF     optional path to an unmodified clone of the exact pinned
+                      public Prime Agent commit; default is .deps/prime-agent
+                      on POSIX, or a unique directory under system TEMP on Windows
+  PRIME_NODE_RUNTIME  optional node.exe (or directory containing it); accepted
+                      only when its SHA-256 matches the official pinned binary
+`);
 }
 
 async function main() {
   const args = process.argv.slice(2);
+  if (args.includes("--help")) return printHelp();
+  const supportedFlags = new Set(["--no-frontend", "--no-bridge", "--no-node-modules", "--layout-check-only", "--diagnostic"]);
+  const unknownFlags = args.filter((arg) => arg.startsWith("--") && !supportedFlags.has(arg));
+  if (unknownFlags.length) throw new Error(`unsupported option(s): ${unknownFlags.join(", ")}`);
   const flags = new Set(args);
-  const manifest = { generatedAt: new Date().toISOString(), worktree: WORKTREE, ref: PRIME_AGENT_REF, components: [], layout: {} };
-
-  const record = (name, comp) => { manifest.components.push({ name, ...comp }); };
-
-  log("bold", `\n=== Prime Agent Windows bundle ===\n`);
-
-  // 1. deps
-  await ensurePrimeAgentRefSymlink();
-  if (!existsSync(join(WORKTREE, "node_modules"))) {
-    run("npm", ["install", "--ignore-scripts"], { label: "root deps" });
-  } else { log("gray", "✓ root node_modules present"); }
-
-  // 2. frontend
-  if (!flags.has("--no-frontend")) {
-    const r = run("npm", ["run", "build"], { label: "frontend" });
-    if (r.status !== 0) throw new Error("frontend build failed");
-  } else { log("gray", "⚙ skipping frontend build (--no-frontend)"); }
-  const feDir = join(WORKTREE, "dist");
-  record("frontend", { source: feDir, dest: "frontendDist (../dist)", files: await countFiles(feDir), bytes: await sizeOf(feDir), status: "built" });
-
-  // 3. bridge
-  if (!existsSync(join(WORKTREE, "bridge", "node_modules"))) {
-    const r = run("npm", ["install", "--ignore-scripts"], { cwd: join(WORKTREE, "bridge"), label: "bridge deps" });
-    if (r.status !== 0) throw new Error("bridge deps install failed");
+  const platformProvenance = createNativeBuildProvenance(flags.has("--diagnostic") ? "source-diagnostic" : "windows-release");
+  if (!flags.has("--diagnostic")) {
+    assertWindowsReleaseProvenance({ platformProvenance });
   }
-  const r = run("npx", ["tsc", "-p", "tsconfig.json"], { cwd: join(WORKTREE, "bridge"), label: "bridge build" });
-  if (r.status !== 0) throw new Error("bridge build failed");
-  const bridgeDist = join(WORKTREE, "bridge", "dist");
-  const resBridge = join(RESOURCES, "bridge", "dist");
-  await rm(resBridge, { recursive: true, force: true });
-  await cp(bridgeDist, resBridge, { recursive: true });
-  record("bridge", { source: bridgeDist, dest: "resources/bridge/dist", files: await countFiles(resBridge), bytes: await sizeOf(resBridge), runtimeEntry: "bridge/dist/bridge/src/index.js", status: "built" });
-
-  // 4. daemon (copy from read-only ref; rebuild-in-sandbox optional)
-  const daemonSrc = join(PRIME_AGENT_REF, "packages", "coding-agent", "dist");
-  const daemonPkgSrc = join(PRIME_AGENT_REF, "packages", "coding-agent", "package.json");
-  const resDaemonDist = join(RESOURCES, "daemon", "dist");
-  await rm(resDaemonDist, { recursive: true, force: true });
-  await cp(daemonSrc, resDaemonDist, { recursive: true });
-  await cp(daemonPkgSrc, join(RESOURCES, "daemon", "package.json"));
-  const modeNote = flags.has("--rebuild-daemon")
-    ? "rebuilt in sandbox (ref kept read-only)"
-    : "copied from read-only ref dist (rebuild available via --rebuild-daemon; skipped to preserve the read-only reference checkout as specified)";
-  record("daemon", { source: daemonSrc, dest: "resources/daemon/dist", cliEntry: "daemon/dist/cli.js", version: await daemonVersion(daemonPkgSrc), status: "staged", note: modeNote });
-
-  // 5. node runtime (tracked; verify, else copy from portable source)
-  const nodeDir = join(RESOURCES, "node", "node-v24.18.0-win-x64");
-  if (!existsSync(join(nodeDir, "node.exe"))) {
-    log("yellow", "⚡ node runtime missing in resources/ — copying from portable source");
-    let src = DEFAULT_NODE_RUNTIME_SRC;
-    if (!existsSync(join(src, "node.exe"))) {
-      // fall back to the tracked zip in resources/node
-      const zipSrc = join(RESOURCES, "node", "node.zip");
-      src = zipSrc;
-    }
-    await cp(src, nodeDir, { recursive: true });
-  }
-  record("node-runtime", { dest: "node/", exe: "node/node-v24.18.0-win-x64/node.exe", version: (await readVersion(join(nodeDir, "node.exe"))), status: "present" });
-
-  // 6. shared node_modules
-  const resNm = join(RESOURCES, "node_modules");
-  if (flags.has("--no-node-modules")) {
-    log("yellow", "⚙ skipping node_modules staging (--no-node-modules)");
-  } else {
-    if (!existsSync(resNm)) {
-      log("yellow", "⚡ copying shared node_modules from", DEFAULT_NODE_MODULES_SRC, "(~500 MB, one-time)");
-      // Non-dereferenced copy: AppData ship is real dirs (portable).
-      await cp(DEFAULT_NODE_MODULES_SRC, resNm, { recursive: true });
-    } else { log("gray", "✓ resources/node_modules present"); }
-    // Refresh the @earendil-works/* packages from the current prime-agent-ref.
-    // The AppData install predates the TCP-capable daemon-socket, so its
-    // @earendil-works/* copies lack `isTcpDaemonSocketSpec` / `defaultDaemonSocketPath`
-    // TCP support — the bridge resolves `@earendil-works/pi-coding-agent` from
-    // resources/node_modules/ and falls back to the named-pipe default, breaking
-    // `PRIME_DAEMON_TCP=1` even though the daemon dist (copied fresh above) is
-    // TCP-self-contained. Copy each package DIRECTLY from `packages/<name>/` in
-    // the ref (the real source dirs) rather than via the ref's
-    // `node_modules/@earendil-works/` symlink layer — that layer contains
-    // self-referential monorepo symlinks (e.g. `packages/ai/node_modules/
-    // @earendil-works/pi-ai` → `packages/ai`) that cause ELOOP under a naive
-    // dereference-copy. Filter out each package's internal `node_modules/`
-    // (workspace hoisting artifact) so the staged package resolves its deps
-    // from the parent `resources/node_modules/` (hoisted, self-contained).
-    const refPackages = join(PRIME_AGENT_REF, "packages");
-    const resEarendilNm = join(resNm, "@earendil-works");
-    const earendilPackages = [
-      { pkgDir: "agent", name: "pi-agent-core" },
-      { pkgDir: "ai", name: "pi-ai" },
-      { pkgDir: "coding-agent", name: "pi-coding-agent" },
-      { pkgDir: "tui", name: "pi-tui" },
-    ];
-    // Node's `fs.cp` filter: return `true` to INCLUDE the path, `false` to
-    // EXCLUDE. We INCLUDE the package contents and EXCLUDE any path segment
-    // named `node_modules` (the ref packages have internal node_modules
-    // symlinks for workspace hoisting — we don't want them; runtime resolves
-    // from the parent hoisted tree, and the self-referential symlinks cause
-    // ELOOP under dereference).
-    const includeNonNodeModules = (p) => {
-      const norm = p.replace(/\\/g, "/");
-      return !/(^|\/)node_modules(\/|$)/.test(norm);
-    };
-    if (existsSync(refPackages)) {
-      log("yellow", "⚡ refreshing @earendil-works/* from prime-agent-ref (TCP-capable code; copy package.json + dist/ per package, skip internal node_modules)");
-      await mkdir(resEarendilNm, { recursive: true });
-      for (const { pkgDir, name } of earendilPackages) {
-        const src = join(refPackages, pkgDir);
-        const dest = join(resEarendilNm, name);
-        if (!existsSync(src)) { log("yellow", "  ⚠", src, "missing — skipping"); continue; }
-        try { await rm(dest, { recursive: true, force: true }); } catch {}
-        await mkdir(dest, { recursive: true });
-        // Copy `package.json` (Node package marker — `main: ./dist/index.js`)
-        const pkgJson = join(src, "package.json");
-        if (existsSync(pkgJson)) {
-          await cp(pkgJson, join(dest, "package.json"), { dereference: true });
-        }
-        // Copy `dist/` (built runtime code — contains TCP-capable daemon-socket).
-        // We deliberately copy ONLY `package.json` + `dist/` (+ optional `src/`)
-        // rather than the whole package root, because the ref packages contain
-        // self-referential symlinks at their root (e.g. `packages/ai/pi-ai` →
-        // `packages/ai`) that cause ELOOP under a full dereference-copy, and
-        // require elevated privileges to copy as symlinks. The runtime only
-        // needs `package.json` + `dist/` (Node resolves `@earendil-works/pi-X`
-        // via `package.json` → `dist/index.js`).
-        const dist = join(src, "dist");
-        if (existsSync(dist)) {
-          await cp(dist, join(dest, "dist"), { recursive: true, dereference: true, filter: includeNonNodeModules });
-        }
-        const srcDir = join(src, "src");
-        if (existsSync(srcDir)) {
-          await cp(srcDir, join(dest, "src"), { recursive: true, dereference: true, filter: includeNonNodeModules });
-        }
-      }
-    } else {
-      log("yellow", "⚠ ref packages/ not found at", refPackages, "— TCP support may be stale");
-    }
-    const hasTcp = existsSync(resNm) && (await containsTcpSupport(resNm));
-    record("node_modules", { source: DEFAULT_NODE_MODULES_SRC + " (+ @earendil-works/* from " + PRIME_AGENT_REF + ")", dest: "node_modules/", bytes: await sizeOf(resNm), files: await countFiles(resNm), daemonTcpSupport: hasTcp ? "present" : "absent (ref @earendil not found; TCP unavailable)", status: "staged" });
-  }
-
-  // 7. daemon/package.json (re-assert) — already copied in step 4.
-
-  // 8. layout assertion (mirrors settings.rs resolve_runtime_paths)
-  const layout = {
-    node_exe: existsSync(join(RESOURCES, "node", "node-v24.18.0-win-x64", "node.exe")),
-    daemon_cli: existsSync(join(RESOURCES, "daemon", "dist", "cli.js")),
-    bridge_index: existsSync(join(RESOURCES, "bridge", "dist", "bridge", "src", "index.js")),
-    node_modules_dir: existsSync(join(resNm)),
+  // Invalidate prior provenance before touching host-native dependencies. If
+  // staging fails midway, no stale Windows manifest can bless the partial tree.
+  await rm(MANIFEST_PATH, { force: true });
+  const manifest = {
+    generatedAt: new Date().toISOString(),
+    platformProvenance,
+    upstream: {},
+    nodeRuntime: {},
+    components: [],
+    layout: {},
   };
-  manifest.layout = layout;
-  const layoutOk = Object.values(layout).every(Boolean);
-  log(layoutOk ? "green" : "red", layoutOk ? "✓ layout matches resolve_runtime_paths()" : "✗ layout incomplete");
-  console.log(layout);
-  log("gray", "\nRuntime layout (what ends up in the Tauri resource dir after tauri.conf.json mapping):\n  node/node.exe\n  daemon/dist/cli.js\n  daemon/package.json\n  bridge/dist/bridge/src/index.js\n  node_modules/  (shared)");
+  const record = (name, component) => manifest.components.push({ name, ...component });
 
-  // 9. manifest
-  const manifestPath = join(RESOURCES, ".bundle-manifest.json");
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
-  log("cyan", `\nmanifest written: ${manifestPath}`);
-  console.log(JSON.stringify(manifest, null, 2));
+  log("cyan", "\n=== Sophos pinned runtime bundle ===\n");
 
-  if (!layoutOk) process.exit(1);
+  if (!existsSync(join(WORKTREE, "node_modules"))) {
+    runNpm(["ci"], { cwd: WORKTREE, label: "Sophos locked dependency install (normal lifecycle)" });
+  }
+
+  const systemTempRoot = process.platform === "win32" ? await realpath(tmpdir()) : tmpdir();
+  const privateTempRoot = process.platform === "win32"
+    ? await mkdtemp(join(systemTempRoot, "sophos-prime-agent-security-"))
+    : undefined;
+  const primePaths = resolvePrimeAgentSecurityWorkPaths(WORKTREE, {
+    platform: process.platform,
+    systemTempRoot,
+    privateTempRoot,
+  });
+  const primeSourceRoot = process.env.PRIME_AGENT_REF ?? primePaths.sourceRoot;
+  const primeRefPath = resolvePrimeAgentRef(WORKTREE, primeSourceRoot);
+  log("gray", "Prime Agent source:", relative(WORKTREE, primeRefPath) || primeRefPath);
+  const primeSource = await ensurePrimeAgentRef(WORKTREE, primeSourceRoot);
+  const primeBuild = await preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path, primePaths.buildRoot, systemTempRoot);
+  manifest.upstream = {
+    repository: primeSource.repository,
+    ref: primeSource.ref,
+    commit: primeSource.commit,
+    version: primeSource.version,
+    license: primeSource.license,
+    sourceDirectory: relative(WORKTREE, primeSource.path) || ".",
+    buildDirectory: relative(WORKTREE, primeBuild.path) || ".",
+    overlay: primeBuild.provenance,
+  };
+
+  const daemonDist = await buildPinnedDaemon(primeBuild.path, primeSource.path);
+
+  const frontendDist = join(WORKTREE, "dist");
+  if (!flags.has("--no-frontend")) {
+    runNpm(["run", "build"], { cwd: WORKTREE, label: "Sophos frontend build" });
+  } else {
+    log("yellow", "reusing frontend dist/ (--no-frontend)");
+  }
+  requirePath(frontendDist, "frontend dist");
+  record("frontend", {
+    source: "dist/",
+    files: await countFiles(frontendDist),
+    bytes: await sizeOf(frontendDist),
+    status: flags.has("--no-frontend") ? "reused" : "built",
+  });
+
+  const bridgeDist = join(BRIDGE_DIR, "dist");
+  if (!flags.has("--no-bridge")) {
+    runNpm(["ci"], { cwd: BRIDGE_DIR, label: "bridge locked dependency install (normal lifecycle)" });
+    // The bridge's file dependencies intentionally point at the clean source
+    // checkout. Compile against corresponding packages built from the overlay,
+    // without modifying that immutable source checkout.
+    await stageUpstreamPackages(primeBuild.path, join(BRIDGE_DIR, "node_modules"));
+    runNpm(["run", "build"], { cwd: BRIDGE_DIR, label: "bridge TypeScript build" });
+  } else {
+    log("yellow", "reusing bridge/dist (--no-bridge)");
+  }
+  requirePath(join(bridgeDist, "bridge", "src", "index.js"), "built bridge entrypoint");
+
+  const stagedDaemonDist = join(RESOURCES, "daemon", "dist");
+  await rm(stagedDaemonDist, { recursive: true, force: true });
+  await cp(daemonDist, stagedDaemonDist, { recursive: true, dereference: true });
+  await mkdir(join(RESOURCES, "daemon"), { recursive: true });
+  const daemonRuntimeManifest = JSON.parse(await readFile(join(RESOURCES, "daemon", "package.json"), "utf8"));
+  validateDaemonRuntimePackage(daemonRuntimeManifest, PRIME_AGENT_PIN);
+  await copyFile(join(primeSource.path, "LICENSE"), join(RESOURCES, "daemon", "LICENSE"));
+  record("daemon", {
+    source: `${manifest.upstream.buildDirectory}/packages/coding-agent/dist`,
+    dest: "resources/daemon/dist",
+    version: PRIME_AGENT_PIN.version,
+    license: PRIME_AGENT_PIN.license,
+    files: await countFiles(stagedDaemonDist),
+    bytes: await sizeOf(stagedDaemonDist),
+    status: "built from pinned source",
+  });
+
+  const stagedBridgeDist = join(RESOURCES, "bridge", "dist");
+  await rm(stagedBridgeDist, { recursive: true, force: true });
+  await cp(bridgeDist, stagedBridgeDist, { recursive: true, dereference: true });
+  record("bridge", {
+    source: "bridge/dist/",
+    dest: "resources/bridge/dist",
+    runtimeEntry: "bridge/dist/bridge/src/index.js",
+    files: await countFiles(stagedBridgeDist),
+    bytes: await sizeOf(stagedBridgeDist),
+    status: flags.has("--no-bridge") ? "reused" : "built",
+  });
+
+  const nodeRuntime = await ensureNodeRuntime(WORKTREE);
+  manifest.nodeRuntime = {
+    version: nodeRuntime.version,
+    platform: NODE_RUNTIME_PIN.platform,
+    url: NODE_RUNTIME_PIN.url,
+    sha256: nodeRuntime.sha256,
+    source: process.env.PRIME_NODE_RUNTIME ? "verified operator-supplied binary" : "verified official Node distribution",
+    dest: `resources/node/node-v${NODE_RUNTIME_PIN.version}-${NODE_RUNTIME_PIN.platform}/node.exe`,
+  };
+  record("node-runtime", { ...manifest.nodeRuntime, status: "sha256 verified" });
+
+  const stagedNodeModules = join(RESOURCES, "node_modules");
+  if (flags.has("--no-node-modules")) {
+    log("yellow", "skipping node_modules staging (--no-node-modules)");
+  } else {
+    await rm(stagedNodeModules, { recursive: true, force: true });
+    // `npm prune --omit=dev` rewrites platform-specific lock metadata (for example
+    // `libc` on optional native packages). A plain `npm ci --omit=dev` does keep
+    // the lock bytes, but runs the root `prepare: husky` hook after omitting the
+    // dev-only Husky CLI, which fails on Windows. Construct the exact production
+    // tree without lifecycle hooks, then replay the installed production packages'
+    // lifecycle scripts; `npm rebuild` does not run the root `prepare` hook.
+    runNpm(["ci", "--omit=dev", "--ignore-scripts"], {
+      cwd: primeBuild.path,
+      label: "Prime Agent production dependency tree (lifecycle deferred)",
+    });
+    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm ci --omit=dev --ignore-scripts");
+    runNpm(["rebuild", "--omit=dev"], {
+      cwd: primeBuild.path,
+      label: "Prime Agent production dependency lifecycle scripts",
+    });
+    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm rebuild --omit=dev");
+    await cp(join(primeBuild.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
+    await rm(join(stagedNodeModules, "@earendil-works"), { recursive: true, force: true });
+    const upstreamPackages = await stageUpstreamPackages(primeBuild.path, stagedNodeModules);
+    record("node_modules", {
+      source: "pinned Prime Agent production lockfile plus bridge runtime packages",
+      dest: "resources/node_modules/",
+      builtOn: { ...platformProvenance.buildHost },
+      target: { ...platformProvenance.target },
+      mode: platformProvenance.mode,
+      releaseEligible: platformProvenance.releaseEligible,
+      upstreamPackages,
+      files: await countFiles(stagedNodeModules),
+      bytes: await sizeOf(stagedNodeModules),
+      status: "staged from pinned production dependencies",
+    });
+  }
+
+  manifest.layout = {
+    node_exe: existsSync(nodeRuntime.path),
+    daemon_cli: existsSync(join(stagedDaemonDist, "cli.js")),
+    daemon_bundle_cli: existsSync(join(stagedDaemonDist, "bundle", "cli.js")),
+    bridge_index: existsSync(join(stagedBridgeDist, "bridge", "src", "index.js")),
+    node_modules_dir: existsSync(stagedNodeModules),
+    daemon_license: existsSync(join(RESOURCES, "daemon", "LICENSE")),
+  };
+  const layoutOk = manifest.layout.node_exe
+    && manifest.layout.daemon_cli
+    && manifest.layout.daemon_bundle_cli
+    && manifest.layout.bridge_index
+    && manifest.layout.node_modules_dir
+    && manifest.layout.daemon_license;
+  log(layoutOk ? "green" : "red", layoutOk ? "✓ runtime layout and license present" : "✗ runtime layout incomplete");
+  console.log(JSON.stringify(manifest.layout, null, 2));
+  if (!layoutOk) throw new Error("bundle layout is incomplete; refusing to report success");
+
+  await mkdir(RESOURCES, { recursive: true });
+  await writeFile(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+  log("cyan", "manifest:", MANIFEST_PATH);
   log("green", "\n=== bundle complete ===\n");
 }
 
-async function daemonVersion(pkgPath) {
-  try { const j = JSON.parse(await readFile(pkgPath, "utf8")); return j.version; } catch { return "unknown"; }
-}
-async function readVersion(nodeExe) {
-  const r = spawnSync(nodeExe, ["--version"], { shell: true });
-  return (r.stdout?.toString() || "").trim() || "unknown";
-}
-async function containsTcpSupport(nm) {
-  try {
-    const txt = await readFile(join(nm, "@earendil-works", "pi-coding-agent", "dist", "modes", "daemon", "daemon-socket.js"), "utf8");
-    return txt.includes("isTcpDaemonSocketSpec");
-  } catch { return false; }
-}
-
-main().catch((e) => { log("red", "\n✗ bundle failed:", e.message); process.exit(1); });
+main().catch((error) => {
+  log("red", "\n✗ bundle failed:", error.message);
+  process.exitCode = 1;
+});

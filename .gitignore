@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 bridge/node_modules/
+.deps/
 
 # Build output
 dist/
@@ -76,3 +77,4 @@ generator-state.json
 
 # Smoke test screenshots
 verify/screenshots/
+verify/cua/screenshots/

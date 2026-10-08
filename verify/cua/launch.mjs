@@ -13,21 +13,45 @@
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { call, listWindows, getWindowState, click, sleep } from "./driver.mjs";
+import {
+  call,
+  listWindows,
+  getWindowState,
+  getWindowStateForPixelClick,
+  click,
+  sleep,
+} from "./driver.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** Workspace root (two levels up from verify/cua/). */
 export const WORKSPACE_ROOT = path.resolve(__dirname, "..", "..");
 
+/** Resolve a release/debug build path under the actual checked-out workspace. */
+export function resolveAppBuildPath(workspaceRoot = WORKSPACE_ROOT, configuration = "release") {
+  if (configuration !== "debug" && configuration !== "release") {
+    throw new Error(`Unsupported app build configuration: ${configuration}`);
+  }
+  return path.join(
+    workspaceRoot,
+    "src-tauri",
+    "target",
+    configuration,
+    "prime-agent-windows.exe",
+  );
+}
+
 /** Default path to the Sophos desktop app release build. */
-export const DEFAULT_APP_PATH = path.join(
-  WORKSPACE_ROOT,
-  "src-tauri",
-  "target",
-  "release",
-  "prime-agent-windows.exe",
-);
+export function resolveAppPath({ env = process.env, workspaceRoot = WORKSPACE_ROOT, configuration = "release" } = {}) {
+  const override = String(env.SOPHOS_EXE ?? "").trim();
+  if (override) {
+    if (!path.isAbsolute(override)) throw new Error("SOPHOS_EXE must be an absolute executable path");
+    return override;
+  }
+  return resolveAppBuildPath(workspaceRoot, configuration);
+}
+
+export const DEFAULT_APP_PATH = resolveAppPath();
 
 /** The app's process name (from list_windows `app_name`). */
 export const APP_PROCESS_NAME = "prime-agent-windows.exe";
@@ -75,7 +99,7 @@ export async function waitForWindow(pid, timeoutMs = 15000) {
  * surface), which is inert.
  */
 export async function enableWebContentAccessibility(pid, windowId) {
-  const state = getWindowState(pid, windowId, { include_screenshot: false });
+  const state = getWindowStateForPixelClick(pid, windowId);
   const sw = state.screenshot_width || 1200;
   const sh = state.screenshot_height || 800;
   // Click near the centre of the content area.
@@ -91,9 +115,18 @@ export async function enableWebContentAccessibility(pid, windowId) {
 export async function launchApp(appPath = DEFAULT_APP_PATH) {
   const res = call("launch_app", { path: appPath });
   const pid = res.pid;
-  const { pid: foundPid, windowId } = await waitForWindow(pid);
-  await enableWebContentAccessibility(foundPid, windowId);
-  return { pid: foundPid, windowId };
+  try {
+    const { pid: foundPid, windowId } = await waitForWindow(pid);
+    await enableWebContentAccessibility(foundPid, windowId);
+    return { pid: foundPid, windowId };
+  } catch (error) {
+    try {
+      call("kill_app", { pid });
+    } catch {
+      // The app may have exited before the UIA window became ready.
+    }
+    throw error;
+  }
 }
 
 /**

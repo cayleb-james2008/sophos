@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { tokens } from "../design/tokens";
 import { Text, Tooltip, IconButton } from "../design";
-import { useConnectionState, useIpc } from "../ipc/client";
+import { useConnectionState, useIpc, isDemoMode } from "../ipc/client";
 import type { AgentInfo } from "../ipc/contract";
 import { useRefinementGate } from "../features/longrunning/useRefinementGate";
 import { ChevronDownIcon, TerminalIcon, SigmaGlyph } from "./icons";
@@ -105,8 +105,10 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
     };
   }, [detailsOpen]);
 
+  const demoMode = isDemoMode();
   const kind = statusKind(state.status);
-  const label = statusLabel(kind);
+  const indicatorKind = demoMode ? "preview" : kind;
+  const label = demoMode ? "Preview · Simulated" : statusLabel(kind);
   const model = state.model?.model ?? "no model";
   const provider = state.model?.provider ?? "—";
   const tokensUsed = state.context?.tokens ?? 0;
@@ -137,7 +139,7 @@ export function SystemBar({ engineOpen, onToggleEngine }: { engineOpen: boolean;
       <div key={`${kind}:${model}:${provider}:${tokensUsed}:${pct}`} className="system-bar__readout system-bar__readout--updated" aria-label="Engine status">
         <Tooltip content={label} side="bottom">
           <div className="system-bar__cell">
-            <span className={`system-bar__dot system-bar__dot--${kind}`} aria-hidden="true" />
+            <span className={`system-bar__dot system-bar__dot--${indicatorKind}`} aria-hidden="true" />
             <span className="system-bar__label">Engine</span>
             <span className="system-bar__value">{label}</span>
           </div>

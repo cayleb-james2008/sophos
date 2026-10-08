@@ -16,12 +16,96 @@
 // (UIA Invoke) whenever the element exposes one — they need no coordinates.
 
 import { spawnSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, resolve, win32 } from "node:path";
+import { fileURLToPath } from "node:url";
 
-/** Path to the cua-driver binary. Override with the CUA_DRIVER_BIN env var. */
-export const DRIVER_BIN =
-  process.env.CUA_DRIVER_BIN ||
-  "C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe";
+/** Resolve cua-driver from an explicit override or the current user's install. */
+export function resolveDriverBin({
+  env = process.env,
+  platform = process.platform,
+  homeDir = homedir(),
+} = {}) {
+  if (env.CUA_DRIVER_BIN) return env.CUA_DRIVER_BIN;
+  if (platform !== "win32") return "cua-driver";
+
+  const localAppData = env.LOCALAPPDATA || win32.join(homeDir, "AppData", "Local");
+  return win32.join(
+    localAppData,
+    "Programs",
+    "Cua",
+    "cua-driver",
+    "bin",
+    "cua-driver.exe",
+  );
+}
+
+export const DRIVER_BIN = resolveDriverBin();
+// One-shot CLI calls need a stable public session label to share screenshot
+// context across the observation/action boundary. The process ID keeps
+// parallel suite processes isolated while remaining constant within a suite.
+export const CUA_SESSION = process.env.CUA_SESSION || `sophos-${process.pid}`;
+export const DRIVER_SESSION = CUA_SESSION;
+const screenshotContexts = new Set();
+const SCREENSHOT_DIR = process.env.CUA_SCREENSHOT_DIR
+  ? resolve(process.env.CUA_SCREENSHOT_DIR)
+  : join(dirname(fileURLToPath(import.meta.url)), "screenshots");
+/**
+ * All pinned v0.34.0 tool schemas accept an optional public session label. Include it
+ * on every one-shot call so snapshots and every subsequent action share one run.
+ */
+export function sessionScopedPayload(_tool, args = {}, session = CUA_SESSION) {
+  if (args.session != null) return args;
+  return { ...args, session };
+}
+
+export function withSession(args = {}, session = CUA_SESSION) {
+  return sessionScopedPayload("", args, session);
+}
+
+/** Keep one named driver session alive across one-shot CLI calls. */
+export function createSessionInvoker(invokeTool, defaultSession = CUA_SESSION) {
+  const activeSessions = new Set();
+
+  const invoke = (tool, args = {}, callOptions = {}) => {
+    const payload = withSession(args, defaultSession);
+    const session = payload.session;
+
+    if (tool === "start_session") {
+      const result = invokeTool(tool, payload, callOptions);
+      activeSessions.add(session);
+      return result;
+    }
+    if (tool === "end_session") {
+      const result = invokeTool(tool, payload, callOptions);
+      activeSessions.delete(session);
+      return result;
+    }
+    if (!activeSessions.has(session)) {
+      invokeTool("start_session", { session });
+      activeSessions.add(session);
+    }
+    return invokeTool(tool, payload, callOptions);
+  };
+
+  invoke.endAll = () => {
+    for (const session of activeSessions) {
+      try {
+        invokeTool("end_session", { session });
+      } catch {
+        // The daemon may already have stopped during runner teardown.
+      }
+    }
+    activeSessions.clear();
+  };
+
+  return invoke;
+}
+
+function screenshotContextKey(pid, windowId, session) {
+  return `${session}:${pid}:${windowId}`;
+}
 
 /** Small sleep helper (ms). */
 export function sleep(ms) {
@@ -33,15 +117,28 @@ export function sleep(ms) {
  * Returns the parsed JSON result. Throws on non-zero exit or a plain-text
  * error payload (the driver reports some failures as text, not JSON).
  */
-export function call(tool, args = {}) {
-  const result = spawnSync(DRIVER_BIN, ["call", tool], {
-    input: JSON.stringify(args),
+function invokeDriverCall(tool, args = {}, { timeoutMs } = {}, invoke = spawnSync) {
+  const payload = sessionScopedPayload(tool, args);
+  const spawnOptions = {
+    input: JSON.stringify(payload),
     encoding: "utf-8",
     windowsHide: true,
-  });
+  };
+  if (timeoutMs !== undefined) {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new RangeError("timeoutMs must be a finite positive number");
+    }
+    spawnOptions.timeout = Math.max(1, Math.ceil(timeoutMs));
+  }
+  const result = invoke(DRIVER_BIN, ["call", tool], spawnOptions);
 
   if (result.error) {
-    throw new Error(`cua-driver call ${tool} failed to spawn: ${result.error.message}`);
+    const message = result.error.code === "ETIMEDOUT"
+      ? `cua-driver call ${tool} timed out after ${spawnOptions.timeout}ms`
+      : `cua-driver call ${tool} failed to spawn: ${result.error.message}`;
+    const error = new Error(message, { cause: result.error });
+    error.code = result.error.code;
+    throw error;
   }
   if (result.status !== 0) {
     throw new Error(
@@ -68,6 +165,23 @@ export function call(tool, args = {}) {
   return parsed;
 }
 
+const callInSession = createSessionInvoker(
+  (tool, args, callOptions) => invokeDriverCall(tool, args, callOptions),
+  CUA_SESSION,
+);
+process.once("exit", callInSession.endAll);
+
+export function call(tool, args = {}, optionsOrInvoke = {}, injectedInvoke = spawnSync) {
+  // Any action may change the screen behind a cached coordinate snapshot.
+  // The next pixel click must obtain a fresh screenshot in the same session.
+  if (tool !== "get_window_state") screenshotContexts.clear();
+  const callOptions = typeof optionsOrInvoke === "function" ? {} : optionsOrInvoke;
+  const invoke = typeof optionsOrInvoke === "function" ? optionsOrInvoke : injectedInvoke;
+  if (invoke !== spawnSync) return invokeDriverCall(tool, args, callOptions, invoke);
+  if (process.env.CUA_SESSION_LIFECYCLE === "1") return callInSession(tool, args, callOptions);
+  return invokeDriverCall(tool, args, callOptions);
+}
+
 /**
  * Run a tool, and if the driver reports `background_unavailable` (the target
  * surface drops background input — typical for Tauri/Chromium hotkeys and
@@ -75,12 +189,44 @@ export function call(tool, args = {}) {
  * driver's own guidance: always try background first, escalate only on the
  * structured signal.
  */
-export function callWithForegroundFallback(tool, args = {}) {
-  const first = call(tool, args);
-  if (first && first.code === "background_unavailable") {
-    return call(tool, { ...args, delivery_mode: "foreground" });
+export function driverErrorCode(error) {
+  if (typeof error?.code === "string") return error.code;
+  if (typeof error?.refusal?.code === "string") return error.refusal.code;
+  if (typeof error?.structuredContent?.code === "string") return error.structuredContent.code;
+  if (typeof error?.structuredContent?.refusal?.code === "string") return error.structuredContent.refusal.code;
+
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const payloadStart = message.indexOf("{");
+  if (payloadStart < 0) return null;
+  try {
+    const payload = JSON.parse(message.slice(payloadStart));
+    if (typeof payload?.structuredContent?.code === "string") return payload.structuredContent.code;
+    if (typeof payload?.structuredContent?.refusal?.code === "string") return payload.structuredContent.refusal.code;
+    if (typeof payload?.refusal?.code === "string") return payload.refusal.code;
+    return typeof payload?.code === "string" ? payload.code : null;
+  } catch {
+    return null;
+  }
+}
+
+export function invokeWithForegroundFallback(invoke, tool, args = {}) {
+  if (typeof invoke !== "function") throw new TypeError("invoke must be a function");
+  let first;
+  try {
+    first = invoke(tool, args);
+  } catch (error) {
+    if (driverErrorCode(error) !== "background_unavailable") throw error;
+    return invoke(tool, { ...args, delivery_mode: "foreground" });
+  }
+
+  if (driverErrorCode(first) === "background_unavailable") {
+    return invoke(tool, { ...args, delivery_mode: "foreground" });
   }
   return first;
+}
+
+export function callWithForegroundFallback(tool, args = {}) {
+  return invokeWithForegroundFallback(call, tool, args);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +238,7 @@ export function callWithForegroundFallback(tool, args = {}) {
  * up it is left untouched. Returns `{ alreadyRunning }`.
  */
 export function startDaemon() {
+  screenshotContexts.clear();
   const status = spawnSync(DRIVER_BIN, ["status"], { encoding: "utf-8", windowsHide: true });
   if (status.stdout && /daemon is running/i.test(status.stdout)) {
     return { alreadyRunning: true };
@@ -121,7 +268,9 @@ export function startDaemon() {
 
 /** Stop the cua-driver daemon. Returns the driver's status output. */
 export function stopDaemon() {
+  callInSession.endAll();
   const result = spawnSync(DRIVER_BIN, ["stop"], { encoding: "utf-8", windowsHide: true });
+  screenshotContexts.clear();
   return result.stdout || result.stderr || "";
 }
 
@@ -143,8 +292,26 @@ export function listWindows(opts = {}) {
  * `elements` (structured array with `element_index`, `element_token`, `role`,
  * `label`, `frame`, `enabled`, …), `tree_markdown`, `pid` and `window_id`.
  */
-export function getWindowState(pid, windowId, opts = {}) {
-  return call("get_window_state", { pid, window_id: windowId, ...opts });
+export function getWindowState(pid, windowId, opts = {}, optionsOrInvoke = {}, maybeInvoke = call) {
+  const callOptions = typeof optionsOrInvoke === "function" ? {} : optionsOrInvoke;
+  const invoke = typeof optionsOrInvoke === "function" ? optionsOrInvoke : maybeInvoke;
+  const session = opts.session ?? CUA_SESSION;
+  const result = invoke("get_window_state", { pid, window_id: windowId, ...opts, session }, callOptions);
+  const contextKey = screenshotContextKey(pid, windowId, session);
+  if (
+    opts.include_screenshot === true ||
+    (opts.include_screenshot !== false && opts.screenshot_out_file)
+  ) {
+    screenshotContexts.add(contextKey);
+  } else {
+    screenshotContexts.delete(contextKey);
+  }
+  return result;
+}
+
+/** Read fresh window state with an explicit screenshot for pixel input. */
+export function getWindowStateForPixelClick(pid, windowId, invoke = call) {
+  return getWindowState(pid, windowId, { include_screenshot: true }, invoke);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,12 +321,44 @@ export function getWindowState(pid, windowId, opts = {}) {
 /**
  * Left-click at window-local pixel coordinates (x, y) relative to the window's
  * content screenshot. Prefer `clickElement` (element_token) for UIA-exposed
- * elements — pixel clicks are for canvas / custom-drawn surfaces.
+ * elements — pixel clicks are for canvas / custom-drawn surfaces. Optional
+ * `actionOptions.delivery_mode` is forwarded for explicit foreground retries.
  */
-export function click(pid, x, y, windowId) {
-  const args = { pid, x, y };
-  if (windowId) args.window_id = windowId;
-  return call("click", args);
+export function click(pid, x, y, windowId, actionOptions = {}) {
+  return clickWithScreenshotContext(pid, x, y, windowId, CUA_SESSION, call, undefined, actionOptions);
+}
+
+/**
+ * Pixel actions require a screenshot-bearing snapshot owned by the same CUA
+ * session. Refresh it on demand when the caller's most recent UIA read omitted
+ * its screenshot; this preserves the coordinate action instead of silently
+ * weakening or dropping UI coverage.
+ */
+export function clickWithScreenshotContext(
+  pid,
+  x,
+  y,
+  windowId,
+  session = CUA_SESSION,
+  invoke = call,
+  screenshotOutFile,
+  actionOptions = {},
+) {
+  if (!windowId) {
+    throw new Error("Pixel clicks require a windowId to capture same-session screenshot context");
+  }
+  const contextKey = screenshotContextKey(pid, windowId, session);
+  if (!screenshotContexts.has(contextKey)) {
+    const capturePath = screenshotOutFile ?? join(SCREENSHOT_DIR, `click-context-${process.pid}-${pid}.png`);
+    mkdirSync(dirname(capturePath), { recursive: true });
+    getWindowState(pid, windowId, { include_screenshot: true, screenshot_out_file: capturePath, session }, invoke);
+  }
+  const args = { pid, x, y, session };
+  args.window_id = windowId;
+  if (actionOptions?.delivery_mode !== undefined) {
+    args.delivery_mode = actionOptions.delivery_mode;
+  }
+  return invoke("click", args);
 }
 
 /**
@@ -169,7 +368,7 @@ export function click(pid, x, y, windowId) {
  * web-content elements.
  */
 export function clickElement(pid, windowId, elementToken) {
-  return call("click", { pid, window_id: windowId, element_token: elementToken });
+  return call("click", { pid, window_id: windowId, element_token: elementToken, session: CUA_SESSION });
 }
 
 /**
@@ -214,7 +413,7 @@ export function hotkey(pid, keys, windowId, opts = {}) {
  */
 export function scroll(pid, direction, amount, windowId, opts = {}) {
   const args = { pid, direction, amount, ...opts };
-  if (windowId) args.window_id = windowId;
+  if (windowId && !opts.element_token) args.window_id = windowId;
   return callWithForegroundFallback("scroll", args);
 }
 
@@ -234,7 +433,7 @@ export function bringToFront(pid, windowId) {
  * get_window_state response, which includes `screenshot_file_path`.
  */
 export function screenshot(pid, windowId, outPath) {
-  return call("get_window_state", { pid, window_id: windowId, screenshot_out_file: outPath });
+  return getWindowState(pid, windowId, { include_screenshot: true, screenshot_out_file: outPath });
 }
 
 /**
@@ -245,7 +444,9 @@ export function desktopScreenshot(outPath) {
   return call("get_desktop_state", { screenshot_out_file: outPath });
 }
 
-/** True when the cua-driver binary exists on disk. */
+/** True when the explicit binary exists or a bare command resolves on PATH. */
 export function isDriverInstalled() {
-  return existsSync(DRIVER_BIN);
+  if (/[\\/]/.test(DRIVER_BIN)) return existsSync(DRIVER_BIN);
+  const result = spawnSync(DRIVER_BIN, ["--version"], { encoding: "utf-8", windowsHide: true, timeout: 5_000 });
+  return !result.error && result.status === 0;
 }

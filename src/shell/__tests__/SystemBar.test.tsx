@@ -10,6 +10,7 @@ const mockState = vi.hoisted(() => {
   const listeners: Array<(event: unknown) => void> = [];
   return {
     conn: {} as any,
+    demoMode: false,
     client: { listAgents: vi.fn(), onEvent: vi.fn(), listSessions: vi.fn() },
     fireEvent: (e: unknown) => {
       for (const cb of [...listeners]) cb(e);
@@ -22,6 +23,7 @@ vi.mock("../../ipc/client", () => ({
   useConnectionState: () => mockState.conn,
   useIpc: () => mockState.client,
   useIpcEvent: () => undefined,
+  isDemoMode: () => mockState.demoMode,
 }));
 
 const gateMock = vi.hoisted(() => ({ useRefinementGate: vi.fn() }));
@@ -43,6 +45,7 @@ function setConn(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  mockState.demoMode = false;
   setConn();
   (mockState.client.listAgents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   (mockState.client.listSessions as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -70,6 +73,24 @@ describe("SystemBar", () => {
     render(<SystemBar engineOpen={false} onToggleEngine={() => {}} />);
     expect(screen.getByText("Engine live")).toBeInTheDocument();
     expect(screen.getByText("deepseek-v4-flash:0731-cloud")).toBeInTheDocument();
+  });
+
+  it("labels a connected demo as simulated preview instead of live", () => {
+    mockState.demoMode = true;
+    render(<SystemBar engineOpen={false} onToggleEngine={() => {}} />);
+
+    expect(screen.getByText("Preview · Simulated")).toBeInTheDocument();
+    expect(screen.queryByText("Engine live")).not.toBeInTheDocument();
+    expect(document.querySelector(".system-bar__dot--preview")).toBeInTheDocument();
+  });
+
+  it("keeps the live label and connected indicator for real IPC", () => {
+    mockState.demoMode = false;
+    setConn({ status: { kind: "connected" } });
+    render(<SystemBar engineOpen={false} onToggleEngine={() => {}} />);
+
+    expect(screen.getByText("Engine live")).toBeInTheDocument();
+    expect(document.querySelector(".system-bar__dot--connected")).toBeInTheDocument();
   });
 
   it.each([

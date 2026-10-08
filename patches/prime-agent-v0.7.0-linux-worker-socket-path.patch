@@ -1,0 +1,19 @@
+diff --git a/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts b/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
+--- a/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
++++ b/packages/coding-agent/src/modes/daemon/daemon-supervisor.ts
+@@ -500,6 +500,10 @@ function workerSocketPath(supervisorSocketPath: string, workerId: string): string {
+-	const key = descriptorKey(supervisorSocketPath);
+-	if (process.platform === "win32") {
+-		return `\\\\.\\pipe\\prime-agent-worker-${key}-${workerId.slice(0, 12)}`;
+-	}
+-	return join(defaultDaemonSocketDir(), `worker-${key}-${workerId.slice(0, 12)}.sock`);
++	const key = descriptorKey(supervisorSocketPath);
++	if (process.platform === "win32") {
++		return `\\\\.\\pipe\\prime-agent-worker-${key}-${workerId.slice(0, 12)}`;
++	}
++	const workerKey = createHash("sha256")
++		.update(JSON.stringify([supervisorSocketPath, workerId]))
++		.digest("hex")
++		.slice(0, 20);
++	return join(defaultDaemonSocketDir(), `w-${workerKey}.sock`);
+ }

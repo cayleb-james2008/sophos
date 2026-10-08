@@ -16,6 +16,7 @@ vi.mock("../../ipc/client", () => ({
   useConnectionState: () => mockState.conn,
   useIpc: () => mockState.client,
   useIpcEvent: () => undefined,
+  isDemoMode: () => false,
 }));
 
 const gateMock = vi.hoisted(() => ({ useRefinementGate: vi.fn() }));

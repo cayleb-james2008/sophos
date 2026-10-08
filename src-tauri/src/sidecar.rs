@@ -52,10 +52,6 @@ pub struct SidecarManager {
     job: Arc<Job>,
     node_path: String,
     bridge_path: String,
-    /// When true, spawn the bridge with `PRIME_DAEMON_TCP=1` so its
-    /// `defaultDaemonSocketPath()` resolves to the same TCP-loopback endpoint
-    /// the daemon is listening on. Must match the daemon's transport.
-    daemon_tcp: bool,
     log_sink: Mutex<Option<Arc<EngineLogSink>>>,
 }
 
@@ -65,7 +61,6 @@ impl SidecarManager {
         job: Arc<Job>,
         node_path: String,
         bridge_path: String,
-        daemon_tcp: bool,
     ) -> Arc<Self> {
         Arc::new(Self {
             app,
@@ -77,7 +72,6 @@ impl SidecarManager {
             job,
             node_path,
             bridge_path,
-            daemon_tcp,
             log_sink: Mutex::new(None),
         })
     }
@@ -108,9 +102,6 @@ impl SidecarManager {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())  // JSON-RPC responses
             .stderr(Stdio::piped()); // logs — captured
-        if self.daemon_tcp {
-            cmd.env("PRIME_DAEMON_TCP", "1");
-        }
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
