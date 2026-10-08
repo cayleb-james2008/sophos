@@ -98,7 +98,7 @@ jobs:
 
       - name: Runtime helper and fail-closed gate regression tests
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
-        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs scripts/prepare-dependency-overlay.test.mjs scripts/prepare-prime-agent-security-build.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs verify/e2e-home-cleanup.test.mjs verify/e2e-mock-provider.test.mjs scripts/bundle.test.mjs bridge/verify.test.mjs bridge/session-recovery-readiness.test.mjs bridge/recovery-probe.test.mjs bridge/startup-gate.test.mjs verify/cua/driver.test.mjs verify/cua/inbox-import.test.mjs verify/live-feed-download.test.mjs
+        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs scripts/prepare-dependency-overlay.test.mjs scripts/prepare-prime-agent-security-build.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs verify/e2e-home-cleanup.test.mjs verify/e2e-mock-provider.test.mjs scripts/bundle.test.mjs bridge/verify.test.mjs bridge/session-recovery-readiness.test.mjs bridge/recovery-probe.test.mjs bridge/startup-gate.test.mjs bridge/verify-lifecycle.test.mjs verify/live-bounded-spend-test.test.mjs verify/cua/driver.test.mjs verify/cua/inbox-import.test.mjs verify/live-feed-download.test.mjs
 
       - name: Platform provenance and Tauri resource tests
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
@@ -110,6 +110,10 @@ jobs:
       - name: Build complete runtime bundle
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node scripts/bundle.mjs
+
+      - name: Verify standalone lifecycle on staged Windows bundle
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: npm --prefix bridge run verify:lifecycle
 
       - name: Load production Windows native modules
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
@@ -138,6 +142,28 @@ jobs:
       - name: End-to-end verification
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node verify/e2e.mjs
+
+  lifecycle-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run standalone lifecycle and retired-harness regression tests
+        run: node --test bridge/verify-lifecycle.test.mjs verify/live-bounded-spend-test.test.mjs
 
   # cua-e2e drives the real Tauri release executable through UI Automation
   # (verify/cua/*), using the disclosed demo IPC path (no provider inference).

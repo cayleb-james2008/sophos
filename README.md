@@ -84,7 +84,7 @@ packaged runtime:
 
 | Area | Result | Scope |
 |---|---|---|
-| `npm run test` | Pass | Exact merged-master Windows CI run `37737840508`, including unit tests and runtime regression suites |
+| Hosted unit + runtime regression suites | Pass | Exact merged-master Windows CI run `37737840508`: `npx vitest run` plus the workflow's explicit Node test lists; this is not a run of the root `npm test` script |
 | `npm run build` | Pass | Exact merged-master Windows CI run; frontend and pinned runtime bundle built |
 | Staged daemon/bridge E2E | Pass: 50/50 checks | Windows named pipes on hosted CI; real pinned Prime Agent v0.7.0 runtime. Recovery used one isolated loopback mock-provider request, not live inference |
 | Guarded Windows MSI | Pass: build, notice, compatibility | Hosted workflow built the guarded MSI, checked the embedded MIT notice and pinned-daemon compatibility; candidate MSI was not installed |
