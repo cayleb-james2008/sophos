@@ -18,6 +18,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { getSessionRecoveryAssertions } from "./session-recovery-readiness.mjs";
 import { runRecoveryProbe } from "./recovery-probe.mjs";
 import { startBridgeAfterDaemonStartup } from "./startup-gate.mjs";
+import { isLifecycleCancellationMessage } from "./lifecycle-cancellation.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REF_ROOT = resolve(
@@ -448,6 +449,10 @@ async function run() {
       process.exit(130);
     })();
   };
+  const onLifecycleCancellation = (message) => {
+    if (isLifecycleCancellationMessage(message)) onSignal();
+  };
+  process.on("message", onLifecycleCancellation);
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
   try {
@@ -474,6 +479,7 @@ async function run() {
       `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
+    process.off("message", onLifecycleCancellation);
     return;
   }
 
@@ -967,6 +973,7 @@ async function run() {
       `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
+    process.off("message", onLifecycleCancellation);
   }
 
   if (signalReceived) return;

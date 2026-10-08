@@ -103,12 +103,37 @@ runner result before installer or native-module claims are considered verified.
 
 ### Verifiers
 
-The `verify/` directory holds offline checks. `node verify/e2e.mjs` requires a
-freshly assembled `resources/` bundle and drives the real daemon and bridge
-together, including reconnect recovery. Its recovery probe uses a deterministic
-loopback mock provider; it does not test external provider API access, live
-inference, TCP fallback, Tauri installer creation, or Windows behavior when run
-on another OS.
+The `verify/` directory includes offline checks and historical/manual harnesses;
+do not assume every script is safe to execute with provider credentials.
+`node verify/e2e.mjs` requires a freshly assembled `resources/` bundle and drives
+the real daemon and bridge together, including reconnect recovery. Its recovery
+probe uses a deterministic loopback mock provider; it does not test external
+provider API access, live inference, TCP fallback, Tauri installer creation, or
+Windows behavior when run on another OS.
+
+For the focused standalone bridge lifecycle check, stage a fresh bundle first:
+
+```sh
+node scripts/bundle.mjs               # Windows x64
+# Linux/macOS instead: node scripts/bundle.mjs --diagnostic
+npm --prefix bridge run verify:lifecycle
+```
+
+This command runs the staged `resources/bridge` and `resources/daemon` with the
+complete shared production dependencies in `resources/node_modules`, not the
+compile-only `bridge/node_modules` copies. It checks the bundle's declared
+source pin and overlay metadata, ignores inherited `REF`/`BRIDGE` overrides,
+and fails with staging instructions if the bundle is absent or mismatched.
+Rebundle after changing bridge or daemon source; the command does not compile
+or silently run unstaged edits. It keeps an isolated HOME, an allowlisted child
+environment, fail-closed loopback model selection, and owned-process cleanup.
+On Windows it uses the hash-verified bundled Node; elsewhere it uses host Node.
+For complete build provenance validation, use `node verify/e2e.mjs` as well.
+
+The former `verify/live-bounded-spend-test.mjs` is retired and exits nonzero
+without launching anything. Its broken, unsafe historical source is retained
+as non-executable text in `verify/archive/`; see that directory's README. Neither
+its archive nor the offline lifecycle check establishes a live spend cap.
 
 ## Code style
 

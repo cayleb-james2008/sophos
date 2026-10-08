@@ -3,10 +3,16 @@
 
 import { strict as assert } from "node:assert";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolveLifecycleRuntime } from "./lifecycle-runtime.mjs";
+import { removeTemporaryHomeWithRetry } from "../verify/e2e-home-cleanup.mjs";
+import { selectE2ENode } from "../verify/runtime-executable.mjs";
+import { validateNodeExecutable } from "../scripts/node-runtime.mjs";
+import { NODE_RUNTIME_PIN } from "../scripts/runtime-pins.mjs";
+import { requestLifecycleCancellation } from "./lifecycle-cancellation.mjs";
 import {
   E2E_MOCK_MODEL_ID,
   E2E_MOCK_PROVIDER_ID,
@@ -16,12 +22,38 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const VERIFY = join(HERE, "verify.mjs");
-const { isRecoverableDaemonClose } = await import("./dist/bridge/src/connection.js");
-assert.equal(isRecoverableDaemonClose("Lost connection to the Prime Agent daemon. Cause: socket closed."), true);
-assert.equal(isRecoverableDaemonClose("The daemon closed this agent session after it completed."), false);
-assert.equal(isRecoverableDaemonClose("The Prime Agent daemon shut down while this window was attached."), false);
+const CHILD_GRACE_MS = 60_000;
+let activeChild;
+let interruptionSignal;
+let forceKillTimer;
+
+function forwardInterruption(signal) {
+  if (interruptionSignal) {
+    if (activeChild && activeChild.exitCode === null && activeChild.signalCode === null) activeChild.kill("SIGKILL");
+    return;
+  }
+  interruptionSignal = signal;
+  if (!activeChild || activeChild.exitCode !== null || activeChild.signalCode !== null) return;
+  if (!requestLifecycleCancellation(activeChild, signal)) activeChild.kill("SIGKILL");
+  forceKillTimer = setTimeout(() => {
+    if (activeChild && activeChild.exitCode === null && activeChild.signalCode === null) activeChild.kill("SIGKILL");
+  }, CHILD_GRACE_MS);
+  forceKillTimer.unref();
+}
+
+process.on("SIGINT", () => forwardInterruption("SIGINT"));
+process.on("SIGTERM", () => forwardInterruption("SIGTERM"));
 
 async function run() {
+  const projectRoot = resolve(HERE, "..");
+  const runtime = resolveLifecycleRuntime(projectRoot);
+  const bundledNode = join(projectRoot, "resources", "node", `node-v${NODE_RUNTIME_PIN.version}-${NODE_RUNTIME_PIN.platform}`, "node.exe");
+  const node = selectE2ENode(process.platform, process.execPath, bundledNode);
+  if (process.platform === "win32") await validateNodeExecutable(bundledNode);
+  const { isRecoverableDaemonClose } = await import(pathToFileURL(runtime.connection).href);
+  assert.equal(isRecoverableDaemonClose("Lost connection to the Prime Agent daemon. Cause: socket closed."), true);
+  assert.equal(isRecoverableDaemonClose("The daemon closed this agent session after it completed."), false);
+  assert.equal(isRecoverableDaemonClose("The Prime Agent daemon shut down while this window was attached."), false);
   const isolatedHome = mkdtempSync(join(tmpdir(), "sophos-bridge-lifecycle-"));
   let mockProvider;
   let succeeded = false;
@@ -29,48 +61,55 @@ async function run() {
     mockProvider = await startE2EMockProvider();
     writeE2EMockProviderConfig(isolatedHome, mockProvider.baseUrl);
     const isolatedEnv = Object.fromEntries(
-      ["PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "SystemDrive", "LANG", "LC_ALL", "TZ", "REF", "BRIDGE"]
+      ["PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "SystemDrive", "LANG", "LC_ALL", "TZ"]
         .filter((name) => process.env[name] !== undefined)
         .map((name) => [name, process.env[name]]),
     );
-    const child = spawn(process.execPath, [VERIFY], {
+    const childEnv = { ...isolatedEnv,
+      REF: runtime.ref,
+      BRIDGE: runtime.bridge,
+      HOME: isolatedHome,
+      USERPROFILE: isolatedHome,
+      XDG_CONFIG_HOME: join(isolatedHome, ".config"),
+      XDG_DATA_HOME: join(isolatedHome, ".local", "share"),
+      XDG_CACHE_HOME: join(isolatedHome, ".cache"),
+      APPDATA: join(isolatedHome, "AppData", "Roaming"),
+      LOCALAPPDATA: join(isolatedHome, "AppData", "Local"),
+      TMPDIR: tmpdir(),
+      TEMP: tmpdir(),
+      TMP: tmpdir(),
+      PI_OFFLINE: "1",
+      BRIDGE_VERIFY_RECOVERY: "1",
+      BRIDGE_VERIFY_MODEL_PROVIDER: E2E_MOCK_PROVIDER_ID,
+      BRIDGE_VERIFY_MODEL_ID: E2E_MOCK_MODEL_ID,
+    };
+    if (interruptionSignal) throw new Error(`lifecycle verifier interrupted by ${interruptionSignal}`);
+    const child = spawn(node, [VERIFY], {
       cwd: isolatedHome,
-      stdio: "inherit",
-      env: {
-        ...isolatedEnv,
-        HOME: isolatedHome,
-        USERPROFILE: isolatedHome,
-        XDG_CONFIG_HOME: join(isolatedHome, ".config"),
-        XDG_DATA_HOME: join(isolatedHome, ".local", "share"),
-        XDG_CACHE_HOME: join(isolatedHome, ".cache"),
-        APPDATA: join(isolatedHome, "AppData", "Roaming"),
-        LOCALAPPDATA: join(isolatedHome, "AppData", "Local"),
-        TMPDIR: tmpdir(),
-        TEMP: tmpdir(),
-        TMP: tmpdir(),
-        PI_OFFLINE: "1",
-        BRIDGE_VERIFY_RECOVERY: "1",
-        BRIDGE_VERIFY_MODEL_PROVIDER: E2E_MOCK_PROVIDER_ID,
-        BRIDGE_VERIFY_MODEL_ID: E2E_MOCK_MODEL_ID,
-      },
+      stdio: ["inherit", "inherit", "inherit", "ipc"],
+      env: childEnv,
     });
+    activeChild = child;
     const outcome = await new Promise((resolve, reject) => {
       child.once("error", (error) => reject(new Error(`failed to start lifecycle verifier: ${error.message}`)));
       child.once("exit", (code, signal) => resolve({ code, signal }));
     });
+    if (interruptionSignal) throw new Error(`lifecycle verifier interrupted by ${interruptionSignal}`);
     if (outcome.signal) throw new Error(`lifecycle verifier stopped with ${outcome.signal}`);
     if (outcome.code !== 0) throw new Error(`lifecycle verifier exited with code ${outcome.code ?? "unknown"}`);
     if (mockProvider.requestCount === 0) throw new Error("lifecycle recovery did not use the loopback mock provider");
     succeeded = true;
     console.log(`lifecycle recovery used ${mockProvider.requestCount} loopback mock-provider request(s)`);
   } finally {
+    if (forceKillTimer) clearTimeout(forceKillTimer);
+    activeChild = undefined;
     await mockProvider?.close();
-    if (succeeded) rmSync(isolatedHome, { recursive: true, force: true });
+    if (succeeded) await removeTemporaryHomeWithRetry(isolatedHome);
     else console.error(`preserved isolated lifecycle HOME for diagnostics: ${isolatedHome}`);
   }
 }
 
 run().catch((error) => {
   console.error(`lifecycle verifier failed: ${error.message}`);
-  process.exitCode = 1;
+  process.exitCode = interruptionSignal === "SIGINT" ? 130 : interruptionSignal === "SIGTERM" ? 143 : 1;
 });
