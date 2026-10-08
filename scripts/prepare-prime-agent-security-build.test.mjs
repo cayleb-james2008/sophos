@@ -121,6 +121,45 @@ const bundleSource = await readFile(new URL("./bundle.mjs", import.meta.url), "u
 const e2eSource = await readFile(new URL("../verify/e2e.mjs", import.meta.url), "utf8");
 const windowsCiWorkflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
 const windowsAclWorkflow = await readFile(new URL("../.github/workflows/windows-dependency-hardening.yml", import.meta.url), "utf8");
+const overlayPolicy = JSON.parse(await readFile(new URL("./dependency-hardening-overlay.json", import.meta.url), "utf8"));
+const workflowOverlayPins = [
+  { label: "overlay result lock", pattern: /\$result\.packageLockSha256\s+-ne\s+'([^'\r\n]*)'/g, key: "overlayLockSha256" },
+  { label: "generated package-lock.json", pattern: /\$lockHash\s+-ne\s+'([^'\r\n]*)'/g, key: "overlayLockSha256" },
+  { label: "generated package.json", pattern: /\$manifestHash\s+-ne\s+'([^'\r\n]*)'/g, key: "overlayPackageJsonSha256" },
+];
+
+function assertWorkflowOverlayPins(source) {
+  for (const { label, pattern, key } of workflowOverlayPins) {
+    const matches = [...source.matchAll(pattern)];
+    assert.equal(matches.length, 1, `${label}: exactly one workflow pin must exist`);
+    assert.equal(matches[0][1], PRIME_AGENT_SECURITY_BUILD_PROVENANCE_EXPECTED[key], `${label}: pin must match security-build provenance`);
+    if (key === "overlayLockSha256") {
+      assert.equal(matches[0][1], overlayPolicy.overlayLockSha256, `${label}: pin must match overlay policy`);
+    }
+  }
+}
+
+test("Windows dependency-hardening workflow pins match overlay policy and security-build provenance", () => {
+  assertWorkflowOverlayPins(windowsAclWorkflow);
+});
+
+test("workflow pin synchronization rejects stale or missing literals independently", async (t) => {
+  for (const { label, pattern } of workflowOverlayPins) {
+    await t.test(`${label}: stale pin`, () => {
+      const stale = windowsAclWorkflow.replace(pattern, (match) => match.replace(/'[^']*'$/, `'${"0".repeat(64)}'`));
+      assert.notEqual(stale, windowsAclWorkflow, "fixture must mutate the intended pin");
+      assert.throws(() => assertWorkflowOverlayPins(stale), (error) =>
+        error.code === "ERR_ASSERTION" && error.message.startsWith(`${label}: pin must match security-build provenance`));
+    });
+    await t.test(`${label}: missing pin`, () => {
+      const missing = windowsAclWorkflow.replace(pattern, "$true");
+      assert.notEqual(missing, windowsAclWorkflow, "fixture must remove the intended pin");
+      assert.throws(() => assertWorkflowOverlayPins(missing), (error) =>
+        error.code === "ERR_ASSERTION" && error.message.startsWith(`${label}: exactly one workflow pin must exist`));
+    });
+  }
+});
+
 test("Windows release workflows bootstrap a SHA-pinned, ACL-validated private checkout before package operations", () => {
   const findStepBlock = (source, stepName, offset = 0) => {
     const start = source.indexOf(`      - name: ${stepName}`, offset);
