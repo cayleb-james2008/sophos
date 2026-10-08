@@ -360,7 +360,7 @@ jobs:
             $report.registryDisplayName = [string]$record.DisplayName
             $report.registryDisplayVersion = [string]$record.DisplayVersion
 
-            $installRoot = [string]$record.InstallLocation
+            $installRoot = ([string]$record.InstallLocation).Trim().Trim('"')
             if ([string]::IsNullOrWhiteSpace($installRoot)) {
               $uninstallerMatch = [regex]::Match([string]$record.UninstallString, '(?i)^\s*"(?<path>[^"]*uninstall\.exe)"')
               if (-not $uninstallerMatch.Success) { throw 'Could not resolve the per-user install directory from the uninstall registration' }

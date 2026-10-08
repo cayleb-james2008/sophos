@@ -198,6 +198,15 @@ const tests = [
     name: "Composition controls stay visible and open the thinking + skills panel",
     fn: async (appHandle) => {
       await goAgents(appHandle);
+      // Leave an actionable draft in the composer. The native UIA provider
+      // omits bounds for the disabled Send button, so enable it before
+      // asserting that the expanded composition panel keeps the control in
+      // the visible window.
+      const initial = freshState(appHandle);
+      const input = findBy(initial, { role: "Edit", name: "Message to api-reviewer" });
+      assert(input, "Message input not found before opening composition controls");
+      typeText(appHandle.pid, "composition visibility check", appHandle.windowId, input.element_token);
+      await sleep(800);
       // Keep the composer outside the thread's scroll viewport so its controls
       // remain available when the selected agent's thread is taller than the window.
       const scrollState = getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: true });

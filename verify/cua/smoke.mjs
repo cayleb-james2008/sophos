@@ -17,9 +17,9 @@
 
 import { runSuite } from "./runner.mjs";
 import { writeFileSync } from "node:fs";
-import { getWindowState } from "./driver.mjs";
+import { getWindowState, sleep } from "./driver.mjs";
 import { DEFAULT_APP_PATH, findSophosWindow } from "./launch.mjs";
-import { clickElement, findElement, navTo, sleep, takeScreenshot, getTextContent, waitForElement } from "./helpers.mjs";
+import { clickElement, findElement, navTo, takeScreenshot, getTextContent, waitForElement } from "./helpers.mjs";
 import { waitForAllElements } from "./find-util.mjs";
 import {
   assert,
