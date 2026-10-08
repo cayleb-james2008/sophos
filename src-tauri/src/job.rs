@@ -1,4 +1,4 @@
-//! Windows Job Object — guarantees child processes die with the parent.
+//! Windows Job Object — kills assigned child processes with the parent.
 //!
 //! A job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` is created once at
 //! startup and every child (daemon, sidecar) is assigned to it. When the job
@@ -7,6 +7,8 @@
 //! containment boundary for the daemon, sidecar and their descendants.
 //! Children start suspended and run only after assignment succeeds. Creation,
 //! configuration, assignment and resume errors fail closed, never to a null job.
+//! Hard-killing the owner between suspended creation and assignment can still
+//! leave a suspended, non-executing process; this is not atomic job creation.
 
 use std::io;
 use std::os::windows::io::AsRawHandle;

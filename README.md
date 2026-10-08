@@ -141,10 +141,26 @@ errors and substituted a null job when creation failed. The separate
 containment candidate now refuses setup without a configured job and starts
 daemon/sidecar processes suspended, assigns them, then resumes them. Failed
 assignment or resume terminates and reaps the child before publishing its
-pipes. Native fault/descendant regressions are blocking Windows CI; this
+pipes, with termination/reap errors surfaced if cleanup itself fails. Native
+fault/descendant regressions are blocking Windows CI; this
 source change is not acceptance evidence until those exact-head gates and
 independent review pass. It is not an explanation of the historical shutdown
 trace and is not included in PR #15's tooling-only approval.
+
+The boundary is not an unconditional no-orphans guarantee: a hard kill between
+suspended process creation and successful job assignment can leave a
+suspended, non-executing process. Thread discovery also does not authenticate
+against hostile same-user interference. The native tests cover assigned
+children and their descendants, not atomic create-and-assign or those threats.
+
+The first [PR #16 CI](https://github.com/cayleb-james2008/sophos/actions/runs/37757453312)
+at `88f60b989073730c61422fecf79fb98d2c059e85` passed the native containment
+step but failed a Linux lifecycle fixture: it printed readiness before
+registering its SIGTERM handler. Independent delayed-start probes reproduced
+the missing cleanup marker and passed after reversing that order. I repaired
+the fixture handshake, not the production verifier, and retained the failed
+job instead of waiving or retrying the unchanged candidate. The corrected
+head requires fresh push and PR gates.
 
 One further evidence limit: the public-smoke “no console errors” entry is an
 explicit no-op placeholder, not console monitoring. Its reported 7/7 includes

@@ -34,3 +34,9 @@ These checks do not establish paid inference, security against a same-user
 hostile process, broad Windows-version compatibility, or a cause for the
 historical shutdown trace. Full exact-head CI and independent review remain
 required before publication.
+
+Hard-killing the owner in the gap between suspended process creation and job
+assignment can leave a suspended, non-executing orphan. Cleanup API failures
+are surfaced, not proof of unconditional termination. The hard-kill regression
+waits for the assigned child and descendant to become ready before killing
+the owner; it does not test atomic create-and-assign or the pre-assignment gap.
