@@ -76,11 +76,15 @@ The `verify/` suite requires a bundled runtime. Build it first with
 Unit / component tests run on **Vitest** with jsdom and React Testing Library.
 
 ```sh
-npm test             # run once (CI mode), exits non-zero on failure
-npx vitest run       # same as npm test
+npm test             # Vitest, then the package.json Node regression test list
+npx vitest run       # frontend/unit/component Vitest tests only
 npm run test:watch   # watch mode for development
 npm run test:ui      # interactive Vitest UI (requires @vitest/ui)
 ```
+
+Both commands exit non-zero on failure, but have different scope. The hosted
+workflow also names its runtime, native and CUA checks separately; passing
+Vitest alone does not establish complete workflow or installer acceptance.
 
 Test files live next to the code they cover as `src/**/*.test.{ts,tsx}`, and
 share a global setup at `src/test/setup.ts` (imports `@testing-library/jest-dom`
