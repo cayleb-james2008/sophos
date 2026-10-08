@@ -91,21 +91,24 @@ tests import exactly like source code. `npm run test:ui` requires the optional
 
 **What is covered:** the CI workflow installs from locked dependencies, builds
 the pinned upstream daemon and TypeScript bridge from public source, stages the
-hash-verified Node runtime, and runs the real offline bridge/daemon JSON-RPC
-verifier (`node verify/e2e.mjs`). On Windows this exercises the named-pipe path
-with the bundled Node executable; on Linux/macOS it uses the host Node and a
-Unix-domain socket. Non-Windows results do not validate Windows-native setup.
+hash-verified Node runtime, and runs the bridge/daemon JSON-RPC verifier
+(`node verify/e2e.mjs`). Recovery uses an isolated loopback mock provider so the
+test can verify session persistence without live model inference. On Windows it
+exercises the named-pipe path with bundled Node; on Linux/macOS it uses host
+Node and a Unix-domain socket. Non-Windows results do not validate
+Windows-native setup.
 The Windows workflow also configures a bundled-Node native-module smoke, guarded
 MSI build, and MSI license-extraction check; these steps still need a Windows
 runner result before installer or native-module claims are considered verified.
 
 ### Verifiers
 
-The `verify/` directory holds model-free offline checks. `node verify/e2e.mjs`
-requires a freshly assembled `resources/` bundle and drives the real daemon
-and bridge together, including reconnect recovery. It does not test provider
-API access, TCP fallback, Tauri installer creation, or Windows behavior when
-run on another OS.
+The `verify/` directory holds offline checks. `node verify/e2e.mjs` requires a
+freshly assembled `resources/` bundle and drives the real daemon and bridge
+together, including reconnect recovery. Its recovery probe uses a deterministic
+loopback mock provider; it does not test external provider API access, live
+inference, TCP fallback, Tauri installer creation, or Windows behavior when run
+on another OS.
 
 ## Code style
 

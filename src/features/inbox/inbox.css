@@ -424,8 +424,16 @@
 .inbox__graphwrap {
   position: relative;
   flex: 1;
-  min-height: 0;
+  /* Without a floor this flex item can collapse when the view is first laid
+     out, leaving React Flow with a zero-height canvas and nodes that are only
+     present in the accessibility tree. Scale the floor with viewport height so
+     the graph stays usable without crowding the composer at the 600px minimum. */
+  min-height: clamp(120px, calc(100vh - 500px), 260px);
   background: var(--pa-ink);
+}
+@media (max-height: 640px) {
+  /* Preserve room for the composer/footer at the Tauri window's 600px minimum. */
+  .inbox { padding: 12px 20px; gap: 12px; }
 }
 .inbox__graphblank {
   position: absolute;

@@ -8,14 +8,19 @@
  * The build uses the checked-in generated model catalog; it does not call
  * provider/model-catalog APIs or require credentials.
  */
-import { cp, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { cp, copyFile, mkdir, mkdtemp, readFile, realpath, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ensureNodeRuntime } from "./node-runtime.mjs";
 import { ensurePrimeAgentRef, resolvePrimeAgentRef } from "./prime-agent-ref.mjs";
-import { preparePrimeAgentBuildTree } from "./apply-prime-agent-overlay.mjs";
+import {
+  preparePrimeAgentSecurityBuildTree,
+  resolvePrimeAgentSecurityWorkPaths,
+  verifyPrimeAgentSecurityBuildTree,
+} from "./prepare-prime-agent-security-build.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "./runtime-pins.mjs";
 import { validateDaemonRuntimePackage } from "./daemon-runtime-package.mjs";
 import { assertWindowsReleaseProvenance, createNativeBuildProvenance } from "./native-runtime-platform.mjs";
@@ -72,17 +77,42 @@ function runNpm(args, options = {}) {
   return run("npm", args, options);
 }
 
-async function buildPinnedDaemon(primeAgentRoot) {
+async function verifyPrimeAgentBuildStage(projectRoot, primeAgentRoot, primeSourceRoot, stage) {
+  try {
+    return await verifyPrimeAgentSecurityBuildTree(projectRoot, primeAgentRoot, primeSourceRoot);
+  } catch (error) {
+    throw new Error(`Prime Agent security build verification failed after ${stage}: ${error.message}`);
+  }
+}
+
+async function buildPinnedDaemon(primeAgentRoot, primeSourceRoot) {
   runNpm(["ci"], { cwd: primeAgentRoot, label: "Prime Agent locked dependency install (normal lifecycle)" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "npm ci");
+  run(process.execPath, [
+    join(primeAgentRoot, "node_modules", "vitest", "vitest.mjs"),
+    "--run",
+    "test/daemon-supervisor-monitor.test.ts",
+    "test/session-lease.test.ts",
+    "test/tools-manager.test.ts",
+  ], {
+    cwd: join(primeAgentRoot, "packages", "coding-agent"),
+    shell: false,
+    label: "Prime Agent session-lease, Windows ZIP guard, worker-shutdown fence, and Linux worker-socket path regression tests",
+  });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "Prime Agent regression tests");
   runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "tui"), label: "Prime Agent TUI build" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "TUI build");
   // pi-ai's normal build refreshes its model catalog from external vendor APIs.
   // Sophos uses the catalog committed at the pinned source revision instead.
   runNpm(["exec", "--prefix", ".", "--", "tsgo", "-p", "packages/ai/tsconfig.build.json"], {
     cwd: primeAgentRoot,
     label: "Prime Agent AI build (pinned checked-in catalog)",
   });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "AI build");
   runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "agent"), label: "Prime Agent agent-core build" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "agent-core build");
   runNpm(["run", "build"], { cwd: join(primeAgentRoot, "packages", "coding-agent"), label: "Prime Agent daemon build" });
+  await verifyPrimeAgentBuildStage(WORKTREE, primeAgentRoot, primeSourceRoot, "daemon build");
 
   const daemonDist = join(primeAgentRoot, "packages", "coding-agent", "dist");
   requirePath(join(daemonDist, "cli.js"), "built Prime Agent daemon CLI");
@@ -139,6 +169,7 @@ Options:
 Environment:
   PRIME_AGENT_REF     optional path to an unmodified clone of the exact pinned
                       public Prime Agent commit; default is .deps/prime-agent
+                      on POSIX, or a unique directory under system TEMP on Windows
   PRIME_NODE_RUNTIME  optional node.exe (or directory containing it); accepted
                       only when its SHA-256 matches the official pinned binary
 `);
@@ -174,10 +205,20 @@ async function main() {
     runNpm(["ci"], { cwd: WORKTREE, label: "Sophos locked dependency install (normal lifecycle)" });
   }
 
-  const primeRefPath = resolvePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
+  const systemTempRoot = process.platform === "win32" ? await realpath(tmpdir()) : tmpdir();
+  const privateTempRoot = process.platform === "win32"
+    ? await mkdtemp(join(systemTempRoot, "sophos-prime-agent-security-"))
+    : undefined;
+  const primePaths = resolvePrimeAgentSecurityWorkPaths(WORKTREE, {
+    platform: process.platform,
+    systemTempRoot,
+    privateTempRoot,
+  });
+  const primeSourceRoot = process.env.PRIME_AGENT_REF ?? primePaths.sourceRoot;
+  const primeRefPath = resolvePrimeAgentRef(WORKTREE, primeSourceRoot);
   log("gray", "Prime Agent source:", relative(WORKTREE, primeRefPath) || primeRefPath);
-  const primeSource = await ensurePrimeAgentRef(WORKTREE, process.env.PRIME_AGENT_REF);
-  const primeBuild = preparePrimeAgentBuildTree(WORKTREE, primeSource.path);
+  const primeSource = await ensurePrimeAgentRef(WORKTREE, primeSourceRoot);
+  const primeBuild = await preparePrimeAgentSecurityBuildTree(WORKTREE, primeSource.path, primePaths.buildRoot, systemTempRoot);
   manifest.upstream = {
     repository: primeSource.repository,
     ref: primeSource.ref,
@@ -189,7 +230,7 @@ async function main() {
     overlay: primeBuild.provenance,
   };
 
-  const daemonDist = await buildPinnedDaemon(primeBuild.path);
+  const daemonDist = await buildPinnedDaemon(primeBuild.path, primeSource.path);
 
   const frontendDist = join(WORKTREE, "dist");
   if (!flags.has("--no-frontend")) {
@@ -263,13 +304,22 @@ async function main() {
     log("yellow", "skipping node_modules staging (--no-node-modules)");
   } else {
     await rm(stagedNodeModules, { recursive: true, force: true });
-    // Local workspace/file links do not bring their own dependencies into the
-    // bridge install. Preserve the exact upstream lockfile's production graph
-    // separately, then replace its workspace links with built package files.
-    runNpm(["prune", "--omit=dev"], {
+    // `npm prune --omit=dev` rewrites platform-specific lock metadata (for example
+    // `libc` on optional native packages). A plain `npm ci --omit=dev` does keep
+    // the lock bytes, but runs the root `prepare: husky` hook after omitting the
+    // dev-only Husky CLI, which fails on Windows. Construct the exact production
+    // tree without lifecycle hooks, then replay the installed production packages'
+    // lifecycle scripts; `npm rebuild` does not run the root `prepare` hook.
+    runNpm(["ci", "--omit=dev", "--ignore-scripts"], {
       cwd: primeBuild.path,
-      label: "Prime Agent production dependency tree (normal lifecycle)",
+      label: "Prime Agent production dependency tree (lifecycle deferred)",
     });
+    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm ci --omit=dev --ignore-scripts");
+    runNpm(["rebuild", "--omit=dev"], {
+      cwd: primeBuild.path,
+      label: "Prime Agent production dependency lifecycle scripts",
+    });
+    await verifyPrimeAgentBuildStage(WORKTREE, primeBuild.path, primeSource.path, "npm rebuild --omit=dev");
     await cp(join(primeBuild.path, "node_modules"), stagedNodeModules, { recursive: true, dereference: false });
     await rm(join(stagedNodeModules, "@earendil-works"), { recursive: true, force: true });
     const upstreamPackages = await stageUpstreamPackages(primeBuild.path, stagedNodeModules);

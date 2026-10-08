@@ -10,10 +10,14 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
+import { getSessionRecoveryAssertions } from "./session-recovery-readiness.mjs";
+import { runRecoveryProbe } from "./recovery-probe.mjs";
+import { startBridgeAfterDaemonStartup } from "./startup-gate.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REF_ROOT = resolve(
@@ -48,19 +52,53 @@ function terminateProcessTree(proc) {
   try { proc.kill("SIGTERM"); } catch {}
 }
 
-function terminateSupervisorOnly(proc) {
-  if (!proc?.pid || proc.exitCode !== null) return;
+async function terminateSupervisorOnly(identity) {
+  if (!Number.isInteger(identity?.pid) || identity.pid <= 0) return false;
+  if (typeof identity.processStartId !== "string" || identity.processStartId.length === 0) return false;
+  const sessionLeaseUrl = pathToFileURL(join(REF_ROOT, "dist", "core", "session-lease.js")).href;
+  const { getProcessStartId } = await import(sessionLeaseUrl);
+  const currentStartId = getProcessStartId(identity.pid);
+  if (!currentStartId || currentStartId !== identity.processStartId) return false;
   if (process.platform === "win32") {
     try {
       // Deliberately omit /T: the Windows worker is not detached, but it must
       // survive a supervisor-only restart so the replacement can adopt it.
-      execFileSync("taskkill", ["/PID", String(proc.pid), "/F"], { stdio: "ignore" });
+      execFileSync("taskkill", ["/PID", String(identity.pid), "/F"], { stdio: "ignore" });
+      return true;
     } catch {
-      // The process may have exited between the check and taskkill.
+      // The process may have exited between the identity check and taskkill.
+      return false;
     }
-    return;
   }
-  try { proc.kill("SIGTERM"); } catch {}
+  try {
+    process.kill(identity.pid, "SIGTERM");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function terminateProcessIdentityTree(identity) {
+  if (!Number.isInteger(identity?.pid) || identity.pid <= 0) return false;
+  if (typeof identity.processStartId !== "string" || identity.processStartId.length === 0) return false;
+  const sessionLeaseUrl = pathToFileURL(join(REF_ROOT, "dist", "core", "session-lease.js")).href;
+  const { getProcessStartId } = await import(sessionLeaseUrl);
+  const currentStartId = getProcessStartId(identity.pid);
+  if (!currentStartId || currentStartId !== identity.processStartId) return false;
+  if (process.platform === "win32") {
+    try {
+      execFileSync("taskkill", ["/PID", String(identity.pid), "/T", "/F"], { stdio: "ignore" });
+      return true;
+    } catch {
+      return !processIsAlive(identity.pid);
+    }
+  }
+  try {
+    process.kill(identity.pid, "SIGTERM");
+    return true;
+  } catch {
+    return !processIsAlive(identity.pid);
+  }
 }
 
 function record(label, ok, detail) {
@@ -79,6 +117,178 @@ async function waitForExit(proc, timeoutMs = 5000) {
   });
 }
 
+function processIsAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code !== "ESRCH";
+  }
+}
+
+function readWorkerDescriptorPids(socketPath = SOCKET_PATH) {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? tmpdir();
+  const descriptorRoot = join(home, ".prime", "agent", "daemon-workers");
+  if (!existsSync(descriptorRoot)) return [];
+  const workers = [];
+  try {
+    for (const directory of readdirSync(descriptorRoot, { withFileTypes: true })) {
+      if (!directory.isDirectory()) continue;
+      const directoryPath = join(descriptorRoot, directory.name);
+      for (const entry of readdirSync(directoryPath, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+        try {
+          const descriptor = JSON.parse(readFileSync(join(directoryPath, entry.name), "utf8"));
+          if (descriptor.supervisorSocketPath === socketPath
+            && typeof descriptor.workerId === "string" && Number.isInteger(descriptor.pid) && descriptor.pid > 0) {
+            workers.push({
+              workerId: descriptor.workerId,
+              pid: descriptor.pid,
+              ...(typeof descriptor.processStartId === "string" ? { processStartId: descriptor.processStartId } : {}),
+              lifecycle: typeof descriptor.lifecycle === "string" ? descriptor.lifecycle : "unknown",
+            });
+          }
+        } catch {
+          // A descriptor may be atomically replaced while diagnostics are reading it.
+        }
+      }
+    }
+  } catch {
+    // The daemon can remove its descriptor tree concurrently with diagnostics.
+  }
+  return workers;
+}
+
+async function inspectSupervisorIdentity() {
+  const daemonClientUrl = pathToFileURL(join(REF_ROOT, "dist", "modes", "daemon", "daemon-client.js")).href;
+  const { DaemonClient } = await import(daemonClientUrl);
+  const client = new DaemonClient(SOCKET_PATH);
+  try {
+    await client.connect(500);
+    const hello = await client.waitForHello(500).catch(() => undefined);
+    return {
+      reachable: true,
+      ...(Number.isInteger(hello?.supervisorPid) ? { pid: hello.supervisorPid } : {}),
+      ...(typeof hello?.supervisorProcessStartId === "string" ? { processStartId: hello.supervisorProcessStartId } : {}),
+    };
+  } catch {
+    return { reachable: false };
+  } finally {
+    client.close();
+  }
+}
+
+async function waitForProcessIdentityExit(identity, timeoutMs = 5000) {
+  if (!Number.isInteger(identity?.pid) || identity.pid <= 0) return false;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!processIsAlive(identity.pid)) return true;
+    await sleep(100);
+  }
+  return !processIsAlive(identity.pid);
+}
+
+async function waitForOwnedShutdownProcesses(supervisorIdentity, timeoutMs = 5000) {
+  const currentSupervisor = await inspectSupervisorIdentity();
+  const workers = readWorkerDescriptorPids();
+  const identities = [supervisorIdentity, currentSupervisor, ...workers]
+    .filter((identity) => Number.isInteger(identity?.pid) && identity.pid > 0)
+    .filter((identity, index, all) => all.findIndex((candidate) =>
+      candidate.pid === identity.pid && candidate.processStartId === identity.processStartId) === index);
+  const exited = await Promise.all(identities.map((identity) => waitForProcessIdentityExit(identity, timeoutMs)));
+  if (exited.some((didExit) => !didExit)) return false;
+  const [remainingSupervisor, remainingWorkers] = await Promise.all([
+    inspectSupervisorIdentity(),
+    Promise.resolve(readWorkerDescriptorPids()),
+  ]);
+  return !remainingSupervisor.reachable && !remainingWorkers.some((worker) => processIsAlive(worker.pid));
+}
+
+async function terminateShutdownOwnedProcesses(snapshot) {
+  const identities = [snapshot?.postGracefulSocket, snapshot?.gracefulSupervisor,
+    ...(snapshot?.workers ?? []).filter((worker) => worker.alive)];
+  const uniqueIdentities = identities
+    .filter((identity) => Number.isInteger(identity?.pid) && identity.pid > 0)
+    .filter((identity, index, all) => all.findIndex((candidate) =>
+      candidate.pid === identity.pid && candidate.processStartId === identity.processStartId) === index);
+  await Promise.all(uniqueIdentities.map((identity) => terminateProcessIdentityTree(identity)));
+}
+
+function isReplacementIdentity(current, previous) {
+  return Boolean(current?.reachable && Number.isInteger(current.pid) && current.pid > 0
+    && (current.pid !== previous?.pid
+      || (typeof current.processStartId === "string" && typeof previous?.processStartId === "string"
+        && current.processStartId !== previous.processStartId)));
+}
+
+async function waitForSupervisorReplacement(previousIdentity, timeoutMs = 45_000) {
+  const deadline = Date.now() + timeoutMs;
+  let current = { reachable: false };
+  while (Date.now() < deadline) {
+    current = await inspectSupervisorIdentity();
+    if (isReplacementIdentity(current, previousIdentity)) return current;
+    await sleep(100);
+  }
+  return current;
+}
+
+function processTreeSnapshot(seedPids) {
+  const seeds = [...new Set(seedPids.filter((pid) => Number.isInteger(pid) && pid > 0))];
+  if (process.platform === "win32") {
+    return seeds.map((pid) => ({ pid, alive: processIsAlive(pid) }));
+  }
+  try {
+    const lines = execFileSync("ps", ["-eo", "pid=,ppid=,pgid=,stat=,comm="], { encoding: "utf8", timeout: 3000 }).trim().split("\n");
+    const rows = lines.filter(Boolean).map((line) => {
+      const [pid, ppid, pgid, state, comm] = line.trim().split(/\s+/, 5);
+      return { pid: Number(pid), ppid: Number(ppid), pgid: Number(pgid), state, comm };
+    });
+    const byPid = new Map(rows.map((row) => [row.pid, row]));
+    const selected = new Set(seeds);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const row of rows) {
+        if (!selected.has(row.pid) && selected.has(row.ppid)) {
+          selected.add(row.pid);
+          changed = true;
+        }
+      }
+    }
+    return [...selected].sort((a, b) => a - b).map((pid) => byPid.get(pid) ?? { pid, present: false, alive: processIsAlive(pid) });
+  } catch {
+    return seeds.map((pid) => ({ pid, alive: processIsAlive(pid) }));
+  }
+}
+
+async function snapshotShutdownState(daemon, supervisorIdentity) {
+  const socketState = await inspectSupervisorIdentity().catch(() => ({ reachable: false }));
+  const workers = readWorkerDescriptorPids().map((worker) => ({ ...worker, alive: processIsAlive(worker.pid) }));
+  const pids = [daemon?.pid, supervisorIdentity?.pid, socketState.pid, ...workers.map((worker) => worker.pid)];
+  return {
+    gracefulSupervisor: supervisorIdentity ?? { reachable: false },
+    postGracefulSocket: socketState,
+    daemonLauncher: daemon ? { pid: daemon.pid, exitCode: daemon.exitCode, signalCode: daemon.signalCode, alive: processIsAlive(daemon.pid) } : null,
+    workers,
+    processes: processTreeSnapshot(pids),
+  };
+}
+
+async function logRecoveryOwnership(stage, processHandle) {
+  const socketSupervisor = await inspectSupervisorIdentity();
+  const workers = readWorkerDescriptorPids().map((worker) => ({ ...worker, alive: processIsAlive(worker.pid) }));
+  const processes = processTreeSnapshot([processHandle?.pid, socketSupervisor.pid, ...workers.map((worker) => worker.pid)]);
+  console.log(`[ownership] ${JSON.stringify({
+    stage,
+    processHandle: processHandle ? { pid: processHandle.pid, exitCode: processHandle.exitCode, signalCode: processHandle.signalCode, alive: processIsAlive(processHandle.pid) } : null,
+    socketSupervisor,
+    workers,
+    processes,
+  })}`);
+  return socketSupervisor;
+}
+
 function parseLines(buffer, onLine) {
   let idx;
   while ((idx = buffer.indexOf("\n")) !== -1) {
@@ -89,15 +299,20 @@ function parseLines(buffer, onLine) {
   return buffer;
 }
 
-async function startDaemon() {
+async function startDaemon(onSpawn, signal) {
   const diagnostics = [];
   const proc = spawn(process.execPath, [DAEMON_CLI, "--mode", "daemon", "--daemon-socket", SOCKET_PATH, "--offline"], {
     stdio: ["ignore", "pipe", "pipe"],
   });
+  onSpawn?.(proc);
   proc.stdout.on("data", (chunk) => diagnostics.push(`[daemon] ${chunk.toString()}`));
   proc.stderr.on("data", (chunk) => diagnostics.push(`[daemon-err] ${chunk.toString()}`));
   // Give the supervisor and its session worker time to bind and handshake.
-  await sleep(8000);
+  try {
+    await sleep(8000, undefined, { signal });
+  } catch (error) {
+    if (!signal?.aborted || error?.name !== "AbortError") throw error;
+  }
   return { proc, diagnostics };
 }
 
@@ -105,19 +320,62 @@ async function run() {
   console.log(`BRIDGE_VERIFY_SOCKET=${SOCKET_PATH}`);
   console.log("=== Bridge verification harness ===\n");
 
-  const firstDaemon = await startDaemon();
-  let daemon = firstDaemon.proc;
-  const daemonDiagnostics = [...firstDaemon.diagnostics];
+  let daemon;
+  const daemonDiagnostics = [];
   let bridge;
-  const forceCleanup = () => {
+  let cleanupPromise;
+  let signalCleanupPromise;
+  let signalReceived = false;
+  const startupAbort = new AbortController();
+  const runCancelledError = () => {
+    const error = new Error("bridge verification interrupted by shutdown");
+    error.name = "RunCancelledError";
+    return error;
+  };
+  const waitForRun = async (milliseconds) => {
+    if (startupAbort.signal.aborted) throw runCancelledError();
+    try {
+      await sleep(milliseconds, undefined, { signal: startupAbort.signal });
+    } catch (error) {
+      if (startupAbort.signal.aborted && error?.name === "AbortError") throw runCancelledError();
+      throw error;
+    }
+  };
+  const forceCleanup = async () => {
     try { bridge?.stdin.end(); } catch {}
+    const snapshot = await snapshotShutdownState(daemon);
+    await terminateShutdownOwnedProcesses(snapshot);
     terminateProcessTree(bridge);
     terminateProcessTree(daemon);
+    await waitForExit(bridge, 2000);
+    await waitForExit(daemon, 2000);
+    await waitForOwnedShutdownProcesses(undefined, 2000);
   };
   async function shutdownDaemonGracefully() {
     const daemonLaunchUrl = pathToFileURL(join(REF_ROOT, "dist", "cli", "daemon-launch.js")).href;
-    const { shutdownDaemonAndWait } = await import(daemonLaunchUrl);
-    return shutdownDaemonAndWait(SOCKET_PATH, 10000);
+    const daemonClientUrl = pathToFileURL(join(REF_ROOT, "dist", "modes", "daemon", "daemon-client.js")).href;
+    const { shutdownDaemonAndWait, shutdownConnectedDaemonAndWait } = await import(daemonLaunchUrl);
+    const { DaemonClient } = await import(daemonClientUrl);
+    const client = new DaemonClient(SOCKET_PATH);
+    let identity;
+    try {
+      await client.connect(1000);
+      const hello = await client.waitForHello(2000).catch(() => undefined);
+      identity = {
+        reachable: true,
+        ...(Number.isInteger(hello?.supervisorPid) ? { pid: hello.supervisorPid } : {}),
+        ...(typeof hello?.supervisorProcessStartId === "string" ? { processStartId: hello.supervisorProcessStartId } : {}),
+      };
+      return {
+        stopped: await shutdownConnectedDaemonAndWait(client, SOCKET_PATH, 45000, hello),
+        identity,
+      };
+    } catch {
+      client.close();
+      return { stopped: await shutdownDaemonAndWait(SOCKET_PATH, 45000), identity: identity ?? { reachable: false } };
+    } finally {
+      client.close();
+    }
   }
   const cleanup = async () => {
     try { bridge?.stdin.end(); } catch {}
@@ -131,33 +389,89 @@ async function run() {
     let daemonStopped = false;
     let daemonProcessStopped = !daemon || daemon.exitCode !== null || daemon.signalCode !== null;
     let shutdownError;
+    let shutdownResult;
     try {
-      daemonStopped = await shutdownDaemonGracefully();
-      if (daemonStopped) daemonProcessStopped = await waitForExit(daemon, 5000);
+      shutdownResult = await shutdownDaemonGracefully();
+      daemonStopped = shutdownResult.stopped;
+      if (daemonStopped) {
+        daemonProcessStopped = await waitForExit(daemon, 5000)
+          && await waitForOwnedShutdownProcesses(shutdownResult.identity, 5000);
+      }
     } catch (error) {
       shutdownError = error instanceof Error ? error.message : String(error);
+      daemonProcessStopped = false;
     }
+    let shutdownDiagnostics;
+    let fallbackTerminationNeeded = false;
     if (!daemonStopped || !daemonProcessStopped) {
+      fallbackTerminationNeeded = true;
+      shutdownDiagnostics = await snapshotShutdownState(daemon, shutdownResult?.identity);
+      await terminateShutdownOwnedProcesses(shutdownDiagnostics);
       terminateProcessTree(daemon);
-      daemonProcessStopped = await waitForExit(daemon, 5000);
+      daemonProcessStopped = await waitForExit(daemon, 5000)
+        && await waitForOwnedShutdownProcesses(undefined, 5000);
+      shutdownDiagnostics.afterFallback = await snapshotShutdownState(daemon, shutdownResult?.identity);
     }
-    return { bridgeStopped, daemonStopped: daemonStopped && daemonProcessStopped, shutdownError };
+    return {
+      bridgeStopped,
+      daemonStopped: daemonStopped && daemonProcessStopped && !fallbackTerminationNeeded,
+      gracefulDaemonStopped: daemonStopped,
+      daemonProcessStopped,
+      fallbackTerminationNeeded,
+      shutdownError,
+      shutdownDiagnostics,
+    };
+  };
+  const startCleanup = () => {
+    startupAbort.abort();
+    cleanupPromise ??= cleanup();
+    return cleanupPromise;
   };
   const onSignal = () => {
-    forceCleanup();
-    process.exit(130);
+    signalReceived = true;
+    if (signalCleanupPromise) {
+      void forceCleanup()
+        .catch((error) => console.error("[signal-cleanup] forced cleanup failed:", error))
+        .finally(() => process.exit(130));
+      return;
+    }
+    signalCleanupPromise = (async () => {
+      try {
+        const state = await startCleanup();
+        if (!state.bridgeStopped || !state.daemonStopped || !state.daemonProcessStopped) {
+          await forceCleanup();
+        }
+      } catch (error) {
+        console.error("[signal-cleanup] graceful cleanup failed:", error);
+        await forceCleanup().catch((forceError) => console.error("[signal-cleanup] forced cleanup failed:", forceError));
+      }
+      process.exit(130);
+    })();
   };
-  process.once("SIGINT", onSignal);
-  process.once("SIGTERM", onSignal);
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
   try {
-    bridge = spawn(process.execPath, [BRIDGE, "--daemon-socket", SOCKET_PATH], {
-      stdio: ["pipe", "pipe", "pipe"],
+    const startupCompleted = await startBridgeAfterDaemonStartup({
+      signal: startupAbort.signal,
+      startDaemon: async () => {
+        const started = await startDaemon((proc) => { daemon = proc; }, startupAbort.signal);
+        daemonDiagnostics.push(...started.diagnostics);
+      },
+      startBridge: () => {
+        bridge = spawn(process.execPath, [BRIDGE, "--daemon-socket", SOCKET_PATH], {
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+      },
     });
+    if (!startupCompleted || startupAbort.signal.aborted) {
+      await startCleanup();
+      return;
+    }
   } catch (err) {
-    record("spawn bridge", false, err.message);
-    const cleanupState = await cleanup();
+    record("spawn daemon and bridge", false, err.message);
+    const cleanupState = await startCleanup();
     record("graceful shutdown releases the isolated session HOME", cleanupState.daemonStopped && cleanupState.bridgeStopped,
-      `daemonStopped=${cleanupState.daemonStopped}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}`);
+      `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     return;
@@ -192,19 +506,42 @@ async function run() {
     return new Promise((resolve, reject) => {
       const id = String(cmd.id ?? Math.random());
       const wire = { ...cmd, id };
-      const timer = setTimeout(() => reject(new Error(`timeout waiting for response to ${cmd.method}`)), 8000);
-      const check = setInterval(() => {
+      let settled = false;
+      let timer;
+      let check;
+      const cleanupWait = () => {
+        clearTimeout(timer);
+        clearInterval(check);
+        startupAbort.signal.removeEventListener("abort", onAbort);
+      };
+      const finish = (handler, value) => {
+        if (settled) return;
+        settled = true;
+        cleanupWait();
+        handler(value);
+      };
+      const onAbort = () => finish(reject, runCancelledError());
+      timer = setTimeout(() => finish(reject, new Error(`timeout waiting for response to ${cmd.method}`)), 8000);
+      check = setInterval(() => {
         if (responses.has(id)) {
-          clearTimeout(timer);
-          clearInterval(check);
-          resolve(responses.get(id));
+          finish(resolve, responses.get(id));
         }
       }, 20);
-      bridge.stdin.write(JSON.stringify(wire) + "\n");
+      if (startupAbort.signal.aborted) {
+        onAbort();
+        return;
+      }
+      startupAbort.signal.addEventListener("abort", onAbort, { once: true });
+      try {
+        bridge.stdin.write(JSON.stringify(wire) + "\n");
+      } catch (error) {
+        finish(reject, error);
+      }
     });
   }
 
   function sendRaw(line) {
+    if (startupAbort.signal.aborted) throw runCancelledError();
     bridge.stdin.write(line + "\n");
   }
 
@@ -212,7 +549,7 @@ async function run() {
     // Wait for the bridge to emit its initial connecting event.
     const start = Date.now();
     while (!events.some((e) => e.type === "connection_status" && e.status.kind === "connecting") && Date.now() - start < 4000) {
-      await sleep(50);
+      await waitForRun(50);
     }
     record("emits connecting event on startup", events.some((e) => e.type === "connection_status" && e.status.kind === "connecting"));
 
@@ -225,14 +562,14 @@ async function run() {
     // 2. Wait for the connected event
     const t0 = Date.now();
     while (!events.some((e) => e.type === "connection_status" && e.status.kind === "connected") && Date.now() - t0 < 10000) {
-      await sleep(50);
+      await waitForRun(50);
     }
     const connectedEventSeen = events.some((e) => e.type === "connection_status" && e.status.kind === "connected");
 
     // 3. Wait for the snapshot event
     const t1 = Date.now();
     while (!events.some((e) => e.type === "snapshot") && Date.now() - t1 < 4000) {
-      await sleep(50);
+      await waitForRun(50);
     }
     record("emits snapshot event after attach",
       events.some((e) => e.type === "snapshot"));
@@ -250,18 +587,22 @@ async function run() {
       // Replace the daemon while keeping the bridge alive. This exercises the
       // recoverDaemon readiness gate and the upstream reconnect/reattach path.
       const oldDaemon = daemon;
-      terminateProcessTree(oldDaemon);
-      const exited = await waitForExit(oldDaemon);
-      daemon = undefined;
-      record("old daemon exits before replacement", exited);
-      await sleep(300);
       const reconnectingStart = events.length;
-      const replacement = await startDaemon();
-      daemon = replacement.proc;
-      daemonDiagnostics.push(...replacement.diagnostics);
+      const oldSupervisorIdentity = await logRecoveryOwnership("initial-recovery-before-kill", oldDaemon);
+      const stopAttempted = await terminateSupervisorOnly(oldSupervisorIdentity);
+      const exited = await waitForProcessIdentityExit(oldSupervisorIdentity);
+      daemon = undefined;
+      await logRecoveryOwnership("initial-recovery-after-kill", oldDaemon);
+      record("old daemon exits before replacement", stopAttempted && exited, `pid=${oldSupervisorIdentity.pid ?? "unknown"} identityChecked=${typeof oldSupervisorIdentity.processStartId === "string"}`);
+      const replacementIdentity = exited
+        ? await waitForSupervisorReplacement(oldSupervisorIdentity)
+        : await inspectSupervisorIdentity();
+      await logRecoveryOwnership("initial-recovery-after-replacement", daemon);
+      record("replacement supervisor becomes reachable after daemon loss", isReplacementIdentity(replacementIdentity, oldSupervisorIdentity),
+        `oldPid=${oldSupervisorIdentity.pid ?? "unknown"} newPid=${replacementIdentity.pid ?? "unknown"}`);
       const reconnectDeadline = Date.now() + 45_000;
       while (!events.slice(reconnectingStart).some((e) => e.type === "connection_status" && e.status.kind === "connected") && Date.now() < reconnectDeadline) {
-        await sleep(50);
+        await waitForRun(50);
       }
       const recovered = events.slice(reconnectingStart).some((e) => e.type === "connection_status" && e.status.kind === "connected");
       record("bridge reconnects after daemon replacement", recovered);
@@ -330,21 +671,21 @@ async function run() {
     const parseResponseStart = responseFrames.length;
     sendRaw("not-json-at-all{");
     const parseDeadline = Date.now() + 5000;
-    while (responseFrames.length < parseResponseStart + 1 && Date.now() < parseDeadline) await sleep(20);
+    while (responseFrames.length < parseResponseStart + 1 && Date.now() < parseDeadline) await waitForRun(20);
     const parseResponses = responseFrames.slice(parseResponseStart);
     const parseErrorResp = parseResponses[0];
     record("malformed JSON returns parse error with null id",
       parseResponses.length === 1 && parseErrorResp.error?.code === -32700
         && Object.hasOwn(parseErrorResp, "id") && parseErrorResp.id === null,
       `responses=${JSON.stringify(parseResponses)}`);
-    await sleep(300);
+    await waitForRun(300);
     record("bridge survives malformed JSON line", bridge.exitCode === null, `pid alive=${bridge.exitCode === null}`);
 
     // 14. A real object without method must receive one -32600/null-id response.
     const invalidRequestStart = responseFrames.length;
     sendRaw(JSON.stringify({ jsonrpc: "2.0", id: "invalid-no-method" }));
     const invalidRequestDeadline = Date.now() + 5000;
-    while (responseFrames.length < invalidRequestStart + 1 && Date.now() < invalidRequestDeadline) await sleep(20);
+    while (responseFrames.length < invalidRequestStart + 1 && Date.now() < invalidRequestDeadline) await waitForRun(20);
     const invalidRequestFrames = responseFrames.slice(invalidRequestStart);
     const invalidRequestResp = invalidRequestFrames[0];
     record("object without method returns invalid request with null id",
@@ -362,7 +703,7 @@ async function run() {
     const nullIdResponseStart = responseFrames.length;
     sendRaw(JSON.stringify({ id: null, method: "getState", params: {} }));
     const nullIdDeadline = Date.now() + 5000;
-    while (responseFrames.length < nullIdResponseStart + 1 && Date.now() < nullIdDeadline) await sleep(20);
+    while (responseFrames.length < nullIdResponseStart + 1 && Date.now() < nullIdDeadline) await waitForRun(20);
     const nullIdFrames = responseFrames.slice(nullIdResponseStart);
     const nullIdResp = nullIdFrames[0];
     record("present null id returns one successful response",
@@ -373,7 +714,7 @@ async function run() {
     // 17. Only an absent ID denotes a notification; assert no response frame.
     const notificationResponseStart = responseFrames.length;
     sendRaw(JSON.stringify({ method: "getState", params: {} }));
-    await sleep(300);
+    await waitForRun(300);
     const notificationResponses = responseFrames.slice(notificationResponseStart);
     record("notification (no id) produces no response line",
       notificationResponses.length === 0,
@@ -414,8 +755,8 @@ async function run() {
 
     // 20. newSession with a real, existing cwd must create and attach a real daemon session.
     const sessionCwd = process.env.BRIDGE_VERIFY_SESSION_CWD || process.cwd();
-    const ns2 = await send({ id: "c22", method: "newSession", params: { cwd: sessionCwd, goal: "verify harness session" } });
-    record("newSession({cwd,goal}) creates a session and returns its real activeSessionId",
+    const ns2 = await send({ id: "c22", method: "newSession", params: { cwd: sessionCwd } });
+    record("newSession({cwd}) creates a draft session and returns its real activeSessionId",
       typeof ns2.result?.activeSessionId === "string" && ns2.result.activeSessionId.length > 0,
       `result=${JSON.stringify(ns2.result)} err=${ns2.error ? ns2.error.code + " " + ns2.error.message : "none"}`);
 
@@ -457,28 +798,141 @@ async function run() {
       `result=${JSON.stringify(switchBackToCreated.result)} active=${stateAfterSwitchBack.result?.activeSessionId} expected=${createdSessionId}`);
 
     if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {
+      // Empty sessions are drafts and are intentionally discarded when a
+      // worker closes. Exercise recovery with a real user entry so this check
+      // covers a durable, live session rather than a not-yet-persisted draft.
+      // Select the E2E-only loopback provider so this probe never needs live API credentials.
+      const recoveryModelProvider = process.env.BRIDGE_VERIFY_MODEL_PROVIDER;
+      const recoveryModelId = process.env.BRIDGE_VERIFY_MODEL_ID;
+      const recoveryProbeText = `Sophos recovery persistence probe ${createdSessionId}`;
+      const recoveryProbeDispatch = await runRecoveryProbe({
+        send,
+        provider: recoveryModelProvider,
+        model: recoveryModelId,
+        text: recoveryProbeText,
+      });
+      const recoveryModelSelection = recoveryProbeDispatch.modelSelection;
+      const recoveryModelSelected = recoveryProbeDispatch.modelSelected;
+      record("recovery probe selects the isolated deterministic test model",
+        recoveryModelSelected,
+        `provider=${recoveryModelProvider ?? "missing"} model=${recoveryModelId ?? "missing"} failure=${recoveryProbeDispatch.selectionFailure ?? "none"} errorCode=${recoveryModelSelection?.error?.code ?? "none"}`);
+      if (!recoveryModelSelected) {
+        throw new Error("recovery probe aborted because the isolated deterministic test model was not selected");
+      }
+      const recoveryProbeError = recoveryProbeDispatch.promptError;
+      const recoveryProbeResponse = recoveryProbeDispatch.promptResponse;
+      const recoveryProbeDeadline = Date.now() + 5000;
+      let recoveryProbeSample = 0;
+      let recoveryProbeTranscript = await send({ id: "c30s0", method: "getTranscript", params: {} });
+      while (
+        Date.now() < recoveryProbeDeadline &&
+        !JSON.stringify(recoveryProbeTranscript.result ?? []).includes(recoveryProbeText)
+      ) {
+        await waitForRun(100);
+        recoveryProbeTranscript = await send({ id: `c30s${++recoveryProbeSample}`, method: "getTranscript", params: {} });
+      }
+      const recoveryProbeIsDurable = Array.isArray(recoveryProbeTranscript.result) &&
+        JSON.stringify(recoveryProbeTranscript.result).includes(recoveryProbeText);
+      const recoveryProbeErrorMessage = recoveryProbeResponse?.error
+        ? `${recoveryProbeResponse.error.code} ${recoveryProbeResponse.error.message ?? ""}`
+        : recoveryProbeError instanceof Error
+          ? recoveryProbeError.message
+          : recoveryProbeError ? String(recoveryProbeError) : "none";
+      const safeRecoveryProbeErrorMessage = recoveryProbeErrorMessage
+        .replace(/\bBearer\s+[^\s,;]+/gi, "Bearer [REDACTED]")
+        .replace(/\b(api[_-]?key|token|secret|password)(\s*[:=]\s*)[^\s,;]+/gi, "$1$2[REDACTED]")
+        .replace(/\s+/g, " ")
+        .slice(0, 240);
+      record("session recovery probe has a durable user message before replacement",
+        recoveryProbeIsDurable,
+        `entries=${Array.isArray(recoveryProbeTranscript.result) ? recoveryProbeTranscript.result.length : "not-array"} promptError=${JSON.stringify(safeRecoveryProbeErrorMessage)}`);
+      const recoveryDeadline = Date.now() + 45_000;
+      const reconnectingStart = events.length;
       const oldDaemon = daemon;
-      terminateSupervisorOnly(oldDaemon);
-      const exited = await waitForExit(oldDaemon);
+      const oldSupervisorIdentity = await logRecoveryOwnership("session-recovery-before-kill", oldDaemon);
+      const stopAttempted = await terminateSupervisorOnly(oldSupervisorIdentity);
+      const exited = await waitForProcessIdentityExit(oldSupervisorIdentity);
       daemon = undefined;
-      record("session-recovery daemon exits before replacement", exited);
-      await sleep(300);
-      const replacement = await startDaemon();
-      daemon = replacement.proc;
-      daemonDiagnostics.push(...replacement.diagnostics);
-      record("replacement supervisor starts with persisted session state", replacement.proc.exitCode === null);
-      const stateAfterReconnect = await send({ id: "c33", method: "getState", params: {} });
+      await logRecoveryOwnership("session-recovery-after-kill", oldDaemon);
+      record("session-recovery daemon exits before replacement", stopAttempted && exited, `pid=${oldSupervisorIdentity.pid ?? "unknown"} identityChecked=${typeof oldSupervisorIdentity.processStartId === "string"}`);
+      const replacementIdentity = exited
+        ? await waitForSupervisorReplacement(oldSupervisorIdentity, Math.max(0, recoveryDeadline - Date.now()))
+        : await inspectSupervisorIdentity();
+      await logRecoveryOwnership("session-recovery-after-replacement", daemon);
+      const replacementReady = isReplacementIdentity(replacementIdentity, oldSupervisorIdentity);
+      record("replacement supervisor starts with persisted session state", replacementReady,
+        `oldPid=${oldSupervisorIdentity.pid ?? "unknown"} newPid=${replacementIdentity.pid ?? "unknown"}`);
+      const connectedAfterReplacement = () => events.slice(reconnectingStart)
+        .some((e) => e.type === "connection_status" && e.status.kind === "connected");
+      const recoveryPollStarted = Date.now();
+      let connectedEventObservedAt;
+      let stateAfterReconnect;
+      let stateAfterReconnectObservedAt;
+      let listedAfterReconnect;
+      let listedAfterReconnectObservedAt;
+      let recoveryPollCount = 0;
+      while (replacementReady && createdSessionListing?.id && Date.now() < recoveryDeadline) {
+        if (!connectedAfterReplacement()) {
+          await waitForRun(50);
+          continue;
+        }
+        connectedEventObservedAt ??= Date.now();
+        if (Date.now() >= recoveryDeadline) break;
+        recoveryPollCount += 1;
+        stateAfterReconnect = await send({ id: `c33-${recoveryPollCount}`, method: "getState", params: {} });
+        stateAfterReconnectObservedAt = Date.now();
+        if (Date.now() >= recoveryDeadline) break;
+        listedAfterReconnect = await send({ id: `c34-${recoveryPollCount}`, method: "listSessions", params: {} });
+        listedAfterReconnectObservedAt = Date.now();
+        if (getSessionRecoveryAssertions({
+          connectedEventObservedAt,
+          state: stateAfterReconnect.result,
+          stateObservedAt: stateAfterReconnectObservedAt,
+          sessions: listedAfterReconnect.result,
+          sessionsObservedAt: listedAfterReconnectObservedAt,
+          recoveryDeadline,
+          expectedActiveSessionId: createdSessionId,
+          expectedSessionListingId: createdSessionListing.id,
+        }).ready) break;
+        if (Date.now() < recoveryDeadline) await waitForRun(250);
+      }
+      if (!connectedEventObservedAt && Date.now() < recoveryDeadline && connectedAfterReplacement()) {
+        connectedEventObservedAt = Date.now();
+      }
+      if (!stateAfterReconnect && Date.now() < recoveryDeadline) {
+        stateAfterReconnect = await send({ id: "c33-final", method: "getState", params: {} });
+        stateAfterReconnectObservedAt = Date.now();
+      }
+      if (!listedAfterReconnect && Date.now() < recoveryDeadline) {
+        listedAfterReconnect = await send({ id: "c34-final", method: "listSessions", params: {} });
+        listedAfterReconnectObservedAt = Date.now();
+      }
+      const recoveryElapsedMs = Date.now() - recoveryPollStarted;
+      const recoveryAssertions = getSessionRecoveryAssertions({
+        connectedEventObservedAt,
+        state: stateAfterReconnect?.result,
+        stateObservedAt: stateAfterReconnectObservedAt,
+        sessions: listedAfterReconnect?.result,
+        sessionsObservedAt: listedAfterReconnectObservedAt,
+        recoveryDeadline,
+        expectedActiveSessionId: createdSessionId,
+        expectedSessionListingId: createdSessionListing?.id,
+      });
+      const connectedEventDelayMs = Number.isFinite(connectedEventObservedAt) ? connectedEventObservedAt - recoveryPollStarted : "none";
+      const stateObservedDelayMs = Number.isFinite(stateAfterReconnectObservedAt) ? stateAfterReconnectObservedAt - recoveryPollStarted : "none";
+      const sessionsObservedDelayMs = Number.isFinite(listedAfterReconnectObservedAt) ? listedAfterReconnectObservedAt - recoveryPollStarted : "none";
       record("created session remains connected and active after supervisor replacement",
-        stateAfterReconnect.result?.status?.kind === "connected" && stateAfterReconnect.result?.activeSessionId === createdSessionId,
-        `status=${stateAfterReconnect.result?.status?.kind} active=${stateAfterReconnect.result?.activeSessionId} expected=${createdSessionId}`);
-      const listedAfterReconnect = await send({ id: "c34", method: "listSessions", params: {} });
+        recoveryAssertions.activeSessionReady,
+        `connectedEvent=${recoveryAssertions.connectedEventSeen} status=${stateAfterReconnect?.result?.status?.kind ?? "not-sampled"} active=${stateAfterReconnect?.result?.activeSessionId ?? "not-sampled"} expected=${createdSessionId} polls=${recoveryPollCount} elapsedMs=${recoveryElapsedMs} connectedAtMs=${connectedEventDelayMs} stateAtMs=${stateObservedDelayMs}`);
       record("created session remains listed after daemon replacement",
-        Array.isArray(listedAfterReconnect.result) && listedAfterReconnect.result.some((session) => session.id === createdSessionListing?.id),
-        `listed=${Array.isArray(listedAfterReconnect.result) ? listedAfterReconnect.result.some((session) => session.id === createdSessionListing?.id) : false}`);
+        recoveryAssertions.listedSessionReady,
+        `listed=${Array.isArray(listedAfterReconnect?.result) ? listedAfterReconnect.result.some((session) => session.id === createdSessionListing?.id) : false} polls=${recoveryPollCount} elapsedMs=${recoveryElapsedMs} sessionsAtMs=${sessionsObservedDelayMs}`);
       const transcriptAfterReconnect = await send({ id: "c35", method: "getTranscript", params: {} });
+      const recoveredTranscriptContainsProbe = Array.isArray(transcriptAfterReconnect.result) &&
+        JSON.stringify(transcriptAfterReconnect.result).includes(recoveryProbeText);
       record("created session transcript remains retrievable after daemon replacement",
-        Array.isArray(transcriptAfterReconnect.result),
-        `entries=${transcriptAfterReconnect.result?.length ?? "not-array"}`);
+        recoveredTranscriptContainsProbe,
+        `containsProbeText=${recoveredTranscriptContainsProbe} entries=${transcriptAfterReconnect.result?.length ?? "not-array"}`);
     }
 
     const malformedSession = await send({ id: "c30", method: "newSession", params: { cwd: 42 } });
@@ -505,16 +959,17 @@ async function run() {
       `err=${fork1.error ? fork1.error.code + " " + fork1.error.message : "none"}`);
 
   } catch (err) {
-    record("test harness", false, err.message);
+    if (err?.name !== "RunCancelledError") record("test harness", false, err.message);
   } finally {
-    const cleanupState = await cleanup();
+    const cleanupState = await startCleanup();
     record("graceful daemon shutdown releases adopted session workers before HOME removal",
       cleanupState.daemonStopped && cleanupState.bridgeStopped,
-      `daemonStopped=${cleanupState.daemonStopped}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}`);
+      `daemonStopped=${cleanupState.daemonStopped}; gracefulResult=${cleanupState.gracefulDaemonStopped}; processExited=${cleanupState.daemonProcessStopped}; fallback=${cleanupState.fallbackTerminationNeeded}; bridgeStopped=${cleanupState.bridgeStopped}; ${cleanupState.shutdownError ?? ""}${cleanupState.shutdownDiagnostics ? ` ownership=${JSON.stringify(cleanupState.shutdownDiagnostics)}` : ""}`);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
   }
 
+  if (signalReceived) return;
   const passed = results.filter((r) => r.ok).length;
   const total = results.length;
   if (passed !== total) {

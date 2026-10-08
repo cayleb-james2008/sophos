@@ -118,6 +118,19 @@ describe("AgentDetail", () => {
     expect(screen.getByText("Reviewing the merge")).toBeInTheDocument();
   });
 
+  it("keeps the composer outside the scrollable coordination region and focuses its messages viewport", () => {
+    renderDetail();
+    const region = screen.getByRole("region", { name: "Agent coordination thread" });
+    const messages = screen.getByRole("region", { name: "Agent coordination messages" });
+    const compositionButton = screen.getByRole("button", { name: /composition/i });
+    const messageInput = screen.getByLabelText("Message to Reviewer");
+    expect(region).not.toHaveAttribute("tabindex", "0");
+    expect(messages).toHaveAttribute("tabindex", "0");
+    expect(region).toContainElement(messages);
+    expect(region).not.toContainElement(compositionButton);
+    expect(region).not.toContainElement(messageInput);
+  });
+
   it("shows the runtime model fallback when the agent has no model", () => {
     renderDetail({ agent: { ...AGENT, model: undefined }, runtimeModel: "fallback-model" });
     expect(screen.getByText("fallback-model")).toBeInTheDocument();
@@ -139,7 +152,9 @@ describe("AgentDetail", () => {
 
   it("renders the live session state block with transcript length", () => {
     renderDetail({ sessionState: STATE });
-    expect(screen.getByText(/LIVE SESSION STATE · 2 messages/i)).toBeInTheDocument();
+    const stateLabel = screen.getByText(/LIVE SESSION STATE · 2 messages/i);
+    expect(stateLabel).toBeInTheDocument();
+    expect(stateLabel.closest(".ag-detail__body")).not.toBeNull();
     // Tool activity content falls back to a placeholder label.
     expect(screen.getByText("(tool activity)")).toBeInTheDocument();
   });

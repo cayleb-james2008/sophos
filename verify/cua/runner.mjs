@@ -14,6 +14,7 @@
 import { startDaemon, stopDaemon, sleep } from "./driver.mjs";
 import { launchApp, closeApp } from "./launch.mjs";
 import { takeScreenshot } from "./helpers.mjs";
+import { rmSync, writeFileSync } from "node:fs";
 
 /** Shared app handle populated by beforeAll. */
 export const app = { pid: null, windowId: null };
@@ -30,6 +31,9 @@ export async function beforeAll() {
   const launched = await launchApp();
   app.pid = launched.pid;
   app.windowId = launched.windowId;
+  if (process.env.SOPHOS_CUA_PID_FILE) {
+    writeFileSync(process.env.SOPHOS_CUA_PID_FILE, `${app.pid}\n`, "utf8");
+  }
   return app;
 }
 
@@ -38,6 +42,7 @@ export async function beforeAll() {
  * only if this runner started it (never kill a pre-existing daemon).
  */
 export async function afterAll() {
+  let appCloseFailed = false;
   if (app.pid) {
     try {
       takeScreenshot(app.pid, "final-state", app.windowId);
@@ -46,8 +51,9 @@ export async function afterAll() {
     }
     try {
       closeApp(app.pid);
-    } catch {
-      // Already closed.
+    } catch (error) {
+      appCloseFailed = true;
+      console.error(`App close deferred to job cleanup: ${error.message}`);
     }
     app.pid = null;
     app.windowId = null;
@@ -55,6 +61,9 @@ export async function afterAll() {
   if (daemonStartedByRunner) {
     stopDaemon();
     daemonStartedByRunner = false;
+  }
+  if (!appCloseFailed && process.env.SOPHOS_CUA_PID_FILE) {
+    rmSync(process.env.SOPHOS_CUA_PID_FILE, { force: true });
   }
 }
 
@@ -85,12 +94,15 @@ export async function runTest(name, fn) {
  */
 export async function runSuite(name, tests) {
   console.log(`\n=== ${name} ===`);
-  await beforeAll();
   const results = [];
-  for (const test of tests) {
-    results.push(await runTest(test.name, test.fn));
+  try {
+    await beforeAll();
+    for (const test of tests) {
+      results.push(await runTest(test.name, test.fn));
+    }
+  } finally {
+    await afterAll();
   }
-  await afterAll();
 
   const passed = results.filter((r) => r.pass).length;
   const failed = results.length - passed;

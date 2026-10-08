@@ -6,8 +6,10 @@ launches the app, reads UIA accessibility trees, clicks elements, types text,
 takes screenshots, presses keys/hotkeys, and runs tests with before/after
 hooks and assertion helpers.
 
-The cua-driver works **in the background** — it does not steal the cursor or
-keyboard focus.
+The harness is **background-first**. When a Tauri/Chromium surface rejects a
+background keyboard or scroll event with the structured
+`background_unavailable` signal, the driver retries in the foreground; that
+fallback can use cursor or keyboard focus.
 
 ## Quick start
 
@@ -20,9 +22,9 @@ Exit code `0` = all tests passed. Exit code `1` = at least one test failed.
 
 ## Prerequisites
 
-- The cua-driver binary at
-  `C:/Users/Cayleb/AppData/Local/Programs/Cua/cua-driver/bin/cua-driver.exe`
-  (override with the `CUA_DRIVER_BIN` env var).
+- The cua-driver binary, normally installed on Windows at
+  `%LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe` (resolved from
+  the current user profile; override with the `CUA_DRIVER_BIN` env var).
 - The Sophos desktop app release build at
   `src-tauri/target/release/prime-agent-windows.exe`.
 - Node.js (ESM `.mjs` modules).
@@ -113,13 +115,17 @@ handles launch/teardown and reports pass/fail per test.
 - `node verify/cua/shell.test.mjs` — cua-driver e2e for ALL shell / global features.
 - `node verify/cua/run-all.mjs` — runs all 8 suites in sequence, exits 0 on all-pass / 1 on any fail.
 - `npm run test:cua` — same as above (npm script alias).
-- `npx vitest run` — 1113 unit tests pass (no regressions).
+- `npm run test` — Vitest plus the configured Node regression/helper suites.
 - `npx tsc --noEmit` — clean.
 
 ## CI integration
 
-The cua-driver e2e suite runs on **every push and pull request** in both
-CI systems. A failure **blocks the merge** — the e2e job is not best-effort.
+The GitHub Actions `cua-e2e` job is a blocking check on pushes and pull
+requests. It has two distinct acceptance paths: a signed live-feed package is
+downloaded, verified, installed, and smoke-tested in a fresh non-demo profile;
+then the source-built release executable runs the demo-mode UI suites. Neither
+path performs live provider inference. The separate `test` job builds an MSI
+and verifies its upstream MIT notice, but does not install that candidate MSI.
 
 ### How it works in CI
 
@@ -140,18 +146,22 @@ suite in demo mode. The build chain is:
 
 ### GitHub Actions (`.github/workflows/ci.yml`)
 
-The `cua-e2e` job runs on `windows-latest` alongside the existing `test` job
-(tsc + vitest + best-effort e2e.mjs). The `cua-e2e` job is blocking — no
-`continue-on-error`. Rust is installed via `dtolnay/rust-toolchain@stable`.
-WebView2 is pre-installed on GitHub-hosted Windows runners.
+The `cua-e2e` job runs on `windows-latest` alongside the Windows `test` job.
+It verifies the live updater package signature and bytes, installs those exact
+bytes per-user, checks the installed version, runs a fresh-profile non-demo
+smoke, and separately builds the source checkout for demo-mode UI automation.
+The source CUA suite is blocking; Rust is installed via
+`dtolnay/rust-toolchain@stable`, and WebView2 is pre-installed on GitHub-hosted
+Windows runners. A successful MSI build/license check is not an MSI-install
+test.
 
 ### GitLab CI (`.gitlab-ci.yml`)
 
-The `cua-e2e` job runs on `saas-windows-medium-amd64` (GitLab SaaS Windows
-shared runner) in the `e2e` stage. The `cua-e2e` job is blocking — no
-`allow_failure`. Rust is installed via `rustup` in the job script (GitLab SaaS
-Windows runners do not ship Rust). The job caches `.cargo/registry/` and
-`src-tauri/target/` to speed up subsequent runs.
+The checked-in `.gitlab-ci.yml` is a separate, older pipeline. It builds the
+source executable and runs the CUA suite, but it does not implement the current
+GitHub secure-checkout, signed-public-package install, and fresh-profile smoke
+path. Treat GitLab results as separate evidence, not as a substitute for the
+current GitHub workflow.
 
 ### Running locally (same as CI)
 
@@ -165,7 +175,7 @@ cd src-tauri && cargo build --release && cd ..
 # 3. Install cua-driver (if not already installed)
 #    PowerShell:  irm https://cua.ai/driver/install.ps1 | iex
 
-# 4. Run the full e2e suite
+# 4. Run the source-built demo-mode CUA suite
 node verify/cua/run-all.mjs
 #    or:  npm run test:cua
 ```
@@ -181,7 +191,7 @@ node verify/cua/run-all.mjs
 | Suite times out (5 min) | App hung or a test is stuck | Check the suite's screenshot in `verify/cua/screenshots/`. Re-run the individual suite file (e.g. `node verify/cua/smoke.mjs`) to isolate. |
 | `cargo build --release` fails in CI | Missing Rust toolchain or MSVC | GitHub Actions: ensure `dtolnay/rust-toolchain@stable` step ran. GitLab CI: ensure the rustup install step ran. MSVC Build Tools are pre-installed on both runner types. |
 | `No window with window_id` | App window was closed externally mid-test | The demo-runner retries up to 5 times on stale-window errors. If it persists, ensure no other process is killing the app. |
-| cua-driver not found after install | PATH not updated in the same shell | The install script adds to PATH. In CI, the binary is at `%LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe`. Set `CUA_DRIVER_BIN` explicitly if needed. |
+| cua-driver not found after install | Installed binary belongs to a different user profile | The harness resolves the per-user binary at `%LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe`. Set `CUA_DRIVER_BIN` explicitly if needed. |
 
 ## Demo mode
 
@@ -194,15 +204,16 @@ sidecar and inject `window.__SOPHOS_DEMO__ = true`, so the frontend uses the
 `MockIpcClient` (the same simulated sessions, agents, and messages the browser
 preview uses). See `demo-launch.mjs` / `demo-runner.mjs`.
 
-The Session/Agent e2e suites run in demo mode and exercise every feature
-against the simulated data:
+The source-built Session/Agent e2e suites run in demo mode and exercise their
+UI flows against simulated data:
 
 - **Sessions**: graph view (nodes + edges), tree view, detail inspector, new
   session, resume, fork, clone, switch.
 - **Agents**: fleet graph, RLM children, attach, detach, send message, and
   composition knobs.
 
-Note: `find-util.mjs` provides correct `findBy` / `clickBy` / `waitFor` helpers.
-The harness's `helpers.findElement` has an inverted text filter (it always
-returns the first role/name match, ignoring `text`), so the suites use
-`find-util.mjs` instead of the buggy helpers.
+The public-package smoke intentionally does not enable demo mode: it checks
+first-run/onboarding behavior only, without logging into a provider or claiming
+live inference. For selectors, `find-util.mjs` provides composable `findBy`,
+`clickBy`, and `waitFor` helpers; qualify ambiguous UIA labels with the expected
+role and assert the actual control element.

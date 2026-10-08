@@ -14,8 +14,9 @@
 //   - Send a relay message from the composer
 
 import { getWindowState, getWindowStateForPixelClick, click, sleep, typeText } from "./driver.mjs";
-import { takeScreenshot, getTextContent, elementCenter } from "./helpers.mjs";
+import { takeScreenshot, getTextContent } from "./helpers.mjs";
 import { findAll, findBy, clickBy, waitFor } from "./find-util.mjs";
+import { unreadMessagePixelTarget } from "./inbox-target.mjs";
 import { assert, assertTextContains } from "./assertions.mjs";
 import { runDemoSuite } from "./demo-runner.mjs";
 
@@ -110,10 +111,9 @@ const tests = [
       takeScreenshot(appHandle.pid, "inbox-unread-before", appHandle.windowId);
       const clickState = getWindowStateForPixelClick(appHandle.pid, appHandle.windowId);
       takeScreenshot(appHandle.pid, "inbox-unread-click-state", appHandle.windowId);
-      const pixelNode = findBy(clickState, { text: "Endpoint review approved" });
-      assert(pixelNode, "Unread message node not found in fresh click state");
-      const point = elementCenter(pixelNode, clickState);
-      console.log(`[INBOX-DIAG] pre-click ${JSON.stringify({ countBefore: before, clickState: unreadDiagnostics(clickState), target: { role: pixelNode.role, label: pixelNode.label, frame: pixelNode.frame, point, screenshot: { width: clickState.screenshot_width, height: clickState.screenshot_height } } })}`);
+      const target = unreadMessagePixelTarget(clickState);
+      const point = target.point;
+      console.log(`[INBOX-DIAG] pre-click ${JSON.stringify({ countBefore: before, clickState: unreadDiagnostics(clickState), target: { canvas: target.canvas.frame, role: target.message.role, label: target.message.label, frame: target.message.frame, point, screenshot: { width: clickState.screenshot_width, height: clickState.screenshot_height } } })}`);
       const backgroundResult = click(appHandle.pid, point.x, point.y, appHandle.windowId);
       console.log(`[INBOX-DIAG] background result ${JSON.stringify(backgroundResult)}`);
       await sleep(1200);
@@ -125,10 +125,9 @@ const tests = [
         // This is a verified background no-op, so retry only this same click
         // with the CUA driver's foreground input rung.
         const retryState = getWindowStateForPixelClick(appHandle.pid, appHandle.windowId);
-        const retryNode = findBy(retryState, { text: "Endpoint review approved" });
-        assert(retryNode, "Unread message node not found in foreground retry state");
-        const retryPoint = elementCenter(retryNode, retryState);
-        console.log(`[INBOX-DIAG] foreground target ${JSON.stringify({ role: retryNode.role, label: retryNode.label, frame: retryNode.frame, point: retryPoint, screenshot: { width: retryState.screenshot_width, height: retryState.screenshot_height } })}`);
+        const retryTarget = unreadMessagePixelTarget(retryState);
+        const retryPoint = retryTarget.point;
+        console.log(`[INBOX-DIAG] foreground target ${JSON.stringify({ canvas: retryTarget.canvas.frame, role: retryTarget.message.role, label: retryTarget.message.label, frame: retryTarget.message.frame, point: retryPoint, screenshot: { width: retryState.screenshot_width, height: retryState.screenshot_height } })}`);
         const foregroundResult = click(appHandle.pid, retryPoint.x, retryPoint.y, appHandle.windowId, { delivery_mode: "foreground" });
         console.log(`[INBOX-DIAG] foreground result ${JSON.stringify(foregroundResult)}`);
         await sleep(1200);

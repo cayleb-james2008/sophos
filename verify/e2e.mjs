@@ -18,7 +18,16 @@ import { selectE2ENode } from "./runtime-executable.mjs";
 import { parseBridgeVerifyResult } from "./e2e-result.mjs";
 import { validateNodeExecutable } from "../scripts/node-runtime.mjs";
 import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "../scripts/runtime-pins.mjs";
-import { PRIME_AGENT_SESSION_LEASE_OVERLAY } from "../scripts/apply-prime-agent-overlay.mjs";
+import {
+  E2E_MOCK_MODEL_ID,
+  E2E_MOCK_PROVIDER_ID,
+  startE2EMockProvider,
+  writeE2EMockProviderConfig,
+} from "./e2e-mock-provider.mjs";
+import {
+  matchesPrimeAgentSecurityBuildProvenance,
+  verifyPrimeAgentSecurityBuildTree,
+} from "../scripts/prepare-prime-agent-security-build.mjs";
 import { removeTemporaryHomeWithRetry } from "./e2e-home-cleanup.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -71,6 +80,7 @@ async function main() {
   const testHome = mkdtempSync(join(tmpdir(), "sophos-e2e-home-"));
   const sessionCwd = join(testHome, "session-project");
   mkdirSync(sessionCwd, { recursive: true });
+  let mockProvider;
   try {
     push("\n=== Staged runtime layout and provenance ===\n");
     const layout = {
@@ -98,17 +108,22 @@ async function main() {
         && manifest.upstream?.license === PRIME_AGENT_PIN.license,
       `${manifest.upstream?.version} ${manifest.upstream?.commit} (${manifest.upstream?.license})`);
       const overlay = manifest.upstream?.overlay;
-      const expectedOverlay = PRIME_AGENT_SESSION_LEASE_OVERLAY;
-      const overlayMatches = overlay?.id === expectedOverlay.id
-        && overlay?.upstreamRepository === expectedOverlay.upstreamRepository
-        && overlay?.upstreamCommit === expectedOverlay.upstreamCommit
-        && overlay?.sourcePath === expectedOverlay.sourcePath
-        && overlay?.sourceSha256 === expectedOverlay.sourceSha256
-        && overlay?.patchPath === expectedOverlay.patchPath
-        && overlay?.patchSha256 === expectedOverlay.patchSha256
-        && overlay?.patchedSourceSha256 === expectedOverlay.patchedSourceSha256;
-      record("provenance: audited Windows session-lease overlay", overlayMatches,
-        overlayMatches ? `${overlay.id} source=${overlay.sourceSha256} patch=${overlay.patchSha256}` : "bundle overlay metadata does not match the pinned source patch");
+      const recordedOverlayMatches = matchesPrimeAgentSecurityBuildProvenance(overlay);
+      let overlayBuildError = null;
+      if (recordedOverlayMatches) {
+        try {
+          const buildDirectory = resolve(REPO, manifest.upstream?.buildDirectory ?? "");
+          const sourceDirectory = resolve(REPO, manifest.upstream?.sourceDirectory ?? "");
+          await verifyPrimeAgentSecurityBuildTree(REPO, buildDirectory, sourceDirectory);
+        } catch (error) {
+          overlayBuildError = error instanceof Error ? error.message : String(error);
+        }
+      }
+      const overlayMatches = recordedOverlayMatches && overlayBuildError === null;
+      record("provenance: composed Prime Agent lease, Windows ZIP guard, worker-shutdown fence, and Linux worker-socket path", overlayMatches,
+        overlayMatches
+          ? `lease=${overlay.sessionLeasePatchSha256} ZIP=${overlay.windowsZipGuardPatchSha256} workerSocket=${overlay.linuxWorkerSocketPathPatchSha256} shutdown=${overlay.workerShutdownFencePatchSha256} order=${overlay.patchOrder.join(" -> ")}`
+          : overlayBuildError ?? "bundle overlay metadata does not match the reviewed composed source patches");
     } catch (error) {
       record("provenance: pinned Prime Agent source", false, String(error));
       report.summary = { overall: "FAIL", reason: "bundle manifest missing or invalid" };
@@ -144,6 +159,8 @@ async function main() {
     }
 
     push("\n=== Real daemon + bridge JSON-RPC integration ===\n");
+    mockProvider = await startE2EMockProvider();
+    const mockModelsPath = writeE2EMockProviderConfig(testHome, mockProvider.baseUrl);
     const isolatedEnv = Object.fromEntries(
       ["PATH", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "SystemDrive", "LANG", "LC_ALL", "TZ"]
         .filter((name) => process.env[name] !== undefined)
@@ -166,6 +183,8 @@ async function main() {
       BRIDGE: BRIDGE_CLI,
       BRIDGE_VERIFY_RECOVERY: "1",
       BRIDGE_VERIFY_SESSION_CWD: sessionCwd,
+      BRIDGE_VERIFY_MODEL_PROVIDER: E2E_MOCK_PROVIDER_ID,
+      BRIDGE_VERIFY_MODEL_ID: E2E_MOCK_MODEL_ID,
     };
     push("\n=== Pinned session-lease ownership, replacement, and provenance ===\n");
     const leaseTestHome = mkdtempSync(join(tmpdir(), "sophos-session-lease-e2e-home-"));
@@ -203,11 +222,13 @@ async function main() {
       `exit=${leaseTests.status ?? "not-started"}${leaseTests.error ? `; ${leaseTests.error.message}` : ""}`);
     const hostAuthFile = join(testHome, ".prime", "agent", "auth.json");
     record("session E2E starts from isolated HOME with no host auth file",
-      !existsSync(hostAuthFile) && readdirSync(testHome).length === 1,
-      `initial HOME entries=${JSON.stringify(readdirSync(testHome))}`);
-    record("session E2E uses an allow-listed environment without provider credentials",
+      !existsSync(hostAuthFile)
+        && existsSync(mockModelsPath)
+        && JSON.stringify(readdirSync(testHome).sort()) === JSON.stringify([".prime", "session-project"]),
+      `initial HOME entries=${JSON.stringify(readdirSync(testHome).sort())}; external auth file=${existsSync(hostAuthFile)}`);
+    record("session E2E uses allow-listed env and an isolated local mock, not external provider credentials",
       Object.keys(env).every((name) => !/(API.?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)/i.test(name)),
-      `environment keys=${Object.keys(env).sort().join(",")}`);
+      `environment keys=${Object.keys(env).sort().join(",")}; mockProvider=${E2E_MOCK_PROVIDER_ID}; mockAPIKey is test-only config`);
     const verification = await runBridgeVerifier(env);
     push(verification.stdout.trimEnd());
     if (verification.stderr.trim()) push(`[bridge verifier stderr]\n${verification.stderr.trimEnd()}`);
@@ -223,6 +244,15 @@ async function main() {
     };
     record("real staged daemon/bridge integration and reconnect", result.ok && !verification.timedOut,
       `${result.passed}/${result.total} checks; exit=${verification.exitCode}; transport=${process.platform === "win32" ? "Windows named pipe" : "Unix-domain socket"}`);
+    record("recovery probe exercised only the loopback mock provider", mockProvider.requestCount > 0,
+      `requests=${mockProvider.requestCount}; liveProviderInference=false; endpoint=${mockProvider.baseUrl}`);
+    report.mockedModelProvider = {
+      provider: E2E_MOCK_PROVIDER_ID,
+      model: E2E_MOCK_MODEL_ID,
+      endpoint: mockProvider.baseUrl,
+      requests: mockProvider.requestCount,
+      liveProviderInference: false,
+    };
     report.summary = {
       overall: report.steps.every((step) => step.ok) ? "PASS" : "FAIL",
       testedPlatform: process.platform,
@@ -233,13 +263,39 @@ async function main() {
     };
   } finally {
     // Early returns still reach finally: no failed or incomplete report may exit zero.
-    const cleanup = await removeTemporaryHomeWithRetry(testHome, {
-      onRetry: ({ attempt, error, retryDelayMs }) => push(
-        `[cleanup] temporary HOME is locked (${error.code}) on attempt ${attempt}; retrying in ${retryDelayMs}ms`,
-      ),
-    });
-    report.cleanup = { status: "PASS", attempts: cleanup.attempts };
-    push(`[cleanup] temporary HOME removed after ${cleanup.attempts} attempt(s)`);
+    if (mockProvider) {
+      let closeError;
+      try {
+        await mockProvider.close();
+      } catch (error) {
+        closeError = error instanceof Error ? error.message : String(error);
+      }
+      if (!report.mockedModelProvider) {
+        report.mockedModelProvider = {
+          provider: E2E_MOCK_PROVIDER_ID,
+          model: E2E_MOCK_MODEL_ID,
+          endpoint: mockProvider.baseUrl,
+          requests: mockProvider.requestCount,
+          liveProviderInference: false,
+        };
+      }
+      record("loopback mock provider shuts down cleanly", !closeError,
+        closeError ?? `requests=${mockProvider.requestCount}`);
+      if (report.summary.overall) report.summary.overall = report.steps.every((step) => step.ok) ? "PASS" : "FAIL";
+    }
+    if (process.env.SOPHOS_E2E_KEEP_HOME === "1") {
+      report.cleanup = { status: "SKIPPED", reason: "SOPHOS_E2E_KEEP_HOME=1" };
+      report.diagnosticsHome = testHome;
+      push(`[cleanup] preserved temporary HOME for diagnosis: ${testHome}`);
+    } else {
+      const cleanup = await removeTemporaryHomeWithRetry(testHome, {
+        onRetry: ({ attempt, error, retryDelayMs }) => push(
+          `[cleanup] temporary HOME is locked (${error.code}) on attempt ${attempt}; retrying in ${retryDelayMs}ms`,
+        ),
+      });
+      report.cleanup = { status: "PASS", attempts: cleanup.attempts };
+      push(`[cleanup] temporary HOME removed after ${cleanup.attempts} attempt(s)`);
+    }
     process.exitCode = report.summary.overall === "PASS" ? 0 : 1;
     report.finishedAt = new Date().toISOString();
     writeFileSync(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);

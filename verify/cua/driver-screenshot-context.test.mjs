@@ -18,7 +18,7 @@ test("pixel-click state capture requests screenshot context for the same window"
   assert.deepEqual(calls, [
     {
       tool: "get_window_state",
-      args: { pid, window_id: windowId, include_screenshot: true },
+      args: { pid, window_id: windowId, include_screenshot: true, session: driver.CUA_SESSION },
     },
   ]);
 });

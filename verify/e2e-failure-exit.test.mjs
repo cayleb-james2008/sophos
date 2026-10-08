@@ -10,9 +10,11 @@ import { NODE_RUNTIME_PIN, PRIME_AGENT_PIN } from "../scripts/runtime-pins.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCES = [
   "verify/e2e.mjs", "verify/runtime-executable.mjs", "verify/e2e-result.mjs",
-  "verify/e2e-home-cleanup.mjs",
+  "verify/e2e-home-cleanup.mjs", "verify/e2e-mock-provider.mjs",
   "scripts/node-runtime.mjs", "scripts/runtime-pins.mjs", "scripts/runtime-pins.json",
   "scripts/prime-agent-ref.mjs", "scripts/apply-prime-agent-overlay.mjs",
+  "scripts/prepare-prime-agent-security-build.mjs", "scripts/prepare-dependency-overlay.mjs",
+  "scripts/dependency-hardening/windows-acl-security.mjs",
 ];
 
 // These intentionally incomplete assets exercise the verifier's refusal paths,
@@ -35,9 +37,12 @@ function withFixture(fn) {
         env: { PATH: process.env.PATH ?? "", HOME: home, USERPROFILE: home,
           TMPDIR: temp, TEMP: temp, TMP: temp, PI_OFFLINE: "1" },
       });
-      assert.equal(child.error, undefined, child.error?.message);
-      assert.equal(child.signal, null, "gate subprocess must complete, not time out");
-      const report = JSON.parse(readFileSync(join(root, "verify/e2e-report.json"), "utf8"));
+      const diagnostics = `status=${child.status} signal=${child.signal}\nstdout:\n${child.stdout ?? ""}\nstderr:\n${child.stderr ?? ""}`;
+      assert.equal(child.error, undefined, `${child.error?.message ?? "gate subprocess failed"}\n${diagnostics}`);
+      assert.equal(child.signal, null, `gate subprocess must complete, not time out\n${diagnostics}`);
+      const reportPath = join(root, "verify/e2e-report.json");
+      assert.ok(existsSync(reportPath), `gate subprocess did not write e2e-report.json\n${diagnostics}`);
+      const report = JSON.parse(readFileSync(reportPath, "utf8"));
       return { child, report };
     };
     fn({ root, invoke });
@@ -84,6 +89,20 @@ test("failed provenance refuses runtime execution before verifier launch", () =>
   const marker = fillLayout(root, JSON.stringify({ upstream: { ...PRIME_AGENT_PIN, commit: "wrong-commit" } }));
   const { child, report } = invoke();
   assert.equal(report.summary.overall, "FAIL");
+  assert.equal(report.summary.reason, "runtime provenance or dependency validation failed");
+  assert.equal(report.steps.find((step) => step.name === "provenance: pinned Prime Agent source")?.ok, false);
   assert.equal(child.status, 1, child.stdout + child.stderr);
   assert.equal(existsSync(marker), false, "failed provenance must never launch the verifier");
+}));
+
+test("fixture import failures expose child stderr instead of report ENOENT", () => withFixture(({ root, invoke }) => {
+  rmSync(join(root, "verify/e2e-mock-provider.mjs"));
+  assert.throws(invoke, (error) => {
+    assert.match(error.message, /gate subprocess did not write e2e-report\.json/);
+    assert.match(error.message, /status=1/);
+    assert.match(error.message, /stderr:\s*[\s\S]*ERR_MODULE_NOT_FOUND/);
+    assert.match(error.message, /e2e-mock-provider\.mjs/);
+    assert.doesNotMatch(error.message, /ENOENT/);
+    return true;
+  });
 }));
