@@ -4,12 +4,13 @@
 
 # Sophos
 
-**A Windows-native coding agent. Own your intelligence.**
+**A graphical interface and enhanced interpretation of Prime Agent for Windows.**
 
 I’m building Sophos to bring [Prime Intellect’s](https://www.primeintellect.ai/)
-open-source Prime Agent coding agent to Windows as a desktop app. I work on the
-Tauri v2/Rust shell, React UI, packaging, and reliability layers around the
-upstream runtime. Prime Intellect created the agent runtime, daemon, and bridge;
+open-source Prime Agent concept to Windows through a graphical desktop app.
+Sophos adds a Tauri v2/Rust shell, React views for sessions and agents,
+packaging, and reliability layers around the upstream runtime. Prime Intellect
+created the agent runtime, daemon, and bridge;
 Sophos pins their public v0.7.0 source and includes the upstream MIT notice.
 
 **Windows-only.** I’m building Sophos for Windows 10/11 developers who want
@@ -75,6 +76,17 @@ the verification boundary.
 ---
 
 ## Verification status
+
+The current source baseline is merged master
+[`48d6cbdc011fcf762a872f1353f926419c994e29`](https://github.com/cayleb-james2008/sophos/commit/48d6cbdc011fcf762a872f1353f926419c994e29).
+Its [Windows CI run](https://github.com/cayleb-james2008/sophos/actions/runs/37765204065)
+passed 1,126 frontend tests, seven native containment regressions, staged and
+standalone lifecycle checks (50/50 each), and eight CUA demo suites. Three
+background keyboard subchecks remain skipped. These results do not establish
+installation of the current-source MSI, live provider inference, or every
+Windows version. The differentiation document now describes the
+[current source and its limits](docs/WHATS_DIFFERENT.md); the dated snapshots
+below retain their original scope.
 
 I keep local source checks separate from Windows installer and UI acceptance.
 This acceptance snapshot covers PR #14's merged product/runtime candidate,
