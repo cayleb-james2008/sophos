@@ -65,6 +65,10 @@ jobs:
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Native Windows job containment and fault regression tests
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: cargo test --locked --manifest-path verify/job-containment/Cargo.toml --test windows -- --test-threads=1
+
       - name: Install dependencies
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm ci

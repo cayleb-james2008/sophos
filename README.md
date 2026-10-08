@@ -115,6 +115,44 @@ Its direct standalone verification is Linux-local; the Windows package/E2E
 evidence above does not substitute for a hosted Windows invocation of that
 developer command.
 
+### Reviewed follow-up publication
+
+I merged the standalone lifecycle tooling repair in
+[PR #15](https://github.com/cayleb-james2008/sophos/pull/15) after independent
+review of `1e3af2cc23a90f94aa5c93089487fe0926a5dead` and successful exact-head
+[push CI](https://github.com/cayleb-james2008/sophos/actions/runs/37746612479)
+and [PR CI, attempt 2](https://github.com/cayleb-james2008/sophos/actions/runs/37746618605/attempts/2).
+The merge is `46d990d20b8169b28dcd9b00a57096ca062b8966`. Both Windows
+standalone invocations and both staged E2E runs passed 50/50 using one
+loopback-provider request each. Windows IPC cancellation and Linux lifecycle
+fixtures also passed. This supersedes the standalone-tooling limitation in
+the historical snapshot above, not the public-package/source boundary.
+
+PR CI's first attempt failed the Chat model-selector assertion, “MiniMax M3
+not listed in model panel.” I retained that failure. Only the failed CUA job
+was rerun at the unchanged head; it passed 8/8 suites, with the original
+successful Windows test and Linux jobs reused. The three background keyboard
+subcheck skips remain. The separate merged-head workflow is
+[run 37756446836](https://github.com/cayleb-james2008/sophos/actions/runs/37756446836);
+its terminal result must be checked before extending acceptance to that merge.
+
+Independent review also found that the Rust shell ignored job-assignment
+errors and substituted a null job when creation failed. The separate
+containment candidate now refuses setup without a configured job and starts
+daemon/sidecar processes suspended, assigns them, then resumes them. Failed
+assignment or resume terminates and reaps the child before publishing its
+pipes. Native fault/descendant regressions are blocking Windows CI; this
+source change is not acceptance evidence until those exact-head gates and
+independent review pass. It is not an explanation of the historical shutdown
+trace and is not included in PR #15's tooling-only approval.
+
+One further evidence limit: the public-smoke “no console errors” entry is an
+explicit no-op placeholder, not console monitoring. Its reported 7/7 includes
+that placeholder; only six entries perform real assertions. I do not infer a
+clean WebView console from it. The five high production-audit records remain
+unresolved; this containment/tooling work does not upgrade that dependency
+graph or establish production, billing, or live-provider inference acceptance.
+
 ---
 
 ## What's inside
