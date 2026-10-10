@@ -52,8 +52,7 @@ describe("NewSessionModal", () => {
 
   it("pre-fills the saved default working directory on open", async () => {
     renderModal();
-    await waitFor(() => expect(mockClient.getSettings).toHaveBeenCalled());
-    expect(screen.getByDisplayValue("C:\\work\\default")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("C:\\work\\default")).toBeInTheDocument();
   });
 
   it("creates a session with trimmed cwd and goal", async () => {

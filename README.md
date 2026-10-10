@@ -77,14 +77,18 @@ the verification boundary.
 
 ## Verification status
 
-The current source baseline is merged master
+The PR #16 source-publication baseline is
 [`48d6cbdc011fcf762a872f1353f926419c994e29`](https://github.com/cayleb-james2008/sophos/commit/48d6cbdc011fcf762a872f1353f926419c994e29).
 Its [Windows CI run](https://github.com/cayleb-james2008/sophos/actions/runs/37765204065)
 passed 1,126 frontend tests, seven native containment regressions, staged and
 standalone lifecycle checks (50/50 each), and eight CUA demo suites. Three
 background keyboard subchecks remain skipped. These results do not establish
 installation of the current-source MSI, live provider inference, or every
-Windows version. The differentiation document now describes the
+Windows version. Current `master` is
+[`bea08f9d0c779cf990e125aabdda4ad5e6f58804`](https://github.com/cayleb-james2008/sophos/commit/bea08f9d0c779cf990e125aabdda4ad5e6f58804),
+the documentation-only PR #17 follow-up; its exact-head [CI run](https://github.com/cayleb-james2008/sophos/actions/runs/37858358710)
+passed all three required jobs. PR #17 changed no executable source or
+workflows. The differentiation document now describes the
 [current source and its limits](docs/WHATS_DIFFERENT.md); the dated snapshots
 below retain their original scope.
 
