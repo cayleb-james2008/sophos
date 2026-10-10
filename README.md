@@ -84,10 +84,13 @@ passed 1,126 frontend tests, seven native containment regressions, staged and
 standalone lifecycle checks (50/50 each), and eight CUA demo suites. Three
 background keyboard subchecks remain skipped. These results do not establish
 installation of the current-source MSI, live provider inference, or every
-Windows version. Current `master` is
-[`bea08f9d0c779cf990e125aabdda4ad5e6f58804`](https://github.com/cayleb-james2008/sophos/commit/bea08f9d0c779cf990e125aabdda4ad5e6f58804),
-the documentation-only PR #17 follow-up; its exact-head [CI run](https://github.com/cayleb-james2008/sophos/actions/runs/37858358710)
-passed all three required jobs. PR #17 changed no executable source or
+Windows version. The [live `master` branch](https://github.com/cayleb-james2008/sophos/tree/master)
+may advance through reviewed documentation and test updates; the immutable PR #17
+snapshot was `bea08f9d0c779cf990e125aabdda4ad5e6f58804`, and its exact-head
+[CI run](https://github.com/cayleb-james2008/sophos/actions/runs/37858358710)
+passed all three required jobs. The follow-up PR #18 corrected this baseline
+label and fixed an asynchronous UI-test assertion; its exact-head push and PR
+workflows passed all three jobs. Neither follow-up changed runtime behavior or
 workflows. The differentiation document now describes the
 [current source and its limits](docs/WHATS_DIFFERENT.md); the dated snapshots
 below retain their original scope.
