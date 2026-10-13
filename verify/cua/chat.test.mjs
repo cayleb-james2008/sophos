@@ -21,7 +21,7 @@
 
 import { getWindowState, sleep, typeText, pressKey, hotkey, click, bringToFront, listWindows, call, startDaemon, stopDaemon } from "./driver.mjs";
 import { navTo, takeScreenshot, getTextContent, elementCenter, SCREENSHOT_DIR } from "./helpers.mjs";
-import { findBy, findAll, clickBy, waitFor } from "./find-util.mjs";
+import { findBy, findAll, clickBy, waitFor, waitForAllElements } from "./find-util.mjs";
 import { assert, assertTextContains } from "./assertions.mjs";
 import { enableWebContentAccessibility } from "./demo-launch.mjs";
 import { WORKSPACE_ROOT } from "./launch.mjs";
@@ -120,7 +120,10 @@ async function typeInto(app, text) {
 
 /** Click the Send button (only present when idle). */
 async function clickSend(app) {
-  const st = freshState(app);
+  // Native accessibility can lag the React draft/idle transition. Wait for
+  // the actual Send control instead of treating one absent snapshot as busy.
+  const st = await waitForAllElements(() => freshState(app), [{ role: "Button", name: "Send message" }], 20000);
+  assert(st, "Send button did not appear after the composer idle/draft transition");
   const send = findBy(st, { role: "Button", name: "Send message" });
   assert(send, "Send button not found (is the composer busy?)");
   clickBy(app.pid, st, { role: "Button", name: "Send message" });
@@ -375,9 +378,22 @@ const tests = [
       try { clickBy(app.pid, after, { text: "/cd" }); } catch {}
       await sleep(2000);
       const newDialog = (listWindows() || []).map((w) => w.title).filter((t) => !winsBefore.includes(t));
-      if (newDialog.length > 0) {
-        pressKey(app.pid, "escape", app.windowId);
-        await sleep(600);
+      const picker = freshState(app);
+      if (findBy(picker, { role: "Button", name: "Select Folder" })) {
+        // Escape delivery to a background WebView does not dismiss the native
+        // folder picker reliably. Its owned modal is exposed in the app tree;
+        // invoke Cancel and verify it closed before later tests click the app.
+        assert(findBy(picker, { role: "Button", name: "Cancel" }), "Folder picker Cancel control not found");
+        clickBy(app.pid, picker, { role: "Button", name: "Cancel" });
+        const deadline = Date.now() + 10000;
+        let closed = false;
+        while (Date.now() < deadline) {
+          if (!findBy(freshState(app), { role: "Button", name: "Select Folder" })) { closed = true; break; }
+          await sleep(250);
+        }
+        assert(closed, "Native folder picker remained open after Cancel");
+      } else {
+        assert(newDialog.length === 0, "Unexpected native dialog after /cd");
       }
       // Either the composer cleared (picker path ran) or a native dialog was
       // handled above. The autocomplete wiring is the durable assertion.
@@ -454,9 +470,10 @@ const tests = [
       const exp = findBy(st, { role: "Button", name: "Export session to HTML" });
       assert(exp, "Export button not found");
       clickBy(app.pid, st, { role: "Button", name: "Export session to HTML" });
-      await sleep(700);
-      const after = freshState(app);
-      assertTextContains(after, "Exporting session to HTML");
+      // Read the transient toast immediately; the native snapshot itself can
+      // take most of the toast's 2.6-second lifetime.
+      const exported = await waitForAllElements(() => freshState(app), [{ text: "Exporting session to HTML" }], 10000);
+      assert(exported, "Export toast did not appear after clicking Export");
       takeScreenshot(app.pid, "chat-export", app.windowId);
     },
   },
