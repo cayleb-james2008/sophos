@@ -38,7 +38,9 @@ const REPORT_PATH = resolve(process.env.SOPHOS_VERIFY_REPORT_PATH || join(__dirn
 const VERIFIED_INSTALLER_OUTPUT = process.env.SOPHOS_VERIFIED_INSTALLER_OUTPUT;
 const VERIFIED_INSTALLER_METADATA_OUTPUT = process.env.SOPHOS_VERIFIED_INSTALLER_METADATA_OUTPUT;
 const MANIFEST_TIMEOUT_MS = 20_000;
-const INSTALLER_TIMEOUT_MS = 120_000; // a ~100 MB installer download is slow
+// Keep the complete response-body read bounded, but allow a slow hosted-runner
+// transfer of the public ~100 MB installer to finish without a flaky 2-minute cutoff.
+const INSTALLER_TIMEOUT_MS = 300_000;
 
 const results = [];
 function check(name, cond, detail = "") {
