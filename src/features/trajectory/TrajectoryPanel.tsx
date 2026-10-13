@@ -19,15 +19,26 @@ function formatTime(iso: string): string {
 
 function kindLabel(kind: TrajectoryEntry["kind"]): string {
   switch (kind) {
-    case "prompt": return "Prompt";
-    case "thinking": return "Thinking";
-    case "tool": return "Tool";
-    case "message": return "Message";
-    case "state": return "State";
-    case "agent": return "Agent";
-    case "refinement": return "Refine";
-    case "program": return "Program";
-    default: return "System";
+    case "prompt":
+      return "Prompt";
+    case "thinking":
+      return "Thinking";
+    case "tool":
+      return "Tool";
+    case "message":
+      return "Message";
+    case "state":
+      return "State";
+    case "agent":
+      return "Agent";
+    case "refinement":
+      return "Refine";
+    case "program":
+      return "Program";
+    case "checkpoint":
+      return "Checkpoint";
+    default:
+      return "System";
   }
 }
 
@@ -62,9 +73,7 @@ export function TrajectoryPanel() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return entries;
-    return entries.filter((e) =>
-      `${e.label} ${e.summary} ${e.detail ?? ""}`.toLowerCase().includes(q),
-    );
+    return entries.filter((e) => `${e.label} ${e.summary} ${e.detail ?? ""}`.toLowerCase().includes(q));
   }, [entries, query]);
 
   useEffect(() => {
@@ -74,9 +83,12 @@ export function TrajectoryPanel() {
     if (timerRef.current) window.clearTimeout(timerRef.current);
   }, [query, selectedSession]);
 
-  useEffect(() => () => {
-    if (timerRef.current) window.clearTimeout(timerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    },
+    [],
+  );
 
   // Replay driver: step the cursor through the filtered stream.
   useEffect(() => {
@@ -108,7 +120,13 @@ export function TrajectoryPanel() {
     setBusy(true);
     try {
       await ipc.resumeSession(selectedSession);
-      record(selectedSession, { kind: "system", label: "Trajectory", summary: "Resumed session from the Trajectory view", detail: selectedSession, source: "trajectory" });
+      record(selectedSession, {
+        kind: "system",
+        label: "Trajectory",
+        summary: "Resumed session from the Trajectory view",
+        detail: selectedSession,
+        source: "trajectory",
+      });
     } catch {
       // Daemon unreachable — nothing to resume against.
     } finally {
@@ -122,7 +140,13 @@ export function TrajectoryPanel() {
     setBusy(true);
     try {
       await ipc.forkSession(selectedSession);
-      record(selectedSession, { kind: "system", label: "Trajectory", summary: "Forked session from the Trajectory view", detail: selectedSession, source: "trajectory" });
+      record(selectedSession, {
+        kind: "system",
+        label: "Trajectory",
+        summary: "Forked session from the Trajectory view",
+        detail: selectedSession,
+        source: "trajectory",
+      });
     } catch {
       // Fork needs a forkable entry; the Sessions panel is the fallback.
     } finally {
@@ -141,10 +165,16 @@ export function TrajectoryPanel() {
       <aside className="traj__drawer" role="dialog" aria-label="Trajectory">
         <header className="traj__header">
           <div className="traj__heading">
-            <Text variant="micro" tone="dim" mono uppercase>Every run is traceable</Text>
-            <Text variant="subtitle" weight="semibold">Trajectory</Text>
+            <Text variant="micro" tone="dim" mono uppercase>
+              Every run is traceable
+            </Text>
+            <Text variant="subtitle" weight="semibold">
+              Trajectory
+            </Text>
           </div>
-          <IconButton title="Close trajectory" onClick={() => setTrajectoryOpen(false)} size="sm">✕</IconButton>
+          <IconButton title="Close trajectory" onClick={() => setTrajectoryOpen(false)} size="sm">
+            ✕
+          </IconButton>
         </header>
 
         {/* Session selector */}
@@ -175,27 +205,59 @@ export function TrajectoryPanel() {
               className="traj__search-input"
             />
             {query ? (
-              <IconButton className="traj__search-clear" onClick={() => setQuery("")} title="Clear search" size="sm">✕</IconButton>
+              <IconButton
+                className="traj__search-clear"
+                onClick={() => setQuery("")}
+                title="Clear search"
+                size="sm"
+              >
+                ✕
+              </IconButton>
             ) : null}
           </div>
 
           <div className="traj__actions">
             {!replaying ? (
-              <Button variant="outline" size="sm" onClick={startReplay} disabled={filtered.length === 0} title="Replay the event stream">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startReplay}
+                disabled={filtered.length === 0}
+                title="Replay the event stream"
+              >
                 Replay
               </Button>
             ) : (
               <>
-                <Button variant="accent-soft" size="sm" onClick={() => setPlaying((p) => !p)} title={playing ? "Pause replay" : "Play replay"}>
+                <Button
+                  variant="accent-soft"
+                  size="sm"
+                  onClick={() => setPlaying((p) => !p)}
+                  title={playing ? "Pause replay" : "Play replay"}
+                >
                   {playing ? "Pause" : "Play"}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={stopReplay} title="Stop replay">Stop</Button>
+                <Button variant="ghost" size="sm" onClick={stopReplay} title="Stop replay">
+                  Stop
+                </Button>
               </>
             )}
-            <Button variant="ghost" size="sm" onClick={() => void handleResume()} disabled={busy} title="Load this session into the conversation">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleResume()}
+              disabled={busy}
+              title="Load this session into the conversation"
+            >
               {busy ? <Spinner size={12} /> : null} Resume
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => void handleFork()} disabled={busy} title="Branch a new session from this one">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleFork()}
+              disabled={busy}
+              title="Branch a new session from this one"
+            >
               Fork
             </Button>
           </div>
@@ -214,7 +276,9 @@ export function TrajectoryPanel() {
           {filtered.length === 0 ? (
             <div className="traj__empty">
               <Text variant="label" tone="muted">
-                {query ? "No events match your search." : "No events recorded yet for this session. Send a message and the stream will appear here."}
+                {query
+                  ? "No events match your search."
+                  : "No events recorded yet for this session. Send a message and the stream will appear here."}
               </Text>
             </div>
           ) : (

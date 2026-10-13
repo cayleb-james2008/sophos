@@ -5,6 +5,19 @@ import test from "node:test";
 const verifySource = await readFile(new URL("./verify.mjs", import.meta.url), "utf8");
 const lifecycleSource = await readFile(new URL("./verify-lifecycle.mjs", import.meta.url), "utf8");
 
+test("verification harness isolates provider credentials and tests login/logout semantics", () => {
+  assert.ok(verifySource.includes("const VERIFY_HOME = mkdtempSync(join(tmpdir(),"));
+  assert.ok(verifySource.includes("process.env.HOME = VERIFY_HOME"));
+  assert.ok(verifySource.includes("env: process.env"));
+  assert.ok(verifySource.includes("missingKeyLogin.error?.code === -32602"));
+  assert.ok(verifySource.includes("blankKeyLogin.error?.code === -32602"));
+  assert.ok(verifySource.includes("storedAuth.openrouter?.key === fixtureKey"));
+  assert.ok(verifySource.includes("blankReplacementLogin.error?.code === -32602"));
+  assert.ok(verifySource.includes('settingsResp.result?.auth === undefined'));
+  assert.ok(verifySource.includes('!Object.hasOwn(loggedOutAuth, "openrouter")'));
+  assert.ok(verifySource.includes("rmSync(VERIFY_HOME, { recursive: true, force: true })"));
+});
+
 test("cross-platform lifecycle IPC cancellation routes to the verifier's awaited cleanup handler", () => {
   assert.ok(lifecycleSource.includes('stdio: ["inherit", "inherit", "inherit", "ipc"]'));
   assert.ok(lifecycleSource.includes("requestLifecycleCancellation(activeChild, signal)"));
@@ -35,6 +48,8 @@ test("recovery probe requires successful isolated model selection before dispatc
 test("standalone lifecycle verifier provisions only the loopback recovery fixture", () => {
   assert.ok(lifecycleSource.includes("startE2EMockProvider()"));
   assert.ok(lifecycleSource.includes("writeE2EMockProviderConfig(isolatedHome, mockProvider.baseUrl)"));
+  assert.ok(lifecycleSource.includes("BRIDGE_VERIFY_MOCK_BASE_URL: mockProvider.baseUrl"));
+  assert.ok(verifySource.includes("writeE2EMockProviderConfig(VERIFY_HOME, process.env.BRIDGE_VERIFY_MOCK_BASE_URL)"));
   assert.ok(lifecycleSource.includes("BRIDGE_VERIFY_MODEL_PROVIDER: E2E_MOCK_PROVIDER_ID"));
   assert.ok(lifecycleSource.includes("BRIDGE_VERIFY_MODEL_ID: E2E_MOCK_MODEL_ID"));
   assert.ok(lifecycleSource.includes('PI_OFFLINE: "1"'));
@@ -140,7 +155,7 @@ test("shutdown aborts daemon startup and gates bridge/test startup", () => {
   assert.ok(startupBlock.includes("startupAbort.signal"), "the daemon startup wait receives the cancellation signal");
   assert.match(startupBlock, /startBridge:\s*\(\) =>/);
   assert.match(startupBlock, /if \(!startupCompleted \|\| startupAbort\.signal\.aborted\)/);
-  assert.match(startupBlock, /await startCleanup\(\);\s*return;/);
+  assert.match(startupBlock, /await startCleanup\(\);\s*rmSync\(VERIFY_HOME, \{ recursive: true, force: true \}\);\s*return;/);
   assert.ok(verifySource.includes("startupAbort.abort()"), "starting cleanup cancels startup and in-flight test waits");
   assert.ok(verifySource.includes('if (err?.name !== "RunCancelledError")'), "signal cancellation is not recorded as a test failure");
 });

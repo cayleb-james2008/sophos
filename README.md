@@ -6,14 +6,14 @@
 
 **A graphical interface and enhanced interpretation of Prime Agent for Windows.**
 
-I’m building Sophos to bring [Prime Intellect’s](https://www.primeintellect.ai/)
-open-source Prime Agent concept to Windows through a graphical desktop app.
+Sophos brings [Prime Intellect’s](https://www.primeintellect.ai/)
+open-source Prime Agent to Windows through a graphical desktop app.
 Sophos adds a Tauri v2/Rust shell, React views for sessions and agents,
 packaging, and reliability layers around the upstream runtime. Prime Intellect
 created the agent runtime, daemon, and bridge;
 Sophos pins their public v0.7.0 source and includes the upstream MIT notice.
 
-**Windows-only.** I’m building Sophos for Windows 10/11 developers who want
+**Windows-only.** Sophos is for Windows 10/11 developers who want
 Prime Agent in a desktop app instead of a terminal. The GitLab Releases page
 currently lists v0.6.0 as its latest tagged release; the signed updater feed
 separately announces a v0.7.2 package. Those are different publication
@@ -77,6 +77,20 @@ the verification boundary.
 
 ## Verification status
 
+**Implemented desktop and source checks.** Sophos
+covers daemon-backed sessions and persisted transcripts across restart, saved
+profiles whose instructions apply to new sessions, loopback local-model
+discovery and catalog registration, and real daemon token-budget and semantic
+compaction calls. Profile tool/skill/safety choices remain descriptive; they do
+not grant permissions. The source passed 1,224 Vitest tests across 147 files,
+82 Node tests, and eight Rust lease tests locally. The bridge boundary suite
+passes nine checks, including concurrent credential updates and failed settings
+writes. [PR #20 checks](https://github.com/cayleb-james2008/sophos/pull/20/checks)
+record the hosted Windows results for the corresponding source head.
+This does not establish current-source installer acceptance or live provider
+inference. The CI and installer records below remain tied to their named
+historical commits and packages.
+
 The PR #16 source-publication baseline is
 [`48d6cbdc011fcf762a872f1353f926419c994e29`](https://github.com/cayleb-james2008/sophos/commit/48d6cbdc011fcf762a872f1353f926419c994e29).
 Its [Windows CI run](https://github.com/cayleb-james2008/sophos/actions/runs/37765204065)
@@ -123,16 +137,19 @@ were superseded by the exact-head and post-merge runs listed above. The stale
 UIA identity after reconnect was fixed and the merged-master 50/50 recovery E2E
 and native Agents CUA both passed.
 
-The pinned Prime Agent production dependency graph still has five high npm
-audit records (zero critical): two unresolved `extract-zip` symlink/path
-advisories and an FTP/proxy dependency advisory whose compatible clean upgrade
-requires an untested major-version change. Root development dependencies also
-retain audit findings. The ZIP helper auto-install path is disabled; no clean-
-audit claim is made. The staged standalone lifecycle command's compile-only
-package-layout defect is addressed in a separate, non-runtime tooling follow-up.
-Its direct standalone verification is Linux-local; the Windows package/E2E
-evidence above does not substitute for a hosted Windows invocation of that
-developer command.
+The pinned Prime Agent production graph is staged by the same bundler for the
+diagnostic and Windows release paths. A reviewed `basic-ftp@6.2.1` override
+removes the FTP listing advisory while retaining `get-uri@6.0.5`,
+`pac-proxy-agent@7.2.0`, and `proxy-agent@6.5.0`; a local FTP fixture verifies
+the complete access/list/download path. The latest staged production audit
+reports one high package record containing two unresolved `extract-zip`
+symlink/path advisories (zero critical, no fix available). The Windows ZIP
+helper auto-install path remains disabled, and no clean-audit claim is made.
+Root development dependencies also retain audit findings. The staged standalone
+lifecycle command's compile-only package-layout defect is addressed in a
+separate, non-runtime tooling follow-up. Its direct standalone verification is
+Linux-local; the Windows package/E2E evidence above does not substitute for a
+hosted Windows invocation of that developer command.
 
 ### Reviewed follow-up publication
 
@@ -248,85 +265,25 @@ field. Flat, minimal, legible from 16px to 512px. Source: `public/sophos-icon.sv
 
 ---
 
-## Code Mode — the typed tool SDK
+## Code Mode — interface preview
 
-Code Mode (selectable from the header profile chip, next to Standard /
-Minimal / Creator) exposes the agent's tools through a **typed TypeScript
-SDK**: the agent writes ONE program that calls many tools in a single step
-instead of dozens of separate tool round-trips — exactly what DeepSeek
-Harness's Code mode does.
+Code Mode renders a typed SDK and a `run_code` program view, but the pinned
+Prime Agent daemon does not execute Sophos `run_code` programs. The program,
+tool-call cards, and demo responses are simulated previews, not native tool
+execution. MCP server/resource/prompt, CUA/UIA, workspace-security, squad,
+thought-tree, distilled-skill, workspace-twin, and checkpoint-restore bridge
+operations are unsupported in this build and return an explicit error; their
+related UI is preview-only.
 
-- **Deterministic SDK renderer** — turns a live tool registry into typed
-  TypeScript stubs: lexicographic tool order, byte-identical output for an
-  unchanged tool set, and unsupported schemas degrade to a permissive
-  contract instead of throwing. Only erasable TypeScript is emitted, so
-  stripping types yields valid JavaScript.
-- **Live tool registry** — built from the same sources the rest of the app
-  already uses: built-in tools, extension tools (`getExtensions`), MCP tools
-  (enabled servers in Settings → Advanced, probed via `testMcpServer`), and
-  skills (`getRuntimeInfo`).
-- **run_code program view** — a right-side drawer decomposes each program
-  into its individual tool-call cards (the same cards the chat renders) and
-  records the program + every call in the Trajectory log, so runs are
-  searchable, resumable, and forkable like any session.
+## Profiles — saved instructions with preview-only controls
 
-> **Known limitation:** `run_code` is **demo-mode only** for now. The daemon
-> contract has no seam for a sandboxed TypeScript runtime, so programs are
-> simulated and every output is clearly labeled — a real runtime needs a
-> daemon/bridge contract change (see CHANGELOG).
-
----
-
-## Profile Studio — build your own agent
-
-The Profile Studio (opens from the header profile chip → **Profile Studio —
-build your own**) is the DeepSeek Harness **Creator mode made visual**: inspect
-the live runtime, compose capabilities, and test in memory — no restart, no
-Save required to see the effect.
-
-- **Inspect the live runtime** — the editor composes from the same live tool
-  registry the Code Mode SDK renders (built-in tools + extension/MCP tools +
-  discovered skills, with per-category counts). A source that is absent — no
-  MCP servers configured, no extensions, the runtime not reporting skills —
-  degrades honestly: the group renders its count and a plain note instead of
-  pretending.
-- **Compose** — name, tagline, description, working style (one chip per
-  line), base mode (Standard / Minimal / Creator / Code), tool toggles per
-  category, skill toggles, and a safety posture (auto-approve safe tools vs.
-  a confirm list). A live composition summary updates with every toggle.
-- **Test in memory (hot reload)** — every edit applies to the running app
-  immediately: the header chip, the composer hint, and (in demo mode) the
-  simulated responses all follow the draft. **Save** persists to settings and
-  selects a new profile; **Discard** drops the draft; **Delete** removes the
-  profile and falls back to Standard defaults if it was active. A malformed
-  or empty profile (no name / no tools) degrades to Standard defaults
-  instead of crashing.
-- **Picker integration** — custom profiles live in a **Custom** section
-  beside the five built-ins (Gauntlet / Standard / Minimal / Creator / Code),
-  each with Edit / Export / Delete actions; the selection and the store survive
-  restarts.
-- **Portability (export / import)** — save any custom profile to a
-  **human-readable JSON file** (`*.sophos-profile.json`, a pretty-printed
-  `sophos-custom-profile` envelope) and load it back or share it: **Export**
-  from the studio footer (the live draft, even before Save) or a profile's
-  card in the picker writes through the **native save dialog**; **Import** via
-  the **native open dialog** re-parses the file through the same guarded
-  store sanitizer settings use, so an export → import round-trip reproduces
-  the identical composition. Parsing never crashes — malformed JSON, a
-  foreign file, a future version, or a broken field shape each produce a
-  clear error — and a name collision is **never silently overwritten**: the
-  incoming profile becomes a unique copy (`"Name (copy)"`) with a visible
-  notice saying nothing was overwritten.
-
-> **Known limitation:** a custom profile's instructions are an **additive
-> UI-layer hint, exactly like the built-in profiles** — the daemon contract
-> has no seam to apply the composed system prompt / tool set / safety posture
-> to live sessions (the bridge forwards only `streamingBehavior` and
-> `queueIfBusy` from prompt options). Custom profiles therefore visibly drive
-> the header chip, composer hint, composition summary, and demo responses,
-> and persist in settings — but wiring them into the live daemon needs a
-> bridge/daemon contract change (a future release). See CHANGELOG for the
-> full limitation and the `custom-protocol` build note.
+Custom profiles persist locally and can be selected for new sessions; Sophos
+adds the selected profile's instructions to the daemon system prompt when the
+session is created. Existing sessions keep their original setup. Tool, skill,
+and safety choices in Profile Studio describe the profile and its UI preview;
+they do not change daemon capabilities or enforce approval rules. Loopback
+local-model discovery and catalog registration are supported, but a registered
+model is not evidence of successful live inference.
 
 ---
 

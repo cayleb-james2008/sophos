@@ -92,7 +92,16 @@ function ViewScaffoldError({
   return (
     <div className="view-scaffold__error" role="alert">
       <div className="view-scaffold__error-icon view-scaffold__error-icon--danger" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <circle cx="12" cy="12" r="9" />
           <line x1="12" y1="8" x2="12" y2="13" />
           <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -104,9 +113,7 @@ function ViewScaffoldError({
       <Text variant="label" tone="muted">
         Something went wrong. Retry to recover, or check the daemon connection.
       </Text>
-      {detail ? (
-        <pre className="view-scaffold__error-detail">{detail}</pre>
-      ) : null}
+      {detail ? <pre className="view-scaffold__error-detail">{detail}</pre> : null}
       {onRetry ? (
         <Button variant="accent-soft" onClick={onRetry}>
           Retry

@@ -21,34 +21,77 @@ import type { Readable, Writable } from "node:stream";
 
 import type {
   AgentInfo,
-  AgentMessage,
   ConnectionState,
   IpcEvent,
+  MemoryTier,
+  MemoryTierEntry,
   Settings,
+  SquadWorkflowType,
+  WorkspaceSecurityPolicy,
+  DesktopUiAction,
 } from "../../src/ipc/contract.js";
 import {
   ConnectionHolder,
+  createCheckpoint as connCreateCheckpoint,
   enrichConnectionState,
+  evaluateSquadPiece as connEvaluateSquadPiece,
+  forgetMemory as connForgetMemory,
   getHarnessState as connGetHarnessState,
   getKernelState as connGetKernelState,
+  getMcpPrompt as connGetMcpPrompt,
+  getMcpServers as connGetMcpServers,
+  getMemoryState as connGetMemoryState,
   getModels as connGetModels,
   getProviders as connGetProviders,
+  getSecurityAuditLog as connGetSecurityAuditLog,
+  getSecurityPolicy as connGetSecurityPolicy,
+  getSquadTopology as connGetSquadTopology,
+  getSquadWorkflow as connGetSquadWorkflow,
+  getTokenBudget as connGetTokenBudget,
   getTranscript as connGetTranscript,
+  listCheckpoints as connListCheckpoints,
   listSessions as connListSessions,
   mapConnectionState,
   mapContextTree,
-  mapAgentMessage,
   mapCronJobToSchedule,
   mapSessionTree,
+  pauseSquadWorkflow as connPauseSquadWorkflow,
+  readMcpResource as connReadMcpResource,
+  recallMemory as connRecallMemory,
+  restoreCheckpoint as connRestoreCheckpoint,
+  runSquadWorkflow as connRunSquadWorkflow,
+  searchMemory as connSearchMemory,
+  setSecurityPolicy as connSetSecurityPolicy,
+  storeMemory as connStoreMemory,
   writeAuthKey,
   writeModelOverrideToModelsJson,
+  writeLocalProvidersToModelsJson,
+  analyzeBlastRadius as connAnalyzeBlastRadius,
+  compactContext as connCompactContext,
+  listDesktopWindows as connListDesktopWindows,
+  inspectDesktopWindow as connInspectDesktopWindow,
+  dispatchDesktopAction as connDispatchDesktopAction,
+  captureDesktopScreenshot as connCaptureDesktopScreenshot,
+  listDistilledSkills as connListDistilledSkills,
+  distillSkillFromTrajectory as connDistillSkillFromTrajectory,
+  promoteSkill as connPromoteSkill,
+  deleteDistilledSkill as connDeleteDistilledSkill,
+  getThoughtTree as connGetThoughtTree,
+  runSpeculativeBranch as connRunSpeculativeBranch,
+  pruneThoughtBranch as connPruneThoughtBranch,
+  promoteThoughtBranch as connPromoteThoughtBranch,
+  listWorkspaceTwins as connListWorkspaceTwins,
+  createWorkspaceTwin as connCreateWorkspaceTwin,
+  executeInTwin as connExecuteInTwin,
+  diffWorkspaceTwin as connDiffWorkspaceTwin,
+  mergeWorkspaceTwin as connMergeWorkspaceTwin,
+  rollbackWorkspaceTwin as connRollbackWorkspaceTwin,
   type AgentConnectionRlmChild,
 } from "./connection.js";
 
 // ---------------------------------------------------------------------------
-// JSON-RPC envelope (subset of JSON-RPC 2.0 — the Rust shell uses
-// method-tagged objects without a version member, but a supplied version must
-// be valid JSON-RPC 2.0).
+// JSON-RPC envelope (subset of JSON-RPC 2.0 — we don't require a version
+// field because the Rust shell uses method-tagged objects).
 // ---------------------------------------------------------------------------
 
 type RpcId = string | number | null;
@@ -64,10 +107,6 @@ interface RpcResponse {
   id: RpcId;
   result?: unknown;
   error?: { code: number; message: string; data?: unknown };
-}
-
-interface RpcEventEnvelope {
-  event: IpcEvent;
 }
 
 const JSON_RPC_ERROR = {
@@ -137,19 +176,13 @@ export class RpcServer {
     try {
       parsed = JSON.parse(line);
     } catch (err) {
-      // Parse errors are protocol errors, not notifications: no request ID can
-      // be recovered, so JSON-RPC requires an explicit null ID response.
       await this.respondError(true, null, JSON_RPC_ERROR.parseError, "parse error", String(err));
       return;
     }
     if (!isRpcRequest(parsed)) {
-      // Invalid request objects also receive an error with an explicit null ID,
-      // even if a malformed object happened to contain an `id` member.
       await this.respondError(true, null, JSON_RPC_ERROR.invalidRequest, "invalid request");
       return;
     }
-    // Omitted IDs are notifications. A present null ID is still a request and
-    // must receive a response whose ID is null.
     const hasId = Object.prototype.hasOwnProperty.call(parsed, "id");
     const id = hasId ? parsed.id! : null;
     try {
@@ -167,7 +200,17 @@ export class RpcServer {
     // params and returns either void or a typed shape.
     switch (method) {
       case "prompt": {
-        const p = requireParams<{ text: string; options?: { thinking?: string; streamingBehavior?: "steer" | "followUp"; queueIfBusy?: boolean; serviceTier?: string; transport?: string; goal?: string } }>(params, ["text"]);
+        const p = requireParams<{
+          text: string;
+          options?: {
+            thinking?: string;
+            streamingBehavior?: "steer" | "followUp";
+            queueIfBusy?: boolean;
+            serviceTier?: string;
+            transport?: string;
+            goal?: string;
+          };
+        }>(params, ["text"]);
         const conn = this.requireConn();
         const opts = p.options
           ? {
@@ -193,7 +236,15 @@ export class RpcServer {
       }
 
       case "setModel": {
-        const p = requireParams<{ provider: string; model: string; thinking?: string; serviceTier?: string; transport?: string; contextWindow?: number; maxOutputTokens?: number }>(params, ["provider", "model"]);
+        const p = requireParams<{
+          provider: string;
+          model: string;
+          thinking?: string;
+          serviceTier?: string;
+          transport?: string;
+          contextWindow?: number;
+          maxOutputTokens?: number;
+        }>(params, ["provider", "model"]);
         const conn = this.requireConn();
         // Apply runtime overrides (context window / max output tokens) to the
         // ENGINE, not just settings. The daemon re-reads ~/.prime/agent/models.json
@@ -252,16 +303,40 @@ export class RpcServer {
         // client) which accepts AgentSessionRuntimeConfig.{cwd,initialGoal}.
         // The resulting session then needs to be re-attached, so we tear down
         // the current connection and start a fresh attach cycle.
-        const p = optionalParams<{ cwd?: string; goal?: string }>(params) ?? {};
+        const p =
+          optionalParams<{
+            cwd?: string;
+            goal?: string;
+            profile?: { id?: unknown; name?: unknown; mode?: unknown; systemPrompt?: unknown };
+          }>(params) ?? {};
+        const opts: {
+          cwd?: string;
+          goal?: string;
+          profile?: { id: string; name: string; mode: string; systemPrompt: string };
+        } = {};
         if (p.cwd !== undefined && typeof p.cwd !== "string") {
           throw rpcError(JSON_RPC_ERROR.invalidParams, "cwd must be a string");
         }
         if (p.goal !== undefined && typeof p.goal !== "string") {
           throw rpcError(JSON_RPC_ERROR.invalidParams, "goal must be a string");
         }
-        const opts: { cwd?: string; goal?: string } = {};
         if (typeof p.cwd === "string") opts.cwd = p.cwd;
         if (typeof p.goal === "string") opts.goal = p.goal;
+        if (p.profile && typeof p.profile === "object") {
+          const { id, name, mode, systemPrompt } = p.profile;
+          if (
+            typeof id === "string" &&
+            /^[a-zA-Z0-9._-]{1,64}$/.test(id) &&
+            typeof name === "string" &&
+            name.trim().length > 0 &&
+            name.length <= 100 &&
+            (mode === "standard" || mode === "minimal" || mode === "creator" || mode === "code") &&
+            typeof systemPrompt === "string" &&
+            systemPrompt.length <= 12000
+          ) {
+            opts.profile = { id, name: name.trim(), mode, systemPrompt: systemPrompt.trim() };
+          }
+        }
         if (Object.keys(opts).length === 0) {
           const conn = this.requireConn();
           const result = await conn.newSession();
@@ -315,7 +390,7 @@ export class RpcServer {
         const agents: AgentInfo[] = children.map((c: AgentConnectionRlmChild) => ({
           id: c.id,
           name: c.sessionName ?? c.label,
-          status: (c.status === "queued" || c.status === "running") ? "running" : "saved",
+          status: c.status === "queued" || c.status === "running" ? "running" : "saved",
           sessionId: c.activeSessionId,
         }));
         return agents;
@@ -323,7 +398,9 @@ export class RpcServer {
 
       case "attachAgent": {
         const p = requireParams<{ id: string }>(params, ["id"]);
-        const child = this.holder.getSnapshot()?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
+        const child = this.holder
+          .getSnapshot()
+          ?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
         if (!child?.activeSessionId) {
           throw rpcError(JSON_RPC_ERROR.invalidParams, `agent not found or not attachable: ${p.id}`);
         }
@@ -379,30 +456,19 @@ export class RpcServer {
       }
 
       case "login": {
-        // The daemon's AgentConnection exposes no auth flow. Interim solution
-        // (scope limitation, per orchestrator): persist the key in the bridge
-        // settings store AND mirror it into ~/.prime/agent/auth.json — the file
-        // the daemon actually reads (AuthStorageData / ApiKeyCredential shape) —
-        // so a login from the UI reaches the daemon like its own /login flow.
-        const p = requireParams<{ provider: string; apiKey?: string }>(params, ["provider"]);
-        const store = this.holder.getSettingsStore();
-        const current = store.get();
-        const auth = { ...(current.auth ?? {}) };
-        if (p.apiKey) auth[p.provider] = p.apiKey;
-        else delete auth[p.provider];
-        store.update({ auth } as Settings);
+        // The pinned daemon reads API keys from auth.json; never echo them through
+        // the general settings store or return them through settings IPC.
+        const p = requireParams<{ provider: string; apiKey: string }>(params, ["provider", "apiKey"]);
+        if (typeof p.apiKey !== "string" || p.apiKey.trim().length === 0) {
+          throw rpcError(JSON_RPC_ERROR.invalidParams, "apiKey must be a non-empty string");
+        }
         writeAuthKey(p.provider, p.apiKey);
         return { provider: p.provider, stored: Boolean(p.apiKey) };
       }
 
       case "logout": {
-        // Remove only the target provider's key — settings store + auth.json mirror.
+        // Remove only the selected provider from the daemon auth store.
         const p = requireParams<{ provider: string }>(params, ["provider"]);
-        const store = this.holder.getSettingsStore();
-        const current = store.get();
-        const auth = { ...(current.auth ?? {}) };
-        delete auth[p.provider];
-        store.update({ auth } as Settings);
         writeAuthKey(p.provider);
         return { provider: p.provider, stored: false };
       }
@@ -413,7 +479,22 @@ export class RpcServer {
 
       case "setSettings": {
         const p = requireParams<{ settings: Record<string, unknown> }>(params, ["settings"]);
-        const updated = this.holder.getSettingsStore().update(p.settings as Partial<Settings>);
+        const store = this.holder.getSettingsStore();
+        const previousSettings = store.get();
+        const previousLocalProviders = previousSettings.localProviders ?? [];
+        const updated = store.update(p.settings as Partial<Settings>);
+        if (Object.prototype.hasOwnProperty.call(p.settings, "localProviders")) {
+          try {
+            writeLocalProvidersToModelsJson(previousLocalProviders, updated.localProviders ?? []);
+          } catch (error) {
+            // Keep the UI settings and daemon model catalog in sync when the
+            // filesystem refuses the provider update (for example, malformed
+            // models.json or a permissions failure).
+            store.update({ localProviders: previousLocalProviders });
+            throw error;
+          }
+          await this.holder.refreshModelCatalog().catch(() => undefined);
+        }
         return updated;
       }
 
@@ -422,9 +503,8 @@ export class RpcServer {
         // the Tauri shell API; the daemon treats it as a transient bash run.
         const p = requireParams<{ command: string; args?: string[] }>(params, ["command"]);
         const conn = this.requireConn();
-        const full = p.args && p.args.length > 0
-          ? `${p.command} ${p.args.map(shellQuote).join(" ")}`
-          : p.command;
+        const full =
+          p.args && p.args.length > 0 ? `${p.command} ${p.args.map(shellQuote).join(" ")}` : p.command;
         await conn.executeBash(full, { transient: true });
         return undefined;
       }
@@ -452,13 +532,14 @@ export class RpcServer {
           id: c.id,
           sessionId: c.activeSessionId,
           name: c.sessionName ?? c.label,
-          status: (c.status === "queued" || c.status === "running")
-            ? "running"
-            : c.status === "done"
-              ? "done"
-              : c.status === "error" || c.status === "cancelled"
-                ? "error"
-                : "idle",
+          status:
+            c.status === "queued" || c.status === "running"
+              ? "running"
+              : c.status === "done"
+                ? "done"
+                : c.status === "error" || c.status === "cancelled"
+                  ? "error"
+                  : "idle",
           parentId: c.parentId,
           summary: c.answerPreview,
         }));
@@ -467,7 +548,9 @@ export class RpcServer {
       case "sendAgentMessage": {
         const p = requireParams<{ agentId: string; message: string }>(params, ["agentId", "message"]);
         const conn = this.requireConn();
-        const child = this.holder.getSnapshot()?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.agentId);
+        const child = this.holder
+          .getSnapshot()
+          ?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.agentId);
         const target = child?.activeSessionId;
         if (!target) {
           throw rpcError(JSON_RPC_ERROR.invalidParams, `agent ${p.agentId} not found`);
@@ -509,19 +592,14 @@ export class RpcServer {
         const p = optionalParams<{ format?: string }>(params) ?? {};
         const format = p.format === "jsonl" ? "jsonl" : "html";
         const conn = this.requireConn();
-        const exportedPath = format === "jsonl"
-          ? await conn.exportToJsonl()
-          : await conn.exportToHtml();
+        const exportedPath = format === "jsonl" ? await conn.exportToJsonl() : await conn.exportToHtml();
         return { format, exportedPath };
       }
 
       case "shareSession": {
         // The daemon has no share/upload surface. Report it gracefully so the
         // frontend can disable/explain the action rather than hard-fail.
-        throw rpcError(
-          JSON_RPC_ERROR.methodNotFound,
-          "shareSession is not yet supported by the daemon",
-        );
+        throw rpcError(JSON_RPC_ERROR.methodNotFound, "shareSession is not yet supported by the daemon");
       }
 
       case "getSessionTree": {
@@ -553,10 +631,7 @@ export class RpcServer {
             // fall through to unsupported below
           }
         }
-        throw rpcError(
-          JSON_RPC_ERROR.methodNotFound,
-          "cloneSession is not yet supported by the daemon",
-        );
+        throw rpcError(JSON_RPC_ERROR.methodNotFound, "cloneSession is not yet supported by the daemon");
       }
 
       case "nameSession": {
@@ -686,23 +761,35 @@ export class RpcServer {
 
       case "getAgentState": {
         const p = requireParams<{ id: string }>(params, ["id"]);
-        const child = this.holder.getSnapshot()?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
+        const child = this.holder
+          .getSnapshot()
+          ?.children?.find((candidate: AgentConnectionRlmChild) => candidate.id === p.id);
         if (!child) throw rpcError(JSON_RPC_ERROR.invalidParams, `agent not found: ${p.id}`);
-        return this.holder.getAttachedChildState(p.id) ?? {
-          id: child.id,
-          status: child.status,
-          sessionId: child.activeSessionId,
-          model: child.model,
-          summary: child.recap ?? child.answerPreview,
-          activity: child.activity && typeof child.activity === "object" ? (child.activity as { kind?: string }).kind : undefined,
-          tokenCount: child.tokenCount,
-          toolUseCount: child.toolUseCount,
-          transcript: [],
-        };
+        return (
+          this.holder.getAttachedChildState(p.id) ?? {
+            id: child.id,
+            status: child.status,
+            sessionId: child.activeSessionId,
+            model: child.model,
+            summary: child.recap ?? child.answerPreview,
+            activity:
+              child.activity && typeof child.activity === "object"
+                ? (child.activity as { kind?: string }).kind
+                : undefined,
+            tokenCount: child.tokenCount,
+            toolUseCount: child.toolUseCount,
+            transcript: [],
+          }
+        );
       }
 
       case "createSkill": {
-        const p = requireParams<{ name: string; description: string; content: string; pythonImport?: string }>(params, ["name", "description", "content"]);
+        const p = requireParams<{
+          name: string;
+          description: string;
+          content: string;
+          pythonImport?: string;
+        }>(params, ["name", "description", "content"]);
         const conn = this.requireConn();
         const name = p.name.trim();
         if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) {
@@ -719,13 +806,22 @@ export class RpcServer {
             throw rpcError(JSON_RPC_ERROR.invalidParams, "python import must be a valid module name");
           }
           mkdirSync(resolve(root, "src", importName), { recursive: true });
-          writeFileSync(resolve(root, "src", importName, "__init__.py"), "\\nasync def run(*args, **kwargs):\\n    \\\"\\\"\\\"Implement this skill's callable here.\\\"\\\"\\\"\\n    raise NotImplementedError(\\\"Skill callable is not implemented yet\\\")\\n", "utf8");
+          writeFileSync(
+            resolve(root, "src", importName, "__init__.py"),
+            '\\nasync def run(*args, **kwargs):\\n    \\"\\"\\"Implement this skill\'s callable here.\\"\\"\\"\\n    raise NotImplementedError(\\"Skill callable is not implemented yet\\")\\n',
+            "utf8",
+          );
         }
         const settings = this.holder.getSettingsStore().get() as Settings & { skills?: string[] };
         const skills = [...new Set([...(settings.skills ?? []), root])];
         this.holder.getSettingsStore().update({ skills } as Partial<Settings>);
         await conn.reload();
-        return { name, description: p.description.trim(), filePath: resolve(root, "SKILL.md"), source: "project" };
+        return {
+          name,
+          description: p.description.trim(),
+          filePath: resolve(root, "SKILL.md"),
+          source: "project",
+        };
       }
 
       case "installSkill": {
@@ -750,7 +846,9 @@ export class RpcServer {
         const conn = this.requireConn();
         const path = resolve(p.path);
         const name = path.split(/[/\\]/).pop() ?? path;
-        const settings = this.holder.getSettingsStore().get() as Settings & { extensions?: Array<{ name: string; path: string; enabled: boolean }> };
+        const settings = this.holder.getSettingsStore().get() as Settings & {
+          extensions?: Array<{ name: string; path: string; enabled: boolean }>;
+        };
         // Dedupe by path — installing the same path twice should not create a duplicate entry (matches installSkill's `new Set` pattern).
         const existing = new Map((settings.extensions ?? []).map((e) => [e.path, e] as const));
         existing.set(path, { name, path, enabled: true });
@@ -764,11 +862,229 @@ export class RpcServer {
         const p = requireParams<{ path: string }>(params, ["path"]);
         const conn = this.requireConn();
         const path = resolve(p.path);
-        const settings = this.holder.getSettingsStore().get() as Settings & { extensions?: Array<{ name: string; path: string; enabled: boolean }> };
+        const settings = this.holder.getSettingsStore().get() as Settings & {
+          extensions?: Array<{ name: string; path: string; enabled: boolean }>;
+        };
         const extensions = (settings.extensions ?? []).filter((e) => e.path !== path);
         this.holder.getSettingsStore().update({ extensions } as Partial<Settings>);
         await conn.reload();
         return undefined;
+      }
+
+      case "getMemoryState": {
+        const p = optionalParams<{ tier?: MemoryTier }>(params);
+        return connGetMemoryState(this.requireConn(), p?.tier);
+      }
+
+      case "searchMemory": {
+        const p = requireParams<{ query: string; tier?: MemoryTier; maxResults?: number }>(params, ["query"]);
+        return connSearchMemory(this.requireConn(), p.query, p.tier, p.maxResults);
+      }
+
+      case "storeMemory": {
+        const p = requireParams<{ entry: Omit<MemoryTierEntry, "id"> }>(params, ["entry"]);
+        return connStoreMemory(this.requireConn(), p.entry);
+      }
+
+      case "recallMemory": {
+        const p = requireParams<{ query: string; limit?: number }>(params, ["query"]);
+        return connRecallMemory(this.requireConn(), p.query, p.limit);
+      }
+
+      case "forgetMemory": {
+        const p = requireParams<{ id: string }>(params, ["id"]);
+        return connForgetMemory(this.requireConn(), p.id);
+      }
+
+      case "createCheckpoint": {
+        const p = requireParams<{ label: string; summary?: string }>(params, ["label"]);
+        return connCreateCheckpoint(this.requireConn(), p.label, p.summary);
+      }
+
+      case "restoreCheckpoint": {
+        const p = requireParams<{ id: string }>(params, ["id"]);
+        return connRestoreCheckpoint(this.requireConn(), p.id);
+      }
+
+      case "listCheckpoints": {
+        const p = optionalParams<{ sessionId?: string }>(params);
+        return connListCheckpoints(this.requireConn(), p?.sessionId);
+      }
+
+      case "getSquadTopology": {
+        return connGetSquadTopology(this.requireConn());
+      }
+
+      case "evaluateSquadPiece": {
+        const p = requireParams<{
+          childId: string;
+          pieceContract: string;
+          bar: string;
+          outputPaths: string[];
+        }>(params, ["childId", "pieceContract", "bar", "outputPaths"]);
+        return connEvaluateSquadPiece(this.requireConn(), p.childId, p.pieceContract, p.bar, p.outputPaths);
+      }
+
+      case "getMcpServers": {
+        return connGetMcpServers(this.requireConn());
+      }
+
+      case "readMcpResource": {
+        const p = requireParams<{ serverName: string; uri: string }>(params, ["serverName", "uri"]);
+        return connReadMcpResource(this.requireConn(), p.serverName, p.uri);
+      }
+
+      case "getMcpPrompt": {
+        const p = requireParams<{ serverName: string; name: string; args?: Record<string, string> }>(params, [
+          "serverName",
+          "name",
+        ]);
+        return connGetMcpPrompt(this.requireConn(), p.serverName, p.name, p.args);
+      }
+
+      case "getSecurityPolicy": {
+        return connGetSecurityPolicy(this.requireConn());
+      }
+
+      case "setSecurityPolicy": {
+        const p = requireParams<{ policy: WorkspaceSecurityPolicy; customBlockedPatterns?: string[] }>(
+          params,
+          ["policy"],
+        );
+        await connSetSecurityPolicy(this.requireConn(), p.policy, p.customBlockedPatterns);
+        return undefined;
+      }
+
+      case "analyzeBlastRadius": {
+        const p = requireParams<{ command: string; targetFiles?: string[] }>(params, ["command"]);
+        return connAnalyzeBlastRadius(this.requireConn(), p.command, p.targetFiles);
+      }
+
+      case "getSecurityAuditLog": {
+        return connGetSecurityAuditLog(this.requireConn());
+      }
+
+      case "getSquadWorkflow": {
+        return connGetSquadWorkflow(this.requireConn());
+      }
+
+      case "runSquadWorkflow": {
+        const p = requireParams<{ type: SquadWorkflowType; goal: string; bar: string }>(params, [
+          "type",
+          "goal",
+          "bar",
+        ]);
+        return connRunSquadWorkflow(this.requireConn(), p.type, p.goal, p.bar);
+      }
+
+      case "pauseSquadWorkflow": {
+        const p = requireParams<{ id: string }>(params, ["id"]);
+        await connPauseSquadWorkflow(this.requireConn(), p.id);
+        return undefined;
+      }
+
+      case "getTokenBudget": {
+        return connGetTokenBudget(this.requireConn());
+      }
+
+      case "compactContext": {
+        const p = requireParams<{ strategy: "semantic-summarize" | "prune-oldest" | "evict-tools" }>(params, [
+          "strategy",
+        ]);
+        return connCompactContext(this.requireConn(), p.strategy);
+      }
+
+      case "listDesktopWindows": {
+        return connListDesktopWindows(this.requireConn());
+      }
+
+      case "inspectDesktopWindow": {
+        const p = requireParams<{ windowId: string }>(params, ["windowId"]);
+        return connInspectDesktopWindow(this.requireConn(), p.windowId);
+      }
+
+      case "dispatchDesktopAction": {
+        const p = requireParams<{ windowId: string; action: DesktopUiAction }>(params, [
+          "windowId",
+          "action",
+        ]);
+        return connDispatchDesktopAction(this.requireConn(), p.windowId, p.action);
+      }
+
+      case "captureDesktopScreenshot": {
+        const p = requireParams<{ windowId: string }>(params, ["windowId"]);
+        return connCaptureDesktopScreenshot(this.requireConn(), p.windowId);
+      }
+
+      case "listDistilledSkills": {
+        return connListDistilledSkills(this.requireConn());
+      }
+
+      case "distillSkillFromTrajectory": {
+        const p = requireParams<{ sessionId: string; name?: string }>(params, ["sessionId"]);
+        return connDistillSkillFromTrajectory(this.requireConn(), p.sessionId, p.name);
+      }
+
+      case "promoteSkill": {
+        const p = requireParams<{ skillId: string }>(params, ["skillId"]);
+        return connPromoteSkill(this.requireConn(), p.skillId);
+      }
+
+      case "deleteDistilledSkill": {
+        const p = requireParams<{ skillId: string }>(params, ["skillId"]);
+        await connDeleteDistilledSkill(this.requireConn(), p.skillId);
+        return undefined;
+      }
+
+      case "getThoughtTree": {
+        return connGetThoughtTree(this.requireConn());
+      }
+
+      case "runSpeculativeBranch": {
+        const p = requireParams<{ parentNodeId: string; hypothesis: string }>(params, [
+          "parentNodeId",
+          "hypothesis",
+        ]);
+        return connRunSpeculativeBranch(this.requireConn(), p.parentNodeId, p.hypothesis);
+      }
+
+      case "pruneThoughtBranch": {
+        const p = requireParams<{ nodeId: string }>(params, ["nodeId"]);
+        return connPruneThoughtBranch(this.requireConn(), p.nodeId);
+      }
+
+      case "promoteThoughtBranch": {
+        const p = requireParams<{ nodeId: string }>(params, ["nodeId"]);
+        return connPromoteThoughtBranch(this.requireConn(), p.nodeId);
+      }
+
+      case "listWorkspaceTwins": {
+        return connListWorkspaceTwins(this.requireConn());
+      }
+
+      case "createWorkspaceTwin": {
+        const p = requireParams<{ name: string; baseBranch?: string }>(params, ["name"]);
+        return connCreateWorkspaceTwin(this.requireConn(), p.name, p.baseBranch);
+      }
+
+      case "executeInTwin": {
+        const p = requireParams<{ twinId: string; command: string }>(params, ["twinId", "command"]);
+        return connExecuteInTwin(this.requireConn(), p.twinId, p.command);
+      }
+
+      case "diffWorkspaceTwin": {
+        const p = requireParams<{ twinId: string }>(params, ["twinId"]);
+        return connDiffWorkspaceTwin(this.requireConn(), p.twinId);
+      }
+
+      case "mergeWorkspaceTwin": {
+        const p = requireParams<{ twinId: string }>(params, ["twinId"]);
+        return connMergeWorkspaceTwin(this.requireConn(), p.twinId);
+      }
+
+      case "rollbackWorkspaceTwin": {
+        const p = requireParams<{ twinId: string }>(params, ["twinId"]);
+        return connRollbackWorkspaceTwin(this.requireConn(), p.twinId);
       }
 
       default:
@@ -844,28 +1160,21 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 function isRpcRequest(value: unknown): value is RpcRequest {
   if (!isPlainObject(value) || typeof value.method !== "string") return false;
-
-  // The Rust shell uses method-tagged objects without a version member, so
-  // omission remains supported. If supplied, however, the JSON-RPC version
-  // must be the 2.0 value.
   if (Object.prototype.hasOwnProperty.call(value, "jsonrpc") && value.jsonrpc !== "2.0") return false;
-
   if (Object.prototype.hasOwnProperty.call(value, "id") && !isRpcId(value.id)) return false;
-
-  // JSON-RPC params are structured values. Preserve the bridge's existing
-  // null-as-omitted behavior while rejecting other scalar shapes up front.
-  if (Object.prototype.hasOwnProperty.call(value, "params")
-    && value.params !== null
-    && !isPlainObject(value.params)
-    && !Array.isArray(value.params)) return false;
-
+  if (
+    Object.prototype.hasOwnProperty.call(value, "params") &&
+    value.params !== null &&
+    !isPlainObject(value.params) &&
+    !Array.isArray(value.params)
+  ) {
+    return false;
+  }
   return true;
 }
 
 function isRpcId(value: unknown): value is RpcId {
-  return value === null
-    || typeof value === "string"
-    || (typeof value === "number" && Number.isFinite(value));
+  return value === null || typeof value === "string" || (typeof value === "number" && Number.isFinite(value));
 }
 
 function requireParams<T extends Record<string, unknown>>(

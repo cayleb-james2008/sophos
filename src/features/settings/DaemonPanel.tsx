@@ -39,13 +39,20 @@ export function DaemonTransportCard() {
         <DaemonToggle checked={false} onChange={() => undefined} disabled />
       </div>
       <Text variant="body" tone="muted">
-        TCP fallback is unsupported by pinned Prime Agent v0.7.0. Sophos continues using the default local socket.
+        TCP fallback is unsupported by pinned Prime Agent v0.7.0. Sophos continues using the default local
+        socket.
       </Text>
     </Card>
   );
 }
 
-export function DaemonDiagnosticsCard({ status, onRefresh }: { status: { connected: boolean; tcpEnabled?: boolean; socketPath?: string }; onRefresh: () => void }) {
+export function DaemonDiagnosticsCard({
+  status,
+  onRefresh,
+}: {
+  status: { connected: boolean; tcpEnabled?: boolean; socketPath?: string };
+  onRefresh: () => void;
+}) {
   return (
     <Card variant="raised" padding="lg" className="card-stack">
       <div className="sp-head">
@@ -70,7 +77,12 @@ export function DaemonDiagnosticsCard({ status, onRefresh }: { status: { connect
           <Text variant="micro" tone="dim" uppercase>
             Daemon status
           </Text>
-          <Text variant="label" mono weight="medium" className={`dp-statval${status.connected ? " dp-statval--ok" : " dp-statval--err"}`}>
+          <Text
+            variant="label"
+            mono
+            weight="medium"
+            className={`dp-statval${status.connected ? " dp-statval--ok" : " dp-statval--err"}`}
+          >
             {status.connected ? "Connected" : "Disconnected"}
           </Text>
         </div>
@@ -93,7 +105,8 @@ export function DaemonDiagnosticsCard({ status, onRefresh }: { status: { connect
       </div>
 
       <Text variant="micro" tone="dim">
-        TCP fallback is unsupported by pinned Prime Agent v0.7.0; the engine stays on the default local socket.
+        TCP fallback is unsupported by pinned Prime Agent v0.7.0; the engine stays on the default local
+        socket.
       </Text>
     </Card>
   );

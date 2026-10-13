@@ -14,23 +14,33 @@ const mockClient = vi.hoisted(() => ({
 
 vi.mock("../../../ipc/client", () => ({
   useIpc: () => mockClient,
+  isDemoMode: () => true,
 }));
 
 const harnessState = {
   source: "daemon-owned state",
   entries: [
     { id: "e1", kind: "memory", title: "Memory A", content: "A durable fact", scope: "local", version: 3 },
-    { id: "e2", kind: "skill", title: "Skill B", content: "A reusable skill", reference: { path: "skills/b" }, version: 1 },
+    {
+      id: "e2",
+      kind: "skill",
+      title: "Skill B",
+      content: "A reusable skill",
+      reference: { path: "skills/b" },
+      version: 1,
+    },
     { id: "e3", kind: "prompt", title: "Prompt C", content: "A prompt addendum" },
   ],
-  refinements: [
-    { id: "r1", summary: "Tighten instructions", timestamp: "2026-01-15T10:00:00.000Z" },
-  ],
+  refinements: [{ id: "r1", summary: "Tighten instructions", timestamp: "2026-01-15T10:00:00.000Z" }],
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  (mockClient.getHarnessState as ReturnType<typeof vi.fn>).mockResolvedValue({ ...harnessState, entries: harnessState.entries.map((e) => ({ ...e })), refinements: harnessState.refinements.map((r) => ({ ...r })) });
+  (mockClient.getHarnessState as ReturnType<typeof vi.fn>).mockResolvedValue({
+    ...harnessState,
+    entries: harnessState.entries.map((e) => ({ ...e })),
+    refinements: harnessState.refinements.map((r) => ({ ...r })),
+  });
   (mockClient.prompt as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 });
 
@@ -62,7 +72,11 @@ describe("HarnessStatePanel", () => {
   });
 
   it("shows an empty state when there are no entries in the current scope", async () => {
-    (mockClient.getHarnessState as ReturnType<typeof vi.fn>).mockResolvedValue({ source: "daemon", entries: [], refinements: [] });
+    (mockClient.getHarnessState as ReturnType<typeof vi.fn>).mockResolvedValue({
+      source: "daemon",
+      entries: [],
+      refinements: [],
+    });
     render(<HarnessStatePanel />);
     await waitFor(() => expect(screen.getByText(/no saved entries in this scope yet/i)).toBeInTheDocument());
   });
@@ -79,7 +93,12 @@ describe("HarnessStatePanel", () => {
     await waitFor(() => expect(screen.getByText("Tighten instructions")).toBeInTheDocument());
 
     await user.click(screen.getByRole("button", { name: /^rollback$/i }));
-    await waitFor(() => expect(mockClient.prompt).toHaveBeenCalledWith("/refine rollback r1", expect.objectContaining({ queueIfBusy: true })));
+    await waitFor(() =>
+      expect(mockClient.prompt).toHaveBeenCalledWith(
+        "/refine rollback r1",
+        expect.objectContaining({ queueIfBusy: true }),
+      ),
+    );
   });
 
   it("surfaces an error when a rollback request fails", async () => {
@@ -93,7 +112,11 @@ describe("HarnessStatePanel", () => {
   });
 
   it("renders an empty refinements note when none exist", async () => {
-    (mockClient.getHarnessState as ReturnType<typeof vi.fn>).mockResolvedValue({ source: "daemon", entries: [], refinements: [] });
+    (mockClient.getHarnessState as ReturnType<typeof vi.fn>).mockResolvedValue({
+      source: "daemon",
+      entries: [],
+      refinements: [],
+    });
     render(<HarnessStatePanel />);
     await waitFor(() => expect(screen.getByText(/no daemon refinement records yet/i)).toBeInTheDocument());
   });

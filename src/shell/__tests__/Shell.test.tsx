@@ -8,7 +8,11 @@ import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockState = vi.hoisted(() => ({
-  conn: { status: { kind: "connected" }, model: { provider: "p", model: "m" }, context: { tokens: 0, contextWindow: 1000 } },
+  conn: {
+    status: { kind: "connected" },
+    model: { provider: "p", model: "m" },
+    context: { tokens: 0, contextWindow: 1000 },
+  },
   client: { listAgents: vi.fn(), onEvent: vi.fn(), listSessions: vi.fn() },
 }));
 
@@ -29,7 +33,11 @@ vi.mock("../../features/longrunning/RefinementGateBanner", () => ({ RefinementGa
 vi.mock("../../features/longrunning/RunGuardBanner", () => ({ RunGuardBanner: () => null }));
 vi.mock("../../features/settings/DaemonStatusBanner", () => ({ DaemonStatusBanner: () => null }));
 vi.mock("../../features/engine/EnginePanel", () => ({
-  EnginePanel: ({ open }: { open: boolean }) => <div data-testid="engine-panel" data-open={String(open)}>engine</div>,
+  EnginePanel: ({ open }: { open: boolean }) => (
+    <div data-testid="engine-panel" data-open={String(open)}>
+      engine
+    </div>
+  ),
 }));
 
 import { Shell } from "../Shell";

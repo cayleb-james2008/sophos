@@ -5,6 +5,118 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+- **Profile instructions reach live sessions** — creating a session through either New Session or New Chat appends the selected profile's instructions to Prime Agent's runtime system prompt. Resumed sessions retain their original setup; profile tool, skill, and safety toggles remain descriptive guidance and do not enforce permissions.
+- **Local models use Prime Agent's model catalog** — detected and manually configured loopback servers provide their model IDs to the bridge, which safely updates the custom model catalog and then selects the model through the daemon. Manual endpoint setup probes the server first and rejects non-loopback URLs; local requests never fall back to cloud providers.
+- **Live profile prompt hints removed** — the bridge no longer accepts demo-only profile display fields on live chat prompts; demo simulation still uses them in the preview.
+
+## [0.12.0] — 2026-08-28 (Ephemeral Workspace Twin Sandbox & Zero-Copy Worktrees)
+
+### Added
+- **Ephemeral Workspace Twin Sandbox (Devin Sandbox / Worktrees)** (`src/features/sandbox/TwinSandboxPanel.tsx`, `src/features/sandbox/twinSandbox.css`):
+  - Zero-copy Git worktree sandbox isolation for destructive migrations, dependency installations, and speculative agent trials.
+  - Isolated command execution console allowing safe test runs and tool actions strictly inside the twin without mutating primary workspace files.
+  - Side-by-side Git diff viewer with file change breakdown, insertion/deletion metrics, and mergeability checks.
+  - One-click safe merge to primary workspace or zero-residue fail-closed rollback.
+  - Integrated into Settings as the "Workspace Twins" tab.
+- **IPC Protocol Seam Extensions** (`src/ipc/contract.ts`, `src/ipc/client.ts`, `src/ipc/mockClient.ts`, `bridge/src/rpc.ts`, `bridge/src/connection.ts`):
+  - Added typed methods: `listWorkspaceTwins()`, `createWorkspaceTwin(name, baseBranch)`, `executeInTwin(twinId, command)`, `diffWorkspaceTwin(twinId)`, `mergeWorkspaceTwin(twinId)`, and `rollbackWorkspaceTwin(twinId)`.
+
+### Changed
+- **Version** — 0.11.0 → 0.12.0 (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`).
+
+## [0.11.0] — 2026-08-28 (Self-Evolving Skill Distillation & Tree-of-Thoughts Execution)
+
+### Added
+- **Self-Evolving Skill Distillation Engine (Voyager & Eureka)** (`src/features/skills/SkillDistillationPanel.tsx`, `src/features/skills/skillDistillation.css`):
+  - Trajectory analyzer extracting reusable multi-turn workflows, test remediation steps, and debugging patterns into typed `.skill` packages.
+  - Interactive skill inspector with live `SKILL.md` Markdown definition preview, trigger tags, success rates, and observed run counts.
+  - One-click skill promotion directly to the fleet canonical skill library (`~/.skill-library/active`).
+  - Integrated into Settings as the "Skill Distillation" tab.
+- **Speculative Tree-of-Thoughts Execution Engine (ToT / FoT)** (`src/features/tree/ThoughtTreePanel.tsx`, `src/features/tree/thoughtTree.css`):
+  - Dynamic branching decision tree DAG visualizer rendering concurrent hypothesis, plan, code diff, and test run nodes.
+  - Branch confidence scoring heuristic (0–100%) with high/low visual badges and evaluator rationales.
+  - Candidate code diff viewer with syntax highlighting and unit test preflight tie-outs.
+  - Fail-closed branch pruning and 1-click winner branch rollout promotion.
+  - Integrated into Settings as the "Tree of Thoughts" tab.
+- **IPC Protocol Seam Extensions** (`src/ipc/contract.ts`, `src/ipc/client.ts`, `src/ipc/mockClient.ts`, `bridge/src/rpc.ts`, `bridge/src/connection.ts`):
+  - Added typed methods: `listDistilledSkills()`, `distillSkillFromTrajectory(sessionId, name)`, `promoteSkill(skillId)`, `deleteDistilledSkill(skillId)`, `getThoughtTree()`, `runSpeculativeBranch(parentNodeId, hypothesis)`, `pruneThoughtBranch(nodeId)`, and `promoteThoughtBranch(nodeId)`.
+
+### Changed
+- **Version** — 0.10.0 → 0.11.0 (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`).
+
+## [0.10.0] — 2026-08-28 (Native Windows Computer-Use Action Space & UI Automation)
+
+### Added
+- **Native Windows Computer-Use Action Space (CUA & UIA)** (`src/features/cua/CuaControlPanel.tsx`, `src/features/cua/cua.css`):
+  - Real-time running Windows application scanner querying process names, window bounds, visibility, and PIDs.
+  - UI Automation (UIA) accessibility tree explorer providing hierarchical element tree inspection (buttons, edit fields, documents, panes, navigation bars).
+  - Background Action Dispatcher supporting headless click, text typing stream, key events, and hover actions without stealing operator window focus.
+  - Live background window visual canvas rendering SVG bounding box snapshots and action telemetry.
+  - Integrated into the Settings & Control Room tabs as "Desktop CUA".
+- **IPC Protocol Seam Extensions** (`src/ipc/contract.ts`, `src/ipc/client.ts`, `src/ipc/mockClient.ts`, `bridge/src/rpc.ts`, `bridge/src/connection.ts`):
+  - Added typed methods `listDesktopWindows()`, `inspectDesktopWindow(windowId)`, `dispatchDesktopAction(windowId, action)`, and `captureDesktopScreenshot(windowId)`.
+
+### Changed
+- **Version** — 0.9.0 → 0.10.0 (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`).
+
+## [0.9.0] — 2026-08-28 (Modern Architecture & Fleet Intelligence)
+
+### Added
+- **Model Context Protocol (Anthropic MCP v1.2+) Live Explorer** (`src/features/mcp/McpExplorer.tsx`):
+  - Real-time MCP server discovery, latency health probes, and capability indicators.
+  - Interactive resource explorer with on-demand streaming (`client.readMcpResource()`), syntax highlight preview, and MIME type tagging.
+  - Interactive prompt template catalog (`client.getMcpPrompt()`) with dynamic argument form synthesis and one-click injection into composer.
+  - Live JSON tool schema inspection.
+- **Autonomous Workspace Security Sandbox & Blast Radius Governance** (`src/features/security/SecuritySandboxPanel.tsx`):
+  - 4-tier execution security policy (`strict-sandbox`, `confirm-risky`, `permissive`, `network-isolated`).
+  - Pre-execution blast radius analyzer (`client.analyzeBlastRadius()`) that calculates files targeted, risk level (`low`, `medium`, `high`, `critical`), and safety recommendations.
+  - Guarded security zones (`.git/**`, `**/.env*`, `**/.ssh/**`, `**/*.key*`) with fail-closed gates.
+  - Real-time security execution audit trail.
+- **Dynamic Multi-Agent Squad Workflow Engine** (`src/features/agents/SquadWorkflowGraph.tsx`):
+  - Visual DAG topology engine supporting Sequential Pipelines, Hierarchical Specialist Squads, and Multi-Agent Consensus Synthesis.
+  - Live node execution tracking with state propagation (planner, worker, blind critic, lead verifier) and consensus agreement scoring.
+- **Context Token Budget & Compaction Optimizer** (`src/features/longrunning/HarnessStatePanel.tsx`):
+  - Real-time token budget breakdown across 6 architectural tiers (system prompt, tools/schemas, working memory, episodic recall, semantic archival, chat transcript, checkpoints).
+  - Interactive context compaction optimizer supporting DSPy semantic summarization, oldest turn pruning, and dormant tool eviction.
+
+### Changed
+- **Version** — 0.8.0 → 0.9.0 (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`).
+- **IPC Protocol Seam** — Expanded `src/ipc/contract.ts`, `src/ipc/client.ts`, `src/ipc/mockClient.ts`, `bridge/src/rpc.ts`, and `bridge/src/connection.ts` with 12 new RPC endpoints and full TypeScript domain models.
+- **Navigation & Settings** — Integrated MCP Explorer and Security Sandbox into Settings Control Room; integrated Squad Workflows view toggle into Agent Fleet Command Center.
+
+### Tests
+- **Vitest**: 139 passed test files (1,179 passed tests, 0 failures).
+- **TypeScript & Lint**: `tsc --noEmit` clean, ESLint 9 clean with zero warnings, Prettier clean.
+- **Rust**: `cargo test` 25 passed.
+- **Auto-Updater & Live Feed**: 34/34 updater tests passed, 20/20 live-feed integrity checks passed.
+
+## [0.8.0] — 2026-08-17 (Beta)
+
+### Added
+- **Enforced lint + format gate** — ESLint 9 (flat config) with `typescript-eslint`, `react`, and `react-hooks`, plus Prettier. `npm run lint` (zero warnings), `npm run format:check`, and `npm run check` (lint + format + `tsc --noEmit`) now gate the codebase; wired so a dirty tree fails locally. No new cloud dependency — all local devDependencies.
+- **Stale session-lease recovery (v0.8.0)** — a conservative Rust startup sweep (`src-tauri/src/lease.rs`) that runs before the daemon spawns: it clears crash-leftover lease debris (`*.lock.stale-*` / `*.lock.candidate-*`) and reclaims full `*.lock` lease directories only when the `owner.json` PID is provably dead **and** past a 1-hour grace window. Missing/malformed owner data or an undeterminable PID liveness always means *keep* — the sweep never deletes on uncertainty. 6 Rust unit tests pin the classification.
+- **Reliability dispositions record** — `docs/reliability-0.8.0.md` documents, for each of the five named reliability bugs (goal-loop watchdog, dead-kernel detection, spend/iteration circuit-breaker, stale session-lease recovery, console-window recovery), whether it is FIXED-with-a-test or REFUTED as an upstream daemon/bridge seam — with evidence, never silently open.
+
+### Changed
+- **Version** — 0.7.2 → 0.8.0 (package.json, tauri.conf.json, Cargo.toml, Cargo.lock, README badges/installer paths, and the sidebar release literal `v0.8.0-beta`). README version strings now match the real release instead of drifting at 0.5.0.
+
+### Fixed
+- **No untyped `any` left in production code** — the three `window as any` casts (demo-mode flag + debug IPC handle) are replaced by a typed global augmentation in `src/vite-env.d.ts`.
+- **Two real React Rules-of-Hooks violations** — `useProfile()` called `useProfileState()` conditionally (`src/features/profiles/profiles.ts`) and `SessionTree` called `useMemo` after an early return (`src/features/sessions/SessionTree.tsx`); both now call hooks unconditionally, so hook order can never desynchronize across renders.
+- **Dead code removed** — unused imports and the unused `RpcEventEnvelope` type in `bridge/src/rpc.ts`, unused `resolve`/`AgentInfo` imports in `bridge/src/connection.ts`, and an unused `IpcCommand` import in the Rust shell. The `Rust contract.rs` typed mirror (`IpcCommand`/`PromptOptions`) is now explicitly documented as test-only, not a silent dead surface.
+- **Hook-dependency drift** — `useAgents` (unread refresh), `FirstRunBanner` (demo flag + stable `dismiss`), and `TrajectoryProvider` (stable `record`/`clearAll`) now declare their real dependencies; the `useVirtualList` cache-buster `version` dependency is documented rather than left unexplained.
+- **Goal-loop watchdog, dead-kernel detection, and the spend/iteration circuit-breaker** were already shipped client-side in 0.7.x (`useStall`, `useRunGuard`, `RunGuardBanner`); this release verifies each against its regression tests and records the disposition explicitly (see `docs/reliability-0.8.0.md`). The console-window story (`CREATE_NO_WINDOW` + `no-window-preload.cjs` + the kill-on-close Job Object) is likewise verified and recorded.
+
+### Tests
+- Unit — 1119 pass (up from 1118), `tsc --noEmit` clean (frontend + bridge), `eslint --max-warnings 0` clean, `prettier --check` clean. No skips, no new suppressions.
+- Rust — `cargo test` 25 pass (6 new `lease.rs` tests + the existing sidecar-recovery and native-session tests), zero warnings.
+- cua-driver e2e — **8/8 suites green** against the rebuilt release exe (SMOKE 6/6, SESSIONS 8/8, AGENTS 6/6, CHAT 11 passed, INBOX 5/5, SETTINGS 10/10, SHELL 6/6, STUDIO 7/7), fresh screenshots + run record committed (see `verify/cua/e2e-run-0.8.0.md`). The CHAT suite now drives the release build (not the debug build), and the per-suite timeout was raised 5→10 minutes because CHAT and STUDIO legitimately run ~5 minutes and a single WebView2 timing-flake retry could previously redden a passing run. Three triggers stay labelled SKIPs (CHAT steering indicator + slash click-select, SHELL keyboard-shortcuts overlay) — documented background-WebView2 input limitations, each covered by unit tests.
+
+Release notes: [`docs/release-notes-v0.8.0.md`](docs/release-notes-v0.8.0.md) (installer, downloads, screenshots). GitLab release prep: [`docs/gitlab-release-v0.8.0.md`](docs/gitlab-release-v0.8.0.md).
+
 ## [0.7.2] — 2026-08-16 (Beta)
 
 ### Added

@@ -13,6 +13,7 @@ const mockState = vi.hoisted(() => {
   const listeners: Array<(event: unknown) => void> = [];
   return {
     listeners,
+    demoShell: false,
     fire: (event: unknown) => {
       for (const cb of [...listeners]) cb(event);
     },
@@ -42,6 +43,7 @@ vi.mock("../../../ipc/client", async () => {
     },
     useConnectionState: () => ({}),
     isTauri: true,
+    isDemoShell: () => mockState.demoShell,
   };
 });
 
@@ -70,6 +72,7 @@ function setup() {
 
 beforeEach(() => {
   mockState.listeners.length = 0;
+  mockState.demoShell = false;
   vi.clearAllMocks();
   (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   (mockState.client.prompt as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
@@ -105,6 +108,55 @@ describe("useTranscript", () => {
     expect(setBusy).toHaveBeenLastCalledWith(true);
   });
 
+  it("forwards the active custom profile only through the Tauri demo client", async () => {
+    mockState.demoShell = true;
+    const profile = {
+      id: "custom-builder",
+      name: "Builder Bot",
+      tagline: "Compose fast, verify always",
+      description: "",
+      workingStyle: ["Goal first", "Verify with real runs"],
+      systemPrompt: "",
+      mode: "creator" as const,
+    };
+    const { hook } = setup();
+    await waitFor(() => expect(hook.result.current.loaded).toBe(true));
+
+    await act(async () => {
+      await hook.result.current.runTurn("show me what this profile does", undefined, profile);
+    });
+
+    expect(mockState.client.prompt).toHaveBeenCalledWith("show me what this profile does", {
+      profile: "custom-builder",
+      profileFlavor: {
+        name: "Builder Bot",
+        tagline: "Compose fast, verify always",
+        workingStyle: ["Goal first", "Verify with real runs"],
+        mode: "creator",
+      },
+    });
+  });
+
+  it("keeps profile flavor options off the live Tauri provider route", async () => {
+    const profile = {
+      id: "custom-builder",
+      name: "Builder Bot",
+      tagline: "Compose fast, verify always",
+      description: "",
+      workingStyle: ["Goal first"],
+      systemPrompt: "",
+      mode: "creator" as const,
+    };
+    const { hook } = setup();
+    await waitFor(() => expect(hook.result.current.loaded).toBe(true));
+
+    await act(async () => {
+      await hook.result.current.runTurn("run this with my profile", undefined, profile);
+    });
+
+    expect(mockState.client.prompt).toHaveBeenCalledWith("run this with my profile");
+  });
+
   it("runTurn ignores empty text", async () => {
     const { hook } = setup();
     await waitFor(() => expect(hook.result.current.loaded).toBe(true));
@@ -127,7 +179,10 @@ describe("useTranscript", () => {
   });
 
   it("editAndResend replaces the message slice and re-prompts", async () => {
-    (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([userMsg("A"), asstMsg("B")]);
+    (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([
+      userMsg("A"),
+      asstMsg("B"),
+    ]);
     const { hook } = setup();
     await waitFor(() => expect(hook.result.current.loaded).toBe(true));
     await act(async () => {
@@ -138,7 +193,10 @@ describe("useTranscript", () => {
   });
 
   it("retry re-issues the preceding user prompt", async () => {
-    (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([userMsg("A"), asstMsg("B")]);
+    (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([
+      userMsg("A"),
+      asstMsg("B"),
+    ]);
     const { hook } = setup();
     await waitFor(() => expect(hook.result.current.loaded).toBe(true));
     const b = hook.result.current.messages[1];
@@ -190,14 +248,20 @@ describe("useTranscript", () => {
     });
     expect(hook.result.current.messages).toHaveLength(1);
     act(() => {
-      mockState.fire({ type: "session_event", event: { kind: "tool_call", name: "read_file", input: "{\"p\":1}" } });
+      mockState.fire({
+        type: "session_event",
+        event: { kind: "tool_call", name: "read_file", input: '{"p":1}' },
+      });
     });
     const tc = hook.result.current.messages[0].toolCalls![0];
     expect(tc.name).toBe("read_file");
     expect(tc.status).toBe("running");
 
     act(() => {
-      mockState.fire({ type: "session_event", event: { kind: "tool_result", name: "read_file", output: "42 lines" } });
+      mockState.fire({
+        type: "session_event",
+        event: { kind: "tool_result", name: "read_file", output: "42 lines" },
+      });
     });
     expect(hook.result.current.messages[0].toolCalls![0].status).toBe("complete");
     expect(hook.result.current.messages[0].toolCalls![0].output).toBe("42 lines");

@@ -49,11 +49,29 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       className={`diff-copy ${visible || copied ? "is-visible" : ""} ${copied ? "is-copied" : ""}`}
     >
       {copied ? (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="20 6 9 17 4 12" />
         </svg>
       ) : (
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="9" y="9" width="13" height="13" rx="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
         </svg>
@@ -78,9 +96,7 @@ export function DiffView({
     <div data-diff="true" className="diff">
       {/* Header — file path + add/remove counts + copy affordances */}
       <div className="diff-header">
-        <span className="diff-file-badge">
-          Δ
-        </span>
+        <span className="diff-file-badge">Δ</span>
         <Text variant="micro" tone="muted" mono className="diff-file-name">
           {filePath || "(unknown path)"}
         </Text>
@@ -107,10 +123,10 @@ export function DiffView({
               data-diff-remove={isRemove ? "true" : undefined}
               className={`diff-line${isAdd ? " diff-line--add" : isRemove ? " diff-line--remove" : ""}`}
             >
-              <span className="diff-line-sign">
-                {sign}
-              </span>
-              <span className={`diff-line-text${isAdd ? " diff-line-text--add" : isRemove ? " diff-line-text--remove" : ""}`}>
+              <span className="diff-line-sign">{sign}</span>
+              <span
+                className={`diff-line-text${isAdd ? " diff-line-text--add" : isRemove ? " diff-line-text--remove" : ""}`}
+              >
                 {l.text || " "}
               </span>
             </div>

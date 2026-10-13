@@ -9,12 +9,19 @@
 // value, ceiling shown as the provider max — persisted to settings and pushed
 // to the engine via useModels().setModelConfig (graceful offline).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Text, Card, Badge, Button, Modal, Input, Select, Spinner } from "../../design";
-import { useIpc } from "../../ipc/client";
-import type { LocalProviderConfig, LocalProviderKind, ModelInfo, ProviderInfo, Settings } from "../../ipc/contract";
+import { isTauri, useIpc } from "../../ipc/client";
+import type {
+  LocalProviderConfig,
+  LocalProviderKind,
+  ModelInfo,
+  ProviderInfo,
+  Settings,
+} from "../../ipc/contract";
 import { useModels, modelKey } from "../providers/useModels";
+import { probeLocalProvider, providerApiBaseUrl } from "../providers/localDetection";
 import { KeyIcon, LogoutIcon, PlugIcon, CpuIcon } from "../sessions/icons";
 
 export function ProvidersPanel() {
@@ -51,16 +58,18 @@ export function ProvidersPanel() {
     p.models.length ? p.models : models.filter((m) => m.provider === p.id);
 
   const connectLocal = async (config: LocalProviderConfig) => {
-    await ipc.setSettings({ localProviders: [config] } as Settings);
-    await ipc.login("local");
+    await ipc.setSettings({
+      localProviders: [...localConfigs.filter((entry) => entry.id !== config.id), config],
+    } as Settings);
     setLocalOpen(false);
     setLocalVersion((v) => v + 1);
     void reload();
   };
 
   const logoutLocal = async () => {
-    await ipc.setSettings({ localProviders: [] } as Settings);
-    await ipc.logout("local");
+    await ipc.setSettings({
+      localProviders: localConfigs.filter((entry) => entry.id !== localConfig?.id),
+    } as Settings);
     setLocalVersion((v) => v + 1);
     void reload();
   };
@@ -79,7 +88,7 @@ export function ProvidersPanel() {
               is never touched. */}
           <LocalProviderCard
             config={localConfig}
-            models={models.filter((m) => m.provider === "local")}
+            models={models.filter((m) => m.provider === localConfig?.id)}
             onConnect={() => setLocalOpen(true)}
             onLogout={() => void logoutLocal()}
           />
@@ -138,7 +147,11 @@ function ProviderCard({
   models: ModelInfo[];
   expandedKey: string | null;
   onToggle: (key: string) => void;
-  onApply: (provider: string, model: string, runtime: { contextWindow?: number; maxOutputTokens?: number }) => void;
+  onApply: (
+    provider: string,
+    model: string,
+    runtime: { contextWindow?: number; maxOutputTokens?: number },
+  ) => void;
   onReset: (provider: string, model: string) => void;
   onLogin: () => void;
   onLogout: () => void;
@@ -175,7 +188,7 @@ function ProviderCard({
         <div className="pp-badges">
           <Badge tone="neutral">{managed ? "Managed" : "API key"}</Badge>
           <Badge tone="neutral" dot dotTone={provider.connected ? "success" : "neutral"}>
-            {provider.connected ? "Connected" : "Offline"}
+            {provider.connected ? "Configured" : "Not configured"}
           </Badge>
         </div>
       </div>
@@ -194,10 +207,7 @@ function ProviderCard({
               const key = modelKey(m.provider, m.id);
               const open = expandedKey === key;
               return (
-                <div
-                  key={m.id}
-                  className={`pp-model${open ? " pp-model--open" : ""}`}
-                >
+                <div key={m.id} className={`pp-model${open ? " pp-model--open" : ""}`}>
                   <Button
                     variant="ghost"
                     type="button"
@@ -218,7 +228,9 @@ function ProviderCard({
                     <span className="pp-modelright">
                       <span className="pp-modelctx">
                         {m.contextWindow ? `${m.contextWindow.toLocaleString()} ctx` : ""}
-                        {m.contextWindow && m.maxOutputTokens ? ` · ${m.maxOutputTokens.toLocaleString()} out` : ""}
+                        {m.contextWindow && m.maxOutputTokens
+                          ? ` · ${m.maxOutputTokens.toLocaleString()} out`
+                          : ""}
                       </span>
                       <Chevron open={open} />
                     </span>
@@ -244,9 +256,16 @@ function ProviderCard({
 
       {provider.id === "ollama-cloud" ? (
         <div className="pp-starter">
-          <Text variant="micro" tone="accent" mono uppercase>Free starter model</Text>
-          <Text variant="label" weight="semibold">DeepSeek V4 Flash 0731</Text>
-          <Text variant="micro" tone="muted">Connect here once; Sophos selects this model automatically for new sessions. No settings file editing required.</Text>
+          <Text variant="micro" tone="accent" mono uppercase>
+            Free starter model
+          </Text>
+          <Text variant="label" weight="semibold">
+            DeepSeek V4 Flash 0731
+          </Text>
+          <Text variant="micro" tone="muted">
+            Connect here once; Sophos selects this model automatically for new sessions. No settings file
+            editing required.
+          </Text>
         </div>
       ) : null}
 
@@ -295,25 +314,21 @@ function ModelConfigEditor({
         <Text variant="micro" tone="dim" mono uppercase>
           Runtime config
         </Text>
-        <Button variant="ghost" size="sm" onClick={() => { setCtx(ceilCtx); setOut(ceilOut); onReset(); }}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setCtx(ceilCtx);
+            setOut(ceilOut);
+            onReset();
+          }}
+        >
           Reset to max
         </Button>
       </div>
 
-      <TokenField
-        label="Context window"
-        value={ctx}
-        max={ceilCtx}
-        min={MIN_TOKENS}
-        onChange={setCtx}
-      />
-      <TokenField
-        label="Max output tokens"
-        value={out}
-        max={ceilOut}
-        min={MIN_TOKENS}
-        onChange={setOut}
-      />
+      <TokenField label="Context window" value={ctx} max={ceilCtx} min={MIN_TOKENS} onChange={setCtx} />
+      <TokenField label="Max output tokens" value={out} max={ceilOut} min={MIN_TOKENS} onChange={setOut} />
 
       <div className="kp-runfoot">
         <Button variant="accent-soft" size="sm" onClick={apply}>
@@ -452,7 +467,7 @@ function LocalProviderCard({
         <div className="pp-badges">
           <Badge tone="neutral">Local</Badge>
           <Badge tone="neutral" dot dotTone={connected ? "success" : "neutral"}>
-            {connected ? "Connected" : "Offline"}
+            {connected ? "Configured" : "Not configured"}
           </Badge>
         </div>
       </div>
@@ -516,16 +531,23 @@ function LocalConnectModal({
   const [baseUrl, setBaseUrl] = useState("http://localhost:11434");
   const [kind, setKind] = useState<LocalProviderKind>("ollama");
   const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const submit = async () => {
     setBusy(true);
     try {
+      const trimmedBaseUrl = baseUrl.trim() || "http://localhost:11434";
+      const models = await probeLocalProvider(trimmedBaseUrl, kind);
       await onConnect({
-        id: "local",
+        id: isTauri ? "sophos-local-manual" : "local",
         name: name.trim() || "My Local Model",
-        baseUrl: baseUrl.trim() || "http://localhost:11434",
+        baseUrl: providerApiBaseUrl(trimmedBaseUrl),
         kind,
+        models,
       });
+      setLocalError(null);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
@@ -551,7 +573,17 @@ function LocalConnectModal({
         <Text variant="micro" tone="dim">
           Point Sophos at a local (self-hosted) model endpoint. The config is stored in your settings.
         </Text>
-        <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My Local Model" />
+        {localError ? (
+          <Text variant="label" tone="danger">
+            {localError}
+          </Text>
+        ) : null}
+        <Input
+          label="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="My Local Model"
+        />
         <Input
           label="Base URL"
           value={baseUrl}
@@ -577,46 +609,6 @@ function LocalConnectModal({
 // Login modal
 // ---------------------------------------------------------------------------
 
-/**
- * Deterministic OAuth sign-in URL for a provider. The daemon owns the real
- * OAuth entry point and the IPC contract does not expose it, so we surface a
- * stable, provider-scoped link here — the copyable URL a headless/SSH user
- * needs when the browser can't open automatically (research D19 / F2).
- */
-function oauthUrl(providerId: string): string {
-  return `https://auth.primeintellect.ai/oauth/${encodeURIComponent(providerId)}`;
-}
-
-/** A read-only URL field with a copy button and a "copied" confirmation. */
-function CopyField({ value, ariaLabel }: { value: string; ariaLabel: string }) {
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<number | null>(null);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      if (timer.current) window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard unavailable — leave the field as-is
-    }
-  };
-
-  return (
-    <div className="pp-copy">
-      <div className="pp-copyfield">
-        <Text variant="micro" tone="muted" mono className="sp-ellipsis">
-          {value}
-        </Text>
-      </div>
-      <Button variant="outline" size="sm" onClick={() => void copy()} aria-label={ariaLabel}>
-        {copied ? "Copied" : "Copy"}
-      </Button>
-    </div>
-  );
-}
-
 function LoginModal({
   provider,
   onClose,
@@ -629,13 +621,17 @@ function LoginModal({
   const ipc = useIpc();
   const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState(false);
-  const managed = provider.kind === "subscription";
+  const [error, setError] = useState<string>();
 
   const login = async () => {
+    if (!apiKey.trim()) return;
     setBusy(true);
+    setError(undefined);
     try {
-      await ipc.login(provider.id, apiKey.trim() || undefined);
+      await ipc.login(provider.id, apiKey.trim());
       onDone();
+    } catch {
+      setError("Could not save the API key. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -651,33 +647,13 @@ function LoginModal({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={login} loading={busy}>
+          <Button variant="primary" onClick={login} loading={busy} disabled={!apiKey.trim()}>
             Connect
           </Button>
         </>
       }
     >
       <div className="ns-form">
-        {managed ? (
-          <>
-            <div className="pp-oauth">
-              <Text variant="micro" tone="dim" uppercase className="pp-oauthlabel">
-                Sign in with OAuth
-              </Text>
-              <CopyField value={oauthUrl(provider.id)} ariaLabel={`Copy ${provider.name} sign-in link`} />
-              <Text variant="micro" tone="dim">
-                If the browser doesn't open automatically, copy this link and open it manually.
-              </Text>
-            </div>
-            <div className="pp-divider">
-              <span className="pp-dividerline" />
-              <Text variant="micro" tone="dim" uppercase>
-                or
-              </Text>
-              <span className="pp-dividerline" />
-            </div>
-          </>
-        ) : null}
         <div className="pp-apikey">
           <Text variant="micro" tone="dim" uppercase className="pp-oauthlabel">
             Use an API key
@@ -688,13 +664,16 @@ function LoginModal({
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="sk-…"
-            hint={
-              managed
-                ? "Set a key directly instead of OAuth — stored locally and never logged."
-                : "Stored locally and never logged. Leave blank to use ambient credentials."
-            }
+            hint="Saved locally for this provider. A model request verifies access."
           />
         </div>
+        {error ? (
+          <div role="alert">
+            <Text variant="micro" tone="danger">
+              {error}
+            </Text>
+          </div>
+        ) : null}
       </div>
     </Modal>
   );

@@ -39,13 +39,13 @@ describe("HighlightedCode", () => {
   });
 
   it("renders Python keywords and comments", () => {
-    render(<HighlightedCode code={'# a comment\ndef run():\n    return "x"' } lang="python" />);
+    render(<HighlightedCode code={'# a comment\ndef run():\n    return "x"'} lang="python" />);
     expect(document.querySelectorAll(".hl-tok--comment").length).toBeGreaterThan(0);
     expect(document.querySelectorAll(".hl-tok--func").length).toBeGreaterThan(0);
   });
 
   it("renders shell comments, strings, and flags", () => {
-    render(<HighlightedCode code={'# note\necho "hi" --force' } lang="shell" />);
+    render(<HighlightedCode code={'# note\necho "hi" --force'} lang="shell" />);
     expect(document.querySelectorAll(".hl-tok--comment").length).toBeGreaterThan(0);
     expect(document.querySelectorAll(".hl-tok--string").length).toBeGreaterThan(0);
     expect(document.querySelectorAll(".hl-tok--keyword").length).toBeGreaterThan(0);

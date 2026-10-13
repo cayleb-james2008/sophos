@@ -55,7 +55,12 @@ export function applyRunEvent(runs: CodeRun[], event: CodeRunEvent): CodeRun[] {
       if (!event.program) return runs;
       const calls: CodeRunCall[] = decomposeProgram(event.program).map((call) => ({
         name: call.name,
-        input: call.input === undefined ? undefined : typeof call.input === "string" ? call.input : JSON.stringify(call.input),
+        input:
+          call.input === undefined
+            ? undefined
+            : typeof call.input === "string"
+              ? call.input
+              : JSON.stringify(call.input),
         status: "running",
       }));
       const run: CodeRun = {
@@ -80,9 +85,14 @@ export function applyRunEvent(runs: CodeRun[], event: CodeRunEvent): CodeRun[] {
               ...run,
               calls: (() => {
                 const index = run.calls.findIndex((c) => c.name === event.name && c.status !== "complete");
-                if (index < 0) return [...run.calls, { name: event.name, input: event.input, status: "running" as const }];
+                if (index < 0)
+                  return [...run.calls, { name: event.name, input: event.input, status: "running" as const }];
                 const calls = [...run.calls];
-                calls[index] = { ...calls[index], input: event.input ?? calls[index].input, status: "running" as const };
+                calls[index] = {
+                  ...calls[index],
+                  input: event.input ?? calls[index].input,
+                  status: "running" as const,
+                };
                 return calls;
               })(),
             }
@@ -113,7 +123,9 @@ export function applyRunEvent(runs: CodeRun[], event: CodeRunEvent): CodeRun[] {
           ? {
               ...run,
               status: "complete" as const,
-              calls: run.calls.map((c) => (c.status === "running" ? { ...c, status: "complete" as const } : c)),
+              calls: run.calls.map((c) =>
+                c.status === "running" ? { ...c, status: "complete" as const } : c,
+              ),
             }
           : run,
       );
@@ -139,7 +151,13 @@ function fromIpcEvent(evt: Record<string, unknown>, sessionId: string): CodeRunE
   if (kind === "run_code") {
     const program = typeof evt.program === "string" ? evt.program : "";
     if (!program) return null;
-    return { type: "run_code", runId: typeof evt.runId === "string" ? evt.runId : `code-run-${Date.now()}`, sessionId, program, ts };
+    return {
+      type: "run_code",
+      runId: typeof evt.runId === "string" ? evt.runId : `code-run-${Date.now()}`,
+      sessionId,
+      program,
+      ts,
+    };
   }
   if (kind === "run_complete") {
     const runId = typeof evt.runId === "string" ? evt.runId : "";
@@ -154,10 +172,20 @@ function fromIpcEvent(evt: Record<string, unknown>, sessionId: string): CodeRunE
     const name = typeof evt.name === "string" ? evt.name : "";
     if (!name) return null;
     if (kind === "tool_call") {
-      const input = typeof evt.input === "string" ? evt.input : evt.input !== undefined ? JSON.stringify(evt.input) : undefined;
+      const input =
+        typeof evt.input === "string"
+          ? evt.input
+          : evt.input !== undefined
+            ? JSON.stringify(evt.input)
+            : undefined;
       return { type: "tool_call", runId, sessionId, name, input, ts };
     }
-    const output = typeof evt.output === "string" ? evt.output : evt.output !== undefined ? JSON.stringify(evt.output) : undefined;
+    const output =
+      typeof evt.output === "string"
+        ? evt.output
+        : evt.output !== undefined
+          ? JSON.stringify(evt.output)
+          : undefined;
     return { type: "tool_result", runId, sessionId, name, output, ts };
   }
   return null;
@@ -202,11 +230,12 @@ export function CodeRunProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<CodeRunsContextValue>(
     () => ({
       runs,
-      clearSession: (sessionId: string) => setRuns((prev) => {
-        const next = { ...prev };
-        delete next[sessionId];
-        return next;
-      }),
+      clearSession: (sessionId: string) =>
+        setRuns((prev) => {
+          const next = { ...prev };
+          delete next[sessionId];
+          return next;
+        }),
     }),
     [runs],
   );
@@ -216,21 +245,48 @@ export function CodeRunProvider({ children }: { children: React.ReactNode }) {
 
 type TrajectoryPartial = Omit<TrajectoryEntry, "id" | "seq" | "ts" | "sessionId">;
 
-function recordTrajectory(record: (sessionId: string, entry: TrajectoryPartial) => void, event: CodeRunEvent): void {
+function recordTrajectory(
+  record: (sessionId: string, entry: TrajectoryPartial) => void,
+  event: CodeRunEvent,
+): void {
   switch (event.type) {
     case "run_code": {
       const count = decomposeProgram(event.program).length;
-      record(event.sessionId, { kind: "program", label: "Code program", summary: `run_code — ${count} tool call${count === 1 ? "" : "s"}`, detail: event.program, source: "code-run" });
+      record(event.sessionId, {
+        kind: "program",
+        label: "Code program",
+        summary: `run_code — ${count} tool call${count === 1 ? "" : "s"}`,
+        detail: event.program,
+        source: "code-run",
+      });
       break;
     }
     case "tool_call":
-      record(event.sessionId, { kind: "tool", label: "Tool call (code)", summary: `called ${event.name}`, detail: event.input ?? "", source: "code-run" });
+      record(event.sessionId, {
+        kind: "tool",
+        label: "Tool call (code)",
+        summary: `called ${event.name}`,
+        detail: event.input ?? "",
+        source: "code-run",
+      });
       break;
     case "tool_result":
-      record(event.sessionId, { kind: "tool", label: "Tool result (code)", summary: `result of ${event.name}`, detail: event.output ?? "", source: "code-run" });
+      record(event.sessionId, {
+        kind: "tool",
+        label: "Tool result (code)",
+        summary: `result of ${event.name}`,
+        detail: event.output ?? "",
+        source: "code-run",
+      });
       break;
     case "run_complete":
-      record(event.sessionId, { kind: "program", label: "Code program", summary: "run_code complete", detail: event.runId, source: "code-run" });
+      record(event.sessionId, {
+        kind: "program",
+        label: "Code program",
+        summary: "run_code complete",
+        detail: event.runId,
+        source: "code-run",
+      });
       break;
   }
 }

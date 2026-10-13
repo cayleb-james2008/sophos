@@ -45,7 +45,13 @@ describe("working style parsing", () => {
 describe("studioReducer", () => {
   it("edits identity fields immutably", () => {
     const d = draft();
-    const next = studioReducer(studioReducer(studioReducer(d, { type: "name", value: "Renamed" }), { type: "tagline", value: "New tagline" }), { type: "description", value: "New desc" });
+    const next = studioReducer(
+      studioReducer(studioReducer(d, { type: "name", value: "Renamed" }), {
+        type: "tagline",
+        value: "New tagline",
+      }),
+      { type: "description", value: "New desc" },
+    );
     expect(d.name).toBe("Builder Bot");
     expect(next.name).toBe("Renamed");
     expect(next.tagline).toBe("New tagline");
@@ -90,7 +96,10 @@ describe("studioReducer", () => {
   });
 
   it("adds confirm entries (deduped, trimmed, empty ignored)", () => {
-    const a = studioReducer(draft({ safety: { autoApprove: false, confirm: ["Destructive shell"] } }), { type: "confirmAdd", value: "  Network write  " });
+    const a = studioReducer(draft({ safety: { autoApprove: false, confirm: ["Destructive shell"] } }), {
+      type: "confirmAdd",
+      value: "  Network write  ",
+    });
     expect(a.safety.confirm).toEqual(["Destructive shell", "Network write"]);
     const dup = studioReducer(a, { type: "confirmAdd", value: "Network write" });
     expect(dup.safety.confirm).toHaveLength(2);
@@ -99,7 +108,10 @@ describe("studioReducer", () => {
   });
 
   it("removes confirm entries", () => {
-    const next = studioReducer(draft({ safety: { autoApprove: false, confirm: ["Destructive shell", "Network write"] } }), { type: "confirmRemove", value: "Network write" });
+    const next = studioReducer(
+      draft({ safety: { autoApprove: false, confirm: ["Destructive shell", "Network write"] } }),
+      { type: "confirmRemove", value: "Network write" },
+    );
     expect(next.safety.confirm).toEqual(["Destructive shell"]);
   });
 
@@ -121,7 +133,9 @@ describe("studioReducer", () => {
 
 describe("live composition summary", () => {
   it("reflects tools, skills, and safety posture", () => {
-    const summary = studioCompositionSummary(draft({ skills: ["release-audit"], safety: { autoApprove: true, confirm: [] } }));
+    const summary = studioCompositionSummary(
+      draft({ skills: ["release-audit"], safety: { autoApprove: true, confirm: [] } }),
+    );
     expect(summary).toContain("Tools: shell, web_search");
     expect(summary).toContain("Skills: release-audit");
     expect(summary).toContain("safe tools auto-approved");
@@ -137,7 +151,9 @@ describe("live composition summary", () => {
   });
 
   it("shows the confirm list when not auto-approving", () => {
-    const summary = studioCompositionSummary(draft({ safety: { autoApprove: false, confirm: ["Destructive shell"] } }));
+    const summary = studioCompositionSummary(
+      draft({ safety: { autoApprove: false, confirm: ["Destructive shell"] } }),
+    );
     expect(summary).toContain("confirms: Destructive shell");
   });
 });

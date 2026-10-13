@@ -85,7 +85,13 @@ export function SubagentPolicyPanel() {
             </Text>
           </div>
         </div>
-        {saved ? <Badge tone="success" dot>Saved</Badge> : <Badge tone="neutral">Persists</Badge>}
+        {saved ? (
+          <Badge tone="success" dot>
+            Saved
+          </Badge>
+        ) : (
+          <Badge tone="neutral">Persists</Badge>
+        )}
       </div>
 
       {isLoading ? (
@@ -96,16 +102,20 @@ export function SubagentPolicyPanel() {
         </div>
       ) : error ? (
         <div className="sub-error" role="alert">
-          <Text variant="body" tone="danger">{error}</Text>
+          <Text variant="body" tone="danger">
+            {error}
+          </Text>
           <div className="sub-error__actions">
-            <Button variant="outline" size="sm" onClick={() => void load()}>Retry</Button>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              Retry
+            </Button>
           </div>
         </div>
       ) : !providers.length ? (
         <div className="sub-empty">
           <Text variant="body" tone="muted">
-            No providers configured. Connect a provider on the Providers tab, then set a
-            default model for your subagents.
+            No providers configured. Connect a provider on the Providers tab, then set a default model for
+            your subagents.
           </Text>
         </div>
       ) : (
@@ -117,7 +127,9 @@ export function SubagentPolicyPanel() {
               onChange={(e) => void persist({ subagentDefaultProvider: e.target.value })}
               options={providers.map((p) => ({ value: p.id, label: p.name }))}
             />
-            <Text variant="micro" tone="dim">Provider that new subagents use by default</Text>
+            <Text variant="micro" tone="dim">
+              Provider that new subagents use by default
+            </Text>
           </div>
           <div className="sub-field">
             <Select
@@ -139,7 +151,9 @@ export function SubagentPolicyPanel() {
               onChange={(e) => void persist({ subagentDefaultThinking: e.target.value })}
               options={THINKING_OPTIONS}
             />
-            <Text variant="micro" tone="dim">Reasoning effort inherited by new subagents</Text>
+            <Text variant="micro" tone="dim">
+              Reasoning effort inherited by new subagents
+            </Text>
           </div>
         </div>
       )}

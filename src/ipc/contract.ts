@@ -8,61 +8,131 @@
 
 export type IpcCommand =
   | { method: "prompt"; params: { text: string; options?: PromptOptions } }
-  | { method: "abort"; params: {} }
+  | { method: "abort"; params: Record<string, never> }
   | { method: "steer"; params: { text: string } }
-  | { method: "setModel"; params: { provider: string; model: string; thinking?: string; serviceTier?: string; transport?: string; contextWindow?: number; maxOutputTokens?: number } }
-  | { method: "newSession"; params: { cwd?: string; goal?: string } }
+  | {
+      method: "setModel";
+      params: {
+        provider: string;
+        model: string;
+        thinking?: string;
+        serviceTier?: string;
+        transport?: string;
+        contextWindow?: number;
+        maxOutputTokens?: number;
+      };
+    }
+  | {
+      method: "newSession";
+      params: {
+        cwd?: string;
+        goal?: string;
+        profile?: { id: string; name: string; mode: string; systemPrompt: string };
+      };
+    }
   | { method: "switchSession"; params: { id: string } }
   | { method: "resumeSession"; params: { pathOrId: string } }
   | { method: "forkSession"; params: { pathOrId: string } }
-  | { method: "listSessions"; params: {} }
-  | { method: "listAgents"; params: {} }
+  | { method: "listSessions"; params: Record<string, never> }
+  | { method: "listAgents"; params: Record<string, never> }
   | { method: "attachAgent"; params: { id: string } }
   | { method: "detachAgent"; params: { id: string } }
-  | { method: "getState"; params: {} }
-  | { method: "getTranscript"; params: {} }
-  | { method: "getModels"; params: {} }
-  | { method: "getProviders"; params: {} }
+  | { method: "getState"; params: Record<string, never> }
+  | { method: "getTranscript"; params: Record<string, never> }
+  | { method: "getModels"; params: Record<string, never> }
+  | { method: "getProviders"; params: Record<string, never> }
   | { method: "login"; params: { provider: string; apiKey?: string } }
   | { method: "logout"; params: { provider: string } }
-  | { method: "getSettings"; params: {} }
+  | { method: "getSettings"; params: Record<string, never> }
   | { method: "setSettings"; params: { settings: Record<string, unknown> } }
   | { method: "runCommand"; params: { command: string; args?: string[] } }
-  | { method: "getContextStats"; params: {} }
-  | { method: "getRlmChildren"; params: {} }
+  | { method: "getContextStats"; params: Record<string, never> }
+  | { method: "getRlmChildren"; params: Record<string, never> }
   | { method: "sendAgentMessage"; params: { agentId: string; message: string } }
-  | { method: "listInbox"; params: {} }
+  | { method: "listInbox"; params: Record<string, never> }
   | { method: "markMessageRead"; params: { messageId: string } }
   | { method: "compact"; params: { prompt?: string } }
-  | { method: "retry"; params: {} }
-  | { method: "refine"; params: {} }
+  | { method: "retry"; params: Record<string, never> }
+  | { method: "refine"; params: Record<string, never> }
   | { method: "exportSession"; params: { format?: string } }
-  | { method: "shareSession"; params: {} }
-  | { method: "getSessionTree"; params: {} }
-  | { method: "cloneSession"; params: {} }
+  | { method: "shareSession"; params: Record<string, never> }
+  | { method: "getSessionTree"; params: Record<string, never> }
+  | { method: "cloneSession"; params: Record<string, never> }
   | { method: "nameSession"; params: { name: string } }
   | { method: "sideQuestion"; params: { text: string } }
   | { method: "addSchedule"; params: { cron: string; prompt: string } }
   | { method: "removeSchedule"; params: { id: string } }
   | { method: "setHeartbeat"; params: { schedule: string; prompt?: string } }
-  | { method: "removeHeartbeat"; params: {} }
+  | { method: "removeHeartbeat"; params: Record<string, never> }
   | { method: "navigateTree"; params: { entryId: string } }
   | { method: "startSideQuestion"; params: { text: string } }
   | { method: "exportToHtml"; params: { outputPath?: string } }
   | { method: "exportToJsonl"; params: { outputPath?: string } }
   | { method: "setSessionName"; params: { name: string } }
-  | { method: "getContextTree"; params: {} }
-  | { method: "getRuntimeInfo"; params: {} }
-  | { method: "getKernelState"; params: {} }
-  | { method: "getHarnessState"; params: {} }
+  | { method: "getContextTree"; params: Record<string, never> }
+  | { method: "getRuntimeInfo"; params: Record<string, never> }
+  | { method: "getKernelState"; params: Record<string, never> }
+  | { method: "getHarnessState"; params: Record<string, never> }
   | { method: "getAgentState"; params: { id: string } }
-  | { method: "createSkill"; params: { name: string; description: string; content: string; pythonImport?: string } }
+  | {
+      method: "createSkill";
+      params: { name: string; description: string; content: string; pythonImport?: string };
+    }
   | { method: "installSkill"; params: { path: string } }
   | { method: "installExtension"; params: { path: string } }
   | { method: "removeExtension"; params: { path: string } }
-  | { method: "getExtensions"; params: {} }
+  | { method: "getExtensions"; params: Record<string, never> }
   | { method: "testMcpServer"; params: { name: string; command: string; args?: string[] } }
-  | { method: "getSlashCommands"; params: {} };
+  | { method: "getSlashCommands"; params: Record<string, never> }
+  | { method: "getMemoryState"; params: { tier?: MemoryTier } }
+  | { method: "searchMemory"; params: { query: string; tier?: MemoryTier; maxResults?: number } }
+  | { method: "storeMemory"; params: { entry: Omit<MemoryTierEntry, "id"> } }
+  | { method: "recallMemory"; params: { query: string; limit?: number } }
+  | { method: "forgetMemory"; params: { id: string } }
+  | { method: "createCheckpoint"; params: { label: string; summary?: string } }
+  | { method: "restoreCheckpoint"; params: { id: string } }
+  | { method: "listCheckpoints"; params: { sessionId?: string } }
+  | { method: "getSquadTopology"; params: Record<string, never> }
+  | {
+      method: "evaluateSquadPiece";
+      params: { childId: string; pieceContract: string; bar: string; outputPaths: string[] };
+    }
+  | { method: "getMcpServers"; params: Record<string, never> }
+  | { method: "readMcpResource"; params: { serverName: string; uri: string } }
+  | { method: "getMcpPrompt"; params: { serverName: string; name: string; args?: Record<string, string> } }
+  | { method: "getSecurityPolicy"; params: Record<string, never> }
+  | {
+      method: "setSecurityPolicy";
+      params: { policy: WorkspaceSecurityPolicy; customBlockedPatterns?: string[] };
+    }
+  | { method: "analyzeBlastRadius"; params: { command: string; targetFiles?: string[] } }
+  | { method: "getSecurityAuditLog"; params: Record<string, never> }
+  | { method: "getSquadWorkflow"; params: Record<string, never> }
+  | { method: "runSquadWorkflow"; params: { type: SquadWorkflowType; goal: string; bar: string } }
+  | { method: "pauseSquadWorkflow"; params: { id: string } }
+  | { method: "getTokenBudget"; params: Record<string, never> }
+  | {
+      method: "compactContext";
+      params: { strategy: "semantic-summarize" | "prune-oldest" | "evict-tools" };
+    }
+  | { method: "listDesktopWindows"; params: Record<string, never> }
+  | { method: "inspectDesktopWindow"; params: { windowId: string } }
+  | { method: "dispatchDesktopAction"; params: { windowId: string; action: DesktopUiAction } }
+  | { method: "captureDesktopScreenshot"; params: { windowId: string } }
+  | { method: "listDistilledSkills"; params: Record<string, never> }
+  | { method: "distillSkillFromTrajectory"; params: { sessionId: string; name?: string } }
+  | { method: "promoteSkill"; params: { skillId: string } }
+  | { method: "deleteDistilledSkill"; params: { skillId: string } }
+  | { method: "getThoughtTree"; params: Record<string, never> }
+  | { method: "runSpeculativeBranch"; params: { parentNodeId: string; hypothesis: string } }
+  | { method: "pruneThoughtBranch"; params: { nodeId: string } }
+  | { method: "promoteThoughtBranch"; params: { nodeId: string } }
+  | { method: "listWorkspaceTwins"; params: Record<string, never> }
+  | { method: "createWorkspaceTwin"; params: { name: string; baseBranch?: string } }
+  | { method: "executeInTwin"; params: { twinId: string; command: string } }
+  | { method: "diffWorkspaceTwin"; params: { twinId: string } }
+  | { method: "mergeWorkspaceTwin"; params: { twinId: string } }
+  | { method: "rollbackWorkspaceTwin"; params: { twinId: string } };
 
 export interface PromptOptions {
   thinking?: string;
@@ -254,7 +324,8 @@ export type KernelHealthReason =
   | "browser_preview"
   | "unavailable";
 
-export type KernelHealthAction = "none" | "wait" | "run_cell" | "retry" | "restart" | "refresh" | "open_tauri";
+export type KernelHealthAction =
+  "none" | "wait" | "run_cell" | "retry" | "restart" | "refresh" | "open_tauri";
 
 export interface KernelHealthDiagnostic {
   reason: KernelHealthReason;
@@ -305,6 +376,101 @@ export interface HarnessState {
   entries: HarnessEntry[];
   refinements: HarnessRefinement[];
   source?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Multi-Tier Semantic Memory Architecture (OpenViking / Letta / MemGPT)
+// ---------------------------------------------------------------------------
+
+export type MemoryTier = "working" | "recall" | "archival";
+
+export interface MemoryTierEntry {
+  id: string;
+  tier: MemoryTier;
+  uri?: string; // e.g. viking://user/default/memories/entity.md
+  title: string;
+  content: string;
+  confidence?: number; // 0.0 - 1.0
+  tags?: string[];
+  scope?: "local" | "global";
+  temporalValidity?: {
+    validFrom?: string;
+    validTo?: string;
+    assertedAt: string;
+  };
+  source?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MemoryState {
+  working: MemoryTierEntry[];
+  recall: MemoryTierEntry[];
+  archival: MemoryTierEntry[];
+  totalCount: number;
+  uriIndex?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Durable Session Checkpointing (LangGraph / Temporal / Osmani 2026)
+// ---------------------------------------------------------------------------
+
+export interface CheckpointEntry {
+  id: string;
+  sessionId: string;
+  turnIndex: number;
+  timestamp: string;
+  label: string;
+  summary?: string;
+  deltaDiff?: string;
+  verifiedStatus?: "GREEN" | "UNVERIFIED" | "REFUTED";
+  tokenCount?: number;
+  stateSnapshot?: {
+    activeSessionId?: string;
+    workingDirectory?: string;
+    goal?: string;
+    appliedEditsCount?: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Gauntlet-RLM Squad Topology & Evaluator-Optimizer (Huang et al. / Anthropic)
+// ---------------------------------------------------------------------------
+
+export type SquadRole = "worker" | "critic_text" | "critic_vision" | "researcher" | "orchestrator";
+
+export interface BlindCriticRubric {
+  goalScore: number; // 0.0 - 1.0
+  contractScore: number; // 0.0 - 1.0
+  barScore: number; // 0.0 - 1.0
+  contractVerdict: "PASS" | "FAIL";
+  barVerdict: "PASS" | "FAIL" | "REFUTED";
+  quotedDefects: Array<{
+    file?: string;
+    line?: number;
+    defect: string;
+    recommendation: string;
+  }>;
+  reviewRound: number;
+  criticRole: "critic_text" | "critic_vision";
+  timestamp: string;
+}
+
+export interface SquadMemberState {
+  id: string;
+  role: SquadRole;
+  name: string;
+  status: "idle" | "working" | "evaluating" | "done" | "error";
+  targetPiece?: string;
+  reviewRounds?: number;
+  latestRubric?: BlindCriticRubric;
+  softCriticReplacementCount?: number;
+}
+
+export interface SquadTopology {
+  orchestrator: SquadMemberState;
+  members: SquadMemberState[];
+  activeEvaluationRounds: number;
+  doomLoopDetected: boolean;
 }
 
 /** Live daemon-owned runtime capabilities used by the harness panels. */
@@ -428,6 +594,11 @@ export interface ProviderInfo {
 
 export type LocalProviderKind = "ollama" | "openai-compatible";
 
+export interface LocalProviderModel {
+  id: string;
+  name: string;
+}
+
 /**
  * A local (self-hosted) model endpoint — Ollama or an OpenAI-compatible
  * server. Unlike daemon-discovered cloud providers, this is a user-specified
@@ -439,6 +610,8 @@ export interface LocalProviderConfig {
   name: string;
   baseUrl: string;
   kind: LocalProviderKind;
+  /** Models discovered from the loopback server and registered with Prime Agent. */
+  models?: LocalProviderModel[];
 }
 
 export interface SessionInfo {
@@ -500,7 +673,7 @@ export interface Settings {
    * the engine on selection and persisted here so it survives reconnects.
    */
   modelConfig?: Record<string, ModelRuntimeConfig>;
-  /** API keys per provider, stored/removed by login/logout (persisted to settings). */
+  /** Legacy import input only; getSettings never returns keys. Use login/logout to write auth.json. */
   auth?: Record<string, string>;
   /**
    * Local (Ollama / OpenAI-compatible) endpoint configs, keyed by id. A non-empty
@@ -559,4 +732,265 @@ export interface SlashCommand {
   name: string;
   description: string;
   source?: "builtin" | "extension" | "skill";
+}
+
+// ---------------------------------------------------------------------------
+// Model Context Protocol (MCP) Standard Subsystem (Anthropic MCP v1.2+)
+// ---------------------------------------------------------------------------
+
+export interface McpResource {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+  size?: number;
+  text?: string;
+  blob?: string;
+}
+
+export interface McpPromptArgument {
+  name: string;
+  description?: string;
+  required?: boolean;
+}
+
+export interface McpPromptTemplate {
+  name: string;
+  description?: string;
+  arguments?: McpPromptArgument[];
+}
+
+export interface McpToolSchema {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+}
+
+export interface McpServerDetails {
+  name: string;
+  command: string;
+  args?: string[];
+  enabled: boolean;
+  status: "connected" | "disconnected" | "error" | "testing";
+  latencyMs?: number;
+  protocolVersion?: string;
+  capabilities?: {
+    tools?: boolean;
+    resources?: boolean;
+    prompts?: boolean;
+    logging?: boolean;
+  };
+  tools: McpToolSchema[];
+  resources: McpResource[];
+  prompts: McpPromptTemplate[];
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Autonomous Workspace Security & Blast Radius Governance (SWE-agent)
+// ---------------------------------------------------------------------------
+
+export type WorkspaceSecurityPolicy = "strict-sandbox" | "confirm-risky" | "permissive" | "network-isolated";
+
+export type RiskLevel = "low" | "medium" | "high" | "critical";
+
+export interface BlastRadiusReport {
+  filesTargeted: number;
+  forbiddenPathsHit: string[];
+  riskLevel: RiskLevel;
+  requiresConfirmation: boolean;
+  reasons: string[];
+  suggestedAction: string;
+}
+
+export interface SecurityAuditEntry {
+  id: string;
+  timestamp: string;
+  command: string;
+  policy: WorkspaceSecurityPolicy;
+  blastRadius: BlastRadiusReport;
+  status: "approved" | "blocked" | "auto-passed" | "rejected";
+  actor: string;
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic Multi-Agent Squad Workflow Engine (LangGraph / AutoGen 0.4)
+// ---------------------------------------------------------------------------
+
+export type SquadWorkflowType = "sequential" | "hierarchical" | "consensus" | "custom";
+
+export interface SquadWorkflowNode {
+  id: string;
+  role: string;
+  profileId?: string;
+  model?: string;
+  status: "idle" | "running" | "completed" | "failed" | "skipped";
+  contract?: string;
+  outputPreview?: string;
+  latencyMs?: number;
+  round?: number;
+}
+
+export interface SquadWorkflowState {
+  id: string;
+  name: string;
+  type: SquadWorkflowType;
+  nodes: SquadWorkflowNode[];
+  activeNodeId?: string;
+  consensusScore?: number;
+  totalRounds: number;
+  maxRounds: number;
+  barVerdict?: "PASS" | "FAIL" | "REFUTED";
+}
+
+// ---------------------------------------------------------------------------
+// Context Token Budget & Compaction Optimizer (DSPy / MemGPT)
+// ---------------------------------------------------------------------------
+
+export interface TokenBudgetTiers {
+  systemPrompt: number;
+  toolsAndSchemas: number;
+  workingMemory: number;
+  episodicRecall: number;
+  semanticArchival: number;
+  chatHistory: number;
+  checkpoints: number;
+}
+
+export interface TokenBudgetBreakdown {
+  totalTokens: number;
+  contextLimit: number;
+  usagePercent: number;
+  // Prime Agent does not expose per-tier attribution or this threshold.
+  tiers?: TokenBudgetTiers;
+  autoCompactionThreshold?: number;
+  compactionSavingsTokens?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Native Windows Computer-Use Action Space (CUA & UIA)
+// ---------------------------------------------------------------------------
+
+export interface DesktopWindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface DesktopWindowInfo {
+  id: string;
+  title: string;
+  processName: string;
+  pid: number;
+  bounds: DesktopWindowBounds;
+  isMinimized: boolean;
+  isVisible: boolean;
+}
+
+export interface DesktopUiElement {
+  id: string;
+  name: string;
+  role: string;
+  bounds: DesktopWindowBounds;
+  isEnabled: boolean;
+  isFocused: boolean;
+  children?: DesktopUiElement[];
+}
+
+export interface DesktopUiAction {
+  kind: "click" | "type" | "keypress" | "hover" | "scroll";
+  targetElementId?: string;
+  x?: number;
+  y?: number;
+  text?: string;
+  key?: string;
+}
+
+export interface DesktopActionResult {
+  success: boolean;
+  durationMs: number;
+  message: string;
+  screenshot?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Self-Evolving Skill Distillation Engine (Voyager & Eureka)
+// ---------------------------------------------------------------------------
+
+export interface DistilledSkill {
+  id: string;
+  name: string;
+  description: string;
+  triggers: string[];
+  skillMarkdown: string;
+  successRate: number;
+  runsObserved: number;
+  createdAt: string;
+  isPromoted: boolean;
+  sourceSessionId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Speculative Tree-of-Thoughts Execution Engine (ToT / FoT)
+// ---------------------------------------------------------------------------
+
+export type ThoughtNodeType = "hypothesis" | "plan" | "code_diff" | "test_run" | "eval_verdict";
+
+export interface ThoughtNode {
+  id: string;
+  parentId?: string;
+  type: ThoughtNodeType;
+  label: string;
+  score: number;
+  status: "exploring" | "active" | "pruned" | "promoted";
+  diffSnippet?: string;
+  rationale?: string;
+  depth: number;
+  childrenIds?: string[];
+}
+
+export interface ThoughtTreeState {
+  id: string;
+  rootId: string;
+  goal: string;
+  nodes: ThoughtNode[];
+  activeBranchPath: string[];
+  bestNodeId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Ephemeral Workspace Twin Sandbox (Devin Sandbox / Worktrees)
+// ---------------------------------------------------------------------------
+
+export type TwinStatus = "clean" | "dirty" | "executing" | "merged" | "rolled_back";
+
+export interface WorkspaceTwin {
+  id: string;
+  name: string;
+  branch: string;
+  worktreePath: string;
+  status: TwinStatus;
+  modifiedFilesCount: number;
+  createdAt: string;
+  lastActiveAt: string;
+  baseCommit: string;
+}
+
+export interface TwinDiffReport {
+  twinId: string;
+  filesChanged: string[];
+  insertions: number;
+  deletions: number;
+  diffText: string;
+  isMergeable: boolean;
+}
+
+export interface TwinExecResult {
+  twinId: string;
+  command: string;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
 }

@@ -32,7 +32,11 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
         </em>,
       );
     } else if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
-      out.push(<code key={`${keyBase}-c${k++}`} className="md-code">{part.slice(1, -1)}</code>);
+      out.push(
+        <code key={`${keyBase}-c${k++}`} className="md-code">
+          {part.slice(1, -1)}
+        </code>,
+      );
     } else if (part.startsWith("[") && part.includes("](")) {
       const close = part.indexOf("](");
       const end = part.indexOf(")", close);
@@ -40,7 +44,13 @@ function renderInline(text: string, keyBase: string): React.ReactNode[] {
         const label = part.slice(1, close);
         const href = part.slice(close + 2, end);
         out.push(
-          <a key={`${keyBase}-a${k++}`} href={href} target="_blank" rel="noopener noreferrer" className="md-link">
+          <a
+            key={`${keyBase}-a${k++}`}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="md-link"
+          >
             {label}
           </a>,
         );

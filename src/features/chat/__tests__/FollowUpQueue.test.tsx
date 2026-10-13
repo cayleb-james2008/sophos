@@ -6,7 +6,14 @@ import { FollowUpQueue } from "../FollowUpQueue";
 
 describe("FollowUpQueue", () => {
   it("renders each follow-up chip with its text and hint", () => {
-    render(<FollowUpQueue followUps={[{ id: 1, text: "first" }, { id: 2, text: "second" }]} />);
+    render(
+      <FollowUpQueue
+        followUps={[
+          { id: 1, text: "first" },
+          { id: 2, text: "second" },
+        ]}
+      />,
+    );
     expect(screen.getByText("first")).toBeInTheDocument();
     expect(screen.getByText("second")).toBeInTheDocument();
     expect(screen.getByText(/queued · Alt\+Up to retrieve · Esc to clear/)).toBeInTheDocument();

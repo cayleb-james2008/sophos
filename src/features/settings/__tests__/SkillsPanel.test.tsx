@@ -25,7 +25,12 @@ const RUNTIME = {
   cwd: "C:\\work",
   kernel: { status: "configured", persistent: true, toolAvailable: true },
   skills: [
-    { name: "release-audit", description: "Audit a release artifact", filePath: "C:\\skills\\release-audit", source: "local" },
+    {
+      name: "release-audit",
+      description: "Audit a release artifact",
+      filePath: "C:\\skills\\release-audit",
+      source: "local",
+    },
     { name: "qa", description: "Run the QA battery", filePath: "C:\\skills\\qa" },
   ],
   skillDiagnostics: [{ type: "warn", message: "Could not load path", path: "bad/dir" }],
@@ -35,7 +40,9 @@ const RUNTIME = {
 beforeEach(() => {
   vi.clearAllMocks();
   (mockClient.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({ skills: [], disabledSkills: [] });
-  (mockClient.getRuntimeInfo as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.parse(JSON.stringify(RUNTIME)));
+  (mockClient.getRuntimeInfo as ReturnType<typeof vi.fn>).mockResolvedValue(
+    JSON.parse(JSON.stringify(RUNTIME)),
+  );
   (mockClient.setSettings as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
   (mockClient.createSkill as ReturnType<typeof vi.fn>).mockResolvedValue({ name: "new-skill" });
   (mockClient.installSkill as ReturnType<typeof vi.fn>).mockResolvedValue([{ name: "installed" }]);
@@ -80,7 +87,9 @@ describe("SkillsPanel", () => {
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
-      expect(mockClient.setSettings).toHaveBeenCalledWith(expect.objectContaining({ skills: ["C:\\myskills"] }));
+      expect(mockClient.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ skills: ["C:\\myskills"] }),
+      );
     });
   });
 

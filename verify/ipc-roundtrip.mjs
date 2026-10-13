@@ -10,20 +10,37 @@
 // gracefully", not a failure.
 //
 // Usage: node verify/ipc-roundtrip.mjs
-// Env:   REF (coding-agent package root), DAEMON_PORT (default 48100),
+// Env:   PRIME_AGENT_REF (prime-agent-ref checkout root; packages/coding-agent
+//        is derived), DAEMON_PORT (default 48100),
 //        BRIDGE (path to bridge dist index.js)
 
 import { execFileSync, spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const REF = resolve(
-  process.env.REF ?? resolve(REPO_ROOT, "..", "prime-agent-ref", "packages", "coding-agent"),
-);
+/** PRIME_AGENT_REF points at the prime-agent-ref checkout ROOT (same meaning
+ * as in scripts/bundle.mjs and the README); packages/coding-agent is derived.
+ * Throws a clear error when the checkout or the package is missing. */
+function resolvePrimeAgentRef() {
+  const checkout = resolve(
+    process.env.PRIME_AGENT_REF ?? resolve(REPO_ROOT, "..", "prime-agent-ref"),
+  );
+  const pkg = join(checkout, "packages", "coding-agent");
+  if (!existsSync(checkout) || !existsSync(pkg)) {
+    throw new Error(
+      `PRIME_AGENT_REF is not a usable prime-agent-ref checkout: ${checkout}\n` +
+        `(expected packages/coding-agent under it). Set PRIME_AGENT_REF to the ` +
+        `checkout root, or keep the default sibling checkout (${resolve(REPO_ROOT, "..", "prime-agent-ref")}).`,
+    );
+  }
+  return checkout;
+}
+
+const REF = join(resolvePrimeAgentRef(), "packages", "coding-agent");
 // Unique port per run so the daemon supervisor registry never collides with a
 // previous run's leftover supervisor (which would claim the port is owned).
 const DAEMON_PORT = Number(process.env.DAEMON_PORT || (48000 + Math.floor(Math.random() * 1000)));

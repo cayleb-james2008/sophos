@@ -12,17 +12,33 @@
 //      still valid transport evidence — it means the command reached a worker).
 //
 // Usage: node verify/tcp-smoke.mjs
-// Env:   REF (coding-agent package root), PORT (default 48123)
+// Env:   PRIME_AGENT_REF (prime-agent-ref checkout root; packages/coding-agent
+//        is derived), PORT (default 48123)
 
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const REF =
-  process.env.REF ||
-  "C:/Users/Cayleb/Desktop/workspace/prime-agent-ref/packages/coding-agent";
+/** PRIME_AGENT_REF points at the prime-agent-ref checkout ROOT (same meaning
+ * as in scripts/bundle.mjs and the README); packages/coding-agent is derived.
+ * Throws a clear error when the checkout or the package is missing. */
+function resolvePrimeAgentRef() {
+  const checkout =
+    process.env.PRIME_AGENT_REF || "C:/Users/Cayleb/Desktop/workspace/prime-agent-ref";
+  const pkg = join(checkout, "packages", "coding-agent");
+  if (!existsSync(checkout) || !existsSync(pkg)) {
+    throw new Error(
+      `PRIME_AGENT_REF is not a usable prime-agent-ref checkout: ${checkout}\n` +
+        `(expected packages/coding-agent under it). Set PRIME_AGENT_REF to the ` +
+        `checkout root, or restore the default C:/Users/Cayleb/Desktop/workspace/prime-agent-ref.`,
+    );
+  }
+  return checkout;
+}
+
+const REF = join(resolvePrimeAgentRef(), "packages", "coding-agent");
 const PORT = Number(process.env.PORT || 48123);
 const SPEC = `tcp://127.0.0.1:${PORT}`;
 const CLI = join(REF, "dist", "bundle", "cli.js");

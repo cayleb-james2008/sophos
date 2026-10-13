@@ -36,7 +36,12 @@
 }
 .shortcuts-overlay__heading {
   color: var(--pa-paper);
-  font: 600 18px/1 "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font:
+    600 18px/1 "Geist",
+    "Geist Fallback",
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
   letter-spacing: -0.01em;
 }
 .shortcuts-overlay__close {
@@ -51,7 +56,9 @@
   transition: color 120ms ease;
 }
 .shortcuts-overlay__close:hover,
-.shortcuts-overlay__close:focus-visible { color: var(--pa-paper); }
+.shortcuts-overlay__close:focus-visible {
+  color: var(--pa-paper);
+}
 .shortcuts-overlay__body {
   padding: 8px 0;
   overflow-y: auto;
@@ -60,7 +67,9 @@
   padding: 14px 22px 16px;
   border-bottom: 1px solid var(--pa-border);
 }
-.shortcuts-overlay__group:last-child { border-bottom: 0; }
+.shortcuts-overlay__group:last-child {
+  border-bottom: 0;
+}
 .shortcuts-overlay__grouphead {
   font-family: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
   font-size: 10px;
@@ -80,7 +89,12 @@
 }
 .shortcuts-overlay__label {
   color: var(--pa-paper);
-  font: 500 13px/1.4 "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  font:
+    500 13px/1.4 "Geist",
+    "Geist Fallback",
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
   display: flex;
   flex-direction: column;
   justify-content: center;

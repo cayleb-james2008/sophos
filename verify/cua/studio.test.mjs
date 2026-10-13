@@ -27,6 +27,8 @@ import {
   getWindowState,
   clickElement,
   typeText,
+  pressKey,
+  hotkey,
   bringToFront,
   click,
   listWindows,
@@ -233,8 +235,16 @@ async function focusComposer() {
 }
 
 async function typeInto(text) {
-  const ta = composerIn(freshState());
+  let ta = composerIn(freshState());
   assert(ta, "Composer textarea not found before typing");
+  // Demo launch may leave a starter prompt in the composer. Replace it so
+  // profile assertions exercise only the intended message.
+  hotkey(app.pid, ["ctrl", "a"], app.windowId);
+  await sleep(150);
+  pressKey(app.pid, "delete", app.windowId);
+  await sleep(250);
+  ta = composerIn(freshState());
+  assert(ta, "Composer textarea not found after clearing");
   typeText(app.pid, text, app.windowId, ta.element_token);
   await sleep(500);
 }
@@ -465,7 +475,7 @@ async function runTest(test) {
       console.log(`  \u2713 ${test.name} (${elapsed}ms)`);
       return { name: test.name, pass: true, elapsed };
     } catch (err) {
-      const retriable = stale(err.message) || attempt === 1;
+      const retriable = stale(err.message) && attempt < (test.maxAttempts || 2);
       if (retriable) {
         console.log(`    [retry] ${test.name} — ${err.message}`);
         try { closeApp(app.pid); } catch {}

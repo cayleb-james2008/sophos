@@ -11,10 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SessionInfo, ContextStats, Goal, RlmChild } from "../../../ipc/contract";
 import { SessionsGraph } from "../SessionsGraph";
 
-type TestEnrichment = Record<
-  string,
-  { context?: ContextStats; goals?: Goal[]; rlmChildren?: RlmChild[] }
->;
+type TestEnrichment = Record<string, { context?: ContextStats; goals?: Goal[]; rlmChildren?: RlmChild[] }>;
 
 vi.mock("@xyflow/react", async () => {
   const { useState } = await import("react");

@@ -86,7 +86,11 @@ describe("SlashAutocomplete", () => {
   });
 
   it("does not show overflow when 8 or fewer match", () => {
-    const eight = Array.from({ length: 8 }, (_, i) => ({ name: `c${i}`, description: `d${i}`, source: "builtin" as const }));
+    const eight = Array.from({ length: 8 }, (_, i) => ({
+      name: `c${i}`,
+      description: `d${i}`,
+      source: "builtin" as const,
+    }));
     renderDropdown("", { commands: eight });
     expect(screen.queryByText(/more/)).not.toBeInTheDocument();
   });

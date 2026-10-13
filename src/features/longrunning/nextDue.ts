@@ -22,7 +22,12 @@ function fmt(date: Date): string {
   if (diffMin < 60) return `in ~${diffMin} min`;
   const diffH = Math.round(diffMin / 60);
   if (diffH < 24) return `in ~${diffH} h`;
-  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /** Parse a cron minute field like star-slash-15 or 0 or 5. */

@@ -14,7 +14,7 @@ const reducedMotion = vi.hoisted(() => ({ value: false }));
 
 vi.mock("framer-motion", async () => ({
   motion: {
-    div: ({ initial, animate, transition, children, ...rest }: any) => (
+    div: ({ initial: _initial, animate: _animate, transition: _transition, children, ...rest }: any) => (
       <div {...rest}>{children}</div>
     ),
   },
@@ -35,7 +35,9 @@ vi.mock("@xyflow/react", async () => ({
   Controls: ({ children }: any) => <div data-testid="controls">{children}</div>,
   ControlButton: ({ children, ...props }: any) => <button {...props}>{children}</button>,
   MiniMap: () => <div data-testid="minimap" />,
-  BaseEdge: ({ id, path, className }: any) => <path data-testid={`edge-${id}`} d={path} className={className} />,
+  BaseEdge: ({ id, path, className }: any) => (
+    <path data-testid={`edge-${id}`} d={path} className={className} />
+  ),
   getSmoothStepPath: ({ sourceX, sourceY, targetX, targetY }: any) => [
     `M${sourceX},${sourceY} L${targetX},${targetY}`,
     null,
@@ -46,7 +48,9 @@ vi.mock("@xyflow/react", async () => ({
 
 describe("NodeFrame", () => {
   it("renders kind, title, subtitle, and mono text", () => {
-    render(<NodeFrame kind="AGENT" title="Reviewer" status="running" subtitle="checking" mono="a-1 · running" />);
+    render(
+      <NodeFrame kind="AGENT" title="Reviewer" status="running" subtitle="checking" mono="a-1 · running" />,
+    );
     expect(screen.getByText("AGENT")).toBeInTheDocument();
     expect(screen.getByText("Reviewer")).toBeInTheDocument();
     expect(screen.getByText("checking")).toBeInTheDocument();
@@ -78,7 +82,9 @@ describe("NodeFrame", () => {
   });
 
   it("replaces the status dot with the corner node when one is provided", () => {
-    const { container } = render(<NodeFrame kind="AGENT" title="T" status="idle" corner={<span>unread pill</span>} />);
+    const { container } = render(
+      <NodeFrame kind="AGENT" title="T" status="idle" corner={<span>unread pill</span>} />,
+    );
     expect(screen.getByText("unread pill")).toBeInTheDocument();
     expect(container.querySelector(".pg-node__dot")).toBeNull();
   });
@@ -93,8 +99,12 @@ describe("NodeFrame", () => {
   it("sets the node width custom property and fires onClick", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
-    const { container } = render(<NodeFrame kind="AGENT" title="T" status="idle" width={244} onClick={onClick} />);
-    expect((container.querySelector(".pg-node") as HTMLElement)?.style.getPropertyValue("--node-w")).toBe("244px");
+    const { container } = render(
+      <NodeFrame kind="AGENT" title="T" status="idle" width={244} onClick={onClick} />,
+    );
+    expect((container.querySelector(".pg-node") as HTMLElement)?.style.getPropertyValue("--node-w")).toBe(
+      "244px",
+    );
     await user.click(screen.getByText("T"));
     expect(onClick).toHaveBeenCalledTimes(1);
   });

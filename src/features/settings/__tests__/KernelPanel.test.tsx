@@ -37,7 +37,9 @@ const KERNEL = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  (mockClient.getKernelState as ReturnType<typeof vi.fn>).mockResolvedValue(JSON.parse(JSON.stringify(KERNEL)));
+  (mockClient.getKernelState as ReturnType<typeof vi.fn>).mockResolvedValue(
+    JSON.parse(JSON.stringify(KERNEL)),
+  );
   (mockClient.prompt as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 });
 

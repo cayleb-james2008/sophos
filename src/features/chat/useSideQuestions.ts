@@ -32,7 +32,9 @@ export function useSideQuestions() {
     const e = evt as unknown as Record<string, unknown>;
     const id = typeof e.id === "string" ? e.id : "";
     if (!id) return;
-    setSideQuestions((sqs) => sqs.map((sq) => (sq.id === id ? { ...sq, status: normalizeSideStatus(e.status) } : sq)));
+    setSideQuestions((sqs) =>
+      sqs.map((sq) => (sq.id === id ? { ...sq, status: normalizeSideStatus(e.status) } : sq)),
+    );
   });
 
   const askSideQuestion = useCallback(

@@ -29,14 +29,34 @@ const providers = [
   { id: "ollama-cloud", name: "Ollama Cloud", kind: "subscription", connected: true, models: [] },
 ];
 const models = [
-  { id: "deepseek-v4-flash:0731-cloud", name: "DeepSeek V4 Flash", provider: "ollama-cloud", contextWindow: 1000000, maxOutputTokens: 65536, maxContextWindow: 1000000, maxOutputTokensCeiling: 65536, supportsThinking: true },
-  { id: "minimax-m3", name: "MiniMax M3", provider: "minimax", contextWindow: 524288, maxOutputTokens: 128000, maxContextWindow: 524288, maxOutputTokensCeiling: 128000 },
+  {
+    id: "deepseek-v4-flash:0731-cloud",
+    name: "DeepSeek V4 Flash",
+    provider: "ollama-cloud",
+    contextWindow: 1000000,
+    maxOutputTokens: 65536,
+    maxContextWindow: 1000000,
+    maxOutputTokensCeiling: 65536,
+    supportsThinking: true,
+  },
+  {
+    id: "minimax-m3",
+    name: "MiniMax M3",
+    provider: "minimax",
+    contextWindow: 524288,
+    maxOutputTokens: 128000,
+    maxContextWindow: 524288,
+    maxOutputTokensCeiling: 128000,
+  },
 ];
 
 function makeClient() {
   (mockState.client.getProviders as ReturnType<typeof vi.fn>).mockResolvedValue(providers);
   (mockState.client.getModels as ReturnType<typeof vi.fn>).mockResolvedValue(models);
-  (mockState.client.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({ modelConfig: {}, defaultThinking: "high" });
+  (mockState.client.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+    modelConfig: {},
+    defaultThinking: "high",
+  });
   (mockState.client.setSettings as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
   (mockState.client.setModel as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 }
@@ -64,7 +84,9 @@ describe("useModels", () => {
   });
 
   it("reload refreshes the catalog after a failure", async () => {
-    (mockState.client.getProviders as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("catalog down"));
+    (mockState.client.getProviders as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("catalog down"),
+    );
     const { result } = renderHook(() => useModels());
     await waitFor(() => expect(result.current.error).toBe("catalog down"));
 
@@ -82,7 +104,11 @@ describe("useModels", () => {
     await act(async () => {
       await result.current.setModel("ollama-cloud", "deepseek-v4-flash:0731-cloud", "medium");
     });
-    expect(mockState.client.setModel).toHaveBeenCalledWith("ollama-cloud", "deepseek-v4-flash:0731-cloud", "medium");
+    expect(mockState.client.setModel).toHaveBeenCalledWith(
+      "ollama-cloud",
+      "deepseek-v4-flash:0731-cloud",
+      "medium",
+    );
   });
 
   it("setModel failure surfaces an error without throwing", async () => {
@@ -101,7 +127,9 @@ describe("useModels", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {
-      await result.current.setModelConfig("ollama-cloud", "deepseek-v4-flash:0731-cloud", { contextWindow: 200000 });
+      await result.current.setModelConfig("ollama-cloud", "deepseek-v4-flash:0731-cloud", {
+        contextWindow: 200000,
+      });
     });
     const updated = result.current.models.find((m) => m.id === "deepseek-v4-flash:0731-cloud");
     expect(updated?.contextWindow).toBe(200000);

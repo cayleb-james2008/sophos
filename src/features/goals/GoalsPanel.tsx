@@ -80,7 +80,10 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
       // Route through the prompt system (TUI form) — not the bash transport.
       await ipc.prompt("/goal " + text);
       // Optimistic — in Tauri mode the daemon's snapshot reconciles this.
-      setGoals((prev) => [...prev, { id: `goal-${Date.now()}`, objective: text, status: "active", progress: undefined }]);
+      setGoals((prev) => [
+        ...prev,
+        { id: `goal-${Date.now()}`, objective: text, status: "active", progress: undefined },
+      ]);
       setObjective("");
     }, "Could not set goal (daemon unreachable?)");
     setBusy(false);
@@ -97,12 +100,7 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
           g.id === id
             ? {
                 ...g,
-                status:
-                  action === "pause"
-                    ? "paused"
-                    : action === "resume"
-                      ? "active"
-                      : "cleared",
+                status: action === "pause" ? "paused" : action === "resume" ? "active" : "cleared",
               }
             : g,
         ),
@@ -127,11 +125,7 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
           {goals.length}
         </Badge>
         {collapsible ? (
-          <IconButton
-            title={open ? "Collapse" : "Expand"}
-            onClick={() => setOpen((o) => !o)}
-            size="sm"
-          >
+          <IconButton title={open ? "Collapse" : "Expand"} onClick={() => setOpen((o) => !o)} size="sm">
             <span className={`goals-chevron${open ? " is-open" : ""}`}>
               <ChevronRightIcon size={14} />
             </span>
@@ -158,10 +152,7 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
 
             {/* A2: stalled-goal warning with recovery actions */}
             {stalled ? (
-              <div
-                role="alert"
-                className="goals-stalled"
-              >
+              <div role="alert" className="goals-stalled">
                 <div className="goals-stalledmain">
                   <Text variant="label" weight="semibold" tone="warning">
                     No progress reported for 5+ min
@@ -223,9 +214,9 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
                   No active goals
                 </Text>
                 <Text variant="micro" tone="dim">
-                  A goal is a durable objective the agent keeps working toward across turns until it's completed,
-                  paused, budget-limited, or cleared. Set one above to start — it persists even when you detach,
-                  and the agent keeps prompting on it after ordinary turns.
+                  A goal is a durable objective the agent keeps working toward across turns until it's
+                  completed, paused, budget-limited, or cleared. Set one above to start — it persists even
+                  when you detach, and the agent keeps prompting on it after ordinary turns.
                 </Text>
               </div>
             ) : (
@@ -233,10 +224,7 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
                 {goals.map((g) => {
                   const b = goalBadge(g.status);
                   return (
-                    <div
-                      key={g.id}
-                      className="goals-row"
-                    >
+                    <div key={g.id} className="goals-row">
                       <span
                         className={`goals-rowdot${g.status === "active" ? " goals-rowdot--active" : g.status === "paused" ? " goals-rowdot--paused" : g.status === "completed" ? " goals-rowdot--completed" : ""}`}
                       />
@@ -256,17 +244,33 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
                         </div>
                         <div className="goals-rowactions">
                           {g.status === "active" ? (
-                            <Button variant="ghost" size="sm" onClick={() => void update("pause", g.id)} disabled={busy}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void update("pause", g.id)}
+                              disabled={busy}
+                            >
                               Pause
                             </Button>
                           ) : null}
                           {g.status === "paused" ? (
-                            <Button variant="accent-soft" size="sm" onClick={() => void update("resume", g.id)} disabled={busy}>
+                            <Button
+                              variant="accent-soft"
+                              size="sm"
+                              onClick={() => void update("resume", g.id)}
+                              disabled={busy}
+                            >
                               Resume
                             </Button>
                           ) : null}
                           {g.status !== "cleared" ? (
-                            <Button variant="ghost" size="sm" icon={<XIcon size={12} />} onClick={() => void update("clear", g.id)} disabled={busy}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={<XIcon size={12} />}
+                              onClick={() => void update("clear", g.id)}
+                              disabled={busy}
+                            >
                               Clear
                             </Button>
                           ) : null}
@@ -279,7 +283,8 @@ export function GoalsPanel({ defaultOpen = true, collapsible = true, title = "Go
             )}
 
             <Text variant="micro" tone="dim">
-              Goals persist across turns. Only explicit completion marks a goal done — pausing and clearing are available here.
+              Goals persist across turns. Only explicit completion marks a goal done — pausing and clearing
+              are available here.
             </Text>
           </div>
         </div>

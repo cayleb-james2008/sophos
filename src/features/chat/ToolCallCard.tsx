@@ -11,7 +11,16 @@ import { diffLines, formatUnified, isEditToolName, parseFileEdit } from "./diff"
 
 function ToolIcon({ size = 13, color }: { size?: number; color: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
     </svg>
   );
@@ -46,21 +55,23 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
   return (
     <div className="tool-call-card">
       {/* Header */}
-      <div
-        className={`tool-call-header${!hasOutput && !hasInput ? " tool-call-header--noborder" : ""}`}
-      >
+      <div className={`tool-call-header${!hasOutput && !hasInput ? " tool-call-header--noborder" : ""}`}>
         <ToolIcon color={call.status === "error" ? tokens.color.danger : tokens.color.tool} />
-        <span className="tool-call-prompt">
-          $
-        </span>
+        <span className="tool-call-prompt">$</span>
         <Text variant="label" weight="medium" mono className="tool-call-name">
           {call.name}
         </Text>
         <Badge tone={meta.tone} dot>
           {meta.label}
         </Badge>
-        {call.status === "running" ? <span className="tool-call-card__spinner" aria-label="Tool running" /> : null}
-        <span key={call.status} className={`tool-call-card__state-flash tool-call-card__state-flash--${call.status}`} aria-hidden="true" />
+        {call.status === "running" ? (
+          <span className="tool-call-card__spinner" aria-label="Tool running" />
+        ) : null}
+        <span
+          key={call.status}
+          className={`tool-call-card__state-flash tool-call-card__state-flash--${call.status}`}
+          aria-hidden="true"
+        />
         {hasInput ? (
           <Button
             variant="ghost"
@@ -100,9 +111,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
           <Text variant="micro" tone="dim" mono uppercase className="tool-call-label">
             Input
           </Text>
-          <pre className="tool-call-pre">
-            {call.input}
-          </pre>
+          <pre className="tool-call-pre">{call.input}</pre>
         </div>
       ) : null}
 
@@ -114,9 +123,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
           <Text variant="micro" tone="dim" mono uppercase className="tool-call-label">
             Output
           </Text>
-          <pre className="tool-call-pre">
-            {call.output}
-          </pre>
+          <pre className="tool-call-pre">{call.output}</pre>
         </div>
       ) : null}
       {!isEdit && hasOutput ? (
@@ -136,10 +143,7 @@ export function ToolCallCard({ call }: { call: ToolCall }) {
           </div>
           {showOutput ? (
             <div className={`tool-call-output${call.status === "error" ? " tool-call-output--error" : ""}`}>
-              <HighlightedCode
-                code={call.output ?? ""}
-                lang={detectLang(call.output ?? "")}
-              />
+              <HighlightedCode code={call.output ?? ""} lang={detectLang(call.output ?? "")} />
             </div>
           ) : null}
         </div>

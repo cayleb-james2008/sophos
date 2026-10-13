@@ -14,6 +14,7 @@ mod contract;
 mod daemon;
 mod engine_log;
 mod job;
+mod lease;
 mod native;
 mod settings;
 mod sidecar;
@@ -313,6 +314,22 @@ pub fn run() {
             if demo_mode {
                 eprintln!("[sophos] DEMO MODE — daemon/sidecar skipped, using mock IPC");
             } else {
+                // Recover crash-leftover lease debris and stale session leases
+                // before the daemon starts. The sweep removes only leases with
+                // a provably dead owner that are older than the grace period.
+                let lease_summary = lease::sweep_stale_leases(
+                    &settings::agent_dir(),
+                    lease::DEFAULT_LEASE_GRACE_MS,
+                    &lease::pid_alive,
+                );
+                if lease_summary.leftovers_removed > 0 || lease_summary.stale_leases_removed > 0 {
+                    eprintln!(
+                        "[lease] startup sweep removed {} leftover dirs and {} stale leases ({} kept)",
+                        lease_summary.leftovers_removed,
+                        lease_summary.stale_leases_removed,
+                        lease_summary.kept,
+                    );
+                }
                 daemon.start(&node_path, &daemon_path);
                 sidecar.start();
             }

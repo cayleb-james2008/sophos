@@ -67,10 +67,18 @@ export function studioReducer(draft: CustomProfile, action: StudioAction): Custo
       return { ...draft, safety: { ...draft.safety, confirm: [...draft.safety.confirm, t] } };
     }
     case "confirmRemove":
-      return { ...draft, safety: { ...draft.safety, confirm: draft.safety.confirm.filter((c) => c !== action.value) } };
+      return {
+        ...draft,
+        safety: { ...draft.safety, confirm: draft.safety.confirm.filter((c) => c !== action.value) },
+      };
     case "reset":
       // A full replace — used by Discard and by openStudio(edit).
-      return { ...action.profile, tools: [...action.profile.tools], skills: [...action.profile.skills], safety: { ...action.profile.safety, confirm: [...action.profile.safety.confirm] } };
+      return {
+        ...action.profile,
+        tools: [...action.profile.tools],
+        skills: [...action.profile.skills],
+        safety: { ...action.profile.safety, confirm: [...action.profile.safety.confirm] },
+      };
     default:
       return draft;
   }
@@ -89,6 +97,8 @@ export { isCustomProfileUsable };
 export function studioCompositionSummary(profile: CustomProfile): string {
   const tools = profile.tools.length ? profile.tools.join(", ") : "no tools";
   const skills = profile.skills.length ? profile.skills.join(", ") : "no skills";
-  const safety = profile.safety.autoApprove ? "safe tools auto-approved" : `confirms: ${profile.safety.confirm.join(", ") || "nothing"}`;
+  const safety = profile.safety.autoApprove
+    ? "safe tools auto-approved"
+    : `confirms: ${profile.safety.confirm.join(", ") || "nothing"}`;
   return `Tools: ${tools} · Skills: ${skills} · Safety: ${safety}`;
 }

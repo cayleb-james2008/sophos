@@ -29,7 +29,9 @@ describe("EmptyState", () => {
 
   it("renders an action button that calls onAction", () => {
     const onAction = vi.fn();
-    render(<EmptyState icon={<Icon />} title="T" description="d" actionLabel="New session" onAction={onAction} />);
+    render(
+      <EmptyState icon={<Icon />} title="T" description="d" actionLabel="New session" onAction={onAction} />,
+    );
     screen.getByRole("button", { name: "New session" }).click();
     expect(onAction).toHaveBeenCalledTimes(1);
   });

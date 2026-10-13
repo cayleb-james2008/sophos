@@ -81,10 +81,16 @@ export function Composer({
 
         {/* Code Mode — one program runs many tools via the typed SDK */}
         {codeMode ? (
-          <div className="composer-codehint" title="Code Mode: write one program that calls many tools in a single step">
-            <span className="composer-codehint-dot" aria-hidden="true">&lt;/&gt;</span>
+          <div
+            className="composer-codehint"
+            title="Code Mode: write one program that calls many tools in a single step"
+          >
+            <span className="composer-codehint-dot" aria-hidden="true">
+              &lt;/&gt;
+            </span>
             <Text variant="micro" tone="dim">
-              Code mode — one program runs many tools via the TypeScript SDK. Send a message to run a program; each tool call lands in the Code Mode panel and the Trajectory log.
+              Code mode — one program runs many tools via the TypeScript SDK. Send a message to run a program;
+              each tool call lands in the Code Mode panel and the Trajectory log.
             </Text>
           </div>
         ) : null}

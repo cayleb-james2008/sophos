@@ -37,9 +37,7 @@ describe("useHotkeys", () => {
 
   it("requires the primary modifier (cmd/ctrl equivalence)", () => {
     const handler = vi.fn();
-    renderHook(() =>
-      useHotkeys([{ key: "/", modifiers: ["cmd"], handler, description: "Search" }]),
-    );
+    renderHook(() => useHotkeys([{ key: "/", modifiers: ["cmd"], handler, description: "Search" }]));
     press("/"); // no modifier — not a match
     expect(handler).not.toHaveBeenCalled();
     press("/", { ctrlKey: true }); // ctrl == cmd
@@ -50,27 +48,21 @@ describe("useHotkeys", () => {
 
   it("distinguishes shift and alt modifiers", () => {
     const handler = vi.fn();
-    renderHook(() =>
-      useHotkeys([{ key: "?", modifiers: ["shift"], handler, description: "Help" }]),
-    );
+    renderHook(() => useHotkeys([{ key: "?", modifiers: ["shift"], handler, description: "Help" }]));
     press("?");
     expect(handler).not.toHaveBeenCalled();
     press("?", { shiftKey: true });
     expect(handler).toHaveBeenCalledTimes(1);
 
     const altHandler = vi.fn();
-    renderHook(() =>
-      useHotkeys([{ key: "1", modifiers: ["alt"], handler: altHandler, description: "Tab" }]),
-    );
+    renderHook(() => useHotkeys([{ key: "1", modifiers: ["alt"], handler: altHandler, description: "Tab" }]));
     press("1", { altKey: true });
     expect(altHandler).toHaveBeenCalledTimes(1);
   });
 
   it("does not match when an extra modifier is held", () => {
     const handler = vi.fn();
-    renderHook(() =>
-      useHotkeys([{ key: "k", modifiers: ["cmd"], handler, description: "Palette" }]),
-    );
+    renderHook(() => useHotkeys([{ key: "k", modifiers: ["cmd"], handler, description: "Palette" }]));
     press("k", { ctrlKey: true, shiftKey: true }); // shift is extra
     expect(handler).not.toHaveBeenCalled();
   });

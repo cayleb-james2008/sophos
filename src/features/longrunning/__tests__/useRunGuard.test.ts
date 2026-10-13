@@ -71,7 +71,11 @@ describe("useRunGuard", () => {
   });
 
   it("flags engineDown when disconnected while a goal is active", () => {
-    mockState.conn = { ...baseConn(), status: { kind: "disconnected" }, goals: [{ id: "g1", objective: "x", status: "active" }] };
+    mockState.conn = {
+      ...baseConn(),
+      status: { kind: "disconnected" },
+      goals: [{ id: "g1", objective: "x", status: "active" }],
+    };
     const { result } = renderHook(() => useRunGuard());
     expect(result.current.engineDown).toBe(true);
     expect(result.current.active).toBe(true);

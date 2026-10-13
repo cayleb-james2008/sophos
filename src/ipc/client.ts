@@ -9,39 +9,58 @@
 // `useIpcEvent` for subscribing to the live event stream.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildCodeModeTurn } from "../features/code/demoTurn";
-import { customDemoFlavor, isCustomId, parseCustomProfiles, type CustomProfile } from "../features/studio/store";
+import { MockIpcClient } from "./mockClient";
 import type {
   AgentInfo,
   AgentMessage,
   AgentMessageReceipt,
   ConnectionState,
   AgentSessionState,
+  BlindCriticRubric,
+  CheckpointEntry,
+  ContextTreeNode,
   ExtensionInfo,
   HarnessState,
-  KernelState,
-  ContextTreeNode,
   IpcEvent,
-  LocalProviderConfig,
+  KernelState,
+  McpResource,
+  McpServerDetails,
   McpTestResult,
+  MemoryState,
+  MemoryTier,
+  MemoryTierEntry,
   ModelInfo,
   ModelRuntimeConfig,
   NavigateTreeResult,
   ProviderInfo,
-  RefinementResult,
   RuntimeInfo,
   RuntimeSkill,
   ScheduleInfo,
+  SecurityAuditEntry,
   SessionInfo,
   SessionTree,
   Settings,
   SlashCommand,
+  SquadTopology,
+  SquadWorkflowState,
+  SquadWorkflowType,
+  TokenBudgetBreakdown,
   TranscriptMessage,
+  WorkspaceSecurityPolicy,
+  BlastRadiusReport,
+  DesktopActionResult,
+  DesktopUiAction,
+  DesktopUiElement,
+  DesktopWindowInfo,
+  DistilledSkill,
+  ThoughtTreeState,
+  WorkspaceTwin,
+  TwinDiffReport,
+  TwinExecResult,
 } from "./contract";
 
 /** True when running inside the Tauri shell (real IPC); false in the browser preview. */
-export const isTauri =
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /**
  * True when running inside the real Tauri demo shell: launched with `--demo`
@@ -52,7 +71,7 @@ export const isTauri =
  * provider.
  */
 export function isDemoShell(): boolean {
-  return typeof window !== "undefined" && (window as any).__SOPHOS_DEMO__ === true;
+  return typeof window !== "undefined" && window.__SOPHOS_DEMO__ === true;
 }
 
 /**
@@ -61,16 +80,35 @@ export function isDemoShell(): boolean {
  * demo mode the frontend uses the MockIpcClient.
  */
 export function isDemoMode(): boolean {
-  return isDemoShell() || !isTauri || (typeof window !== "undefined" && window.location.hash.includes("demo"));
+  return (
+    isDemoShell() || !isTauri || (typeof window !== "undefined" && window.location.hash.includes("demo"))
+  );
 }
+
+// Re-export the demo client so existing imports (`import { MockIpcClient }
+// from "@/ipc/client"`) keep working after the mock was split out.
+export { MockIpcClient } from "./mockClient";
 
 export interface IpcClient {
   // Commands
-  prompt(text: string, options?: { thinking?: string; streamingBehavior?: "steer" | "followUp"; queueIfBusy?: boolean; profile?: string; profileFlavor?: { name: string; tagline: string; workingStyle: string[]; mode?: string } }): Promise<void>;
+  prompt(
+    text: string,
+    options?: {
+      thinking?: string;
+      streamingBehavior?: "steer" | "followUp";
+      queueIfBusy?: boolean;
+      profile?: string;
+      profileFlavor?: { name: string; tagline: string; workingStyle: string[]; mode?: string };
+    },
+  ): Promise<void>;
   abort(): Promise<void>;
   steer(text: string): Promise<void>;
   setModel(provider: string, model: string, thinking?: string, runtime?: ModelRuntimeConfig): Promise<void>;
-  newSession(cwd?: string, goal?: string): Promise<void>;
+  newSession(
+    cwd?: string,
+    goal?: string,
+    profile?: { id: string; name: string; mode: string; systemPrompt: string },
+  ): Promise<void>;
   switchSession(id: string): Promise<void>;
   resumeSession(pathOrId: string): Promise<void>;
   forkSession(pathOrId: string): Promise<void>;
@@ -115,13 +153,85 @@ export interface IpcClient {
   getKernelState(): Promise<KernelState>;
   getHarnessState(): Promise<HarnessState>;
   getAgentState(id: string): Promise<AgentSessionState>;
-  createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill>;
+  createSkill(input: {
+    name: string;
+    description: string;
+    content: string;
+    pythonImport?: string;
+  }): Promise<RuntimeSkill>;
   installSkill(path: string): Promise<RuntimeSkill[]>;
   installExtension(path: string): Promise<void>;
   removeExtension(path: string): Promise<void>;
   getExtensions(): Promise<ExtensionInfo[]>;
   testMcpServer(name: string, command: string, args?: string[]): Promise<McpTestResult>;
   getSlashCommands(): Promise<SlashCommand[]>;
+  getMemoryState(tier?: MemoryTier): Promise<MemoryState>;
+  searchMemory(query: string, tier?: MemoryTier, maxResults?: number): Promise<MemoryTierEntry[]>;
+  storeMemory(entry: Omit<MemoryTierEntry, "id">): Promise<MemoryTierEntry>;
+  recallMemory(query: string, limit?: number): Promise<string[]>;
+  forgetMemory(id: string): Promise<void>;
+  createCheckpoint(label: string, summary?: string): Promise<CheckpointEntry>;
+  restoreCheckpoint(id: string): Promise<CheckpointEntry>;
+  listCheckpoints(sessionId?: string): Promise<CheckpointEntry[]>;
+  getSquadTopology(): Promise<SquadTopology>;
+  evaluateSquadPiece(
+    childId: string,
+    pieceContract: string,
+    bar: string,
+    outputPaths: string[],
+  ): Promise<BlindCriticRubric>;
+
+  // Model Context Protocol (MCP) Standard
+  getMcpServers(): Promise<McpServerDetails[]>;
+  readMcpResource(serverName: string, uri: string): Promise<McpResource>;
+  getMcpPrompt(
+    serverName: string,
+    name: string,
+    args?: Record<string, string>,
+  ): Promise<{ description?: string; messages: Array<{ role: "user" | "assistant"; content: string }> }>;
+
+  // Workspace Security Sandbox (SWE-agent)
+  getSecurityPolicy(): Promise<{ policy: WorkspaceSecurityPolicy; customBlockedPatterns: string[] }>;
+  setSecurityPolicy(policy: WorkspaceSecurityPolicy, customBlockedPatterns?: string[]): Promise<void>;
+  analyzeBlastRadius(command: string, targetFiles?: string[]): Promise<BlastRadiusReport>;
+  getSecurityAuditLog(): Promise<SecurityAuditEntry[]>;
+
+  // Dynamic Squad Workflows (LangGraph / AutoGen 0.4)
+  getSquadWorkflow(): Promise<SquadWorkflowState>;
+  runSquadWorkflow(type: SquadWorkflowType, goal: string, bar: string): Promise<SquadWorkflowState>;
+  pauseSquadWorkflow(id: string): Promise<void>;
+
+  // Token Budget & Context Optimizer (DSPy / MemGPT)
+  getTokenBudget(): Promise<TokenBudgetBreakdown>;
+  compactContext(
+    strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
+  ): Promise<{ beforeTokens: number | null; afterTokens: number | null; savedTokens: number | null }>;
+
+  // Native Windows Computer-Use Action Space (CUA & UIA)
+  listDesktopWindows(): Promise<DesktopWindowInfo[]>;
+  inspectDesktopWindow(windowId: string): Promise<DesktopUiElement>;
+  dispatchDesktopAction(windowId: string, action: DesktopUiAction): Promise<DesktopActionResult>;
+  captureDesktopScreenshot(windowId: string): Promise<string>;
+
+  // Self-Evolving Skill Distillation Engine (Voyager / Eureka)
+  listDistilledSkills(): Promise<DistilledSkill[]>;
+  distillSkillFromTrajectory(sessionId: string, name?: string): Promise<DistilledSkill>;
+  promoteSkill(skillId: string): Promise<{ success: boolean; targetPath: string }>;
+  deleteDistilledSkill(skillId: string): Promise<void>;
+
+  // Speculative Tree-of-Thoughts Engine (ToT / FoT)
+  getThoughtTree(): Promise<ThoughtTreeState>;
+  runSpeculativeBranch(parentNodeId: string, hypothesis: string): Promise<ThoughtTreeState>;
+  pruneThoughtBranch(nodeId: string): Promise<ThoughtTreeState>;
+  promoteThoughtBranch(nodeId: string): Promise<ThoughtTreeState>;
+
+  // Ephemeral Workspace Twin Sandbox (Devin Sandbox / Worktrees)
+  listWorkspaceTwins(): Promise<WorkspaceTwin[]>;
+  createWorkspaceTwin(name: string, baseBranch?: string): Promise<WorkspaceTwin>;
+  executeInTwin(twinId: string, command: string): Promise<TwinExecResult>;
+  diffWorkspaceTwin(twinId: string): Promise<TwinDiffReport>;
+  mergeWorkspaceTwin(twinId: string): Promise<{ success: boolean; mergedCommit: string }>;
+  rollbackWorkspaceTwin(twinId: string): Promise<{ success: boolean; message: string }>;
 
   // Events
   onEvent(cb: (event: IpcEvent) => void): () => void;
@@ -157,20 +267,23 @@ export class TauriIpcClient implements IpcClient {
 
   private async setupResponseListener(): Promise<void> {
     const { listen } = await import("@tauri-apps/api/event");
-    this.responseUnlisten = await listen<{ id?: string; result?: unknown; error?: { message: string } }>("ipc-response", (e) => {
-      const payload = e.payload;
-      const id = payload?.id;
-      if (!id) return;
-      const pending = this.pending.get(id);
-      if (!pending) return;
-      clearTimeout(pending.timer);
-      this.pending.delete(id);
-      if (payload.error) {
-        pending.reject(new Error(payload.error.message));
-      } else {
-        pending.resolve(payload.result);
-      }
-    });
+    this.responseUnlisten = await listen<{ id?: string; result?: unknown; error?: { message: string } }>(
+      "ipc-response",
+      (e) => {
+        const payload = e.payload;
+        const id = payload?.id;
+        if (!id) return;
+        const pending = this.pending.get(id);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        this.pending.delete(id);
+        if (payload.error) {
+          pending.reject(new Error(payload.error.message));
+        } else {
+          pending.resolve(payload.result);
+        }
+      },
+    );
   }
 
   private async ensureEventListener(): Promise<void> {
@@ -244,8 +357,12 @@ export class TauriIpcClient implements IpcClient {
       ...(runtime?.maxOutputTokens != null ? { maxOutputTokens: runtime.maxOutputTokens } : {}),
     }) as Promise<void>;
   }
-  newSession(cwd?: string, goal?: string): Promise<void> {
-    return this.send("newSession", { cwd, goal }) as Promise<void>;
+  newSession(
+    cwd?: string,
+    goal?: string,
+    profile?: { id: string; name: string; mode: string; systemPrompt: string },
+  ): Promise<void> {
+    return this.send("newSession", { cwd, goal, profile }) as Promise<void>;
   }
   switchSession(id: string): Promise<void> {
     return this.send("switchSession", { id }) as Promise<void>;
@@ -263,7 +380,11 @@ export class TauriIpcClient implements IpcClient {
     return this.send("listAgents", {}) as Promise<AgentInfo[]>;
   }
   attachAgent(id: string): Promise<{ childId: string; sessionId: string; attached: true }> {
-    return this.send("attachAgent", { id }) as Promise<{ childId: string; sessionId: string; attached: true }>;
+    return this.send("attachAgent", { id }) as Promise<{
+      childId: string;
+      sessionId: string;
+      attached: true;
+    }>;
   }
   detachAgent(id: string): Promise<void> {
     return this.send("detachAgent", { id }) as Promise<void>;
@@ -379,7 +500,12 @@ export class TauriIpcClient implements IpcClient {
   getAgentState(id: string): Promise<AgentSessionState> {
     return this.send("getAgentState", { id }) as Promise<AgentSessionState>;
   }
-  createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill> {
+  createSkill(input: {
+    name: string;
+    description: string;
+    content: string;
+    pythonImport?: string;
+  }): Promise<RuntimeSkill> {
     return this.send("createSkill", input) as Promise<RuntimeSkill>;
   }
   installSkill(path: string): Promise<RuntimeSkill[]> {
@@ -400,856 +526,152 @@ export class TauriIpcClient implements IpcClient {
   getSlashCommands(): Promise<SlashCommand[]> {
     return this.send("getSlashCommands", {}) as Promise<SlashCommand[]>;
   }
-}
-
-// ---------------------------------------------------------------------------
-// Browser fallback (dev without Tauri) — returns neutral data and simulates a
-// connection lifecycle (connecting -> connected) so the shell's live status
-// indicator is demonstrable in the browser preview.
-// ---------------------------------------------------------------------------
-
-const LOCAL_MODEL_CONFIG_KEY = "prime-agent.modelConfig.v1";
-const LOCAL_PROVIDER_KEY = "prime-agent.localProviders.v1";
-const LOCAL_SETTINGS_KEY = "prime-agent.settings.v1";
-
-/** Demo MCP server shipped connected so the Code Mode SDK registry includes
- * MCP tools (via testMcpServer) in demo mode. It's additive to settings and
- * the Settings e2e suite's clear-loop removes it like any other server. */
-const DEMO_MCP_SERVERS = [
-  { name: "demo-fs", command: "npx", args: ["-y", "@modelcontextprotocol/server-filesystem"], enabled: true },
-];
-
-function readLocalSettings(): Settings {
-  try {
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem(LOCAL_SETTINGS_KEY) : null;
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Settings : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeLocalSettings(value: Settings): void {
-  try {
-    if (typeof window !== "undefined") window.localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify(value));
-  } catch {
-    // Browser preview persistence is best-effort.
-  }
-}
-
-const INITIAL_LOCAL_SETTINGS = readLocalSettings();
-
-/** Read the mock's persisted model overrides from localStorage (survives reload). */
-function readLocalModelConfig(): Record<string, ModelRuntimeConfig> {
-  try {
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem(LOCAL_MODEL_CONFIG_KEY) : null;
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, ModelRuntimeConfig>) : {};
-  } catch {
-    return {};
-  }
-}
-
-/** Persist the mock's model overrides to localStorage so a page reload keeps them. */
-function writeLocalModelConfig(value: Record<string, ModelRuntimeConfig>): void {
-  try {
-    if (typeof window !== "undefined") window.localStorage.setItem(LOCAL_MODEL_CONFIG_KEY, JSON.stringify(value));
-  } catch {
-    // ignore quota/security errors — persistence is best-effort in the mock
-  }
-}
-
-/** Read the mock's persisted local provider configs from localStorage. Returns
- * `null` when the key was never written, so the mock can default to a connected
- * local endpoint (matching the cloud-provider convention) instead of an empty
- * "logged out" state on a first-ever load. */
-function readLocalProviders(): LocalProviderConfig[] | null {
-  try {
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem(LOCAL_PROVIDER_KEY) : null;
-    if (raw === null) return null; // never persisted → treat as not-yet-configured
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as LocalProviderConfig[]) : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Persist the mock's local provider configs to localStorage (best-effort). */
-function writeLocalProviders(value: LocalProviderConfig[]): void {
-  try {
-    if (typeof window !== "undefined") window.localStorage.setItem(LOCAL_PROVIDER_KEY, JSON.stringify(value));
-  } catch {
-    // ignore quota/security errors — persistence is best-effort in the mock
-  }
-}
-
-/**
- * Default local endpoint config. The mock ships it connected by default,
- * mirroring the cloud-provider convention (everything connected so the demo
- * looks alive). The local card renders separately from getProviders() — it is
- * a user-specified endpoint, not a daemon-discovered provider — so adding it
- * here never shifts the provider-array indices the e2e tests rely on.
- */
-const LOCAL_DEFAULT_CONFIG: LocalProviderConfig = {
-  id: "local",
-  name: "My Local Model",
-  baseUrl: "http://localhost:11434",
-  kind: "ollama",
-};
-
-export class MockIpcClient implements IpcClient {
-  private listeners: Array<(e: IpcEvent) => void> = [];
-  private mockSettings: Settings & { mcpServers?: Array<{ name: string; command: string; args?: string[]; enabled: boolean }> } = {
-    ...INITIAL_LOCAL_SETTINGS,
-    theme: INITIAL_LOCAL_SETTINGS.theme ?? "dark",
-    modelConfig: { ...(INITIAL_LOCAL_SETTINGS.modelConfig ?? {}), ...readLocalModelConfig() },
-    localProviders: readLocalProviders() ?? [LOCAL_DEFAULT_CONFIG],
-    // Persisted settings win; a fresh demo ships one connected MCP server so
-    // the Code Mode registry has MCP tools without a live daemon.
-    mcpServers: (INITIAL_LOCAL_SETTINGS as Settings & { mcpServers?: typeof DEMO_MCP_SERVERS }).mcpServers ?? DEMO_MCP_SERVERS,
-  };
-  private state: ConnectionState = {
-    status: { kind: "connecting" },
-    model: {
-      provider: this.mockSettings.defaultProvider ?? "ollama-cloud",
-      model: this.mockSettings.defaultModel ?? "deepseek-v4-flash:0731-cloud",
-      thinking: this.mockSettings.defaultThinking,
-    },
-    activeSessionId: "session-0",
-    goals: [{ id: "goal-demo", objective: "Ship the release and verify every published artifact", status: "active", progress: "3 of 5 artifacts verified" }],
-    context: { tokens: 18432, contextWindow: 1000000, messages: 42 },
-    rlmChildren: [{ id: "rlm-1", name: "api-reviewer", status: "running", parentId: "session-0", summary: "Reviewing endpoint contracts" }],
-    schedules: [{ id: "sched-1", cron: "0 9 * * *", prompt: "Send the morning standup summary to the team channel", active: true }],
-    heartbeats: [{ id: "hb-1", interval: "*/15 * * * *", active: true }],
-    autonomousConfig: { active: false, maxTurns: 12, maxTokens: 80000, maxTime: "30m", qualityGates: ["npm run build", "npm test"] },
-    costStats: { totalCost: 0.84, inputTokens: 421337, outputTokens: 118204, sessionCost: 0.31 },
-  };
-  private simulated = false;
-  private timers: number[] = [];
-
-  /** Demo skills surfaced by the browser-preview runtime so the Skills panel
-   * has something to render and the enable/disable + "Just installed" flows are
-   * demonstrable without a live daemon. */
-  private mockSkills: RuntimeSkill[] = [
-    { name: "release-audit", description: "Audit a release artifact", source: "project" },
-    { name: "code-review", description: "Review code for quality", source: "global" },
-    { name: "websearch", description: "Search the web for current information", source: "built-in" },
-  ];
-  private mockExtensions: Array<{ name: string; path: string; enabled: boolean }> = [
-    { name: "github-integration", path: "~/.pi/agent/extensions/github-integration", enabled: true },
-    { name: "linear-sync", path: "~/.pi/agent/extensions/linear-sync", enabled: true },
-  ];
-
-  /** Demo relay messages surfaced by listInbox() so the Inbox renders an
-   * actual message flow (sender → preview → timestamp) with unread/read state
-   * in demo mode instead of an empty relay. markMessageRead round-trips here.
-   * The peers are the RLM children the fleet surfaces (api-reviewer,
-   * test-runner) so the Inbox switcher stays consistent with the Agents view. */
-  private mockInboxMessages: AgentMessage[] = [
-    { id: "in-api-1", fromAgentId: "rlm-1", fromAgentName: "api-reviewer", toAgentId: "self", toAgentName: "You", text: "Endpoint review approved", timestamp: new Date(Date.now() - 90 * 60000).toISOString(), read: false },
-    { id: "out-api-1", fromAgentId: "self", fromAgentName: "You", toAgentId: "rlm-1", toAgentName: "api-reviewer", text: "Please check the new schema", timestamp: new Date(Date.now() - 120 * 60000).toISOString(), read: true },
-    { id: "in-test-1", fromAgentId: "rlm-2", fromAgentName: "test-runner", toAgentId: "self", toAgentName: "You", text: "Suite green on 3 targets", timestamp: new Date(Date.now() - 45 * 60000).toISOString(), read: false },
-  ];
-
-  /** Rich per-extension detail (registered tools + slash commands) surfaced by
-   * getExtensions() so the Extensions panel can render them in the browser
-   * preview without a live daemon. Kept consistent with mockExtensions so the
-   * configured list, the live daemon paths, and the rich detail all line up. */
-  private mockExtensionDetails: ExtensionInfo[] = [
-    { name: "github-integration", path: "~/.pi/agent/extensions/github-integration", enabled: true, tools: [{ name: "create_issue", description: "Create a GitHub issue" }, { name: "list_prs", description: "List open pull requests" }], slashCommands: [{ name: "issue", description: "Create or view GitHub issues" }] },
-    { name: "linear-sync", path: "~/.pi/agent/extensions/linear-sync", enabled: true, tools: [{ name: "create_task", description: "Create a Linear task" }], slashCommands: [{ name: "linear", description: "Manage Linear tasks" }] },
-  ];
-
-  /** Builtin slash commands surfaced by getSlashCommands() so the composer's
-   * inline autocomplete is demonstrable in the browser preview without a live
-   * daemon. Derived from the prime-agent reference's builtin command set. */
-  private mockSlashCommands: SlashCommand[] = [
-    { name: "refine", description: "Refine the session's goal and plan", source: "builtin" },
-    { name: "compact", description: "Compact the session context", source: "builtin" },
-    { name: "retry", description: "Retry the last failed operation", source: "builtin" },
-    { name: "goal", description: "Set or update the session goal", source: "builtin" },
-    { name: "autonomous", description: "Toggle autonomous execution mode", source: "builtin" },
-    { name: "heartbeat", description: "Set or view a persistent heartbeat", source: "builtin" },
-    { name: "schedule", description: "View or schedule recurring tasks", source: "builtin" },
-    { name: "skills", description: "List and manage available skills", source: "builtin" },
-    { name: "effort", description: "Select reasoning/thinking level", source: "builtin" },
-    { name: "fast", description: "Toggle Fast mode", source: "builtin" },
-    { name: "export", description: "Export session to HTML or JSONL", source: "builtin" },
-    { name: "share", description: "Share session as a GitHub gist", source: "builtin" },
-    { name: "copy", description: "Copy last agent message to clipboard", source: "builtin" },
-    { name: "btw", description: "Ask an inline side question", source: "builtin" },
-    { name: "side", description: "Ask an inline side question (alias of /btw)", source: "builtin" },
-    { name: "name", description: "Set or show the session display name", source: "builtin" },
-    { name: "tree", description: "Navigate session tree (switch branches)", source: "builtin" },
-    { name: "clone", description: "Duplicate the current session", source: "builtin" },
-    { name: "fork", description: "Create a new fork from a previous message", source: "builtin" },
-    { name: "context", description: "Show token, cost, and context usage", source: "builtin" },
-    { name: "usage", description: "Show token and cost breakdown", source: "builtin" },
-    { name: "hotkeys", description: "Show all keyboard shortcuts", source: "builtin" },
-    { name: "changelog", description: "Show changelog entries", source: "builtin" },
-    { name: "mcp", description: "Open MCP connections or manage MCP integrations", source: "builtin" },
-    { name: "model", description: "Select model (opens selector UI)", source: "builtin" },
-    { name: "new", description: "Start a new session", source: "builtin" },
-    { name: "settings", description: "Open settings menu", source: "builtin" },
-    { name: "login", description: "Configure provider authentication", source: "builtin" },
-    { name: "logout", description: "Remove provider authentication", source: "builtin" },
-    { name: "reload", description: "Reload keybindings, extensions, skills, and prompts", source: "builtin" },
-    { name: "help", description: "Show command help", source: "builtin" },
-  ];
-
-  // The active session is the one surfaced by the UI. Keeping a single object
-  // on the mock makes enrichment (context / goals / rlm / transcript) coherent
-  // across the views without fabricating per-session data — only the active
-  // session carries context, matching the real daemon's scope.
-  private activeSessionId = "session-0";
-
-  /**
-   * Mutable session list. Starts with the three demo sessions; newSession /
-   * forkSession / cloneSession append to it so the demo mode round-trips
-   * session creation through the UI (the graph re-renders with the new node).
-   */
-  private mockSessions: SessionInfo[] = [
-    { id: "session-0", title: "Refactor auth module", status: "active", cwd: "C:\\work\\api-service", createdAt: new Date(Date.now() - 3600000).toISOString(), updatedAt: new Date().toISOString() },
-    { id: "session-1", title: "Migrate to new config schema", status: "saved", cwd: "C:\\work\\infra", createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString() },
-    { id: "session-2", title: "Sophos — Windows", status: "idle", cwd: "C:\\work\\sophos", createdAt: new Date(Date.now() - 172800000).toISOString() },
-  ];
-
-  /** Append a freshly created session to the demo list and make it active. */
-  private createMockSession(title: string, cwd?: string): string {
-    const id = `session-${Date.now()}`;
-    this.mockSessions = [
-      ...this.mockSessions,
-      { id, title, status: "active", cwd: cwd ?? "", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    ];
-    this.activeSessionId = id;
-    this.state = { ...this.state, activeSessionId: id };
-    return id;
-  }
-
-  onEvent(cb: (event: IpcEvent) => void): () => void {
-    this.listeners.push(cb);
-    this.startSimulation();
-    return () => {
-      this.listeners = this.listeners.filter((l) => l !== cb);
-    };
-  }
-
-  private emit(e: IpcEvent) {
-    this.listeners.forEach((l) => l(e));
-  }
-
-  private startSimulation() {
-    if (this.simulated) return;
-    this.simulated = true;
-    // connecting is already the initial state; emit it, then connect.
-    this.emit({ type: "connection_status", status: { kind: "connecting" } });
-    this.timers.push(
-      window.setTimeout(() => {
-        this.state = { ...this.state, status: { kind: "connected" } };
-        this.emit({ type: "connection_status", status: { kind: "connected" } });
-        this.emit({ type: "snapshot", state: this.state });
-      }, 600),
-    );
-  }
-
-  /** Timers for the in-flight simulated chat turn (streaming assistant reply).
-   * Tracked separately from the connection `timers` so abort()/a new prompt
-   * can stop the current simulated turn without touching connect state. */
-  private chatTurnTimers: number[] = [];
-
-  /** Clear any in-flight simulated chat turn timers. */
-  private clearChatTurn(): void {
-    this.chatTurnTimers.forEach((t) => window.clearTimeout(t));
-    this.chatTurnTimers = [];
-  }
-
-  /** Resolve a custom profile from the mock's persisted settings (guarded). */
-  private customById(id: string | undefined): CustomProfile | undefined {
-    if (!id || !isCustomId(id)) return undefined;
-    const stored = (this.mockSettings as Settings & { customProfiles?: unknown }).customProfiles;
-    return parseCustomProfiles(stored).find((p) => p.id === id);
-  }
-
-  async prompt(text: string, options?: { profile?: string; profileFlavor?: { name: string; tagline: string; workingStyle: string[]; mode?: string } }): Promise<void> {
-    this.emit({ type: "session_event", event: { kind: "user_message", text } });
-    this.simulateChatTurn(text, options?.profile, options?.profileFlavor);
-  }
-  async abort(): Promise<void> {
-    // Stop any in-flight simulated streaming turn (matches the real daemon).
-    this.clearChatTurn();
-  }
-  async steer(text: string): Promise<void> {
-    // A steer is delivered to the (simulated) running turn and gets its own
-    // acknowledgement so the steered indicator round-trips in demo mode.
-    this.emit({
-      type: "session_event",
-      event: {
-        kind: "text",
-        text: `\n\n[steered] noted — I'll address “${text.trim()}” after the current tool calls.`,
-      },
-    });
-  }
-
-  /**
-   * Simulate a full streaming assistant turn in response to the user's prompt.
-   * Emits thinking → tool call → answer deltas through the same session-event
-   * channel the real daemon uses (useTranscript.applySessionEvent), then a
-   * snapshot marking the queue idle so the composer's busy state clears. This
-   * makes the core Chat messaging + streaming features demonstrable/testable
-   * in demo mode via cua-driver.
-   */
-  private simulateChatTurn(
-    text: string,
-    profile?: string,
-    profileFlavor?: { name: string; tagline: string; workingStyle: string[]; mode?: string },
-  ): void {
-    this.clearChatTurn();
-    // Code Mode: the simulated turn writes ONE program that calls several
-    // tools and emits run_code + tool_call/tool_result events, so the Code
-    // Mode panel decomposes it into tool-call cards and the Trajectory log
-    // records the program and each call — all clearly labeled simulated. A
-    // custom profile whose base mode is "code" runs the same turn.
-    if (profile === "code" || profileFlavor?.mode === "code" || this.customById(profile)?.mode === "code") {
-      this.simulateCodeTurn(text);
-      return;
-    }
-    const shown = (text.trim() || "(empty message)").slice(0, 140);
-    const push = (fn: () => void, ms: number) => {
-      this.chatTurnTimers.push(window.setTimeout(fn, ms));
-    };
-    const e = (event: Record<string, unknown>) =>
-      this.emit({ type: "session_event", event } as IpcEvent);
-
-    // Mark the turn as running so the composer's daemonIdle (busy-clearing)
-    // effect sees a queue-idle transition at the END of the turn. Without this
-    // the queue stays idle across turns and the transition never fires again.
-    this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "busy" } } });
-
-    // Thinking.
-    push(() => e({ kind: "thinking_delta", thinking: "Reading your message…" }), 350);
-    push(() => e({ kind: "thinking_delta", thinking: " `" + shown + "`" }), 1600);
-    // A running demo tool call, then its result.
-    push(
-      () =>
-        e({
-          kind: "tool_call",
-          name: "demo_echo",
-          input: JSON.stringify({ text: text.trim() }),
-        }),
-      2600,
-    );
-    push(
-      () =>
-        e({
-          kind: "tool_result",
-          name: "demo_echo",
-          output: `Demo: echoed user input (${shown.length} chars) — no live tool available.`,
-        }),
-      3600,
-    );
-    // Stream the answer in chunks. When the active profile is Gauntlet, append
-    // its plain-English status block so the profile visibly changes how the
-    // agent reports (goal + bar, honest evidence markers) — the e2e anchor
-    // strings above stay intact either way. Custom profiles append their live
-    // draft flavor (follows the studio before Save via profileFlavor, or the
-    // persisted profile from settings).
-    const profileBlock =
-      profile === "gauntlet"
-        ? "\n\nStatus — demo run (simulated response; evidence is a UI round-trip, not a live tool run)\nVerified — the message loop round-tripped and this reply rendered in your conversation\nUnverified — nothing was actually executed — no live engine is connected, so no real tool ran and no real data was fetched\nNext action — connect an engine (or start a local model server), then re-run this prompt for a real result"
-        : isCustomId(profile ?? "")
-          ? customDemoFlavor(profileFlavor ?? this.customById(profile))
-          : "";
-    const chunks = [
-      `Got it — you said: “${shown}”.`,
-      "\n\nThis is a simulated demo response — no live engine is connected, so I can't run real tools or fetch live data.",
-      "\n\nIn the connected app I'd help you work through it step by step.",
-      profileBlock,
-    ].filter(Boolean);
-    chunks.forEach((chunk, i) => {
-      push(() => e({ kind: "text", text: chunk }), 4400 + i * 1100);
-    });
-    // Mark the turn complete → queue idle so busy clears + follow-ups flush.
-    push(() => {
-      this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "idle" } } });
-      this.clearChatTurn();
-    }, 4400 + chunks.length * 1100 + 500);
-  }
-
-  /**
-   * Code-mode simulated turn (Tauri demo shell). Builds the deterministic
-   * run_code program from the user's ACTUAL input and streams it through the
-   * same session_event channel the real daemon uses: run_code (the program),
-   * one tool_call/tool_result pair per call, run_complete, then the answer.
-   * Every output is labeled demo/simulated — no live tool claim.
-   */
-  private simulateCodeTurn(text: string): void {
-    this.clearChatTurn();
-    const shown = (text.trim() || "(empty message)").slice(0, 140);
-    const push = (fn: () => void, ms: number) => {
-      this.chatTurnTimers.push(window.setTimeout(fn, ms));
-    };
-    const e = (event: Record<string, unknown>) =>
-      this.emit({ type: "session_event", event } as IpcEvent);
-
-    this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "busy" } } });
-
-    const { program, calls } = buildCodeModeTurn(text);
-    const runId = `code-run-${Date.now()}`;
-
-    push(() => e({ kind: "thinking_delta", thinking: "Reading your message…" }), 350);
-    push(() => e({ kind: "thinking_delta", thinking: " Code mode: compiling ONE program that calls several tools." }), 1600);
-    push(() => e({ kind: "run_code", runId, program }), 2600);
-    calls.forEach((c, i) => {
-      push(() => e({ kind: "tool_call", runId, name: c.name, input: JSON.stringify(c.input) }), 3200 + i * 700);
-      push(() => e({ kind: "tool_result", runId, name: c.name, output: c.output }), 3200 + i * 700 + 600);
-    });
-    push(() => e({ kind: "run_complete", runId }), 3200 + calls.length * 700 + 800);
-
-    const chunks = [
-      `Got it — you said: “${shown}”.`,
-      "\n\nThis is a simulated demo response — no live engine is connected, so the run_code program and its tool calls are simulated; no real tool ran and no real data was fetched.",
-      `\n\nI ran one program with ${calls.length} tool calls (${calls.map((c) => c.name).join(", ")}) — each decomposed into its own tool-call card in the Code Mode panel and recorded in the Trajectory log.`,
-    ];
-    // The answer streams AFTER the run completes (run_complete lands at
-    // 3200 + calls*700 + 800), so the transcript order matches the browser
-    // preview path: program → tool calls → run complete → answer.
-    const answerStart = 3200 + calls.length * 700 + 900;
-    chunks.forEach((chunk, i) => {
-      push(() => e({ kind: "text", text: chunk }), answerStart + i * 1100);
-    });
-    push(() => {
-      this.emit({ type: "snapshot", state: { ...this.state, queue: { mode: "idle" } } });
-      this.clearChatTurn();
-    }, answerStart + chunks.length * 1100 + 500);
-  }
-  async setModel(provider: string, model: string, _thinking?: string, runtime?: ModelRuntimeConfig): Promise<void> {
-    if (runtime) {
-      this.applyModelRuntime(provider, model, runtime);
-    }
-    this.mockSettings = {
-      ...this.mockSettings,
-      defaultProvider: provider,
-      defaultModel: model,
-      ...(_thinking ? { defaultThinking: _thinking } : {}),
-    };
-    writeLocalSettings(this.mockSettings);
-    this.state = { ...this.state, model: { provider, model, thinking: _thinking } };
-    this.emit({ type: "snapshot", state: this.state });
-  }
-
-  /** Reflect a runtime override in the model catalog + connection context. */
-  private applyModelRuntime(provider: string, model: string, runtime: ModelRuntimeConfig): void {
-    this.mockModels = this.mockModels.map((m) =>
-      m.provider === provider && m.id === model
-        ? {
-            ...m,
-            contextWindow: runtime.contextWindow ?? m.contextWindow,
-            maxOutputTokens: runtime.maxOutputTokens ?? m.maxOutputTokens,
-          }
-        : m,
-    );
-    if (runtime.contextWindow != null) {
-      this.state = { ...this.state, context: { ...(this.state.context ?? {}), contextWindow: runtime.contextWindow } };
-    }
-    this.emit({ type: "snapshot", state: this.state });
-  }
-  async newSession(_cwd?: string, goal?: string): Promise<void> {
-    this.createMockSession("New session", _cwd);
-    if (goal) {
-      this.state = {
-        ...this.state,
-        goals: [{ id: `goal-${Date.now()}`, objective: goal, status: "active" as const }],
-      };
-    }
-    this.emit({ type: "snapshot", state: this.state });
-  }
-  async switchSession(id: string): Promise<void> {
-    this.activeSessionId = id;
-    this.state = { ...this.state, activeSessionId: id };
-    this.emit({ type: "snapshot", state: this.state });
-  }
-  async resumeSession(pathOrId: string): Promise<void> {
-    this.activeSessionId = pathOrId;
-    this.state = { ...this.state, activeSessionId: pathOrId };
-    this.emit({ type: "snapshot", state: this.state });
-  }
-  async forkSession(_pathOrId: string): Promise<void> {
-    this.createMockSession("Forked session");
-    this.emit({ type: "snapshot", state: this.state });
-  }
-  async listSessions(): Promise<SessionInfo[]> {
-    return this.mockSessions;
-  }
-  async listAgents(): Promise<AgentInfo[]> {
-    return [];
-  }
-  async attachAgent(id: string): Promise<{ childId: string; sessionId: string; attached: true }> {
-    const state = await this.getAgentState(id);
-    this.emit({ type: "agent_watch", event: { kind: "attached", childId: id, sessionId: id, state } });
-    return { childId: id, sessionId: id, attached: true };
-  }
-  async detachAgent(id: string): Promise<void> {
-    this.emit({ type: "agent_watch", event: { kind: "detached", childId: id, sessionId: id, reason: "detached" } });
-  }
-  async getState(): Promise<ConnectionState> {
-    return {
-      ...this.state,
-      goals: this.state.goals ?? [
-        { id: "goal-demo", objective: "Ship the release and verify every published artifact", status: "active" as const, progress: "3 of 5 artifacts verified" },
-      ],
-      context: { tokens: 18432, contextWindow: this.state.context?.contextWindow ?? 1000000, messages: 42 },
-      rlmChildren: [
-        { id: "rlm-1", name: "api-reviewer", status: "running" as const, parentId: this.state.activeSessionId, summary: "Reviewing endpoint contracts" },
-      ],
-      schedules: this.state.schedules ?? [{ id: "sched-1", cron: "0 9 * * *", prompt: "Send the morning standup summary to the team channel", active: true }],
-      heartbeats: this.state.heartbeats ?? [{ id: "hb-1", interval: "*/15 * * * *", active: true }],
-      autonomousConfig: this.state.autonomousConfig ?? { active: false, maxTurns: 12, maxTokens: 80000, maxTime: "30m", qualityGates: ["npm run build", "npm test"] },
-      costStats: this.state.costStats ?? { totalCost: 0.84, inputTokens: 421337, outputTokens: 118204, sessionCost: 0.31 },
-    };
-  }
-  async getTranscript(): Promise<TranscriptMessage[]> {
-    // No real transcript exists in the browser preview. Returning [] lets
-    // useChat seed the neutral demo conversation (demoSeed) instead of a fake
-    // canned exchange, so the preview doesn't present made-up work as real.
-    return [];
-  }
-  private mockModels: ModelInfo[] = [
-    {
-      id: "deepseek-v4-flash:0731-cloud",
-      name: "DeepSeek V4 Flash 0731",
-      provider: "ollama-cloud",
-      contextWindow: 1000000,
-      maxOutputTokens: 65536,
-      maxContextWindow: 1000000,
-      maxOutputTokensCeiling: 65536,
-    },
-    {
-      id: "deepseek-v4-flash-free",
-      name: "DeepSeek V4 Flash (free)",
-      provider: "opencode",
-      contextWindow: 1000000,
-      maxOutputTokens: 65536,
-      maxContextWindow: 1000000,
-      maxOutputTokensCeiling: 65536,
-    },
-    {
-      id: "MiniMax-M3",
-      name: "MiniMax M3",
-      provider: "minimax",
-      contextWindow: 524288,
-      maxOutputTokens: 128000,
-      maxContextWindow: 524288,
-      maxOutputTokensCeiling: 128000,
-    },
-  ];
-
-  async getModels(): Promise<ModelInfo[]> {
-    return this.mockModels;
-  }
-  async getProviders(): Promise<ProviderInfo[]> {
-    // Order matters: index 0 stays `ollama-cloud` because the e2e login-flow
-    // test patches the first entry to drive the disconnected Connect modal.
-    //
-    // `prime-intellect` is a **subscription** provider and ships DISCONNECTED
-    // on purpose. The OAuth sign-in block in the Connect modal renders only for
-    // `kind: "subscription"`, so with an all-api_key, all-connected mock the
-    // copyable OAuth link was unreachable in browser-demo mode by any amount of
-    // clicking — which is exactly why a design review reported it missing.
-    // Shipping one managed provider makes that path reachable normally and
-    // keeps it covered by the standing suite.
-    return [
-      { id: "ollama-cloud", name: "Ollama Cloud", kind: "api_key", connected: !this.mockLoggedOut.has("ollama-cloud"), models: [] },
-      { id: "openrouter", name: "OpenRouter", kind: "api_key", connected: !this.mockLoggedOut.has("openrouter"), models: [] },
-      { id: "minimax", name: "MiniMax", kind: "api_key", connected: !this.mockLoggedOut.has("minimax"), models: [] },
-      { id: "opencode", name: "Codex (OpenCode)", kind: "api_key", connected: !this.mockLoggedOut.has("opencode"), models: [] },
-      {
-        id: "prime-intellect",
-        name: "Prime Intellect",
-        kind: "subscription",
-        connected: this.mockLoggedIn.has("prime-intellect"),
-        models: [],
-      },
-    ];
-  }
-  /** Providers the demo user has explicitly signed into this session. */
-  private mockLoggedIn = new Set<string>();
-  /** Providers the demo user has explicitly signed out of this session. */
-  private mockLoggedOut = new Set<string>();
-  async login(provider: string): Promise<void> {
-    // Make the demo honest: signing in actually flips the provider to
-    // connected, so the Connect → modal → connected round-trip is real rather
-    // than a no-op that leaves the UI lying about its state.
-    if (provider === "local") {
-      // A local endpoint has no ambient/daemon auth — connecting stores its
-      // config in settings. ProvidersPanel persists the user-entered config
-      // via setSettings first; this default guards direct login() calls.
-      if (!(this.mockSettings.localProviders ?? []).length) {
-        this.mockSettings = { ...this.mockSettings, localProviders: [LOCAL_DEFAULT_CONFIG] };
-        writeLocalProviders([LOCAL_DEFAULT_CONFIG]);
-      }
-    }
-    this.mockLoggedIn.add(provider);
-    this.mockLoggedOut.delete(provider);
-  }
-  async logout(provider: string): Promise<void> {
-    this.mockLoggedOut.add(provider);
-    this.mockLoggedIn.delete(provider);
-    if (provider === "local") {
-      // Disconnecting a local endpoint removes its config (login stores it,
-      // logout removes it).
-      this.mockSettings = { ...this.mockSettings, localProviders: [] };
-      writeLocalProviders([]);
-    }
-  }
-  async getSettings(): Promise<Settings> {
-    return { ...this.mockSettings, modelConfig: { ...(this.mockSettings.modelConfig ?? {}) }, extensions: this.mockExtensions } as unknown as Settings;
-  }
-  async setSettings(settings: Settings): Promise<void> {
-    const next = { ...this.mockSettings, ...settings };
-    if (settings.modelConfig !== undefined) {
-      // Replace (not merge) — mirrors the bridge SettingsStore.update() semantics,
-      // so a reset that removes a key actually drops it from the persisted config.
-      next.modelConfig = settings.modelConfig;
-    }
-    if (settings.localProviders !== undefined) {
-      next.localProviders = settings.localProviders;
-    }
-    this.mockSettings = next;
-    writeLocalSettings(this.mockSettings);
-    writeLocalModelConfig(next.modelConfig ?? {});
-    writeLocalProviders(next.localProviders ?? []);
-  }
-  async runCommand(): Promise<void> {}
-  async getContextStats(): Promise<ConnectionState["context"]> {
-    return {
-      tokens: 18432,
-      contextWindow: this.state.context?.contextWindow ?? 1000000,
-      messages: 42,
-    };
-  }
-  async getRlmChildren(): Promise<ConnectionState["rlmChildren"]> {
-    return [
-      { id: "rlm-1", name: "api-reviewer", status: "running" as const, parentId: this.activeSessionId, summary: "Reviewing endpoint contracts" },
-      { id: "rlm-2", name: "test-runner", status: "idle" as const, parentId: this.activeSessionId, summary: "Awaiting next batch" },
-    ];
-  }
-  async sendAgentMessage(agentId: string, message: string): Promise<AgentMessageReceipt> {
-    return {
-      id: `mock-receipt-${Date.now()}`,
-      target: { activeSessionId: agentId, sessionId: agentId },
-      message,
-      deliveryStatus: "delivered",
-      deliveredAt: new Date().toISOString(),
-    };
-  }
-  async listInbox(): Promise<AgentMessage[]> {
-    return this.mockInboxMessages;
-  }
-  async markMessageRead(messageId: string): Promise<void> {
-    const raw = messageId.startsWith("msg-") ? messageId.slice(4) : messageId;
-    this.mockInboxMessages = this.mockInboxMessages.map((m) =>
-      m.id === raw ? { ...m, read: true } : m,
-    );
-  }
-  async compact(_prompt?: string): Promise<void> {}
-  async retry(): Promise<void> {}
-  async refine(): Promise<void> {
-    // Browser preview: emit a demo refinement_result so the review-and-approve
-    // gate (A1) is demonstrable without a live daemon. The proposed change is
-    // held pending until the user explicitly applies or discards it.
-    //
-    // P3: the demo edit carries old/new content so the banner renders a REAL
-    // unified diff (added/removed lines), not just a text summary. The frozen
-    // contract type has no old/new fields, so they ride along at runtime and
-    // buildRefinementDiff reads them defensively — production only renders a
-    // true diff when the event actually reports the content.
-    const oldContent = [
-      "You are Sophos, a focused agent.",
-      "Complete the user's tasks.",
-      "Be concise.",
-    ].join("\n");
-    const newContent = [
-      "You are Sophos, a focused agent.",
-      "Complete the user's tasks and verify every published artifact.",
-      "Be concise and cite your sources.",
-    ].join("\n");
-    const result = {
-      id: `refine-${Date.now()}`,
-      summary: "Tighten the session instructions against the stated goal.",
-      rationale: "The current instructions drift from the objective; this pass realigns them.",
-      expectedOutcome: "More focused continuations on the active goal.",
-      appliedEdits: [
-        {
-          id: "edit-1",
-          action: "update",
-          kind: "instruction",
-          title: "Session instructions",
-          path: "session-instructions.md",
-          oldContent,
-          newContent,
-          applied: false,
-        },
-      ],
-    } as unknown as RefinementResult;
-    this.emit({ type: "refinement_result", result });
-  }
-  async exportSession(format?: string): Promise<{ exportedPath?: string }> {
-    // Browser preview: report the requested format without a real export.
-    return { exportedPath: format === "jsonl" ? "mock://session-export.jsonl" : "mock://session-export.html" };
-  }
-  async shareSession(): Promise<void> {}
-  async getSessionTree(): Promise<SessionTree> {
-    return {
-      tree: [
-        {
-          id: "entry-1",
-          type: "message",
-          label: "Initial brief",
-          timestamp: new Date(Date.now() - 3600000).toISOString(),
-          parentId: null,
-          children: [
-            { id: "entry-2", type: "message", label: "Agent reply", timestamp: new Date(Date.now() - 3000000).toISOString(), parentId: "entry-1" },
-          ],
-        },
-      ],
-      leafId: "entry-2",
-    };
-  }
-  async cloneSession(): Promise<{ activeSessionId?: string }> {
-    const id = this.createMockSession("Cloned session");
-    this.emit({ type: "snapshot", state: this.state });
-    return { activeSessionId: id };
-  }
-  async nameSession(_name: string): Promise<void> {
-    // Naming a session is a no-op in the browser preview; state carries no name field.
-  }
-  async sideQuestion(text: string): Promise<{ id: string }> {
-    const id = `side-${Date.now()}`;
-    this.emit({ type: "session_event", event: { kind: "side_question_event", id, text, status: "running" } });
-    return { id };
-  }
-  async addSchedule(cron: string, prompt: string): Promise<ScheduleInfo> {
-    const s: ScheduleInfo = { id: `sched-${Date.now()}`, cron, prompt, active: true };
-    this.state = { ...this.state, schedules: [...(this.state.schedules ?? []), s] };
-    this.emit({ type: "snapshot", state: this.state });
-    return s;
-  }
-  async removeSchedule(id: string): Promise<ScheduleInfo> {
-    this.state = { ...this.state, schedules: (this.state.schedules ?? []).filter((s) => s.id !== id) };
-    this.emit({ type: "snapshot", state: this.state });
-    return { id, cron: "", prompt: "", active: false };
-  }
-  async setHeartbeat(schedule: string, prompt?: string): Promise<ScheduleInfo | undefined> {
-    const s: ScheduleInfo = { id: `hb-${Date.now()}`, cron: schedule, prompt: prompt ?? "", active: true };
-    this.state = { ...this.state, heartbeats: [{ id: s.id, interval: schedule, active: true }] };
-    this.emit({ type: "snapshot", state: this.state });
-    return s;
-  }
-  async removeHeartbeat(): Promise<ScheduleInfo | undefined> {
-    this.state = { ...this.state, heartbeats: [] };
-    this.emit({ type: "snapshot", state: this.state });
-    return undefined;
-  }
-  async navigateTree(entryId: string): Promise<NavigateTreeResult> {
-    return { cancelled: false, editorText: `Navigated to ${entryId} (mock)` };
-  }
-  async startSideQuestion(text: string): Promise<{ id: string }> {
-    const id = `side-${Date.now()}`;
-    this.emit({ type: "session_event", event: { kind: "side_question_event", id, text, status: "running" } });
-    // Simulate the inline side-turn completing so the panel is fully
-    // demonstrable (running → complete with a reply) in demo mode.
-    this.chatTurnTimers.push(
-      window.setTimeout(() => {
-        this.emit({
-          type: "session_event",
-          event: {
-            kind: "side_question_event",
-            id,
-            text,
-            status: "complete",
-            answer: `Side reply (demo) — your question: “${text.trim()}”. In the connected app this opens an inline side conversation that doesn't touch the main session.`,
-          },
-        });
-      }, 1300),
-    );
-    return { id };
-  }
-  async exportToHtml(outputPath?: string): Promise<{ outputPath: string }> {
-    return { outputPath: outputPath ?? "mock://session-export.html" };
-  }
-  async exportToJsonl(outputPath?: string): Promise<{ outputPath: string }> {
-    return { outputPath: outputPath ?? "mock://session-export.jsonl" };
-  }
-  async setSessionName(_name: string): Promise<void> {
-    // No-op in the browser preview; session naming isn't represented in mock state.
-  }
-  async getContextTree(): Promise<ContextTreeNode> {
-    return {
-      id: "root",
-      label: "Session",
-      status: "active",
-      children: [{ id: "sub-1", label: "api-reviewer", status: "running", children: [] }],
-    };
-  }
-  async getRuntimeInfo(): Promise<RuntimeInfo> {
-    return {
-      kernel: { status: "browser-preview", persistent: false, toolAvailable: false },
-      skills: this.mockSkills,
-      skillDiagnostics: [],
-      extensions: this.mockExtensionDetails.map((e) => e.path),
-    };
-  }
-  async getExtensions(): Promise<ExtensionInfo[]> {
-    return this.mockExtensionDetails;
-  }
-  async getKernelState(): Promise<KernelState> {
-    return {
-      status: "browser-preview",
-      persistent: false,
-      toolAvailable: false,
-      cells: [],
-      variables: [],
-      imports: [],
-      diagnostic: {
-        reason: "browser_preview",
-        message: "The browser preview has no live Python workspace.",
-        nextStep: "Open the Tauri app to inspect the live kernel.",
-        action: "open_tauri",
-      },
-    };
-  }
-  async getHarnessState(): Promise<HarnessState> {
-    return { entries: [], refinements: [], source: "browser-preview" };
-  }
-  async getAgentState(id: string): Promise<AgentSessionState> {
-    return { id, status: "browser-preview", transcript: [] };
-  }
-  async createSkill(input: { name: string; description: string; content: string; pythonImport?: string }): Promise<RuntimeSkill> {
-    const skill: RuntimeSkill = { name: input.name, description: input.description, source: "browser-preview" };
-    this.mockSkills = [...this.mockSkills, skill];
-    return skill;
-  }
-  async installSkill(_path: string): Promise<RuntimeSkill[]> {
-    return this.mockSkills;
-  }
-  async installExtension(path: string): Promise<void> {
-    const name = path.split(/[/\\]/).pop() ?? path;
-    this.mockExtensions = [...this.mockExtensions, { name, path, enabled: true }];
-  }
-  async removeExtension(path: string): Promise<void> {
-    this.mockExtensions = this.mockExtensions.filter((e) => e.path !== path);
-  }
-  async testMcpServer(name: string, command: string, _args?: string[]): Promise<McpTestResult> {
-    const valid = command && command.trim().length > 0;
-    if (!valid) {
-      return { serverName: name, connected: false, error: "Command not found" };
-    }
-    return { serverName: name, connected: true, latencyMs: 42, tools: ["search", "fetch"] };
-  }
-  async getSlashCommands(): Promise<SlashCommand[]> {
-    return this.mockSlashCommands;
+  getMemoryState(tier?: MemoryTier): Promise<MemoryState> {
+    return this.send("getMemoryState", { tier }) as Promise<MemoryState>;
+  }
+  searchMemory(query: string, tier?: MemoryTier, maxResults?: number): Promise<MemoryTierEntry[]> {
+    return this.send("searchMemory", { query, tier, maxResults }) as Promise<MemoryTierEntry[]>;
+  }
+  storeMemory(entry: Omit<MemoryTierEntry, "id">): Promise<MemoryTierEntry> {
+    return this.send("storeMemory", { entry }) as Promise<MemoryTierEntry>;
+  }
+  recallMemory(query: string, limit?: number): Promise<string[]> {
+    return this.send("recallMemory", { query, limit }) as Promise<string[]>;
+  }
+  forgetMemory(id: string): Promise<void> {
+    return this.send("forgetMemory", { id }) as Promise<void>;
+  }
+  createCheckpoint(label: string, summary?: string): Promise<CheckpointEntry> {
+    return this.send("createCheckpoint", { label, summary }) as Promise<CheckpointEntry>;
+  }
+  restoreCheckpoint(id: string): Promise<CheckpointEntry> {
+    return this.send("restoreCheckpoint", { id }) as Promise<CheckpointEntry>;
+  }
+  listCheckpoints(sessionId?: string): Promise<CheckpointEntry[]>;
+  listCheckpoints(sessionId?: string): Promise<CheckpointEntry[]> {
+    return this.send("listCheckpoints", { sessionId }) as Promise<CheckpointEntry[]>;
+  }
+  getSquadTopology(): Promise<SquadTopology> {
+    return this.send("getSquadTopology", {}) as Promise<SquadTopology>;
+  }
+  evaluateSquadPiece(
+    childId: string,
+    pieceContract: string,
+    bar: string,
+    outputPaths: string[],
+  ): Promise<BlindCriticRubric> {
+    return this.send("evaluateSquadPiece", {
+      childId,
+      pieceContract,
+      bar,
+      outputPaths,
+    }) as Promise<BlindCriticRubric>;
+  }
+  getMcpServers(): Promise<McpServerDetails[]> {
+    return this.send("getMcpServers", {}) as Promise<McpServerDetails[]>;
+  }
+  readMcpResource(serverName: string, uri: string): Promise<McpResource> {
+    return this.send("readMcpResource", { serverName, uri }) as Promise<McpResource>;
+  }
+  getMcpPrompt(
+    serverName: string,
+    name: string,
+    args?: Record<string, string>,
+  ): Promise<{ description?: string; messages: Array<{ role: "user" | "assistant"; content: string }> }> {
+    return this.send("getMcpPrompt", { serverName, name, args }) as Promise<{
+      description?: string;
+      messages: Array<{ role: "user" | "assistant"; content: string }>;
+    }>;
+  }
+  getSecurityPolicy(): Promise<{ policy: WorkspaceSecurityPolicy; customBlockedPatterns: string[] }> {
+    return this.send("getSecurityPolicy", {}) as Promise<{
+      policy: WorkspaceSecurityPolicy;
+      customBlockedPatterns: string[];
+    }>;
+  }
+  setSecurityPolicy(policy: WorkspaceSecurityPolicy, customBlockedPatterns?: string[]): Promise<void> {
+    return this.send("setSecurityPolicy", { policy, customBlockedPatterns }) as Promise<void>;
+  }
+  analyzeBlastRadius(command: string, targetFiles?: string[]): Promise<BlastRadiusReport> {
+    return this.send("analyzeBlastRadius", { command, targetFiles }) as Promise<BlastRadiusReport>;
+  }
+  getSecurityAuditLog(): Promise<SecurityAuditEntry[]> {
+    return this.send("getSecurityAuditLog", {}) as Promise<SecurityAuditEntry[]>;
+  }
+  getSquadWorkflow(): Promise<SquadWorkflowState> {
+    return this.send("getSquadWorkflow", {}) as Promise<SquadWorkflowState>;
+  }
+  runSquadWorkflow(type: SquadWorkflowType, goal: string, bar: string): Promise<SquadWorkflowState> {
+    return this.send("runSquadWorkflow", { type, goal, bar }) as Promise<SquadWorkflowState>;
+  }
+  pauseSquadWorkflow(id: string): Promise<void> {
+    return this.send("pauseSquadWorkflow", { id }) as Promise<void>;
+  }
+  getTokenBudget(): Promise<TokenBudgetBreakdown> {
+    return this.send("getTokenBudget", {}) as Promise<TokenBudgetBreakdown>;
+  }
+  compactContext(
+    strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
+  ): Promise<{ beforeTokens: number | null; afterTokens: number | null; savedTokens: number | null }> {
+    return this.send("compactContext", { strategy }) as Promise<{
+      beforeTokens: number | null;
+      afterTokens: number | null;
+      savedTokens: number | null;
+    }>;
+  }
+  listDesktopWindows(): Promise<DesktopWindowInfo[]> {
+    return this.send("listDesktopWindows", {}) as Promise<DesktopWindowInfo[]>;
+  }
+  inspectDesktopWindow(windowId: string): Promise<DesktopUiElement> {
+    return this.send("inspectDesktopWindow", { windowId }) as Promise<DesktopUiElement>;
+  }
+  dispatchDesktopAction(windowId: string, action: DesktopUiAction): Promise<DesktopActionResult> {
+    return this.send("dispatchDesktopAction", { windowId, action }) as Promise<DesktopActionResult>;
+  }
+  captureDesktopScreenshot(windowId: string): Promise<string> {
+    return this.send("captureDesktopScreenshot", { windowId }) as Promise<string>;
+  }
+  listDistilledSkills(): Promise<DistilledSkill[]> {
+    return this.send("listDistilledSkills", {}) as Promise<DistilledSkill[]>;
+  }
+  distillSkillFromTrajectory(sessionId: string, name?: string): Promise<DistilledSkill> {
+    return this.send("distillSkillFromTrajectory", { sessionId, name }) as Promise<DistilledSkill>;
+  }
+  promoteSkill(skillId: string): Promise<{ success: boolean; targetPath: string }> {
+    return this.send("promoteSkill", { skillId }) as Promise<{ success: boolean; targetPath: string }>;
+  }
+  deleteDistilledSkill(skillId: string): Promise<void> {
+    return this.send("deleteDistilledSkill", { skillId }) as Promise<void>;
+  }
+  getThoughtTree(): Promise<ThoughtTreeState> {
+    return this.send("getThoughtTree", {}) as Promise<ThoughtTreeState>;
+  }
+  runSpeculativeBranch(parentNodeId: string, hypothesis: string): Promise<ThoughtTreeState> {
+    return this.send("runSpeculativeBranch", { parentNodeId, hypothesis }) as Promise<ThoughtTreeState>;
+  }
+  pruneThoughtBranch(nodeId: string): Promise<ThoughtTreeState> {
+    return this.send("pruneThoughtBranch", { nodeId }) as Promise<ThoughtTreeState>;
+  }
+  promoteThoughtBranch(nodeId: string): Promise<ThoughtTreeState> {
+    return this.send("promoteThoughtBranch", { nodeId }) as Promise<ThoughtTreeState>;
+  }
+  listWorkspaceTwins(): Promise<WorkspaceTwin[]> {
+    return this.send("listWorkspaceTwins", {}) as Promise<WorkspaceTwin[]>;
+  }
+  createWorkspaceTwin(name: string, baseBranch?: string): Promise<WorkspaceTwin> {
+    return this.send("createWorkspaceTwin", { name, baseBranch }) as Promise<WorkspaceTwin>;
+  }
+  executeInTwin(twinId: string, command: string): Promise<TwinExecResult> {
+    return this.send("executeInTwin", { twinId, command }) as Promise<TwinExecResult>;
+  }
+  diffWorkspaceTwin(twinId: string): Promise<TwinDiffReport> {
+    return this.send("diffWorkspaceTwin", { twinId }) as Promise<TwinDiffReport>;
+  }
+  mergeWorkspaceTwin(twinId: string): Promise<{ success: boolean; mergedCommit: string }> {
+    return this.send("mergeWorkspaceTwin", { twinId }) as Promise<{ success: boolean; mergedCommit: string }>;
+  }
+  rollbackWorkspaceTwin(twinId: string): Promise<{ success: boolean; message: string }> {
+    return this.send("rollbackWorkspaceTwin", { twinId }) as Promise<{ success: boolean; message: string }>;
   }
 }
 
@@ -1278,7 +700,7 @@ export function getIpcClient(): IpcClient {
   // already-instantiated singleton). In Tauri this is a no-op (the mock isn't
   // used). Harmless in production.
   if (typeof window !== "undefined" && (!inTauri || demoMode)) {
-    (window as any).__sophosIpc = client;
+    window.__sophosIpc = client;
   }
   return client;
 }
@@ -1312,11 +734,14 @@ export function useConnectionState(): ConnectionState {
 
   useEffect(() => {
     let mounted = true;
-    client.getState().then((s) => {
-      if (mounted && s) setState(s);
-    }).catch(() => {
-      // getState may fail if daemon is unreachable — keep "connecting" state.
-    });
+    client
+      .getState()
+      .then((s) => {
+        if (mounted && s) setState(s);
+      })
+      .catch(() => {
+        // getState may fail if daemon is unreachable — keep "connecting" state.
+      });
     return () => {
       mounted = false;
     };

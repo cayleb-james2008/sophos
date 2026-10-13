@@ -21,6 +21,7 @@ const mockConn = vi.hoisted(() => ({
 
 vi.mock("../../../ipc/client", () => ({
   useIpc: () => mockClient,
+  isDemoMode: () => true,
   useConnectionState: () => mockConn,
 }));
 
@@ -74,12 +75,16 @@ describe("AutonomousPanel", () => {
     const user = userEvent.setup();
     render(<AutonomousPanel defaultActive />);
     await user.click(screen.getByRole("button", { name: /nudge/i }));
-    await waitFor(() => expect(mockClient.steer).toHaveBeenCalledWith("Continue the autonomous run and report progress"));
+    await waitFor(() =>
+      expect(mockClient.steer).toHaveBeenCalledWith("Continue the autonomous run and report progress"),
+    );
   });
 
   it("surfaces an error when starting fails", async () => {
     const user = userEvent.setup();
-    (mockClient.prompt as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("no active daemon connection"));
+    (mockClient.prompt as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("no active daemon connection"),
+    );
     render(<AutonomousPanel />);
     await user.click(screen.getByRole("button", { name: /start autonomous/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());

@@ -67,7 +67,7 @@ describe("decomposeProgram", () => {
   });
 
   it("degrades unparseable argument objects to their raw text", () => {
-    const calls = decomposeProgram('await mystery({ nope: [} });');
+    const calls = decomposeProgram("await mystery({ nope: [} });");
     expect(calls).toHaveLength(1);
     expect(calls[0].name).toBe("mystery");
     expect(typeof calls[0].input).toBe("string");
@@ -85,7 +85,13 @@ describe("decomposeProgram", () => {
 
 describe("applyRunEvent", () => {
   const session = "session-0";
-  const base: CodeRunEvent = { type: "run_code", runId: "code-run-1", sessionId: session, program: "", ts: "2026-08-16T00:00:00.000Z" };
+  const base: CodeRunEvent = {
+    type: "run_code",
+    runId: "code-run-1",
+    sessionId: session,
+    program: "",
+    ts: "2026-08-16T00:00:00.000Z",
+  };
 
   function runEvent(): CodeRunEvent {
     const { program } = buildCodeModeTurn("ship it");
@@ -109,7 +115,14 @@ describe("applyRunEvent", () => {
     let runs: CodeRun[] = [];
     const event = runEvent();
     runs = applyRunEvent(runs, event);
-    runs = applyRunEvent(runs, { type: "tool_result", runId: "code-run-1", sessionId: session, name: "readFile", output: "Read 31 lines.", ts: "t" });
+    runs = applyRunEvent(runs, {
+      type: "tool_result",
+      runId: "code-run-1",
+      sessionId: session,
+      name: "readFile",
+      output: "Read 31 lines.",
+      ts: "t",
+    });
     const readFile = runs[0].calls.find((c) => c.name === "readFile");
     expect(readFile?.status).toBe("complete");
     expect(readFile?.output).toBe("Read 31 lines.");
@@ -123,7 +136,14 @@ describe("applyRunEvent", () => {
   it("appends tool_call events for names not in the seeded program", () => {
     let runs: CodeRun[] = [];
     runs = applyRunEvent(runs, runEvent());
-    runs = applyRunEvent(runs, { type: "tool_call", runId: "code-run-1", sessionId: session, name: "extraTool", input: "{}", ts: "t" });
+    runs = applyRunEvent(runs, {
+      type: "tool_call",
+      runId: "code-run-1",
+      sessionId: session,
+      name: "extraTool",
+      input: "{}",
+      ts: "t",
+    });
     expect(runs[0].calls.map((c) => c.name)).toContain("extraTool");
   });
 
@@ -131,11 +151,39 @@ describe("applyRunEvent", () => {
     let runs: CodeRun[] = [];
     runs = applyRunEvent(runs, runEvent());
     // First readFile call (matches the running seed, updates its input).
-    runs = applyRunEvent(runs, { type: "tool_call", runId: "code-run-1", sessionId: session, name: "readFile", input: '{"path":"a.ts"}', ts: "t" });
-    runs = applyRunEvent(runs, { type: "tool_result", runId: "code-run-1", sessionId: session, name: "readFile", output: "content a", ts: "t" });
+    runs = applyRunEvent(runs, {
+      type: "tool_call",
+      runId: "code-run-1",
+      sessionId: session,
+      name: "readFile",
+      input: '{"path":"a.ts"}',
+      ts: "t",
+    });
+    runs = applyRunEvent(runs, {
+      type: "tool_result",
+      runId: "code-run-1",
+      sessionId: session,
+      name: "readFile",
+      output: "content a",
+      ts: "t",
+    });
     // Second readFile call — the first is complete, so this is a NEW card.
-    runs = applyRunEvent(runs, { type: "tool_call", runId: "code-run-1", sessionId: session, name: "readFile", input: '{"path":"b.ts"}', ts: "t" });
-    runs = applyRunEvent(runs, { type: "tool_result", runId: "code-run-1", sessionId: session, name: "readFile", output: "content b", ts: "t" });
+    runs = applyRunEvent(runs, {
+      type: "tool_call",
+      runId: "code-run-1",
+      sessionId: session,
+      name: "readFile",
+      input: '{"path":"b.ts"}',
+      ts: "t",
+    });
+    runs = applyRunEvent(runs, {
+      type: "tool_result",
+      runId: "code-run-1",
+      sessionId: session,
+      name: "readFile",
+      output: "content b",
+      ts: "t",
+    });
     const readFiles = runs[0].calls.filter((c) => c.name === "readFile");
     expect(readFiles).toHaveLength(2);
     expect(readFiles[0].input).toContain('"a.ts"');
@@ -149,20 +197,45 @@ describe("applyRunEvent", () => {
     // A program whose arg object isn't parseable (trailing comma) degrades the
     // seed to the raw argument text.
     const program = 'const c = await webSearch({ query: "x", });';
-    runs = applyRunEvent(runs, { type: "run_code", runId: "code-run-1", sessionId: session, program, ts: "t" });
+    runs = applyRunEvent(runs, {
+      type: "run_code",
+      runId: "code-run-1",
+      sessionId: session,
+      program,
+      ts: "t",
+    });
     expect(runs[0].calls[0].input).toBe('{ query: "x", }');
     // The tool_call event carries the real (parseable) input — it replaces the
     // degraded seed instead of leaving the partial text on the card.
-    runs = applyRunEvent(runs, { type: "tool_call", runId: "code-run-1", sessionId: session, name: "webSearch", input: '{"query":"x"}', ts: "t" });
+    runs = applyRunEvent(runs, {
+      type: "tool_call",
+      runId: "code-run-1",
+      sessionId: session,
+      name: "webSearch",
+      input: '{"query":"x"}',
+      ts: "t",
+    });
     expect(runs[0].calls[0].input).toBe('{"query":"x"}');
   });
 
   it("does not cross-contaminate runs of other sessions or ids", () => {
     let runs: CodeRun[] = [];
     runs = applyRunEvent(runs, runEvent());
-    runs = applyRunEvent(runs, { type: "run_complete", runId: "code-run-other", sessionId: session, ts: "t" });
+    runs = applyRunEvent(runs, {
+      type: "run_complete",
+      runId: "code-run-other",
+      sessionId: session,
+      ts: "t",
+    });
     expect(runs[0].status).toBe("running");
-    runs = applyRunEvent(runs, { type: "tool_result", runId: "code-run-1", sessionId: "other-session", name: "readFile", output: "x", ts: "t" });
+    runs = applyRunEvent(runs, {
+      type: "tool_result",
+      runId: "code-run-1",
+      sessionId: "other-session",
+      name: "readFile",
+      output: "x",
+      ts: "t",
+    });
     expect(runs[0].calls.find((c) => c.name === "readFile")?.status).toBe("running");
   });
 });
@@ -179,7 +252,10 @@ describe("MockIpcClient code-mode prompt (Tauri demo shell path)", () => {
     vi.useRealTimers();
   });
 
-  async function freshClient(): Promise<{ client: import("../../../ipc/client").MockIpcClient; events: Array<Record<string, unknown>> }> {
+  async function freshClient(): Promise<{
+    client: import("../../../ipc/client").MockIpcClient;
+    events: Array<Record<string, unknown>>;
+  }> {
     vi.resetModules();
     const mod = await import("../../../ipc/client");
     const client = mod.getIpcClient() as import("../../../ipc/client").MockIpcClient;
@@ -220,7 +296,9 @@ describe("MockIpcClient code-mode prompt (Tauri demo shell path)", () => {
     await vi.advanceTimersByTimeAsync(30000);
 
     const programOf = (events: Array<Record<string, unknown>>) => {
-      const run = events.find((e) => e.type === "session_event" && (e.event as Record<string, unknown>).kind === "run_code");
+      const run = events.find(
+        (e) => e.type === "session_event" && (e.event as Record<string, unknown>).kind === "run_code",
+      );
       return (run!.event as Record<string, unknown>).program as string;
     };
     expect(programOf(b.events)).toBe(programOf(a.events));
@@ -270,7 +348,12 @@ describe("simulateResponse code mode (browser preview path)", () => {
     const assistant = msgs[0];
     expect(assistant.status).toBe("complete");
     expect(assistant.toolCalls).toHaveLength(4);
-    expect(assistant.toolCalls!.map((c) => c.name)).toEqual(["readFile", "searchFiles", "webSearch", "refine"]);
+    expect(assistant.toolCalls!.map((c) => c.name)).toEqual([
+      "readFile",
+      "searchFiles",
+      "webSearch",
+      "refine",
+    ]);
     expect(assistant.toolCalls!.every((c) => c.status === "complete")).toBe(true);
     expect(assistant.content).toMatch(/simulated/);
 
@@ -282,7 +365,16 @@ describe("simulateResponse code mode (browser preview path)", () => {
     const busEvents: CodeRunEvent[] = [];
     const off = subscribeCodeRunEvents((e) => busEvents.push(e));
     let msgs: TranscriptMessage[] = [];
-    const cleanup = simulateResponse("deterministic goal", { onUpdate: (u) => { msgs = u(msgs); }, onDone: () => {} }, "code");
+    const cleanup = simulateResponse(
+      "deterministic goal",
+      {
+        onUpdate: (u) => {
+          msgs = u(msgs);
+        },
+        onDone: () => {},
+      },
+      "code",
+    );
     vi.advanceTimersByTime(30000);
     const run = busEvents.find((e) => e.type === "run_code");
     expect(run?.type === "run_code" ? run.program : "").toBe(buildCodeModeTurn("deterministic goal").program);

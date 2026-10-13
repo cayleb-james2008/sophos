@@ -1,3 +1,12 @@
+# Pin LF line endings on checkout so Prettier (endOfLine: lf) agrees on
+# Windows CI runners, whose default core.autocrlf=true would check out CRLF.
+* text=auto eol=lf
+
+# Vendored Windows Node.js runtime — keep native line endings (batch/PS1
+# scripts ship with CRLF; do not normalize them).
+resources/node/** -text
+# Preserve pinned source patches, policy manifests, and the historical CRLF
+# fixture byte-for-byte.
 patches/prime-agent-v0.7.0-session-lease-windows.patch -text
 patches/prime-agent-v0.7.0-linux-worker-socket-path.patch -text
 patches/prime-agent-v0.7.0-worker-shutdown-fence.patch -text

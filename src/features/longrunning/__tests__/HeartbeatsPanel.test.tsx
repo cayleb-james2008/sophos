@@ -22,13 +22,20 @@ vi.mock("../../../ipc/client", () => ({
   useConnectionState: () => mockConn,
 }));
 
-const seeded: Heartbeat[] = [{ id: "hb-1", interval: "every 10m", prompt: "Check the deployment", status: "active" }];
+const seeded: Heartbeat[] = [
+  { id: "hb-1", interval: "every 10m", prompt: "Check the deployment", status: "active" },
+];
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockConn.activeSessionId = "s1";
   mockConn.heartbeats = undefined;
-  (mockClient.setHeartbeat as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "hb-new", cron: "every 5 minutes", prompt: "Report progress", active: true });
+  (mockClient.setHeartbeat as ReturnType<typeof vi.fn>).mockResolvedValue({
+    id: "hb-new",
+    cron: "every 5 minutes",
+    prompt: "Report progress",
+    active: true,
+  });
   (mockClient.removeHeartbeat as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 });
 
@@ -62,7 +69,9 @@ describe("HeartbeatsPanel", () => {
     await user.type(screen.getByLabelText("Instruction (optional)"), "Report progress");
     await user.click(screen.getByRole("button", { name: /set heartbeat/i }));
 
-    await waitFor(() => expect(mockClient.setHeartbeat).toHaveBeenCalledWith("every 5 minutes", "Report progress"));
+    await waitFor(() =>
+      expect(mockClient.setHeartbeat).toHaveBeenCalledWith("every 5 minutes", "Report progress"),
+    );
     await waitFor(() => expect(screen.getByText("every 5 minutes")).toBeInTheDocument());
     // Inputs are cleared after a successful add.
     expect((screen.getByLabelText("Interval") as HTMLInputElement).value).toBe("");
@@ -95,7 +104,9 @@ describe("HeartbeatsPanel", () => {
 
   it("surfaces an error when adding fails", async () => {
     const user = userEvent.setup();
-    (mockClient.setHeartbeat as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("no active daemon connection"));
+    (mockClient.setHeartbeat as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("no active daemon connection"),
+    );
     render(<HeartbeatsPanel />);
     await user.type(screen.getByLabelText("Interval"), "10m");
     await user.click(screen.getByRole("button", { name: /set heartbeat/i }));

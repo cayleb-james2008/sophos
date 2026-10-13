@@ -7,6 +7,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsView } from "../SettingsView";
 
+const mockMode = vi.hoisted(() => ({ preview: true }));
+vi.mock("../../../ipc/client", () => ({ isDemoMode: () => mockMode.preview }));
+
 const mockSetSettingsTab = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../state/AppState", async () => ({
@@ -24,10 +27,17 @@ vi.mock("../ExtensionsPanel", async () => ({ ExtensionsPanel: () => <div>extensi
 vi.mock("../AdvancedPanel", async () => ({ AdvancedPanel: () => <div>advanced-stub</div> }));
 vi.mock("../LongRunningPanel", async () => ({ LongRunningPanel: () => <div>longrunning-stub</div> }));
 vi.mock("../AboutPanel", async () => ({ AboutPanel: () => <div>about-stub</div> }));
+vi.mock("../../mcp", async () => ({ McpExplorer: () => <div>mcp-stub</div> }));
+vi.mock("../../security", async () => ({ SecuritySandboxPanel: () => <div>security-stub</div> }));
+vi.mock("../../cua", async () => ({ CuaControlPanel: () => <div>cua-stub</div> }));
+vi.mock("../../skills", async () => ({ SkillDistillationPanel: () => <div>distill-stub</div> }));
+vi.mock("../../tree", async () => ({ ThoughtTreePanel: () => <div>tree-stub</div> }));
+vi.mock("../../sandbox", async () => ({ TwinSandboxPanel: () => <div>twins-stub</div> }));
 
 describe("SettingsView", () => {
   beforeEach(() => {
     mockSetSettingsTab.mockClear();
+    mockMode.preview = true;
   });
 
   it("renders the header, fleet strip, and tab bar", () => {
@@ -56,8 +66,39 @@ describe("SettingsView", () => {
 
   it("exposes every tab in the bar", () => {
     render(<SettingsView />);
-    for (const label of ["General", "Providers", "Subagents", "Skills", "Extensions", "Advanced", "Long-running", "About"]) {
+    for (const label of [
+      "General",
+      "Providers",
+      "MCP Explorer",
+      "Security & Sandbox",
+      "Desktop CUA",
+      "Workspace Twins",
+      "Skill Distillation",
+      "Tree of Thoughts",
+      "Subagents",
+      "Skills",
+      "Extensions",
+      "Advanced",
+      "Long-running",
+      "Import",
+      "About",
+    ]) {
       expect(screen.getByRole("tab", { name: new RegExp(label, "i") })).toBeInTheDocument();
+    }
+  });
+  it("limits the live settings surface to implemented runtime capabilities", () => {
+    mockMode.preview = false;
+    render(<SettingsView />);
+    expect(screen.getByRole("tab", { name: "Providers" })).toBeInTheDocument();
+    for (const label of [
+      "MCP Explorer",
+      "Security & Sandbox",
+      "Desktop CUA",
+      "Workspace Twins",
+      "Skill Distillation",
+      "Tree of Thoughts",
+    ]) {
+      expect(screen.queryByRole("tab", { name: label })).not.toBeInTheDocument();
     }
   });
 });

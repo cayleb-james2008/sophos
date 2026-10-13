@@ -29,7 +29,16 @@ const MAX_HISTORY = 5;
 
 function SearchGlyph({ size = 15 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="11" cy="11" r="7" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
@@ -37,7 +46,11 @@ function SearchGlyph({ size = 15 }: { size?: number }) {
 }
 
 /** Build a snippet around a match, returning the match's position within it. */
-function makeSnippet(text: string, start: number, len: number): { text: string; matchStart: number; matchLen: number } {
+function makeSnippet(
+  text: string,
+  start: number,
+  len: number,
+): { text: string; matchStart: number; matchLen: number } {
   const before = 40;
   const after = 60;
   const s = Math.max(0, start - before);
@@ -49,7 +62,11 @@ function makeSnippet(text: string, start: number, len: number): { text: string; 
 }
 
 /** Render a snippet with the matched term highlighted (terminal green wash). */
-function HighlightedSnippet({ snippet }: { snippet: { text: string; matchStart: number; matchLen: number } }) {
+function HighlightedSnippet({
+  snippet,
+}: {
+  snippet: { text: string; matchStart: number; matchLen: number };
+}) {
   const before = snippet.text.slice(0, snippet.matchStart);
   const match = snippet.text.slice(snippet.matchStart, snippet.matchStart + snippet.matchLen);
   const after = snippet.text.slice(snippet.matchStart + snippet.matchLen);
@@ -389,9 +406,7 @@ export function CommandPalette({
         <div ref={listRef} className="palette__list">
           {submode === "naming" ? (
             <div className="palette__form">
-              <label className="palette__formlabel">
-                Set session name
-              </label>
+              <label className="palette__formlabel">Set session name</label>
               <input
                 autoFocus
                 value={nameValue}
@@ -410,9 +425,7 @@ export function CommandPalette({
                 aria-label="Session name"
                 className="palette__field pa-focus-ring"
               />
-              {nameErr ? (
-                <span className="palette__error">{nameErr}</span>
-              ) : null}
+              {nameErr ? <span className="palette__error">{nameErr}</span> : null}
               <div className="palette__actions">
                 <Button
                   variant="accent-soft"
@@ -473,7 +486,7 @@ export function CommandPalette({
                         <span className="palette__rowmeta">
                           <span className="palette__rowlabel">{r.item.title ?? r.item.id}</span>
                           <span className="palette__rowdesc">
-                            {(r.item.status ?? "idle")} · {relativeTime(r.item.updatedAt)}
+                            {r.item.status ?? "idle"} · {relativeTime(r.item.updatedAt)}
                           </span>
                         </span>
                         <span className="palette__rowhint">↵ open</span>

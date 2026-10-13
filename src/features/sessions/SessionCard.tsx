@@ -92,7 +92,10 @@ export function SessionCard({
               </span>
             )}
             {activeGoals > 0 && (
-              <span className="session__chip" title={`${activeGoals} active goal${activeGoals > 1 ? "s" : ""}`}>
+              <span
+                className="session__chip"
+                title={`${activeGoals} active goal${activeGoals > 1 ? "s" : ""}`}
+              >
                 <TargetIcon size={9} /> {activeGoals}
               </span>
             )}

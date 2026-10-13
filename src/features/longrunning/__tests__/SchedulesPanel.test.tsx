@@ -30,8 +30,18 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockConn.activeSessionId = "s1";
   mockConn.schedules = undefined;
-  (mockClient.addSchedule as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "sch-new", cron: "0 8 * * *", prompt: "Daily report", active: true });
-  (mockClient.removeSchedule as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "sch-1", cron: "0 9 * * 1-5", prompt: "", active: false });
+  (mockClient.addSchedule as ReturnType<typeof vi.fn>).mockResolvedValue({
+    id: "sch-new",
+    cron: "0 8 * * *",
+    prompt: "Daily report",
+    active: true,
+  });
+  (mockClient.removeSchedule as ReturnType<typeof vi.fn>).mockResolvedValue({
+    id: "sch-1",
+    cron: "0 9 * * 1-5",
+    prompt: "",
+    active: false,
+  });
 });
 
 describe("SchedulesPanel", () => {

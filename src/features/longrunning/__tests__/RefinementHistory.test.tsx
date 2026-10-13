@@ -66,7 +66,9 @@ describe("RefinementHistory", () => {
 
   it("surfaces an error when a bare refine fails", async () => {
     const user = userEvent.setup();
-    (mockClient.refine as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("no active daemon connection"));
+    (mockClient.refine as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("no active daemon connection"),
+    );
     render(<HistoryMod.RefinementHistory />);
     await user.click(screen.getByRole("button", { name: /refine now/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
@@ -106,8 +108,18 @@ describe("RefinementHistory", () => {
       <HistoryMod.RefinementHistory
         initial={[
           { id: "h1", timestamp: "2026-01-15T10:00:00.000Z", description: "Tighten goal", status: "applied" },
-          { id: "h2", timestamp: "2026-01-15T11:00:00.000Z", description: "Rejected idea", status: "discarded" },
-          { id: "h3", timestamp: "2026-01-15T12:00:00.000Z", description: "Bad change", status: "rolled-back" },
+          {
+            id: "h2",
+            timestamp: "2026-01-15T11:00:00.000Z",
+            description: "Rejected idea",
+            status: "discarded",
+          },
+          {
+            id: "h3",
+            timestamp: "2026-01-15T12:00:00.000Z",
+            description: "Bad change",
+            status: "rolled-back",
+          },
         ]}
       />,
     );

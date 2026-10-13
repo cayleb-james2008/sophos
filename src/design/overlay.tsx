@@ -36,12 +36,7 @@ export function Card({
   return (
     <div
       onClick={onClick}
-      className={[
-        "pa-card",
-        `pa-card--${variant}`,
-        `pa-card--p-${padding}`,
-        className,
-      ]
+      className={["pa-card", `pa-card--${variant}`, `pa-card--p-${padding}`, className]
         .filter(Boolean)
         .join(" ")}
       style={style}
@@ -65,10 +60,7 @@ export function ScrollArea({
   className?: string;
 }) {
   return (
-    <div
-      className={["pa-scroll-area", className].filter(Boolean).join(" ")}
-      style={style}
-    >
+    <div className={["pa-scroll-area", className].filter(Boolean).join(" ")} style={style}>
       {children}
     </div>
   );
@@ -110,18 +102,15 @@ export function Tabs({ items, activeId, onChange, variant = "underline", style, 
             aria-selected={active}
             disabled={item.disabled}
             onClick={() => onChange(item.id)}
-            className={[
-              "pa-tab",
-              `pa-tab--${variant}`,
-              active ? "pa-tab--active" : null,
-              "pa-focus-ring",
-            ]
+            className={["pa-tab", `pa-tab--${variant}`, active ? "pa-tab--active" : null, "pa-focus-ring"]
               .filter(Boolean)
               .join(" ")}
           >
             {item.icon}
             {item.label}
-            {variant === "underline" && active ? <span className="pa-tab__underline" aria-hidden="true" /> : null}
+            {variant === "underline" && active ? (
+              <span className="pa-tab__underline" aria-hidden="true" />
+            ) : null}
           </button>
         );
       })}
@@ -155,13 +144,7 @@ export function Tooltip({ content, children, side = "top", delay = 300 }: Toolti
   };
 
   return (
-    <span
-      className="pa-tooltip-host"
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
-      onBlur={hide}
-    >
+    <span className="pa-tooltip-host" onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
       {children}
       {visible ? (
         <span role="tooltip" id={id} className={`pa-tooltip pa-tooltip--${side}`}>
@@ -200,10 +183,7 @@ export function Modal({ open, onClose, title, children, footer, width = 480 }: M
   return createPortal(
     <div className="pa-modal" role="dialog" aria-modal="true">
       <div className="pa-modal__backdrop" onClick={onClose} aria-hidden="true" />
-      <div
-        className="pa-modal__panel"
-        style={{ "--pa-modal-width": `${width}px` } as React.CSSProperties}
-      >
+      <div className="pa-modal__panel" style={{ "--pa-modal-width": `${width}px` } as React.CSSProperties}>
         {title ? (
           <div className="pa-modal__head">
             <Text variant="subtitle">{title}</Text>
@@ -267,16 +247,15 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             <Text variant="body" tone="muted">
               A render error occurred in this view. Reload to recover.
             </Text>
-            <Text
-              as="pre"
-              variant="micro"
-              tone="danger"
-              mono
-              className="pa-error-boundary__trace"
-            >
+            <Text as="pre" variant="micro" tone="danger" mono className="pa-error-boundary__trace">
               {this.state.error.message || String(this.state.error)}
             </Text>
-            <Button variant="accent-soft" size="md" onClick={this.handleReload} className="pa-error-boundary__reload">
+            <Button
+              variant="accent-soft"
+              size="md"
+              onClick={this.handleReload}
+              className="pa-error-boundary__reload"
+            >
               Reload
             </Button>
           </div>

@@ -75,14 +75,11 @@ describe("dagreLayout", () => {
   });
 
   it("ignores edges whose source or target is not a laid-out node", () => {
-    const pos = dagreLayout(
-      NODES,
-      [
-        { source: "a", target: "ghost" },
-        { source: "ghost", target: "b" },
-        { source: "a", target: "b" },
-      ],
-    );
+    const pos = dagreLayout(NODES, [
+      { source: "a", target: "ghost" },
+      { source: "ghost", target: "b" },
+      { source: "a", target: "b" },
+    ]);
     // No crash; only known nodes are positioned.
     expect(pos.size).toBe(NODES.length);
     expect(pos.get("ghost")).toBeUndefined();

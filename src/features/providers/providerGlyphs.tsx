@@ -2,7 +2,15 @@
 // model selector so providers are visually distinct at a glance. Falls back
 // to a generic "chip" glyph for unknown providers.
 
-export function ProviderGlyph({ provider, size = 14, color = "currentColor" }: { provider: string; size?: number; color?: string }) {
+export function ProviderGlyph({
+  provider,
+  size = 14,
+  color = "currentColor",
+}: {
+  provider: string;
+  size?: number;
+  color?: string;
+}) {
   const p = provider.toLowerCase();
   const common = {
     width: size,

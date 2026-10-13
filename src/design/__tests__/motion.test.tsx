@@ -34,7 +34,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const Probe = ({ delay }: { delay?: number }) => <span data-testid="probe" data-delay={delay}>{delay ?? "none"}</span>;
+const Probe = ({ delay }: { delay?: number }) => (
+  <span data-testid="probe" data-delay={delay}>
+    {delay ?? "none"}
+  </span>
+);
 
 describe("useReducedMotion", () => {
   it("reflects the OS reduced-motion preference", () => {
@@ -76,7 +80,10 @@ describe("Fade", () => {
     );
     const el = container.firstChild as HTMLElement;
     expect(el).toHaveClass("pa-fade");
-    expect(el).toHaveStyle({ "--pa-motion-duration": "220ms", "--pa-motion-delay": "50ms" } as Record<string, string>);
+    expect(el).toHaveStyle({ "--pa-motion-duration": "220ms", "--pa-motion-delay": "50ms" } as Record<
+      string,
+      string
+    >);
     expect(el).toHaveTextContent("hello");
   });
 

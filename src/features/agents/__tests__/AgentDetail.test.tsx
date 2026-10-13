@@ -30,7 +30,14 @@ const AGENT: AgentRow = {
 };
 
 const THREAD: AgentMessage[] = [
-  { id: "m1", fromAgentId: "agent-12345678", toAgentId: "self", text: "on it", timestamp: "2026-01-01T10:00:00.000Z", read: false },
+  {
+    id: "m1",
+    fromAgentId: "agent-12345678",
+    toAgentId: "self",
+    text: "on it",
+    timestamp: "2026-01-01T10:00:00.000Z",
+    read: false,
+  },
 ];
 
 const STATE: AgentSessionState = {

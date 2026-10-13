@@ -98,10 +98,13 @@ export function MessageRow({
             </Text>
           ) : null}
         </div>
-        <div className="msg-user-bubble">
-          {message.content}
-        </div>
-        <MessageActions role="user" content={message.content} onEdit={() => onEdit(message)} canEdit={canEdit} />
+        <div className="msg-user-bubble">{message.content}</div>
+        <MessageActions
+          role="user"
+          content={message.content}
+          onEdit={() => onEdit(message)}
+          canEdit={canEdit}
+        />
       </div>
     );
   }

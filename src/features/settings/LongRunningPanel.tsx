@@ -8,6 +8,7 @@
 // is left purely to runtime telemetry. The redundant "Long-running & background
 // agents" label is dropped — the tab already says it.
 
+import { isDemoMode } from "../../ipc/client";
 import { useState } from "react";
 import { Tabs } from "../../design";
 import { AutonomousPanel } from "../longrunning/AutonomousPanel";
@@ -18,7 +19,8 @@ import { GoalsPanel } from "../goals/GoalsPanel";
 import { HarnessStatePanel } from "../longrunning/HarnessStatePanel";
 
 export function LongRunningPanel() {
-  const [tab, setTab] = useState("autonomous");
+  const preview = isDemoMode();
+  const [tab, setTab] = useState(preview ? "autonomous" : "harness");
   return (
     <div className="gp-form">
       <Tabs
@@ -30,15 +32,15 @@ export function LongRunningPanel() {
           { id: "schedules", label: "Schedules" },
           { id: "refinement", label: "Refinement" },
           { id: "harness", label: "Harness state" },
-        ]}
+        ].filter((item) => preview || item.id === "harness")}
         activeId={tab}
         onChange={setTab}
       />
-      {tab === "goals" ? <GoalsPanel /> : null}
-      {tab === "autonomous" ? <AutonomousPanel /> : null}
-      {tab === "heartbeats" ? <HeartbeatsPanel /> : null}
-      {tab === "schedules" ? <SchedulesPanel /> : null}
-      {tab === "refinement" ? <RefinementHistory /> : null}
+      {preview && tab === "goals" ? <GoalsPanel /> : null}
+      {preview && tab === "autonomous" ? <AutonomousPanel /> : null}
+      {preview && tab === "heartbeats" ? <HeartbeatsPanel /> : null}
+      {preview && tab === "schedules" ? <SchedulesPanel /> : null}
+      {preview && tab === "refinement" ? <RefinementHistory /> : null}
       {tab === "harness" ? <HarnessStatePanel /> : null}
     </div>
   );

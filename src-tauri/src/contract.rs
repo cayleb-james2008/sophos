@@ -16,6 +16,12 @@ use serde::{Deserialize, Serialize};
 // ---------------------------------------------------------------------------
 
 /// A single JSON-RPC command. Tagged by `method`, with `params` as the content.
+///
+/// The shell relays commands as raw JSON (`serde_json::Value`) rather than this
+/// typed shape, so the enum is constructed only by the contract's own
+/// round-trip tests below. It is kept in lock-step with `src/ipc/contract.ts`
+/// as the authoritative Rust mirror.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "method", content = "params")]
 pub enum IpcCommand {
@@ -117,6 +123,9 @@ pub enum IpcCommand {
     InstallSkill { path: String },
 }
 
+/// Prompt option fields carried through the relay verbatim. Constructed only
+/// inside `IpcCommand` (which is itself test-only); mirrors the TS contract.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptOptions {
     #[serde(skip_serializing_if = "Option::is_none")]

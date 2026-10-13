@@ -92,7 +92,11 @@ export function SkillsPanel() {
     setActionError(undefined);
     setActionMessage(undefined);
     try {
-      const skill = await ipc.createSkill({ name: createName.trim(), description: createDescription.trim(), content: createContent.trim() });
+      const skill = await ipc.createSkill({
+        name: createName.trim(),
+        description: createDescription.trim(),
+        content: createContent.trim(),
+      });
       setCreateName("");
       setCreateDescription("");
       setCreateContent("");
@@ -168,19 +172,28 @@ export function SkillsPanel() {
             </div>
 
             <Text variant="body" tone="muted">
-              Skill discovery is managed by the daemon. This panel reads the live resource snapshot,
-              so the list below is what this session can actually invoke — not a browser-side catalog.
-              Skill paths remain configurable here and are applied on the next daemon session.
+              Skill discovery is managed by the daemon. This panel reads the live resource snapshot, so the
+              list below is what this session can actually invoke — not a browser-side catalog. Skill paths
+              remain configurable here and are applied on the next daemon session.
             </Text>
           </Card>
 
           <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-head">
               <div className="sp-headrow">
-                <Text variant="label" weight="semibold">Discovered skills</Text>
-                <Text variant="micro" tone="dim" mono>{runtime?.skills.length ?? 0}</Text>
+                <Text variant="label" weight="semibold">
+                  Discovered skills
+                </Text>
+                <Text variant="micro" tone="dim" mono>
+                  {runtime?.skills.length ?? 0}
+                </Text>
               </div>
-              {runtime?.skillDiagnostics.length ? <Text variant="micro" tone="warning">{runtime.skillDiagnostics.length} diagnostic{runtime.skillDiagnostics.length === 1 ? "" : "s"}</Text> : null}
+              {runtime?.skillDiagnostics.length ? (
+                <Text variant="micro" tone="warning">
+                  {runtime.skillDiagnostics.length} diagnostic
+                  {runtime.skillDiagnostics.length === 1 ? "" : "s"}
+                </Text>
+              ) : null}
             </div>
             {runtime?.skills.length ? (
               <div className="sp-list">
@@ -194,11 +207,20 @@ export function SkillsPanel() {
                     >
                       <div className="sp-rowmain">
                         <div className="sp-headrow--sm">
-                          <Text variant="label" mono>{skill.name}</Text>
+                          <Text variant="label" mono>
+                            {skill.name}
+                          </Text>
                           {justInstalled ? <Badge tone="success">Just installed</Badge> : null}
                         </div>
-                        <Text variant="micro" tone="muted">{skill.description ?? "No description reported by daemon."}</Text>
-                        {skill.filePath ? <Text variant="micro" tone="dim" mono className="ap-cwd">{skill.filePath}{skill.source ? ` · ${skill.source}` : ""}</Text> : null}
+                        <Text variant="micro" tone="muted">
+                          {skill.description ?? "No description reported by daemon."}
+                        </Text>
+                        {skill.filePath ? (
+                          <Text variant="micro" tone="dim" mono className="ap-cwd">
+                            {skill.filePath}
+                            {skill.source ? ` · ${skill.source}` : ""}
+                          </Text>
+                        ) : null}
                       </div>
                       <label className="sp-check">
                         <input
@@ -207,49 +229,100 @@ export function SkillsPanel() {
                           onChange={(e) => void toggleSkill(skill.name, e.target.checked)}
                           className="sp-checkbox"
                         />
-                        <Text variant="micro" tone="muted">Enable</Text>
+                        <Text variant="micro" tone="muted">
+                          Enable
+                        </Text>
                       </label>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <Text variant="body" tone="dim">The live daemon reported no discoverable skills for this session.</Text>
+              <Text variant="body" tone="dim">
+                The live daemon reported no discoverable skills for this session.
+              </Text>
             )}
             {runtime?.skillDiagnostics.map((diagnostic, index) => (
-              <Text key={`${diagnostic.type}:${index}`} variant="micro" tone="warning">{diagnostic.type}: {diagnostic.message}{diagnostic.path ? ` · ${diagnostic.path}` : ""}</Text>
+              <Text key={`${diagnostic.type}:${index}`} variant="micro" tone="warning">
+                {diagnostic.type}: {diagnostic.message}
+                {diagnostic.path ? ` · ${diagnostic.path}` : ""}
+              </Text>
             ))}
           </Card>
 
           <Card variant="raised" padding="lg" className="card-stack">
             <div className="sp-headrow">
-              <Text variant="label" weight="semibold">Create or install a skill</Text>
+              <Text variant="label" weight="semibold">
+                Create or install a skill
+              </Text>
               <Badge tone="info">live daemon</Badge>
             </div>
-            <Text variant="body" tone="muted">Create a markdown skill in the project resource path, or add an existing skill directory and reload the real daemon resource loader.</Text>
-            {actionError ? <Text variant="micro" tone="danger">{actionError}</Text> : null}
-            {actionMessage ? <Text variant="micro" tone="success">{actionMessage}</Text> : null}
-            <Input label="New skill name" value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="release-audit" />
-            <Input label="Description" value={createDescription} onChange={(e) => setCreateDescription(e.target.value)} placeholder="Audit a release artifact" />
-            <TextArea label="SKILL.md instructions" value={createContent} onChange={(e) => setCreateContent(e.target.value)} placeholder="Explain when and how the agent should use this skill." rows={6} />
+            <Text variant="body" tone="muted">
+              Create a markdown skill in the project resource path, or add an existing skill directory and
+              reload the real daemon resource loader.
+            </Text>
+            {actionError ? (
+              <Text variant="micro" tone="danger">
+                {actionError}
+              </Text>
+            ) : null}
+            {actionMessage ? (
+              <Text variant="micro" tone="success">
+                {actionMessage}
+              </Text>
+            ) : null}
+            <Input
+              label="New skill name"
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              placeholder="release-audit"
+            />
+            <Input
+              label="Description"
+              value={createDescription}
+              onChange={(e) => setCreateDescription(e.target.value)}
+              placeholder="Audit a release artifact"
+            />
+            <TextArea
+              label="SKILL.md instructions"
+              value={createContent}
+              onChange={(e) => setCreateContent(e.target.value)}
+              placeholder="Explain when and how the agent should use this skill."
+              rows={6}
+            />
             <div className="kp-runfoot">
-              <Button variant="primary" onClick={() => void createSkill()} disabled={!createName.trim() || !createDescription.trim() || !createContent.trim()}>Create and install</Button>
+              <Button
+                variant="primary"
+                onClick={() => void createSkill()}
+                disabled={!createName.trim() || !createDescription.trim() || !createContent.trim()}
+              >
+                Create and install
+              </Button>
             </div>
             <div className="sk-preview">
-              <Text variant="micro" tone="dim" uppercase>Preview</Text>
+              <Text variant="micro" tone="dim" uppercase>
+                Preview
+              </Text>
               {previewEmpty ? (
-                <Text variant="body" tone="dim">Start typing to see a preview...</Text>
+                <Text variant="body" tone="dim">
+                  Start typing to see a preview...
+                </Text>
               ) : (
-                <pre className="sk-pre">
-                  {previewBody}
-                </pre>
+                <pre className="sk-pre">{previewBody}</pre>
               )}
             </div>
             <div className="ep-installrow">
               <div className="ep-installfield">
-                <Input label="Existing skill path" value={installPath} onChange={(e) => setInstallPath(e.target.value)} placeholder="C:\\work\\skills\\my-skill" />
+                <Input
+                  label="Existing skill path"
+                  value={installPath}
+                  onChange={(e) => setInstallPath(e.target.value)}
+                  placeholder="C:\\work\\skills\\my-skill"
+                />
               </div>
-              <Button variant="outline" onClick={() => void installSkill()} disabled={!installPath.trim()}>Install path</Button>
+              <Button variant="outline" onClick={() => void installSkill()} disabled={!installPath.trim()}>
+                Install path
+              </Button>
             </div>
           </Card>
 
@@ -264,8 +337,8 @@ export function SkillsPanel() {
             </div>
 
             <Text variant="body" tone="muted" className="sk-desc">
-              Add directories or .md files. Supports glob patterns. Prefix with "!" to exclude,
-              "+" to force-include. Changes apply on Save.
+              Add directories or .md files. Supports glob patterns. Prefix with "!" to exclude, "+" to
+              force-include. Changes apply on Save.
             </Text>
 
             <div className="sp-list">
@@ -283,7 +356,12 @@ export function SkillsPanel() {
                         placeholder="~/.prime/agent/skills/my-skill"
                       />
                     </div>
-                    <Button variant="ghost" size="sm" icon={<XIcon size={13} />} onClick={() => removeSkillPath(idx)} />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<XIcon size={13} />}
+                      onClick={() => removeSkillPath(idx)}
+                    />
                   </div>
                 ))
               )}
@@ -300,7 +378,6 @@ export function SkillsPanel() {
                   Add
                 </Button>
               </div>
-
             </div>
 
             <div className="ep-disc">
@@ -309,16 +386,11 @@ export function SkillsPanel() {
               </Text>
               <Text variant="micro" tone="dim">
                 Precedence: CLI → settings → packages → project → global → built-in
-                <br />
-                • CLI: <Text mono>{`--skill <path>`}</Text>
-                <br />
-                • Settings: <Text mono>skills: ["path", "!excluded"]</Text>
-                <br />
-                • Global: <Text mono>~/.prime/agent/skills/</Text>, <Text mono>~/.agents/skills/</Text>
-                <br />
-                • Project: <Text mono>.prime/agent/skills/</Text>, <Text mono>.agents/skills/</Text>
-                <br />
-                • Packages: <Text mono>skills/</Text> in npm/git packages
+                <br />• CLI: <Text mono>{`--skill <path>`}</Text>
+                <br />• Settings: <Text mono>skills: ["path", "!excluded"]</Text>
+                <br />• Global: <Text mono>~/.prime/agent/skills/</Text>, <Text mono>~/.agents/skills/</Text>
+                <br />• Project: <Text mono>.prime/agent/skills/</Text>, <Text mono>.agents/skills/</Text>
+                <br />• Packages: <Text mono>skills/</Text> in npm/git packages
               </Text>
             </div>
 

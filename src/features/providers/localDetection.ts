@@ -28,7 +28,7 @@ export interface LocalEndpoint {
 
 /** Candidate ports for the known server families + generic OpenAI-compatible servers. */
 const CANDIDATES: Array<{ port: number; kind: LocalEndpointKind }> = [
-  { port: 11434, kind: "ollama" },   // Ollama default
+  { port: 11434, kind: "ollama" }, // Ollama default
   { port: 1234, kind: "lm-studio" }, // LM Studio default
   { port: 8080, kind: "llama.cpp" }, // llama.cpp / llama-server default
   { port: 4891, kind: "openai-compatible" }, // vLLM default
@@ -43,6 +43,64 @@ const CANDIDATES: Array<{ port: number; kind: LocalEndpointKind }> = [
 ];
 
 const SCAN_TIMEOUT_MS = 700;
+const MAX_CATALOG_BYTES = 1024 * 1024;
+const MAX_CATALOG_ROWS = 512;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isModelId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 256 &&
+    value.trim() === value &&
+    !Array.from(value).some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    })
+  );
+}
+
+async function readCatalogJson(response: Response): Promise<unknown> {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_CATALOG_BYTES) {
+    throw new Error("Local model catalog is too large.");
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Local model catalog response has no body.");
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > MAX_CATALOG_BYTES) {
+        await reader.cancel();
+        throw new Error("Local model catalog is too large.");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+}
+
+function rowsFromCatalog(value: unknown, key: string): unknown[] | null {
+  if (!isRecord(value)) return null;
+  const rows = value[key];
+  if (rows === undefined) return [];
+  return Array.isArray(rows) && rows.length <= MAX_CATALOG_ROWS ? rows : null;
+}
 
 /** Friendly display name for a model id (known families, else the raw id). */
 export function friendlyModelName(id: string): string {
@@ -72,42 +130,57 @@ export function friendlyModelName(id: string): string {
 /** Try an Ollama-style probe on a port. Returns models or null. */
 async function probeOllama(port: number): Promise<LocalDetectedModel[] | null> {
   const url = `http://127.0.0.1:${port}/api/tags`;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
-    const res = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
-    window.clearTimeout(timer);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+      redirect: "error",
+    });
     if (!res.ok) return null;
-    const body = (await res.json()) as { models?: Array<{ name?: string; model?: string }> };
-    const list = body.models ?? [];
-    if (!Array.isArray(list) || list.length === 0) return [];
-    return list.map((m) => {
-      const id = m.name ?? m.model ?? "";
-      return id ? { id, name: friendlyModelName(id) } : null;
-    }).filter((m): m is LocalDetectedModel => m !== null);
+    const list = rowsFromCatalog(await readCatalogJson(res), "models");
+    if (!list) return null;
+    if (list.length === 0) return [];
+    return list
+      .map((m) => {
+        if (!isRecord(m)) return null;
+        const id = isModelId(m.name) ? m.name : isModelId(m.model) ? m.model : "";
+        return id ? { id, name: friendlyModelName(id) } : null;
+      })
+      .filter((m): m is LocalDetectedModel => m !== null);
   } catch {
     return null;
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
 /** Try an OpenAI-compatible /v1/models probe on a port. Returns models or null. */
 async function probeOpenAi(port: number): Promise<LocalDetectedModel[] | null> {
   const url = `http://127.0.0.1:${port}/v1/models`;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
-    const res = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
-    window.clearTimeout(timer);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+      redirect: "error",
+    });
     if (!res.ok) return null;
-    const body = (await res.json()) as { data?: Array<{ id?: string }> };
-    const list = body.data ?? [];
-    if (!Array.isArray(list) || list.length === 0) return [];
-    return list.map((m) => {
-      const id = m.id ?? "";
-      return id ? { id, name: friendlyModelName(id) } : null;
-    }).filter((m): m is LocalDetectedModel => m !== null);
+    const list = rowsFromCatalog(await readCatalogJson(res), "data");
+    if (!list) return null;
+    if (list.length === 0) return [];
+    return list
+      .map((m) => {
+        const id = isRecord(m) && isModelId(m.id) ? m.id : "";
+        return id ? { id, name: friendlyModelName(id) } : null;
+      })
+      .filter((m): m is LocalDetectedModel => m !== null);
   } catch {
     return null;
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
@@ -115,18 +188,33 @@ async function probeOpenAi(port: number): Promise<LocalDetectedModel[] | null> {
 async function probePort(port: number, kind: LocalEndpointKind): Promise<LocalEndpoint | null> {
   const ollamaModels = await probeOllama(port);
   if (ollamaModels !== null) {
-    return { id: `local-${port}`, baseUrl: `http://127.0.0.1:${port}`, port, kind: "ollama", name: "Ollama", models: ollamaModels };
+    return {
+      id: `sophos-local-${port}`,
+      baseUrl: `http://127.0.0.1:${port}`,
+      port,
+      kind: "ollama",
+      name: "Ollama",
+      models: ollamaModels,
+    };
   }
   const openAiModels = await probeOpenAi(port);
   if (openAiModels !== null) {
     // Refine the label when the port matches a known family.
-    const kindLabel: LocalEndpointKind = kind === "llama.cpp" || kind === "lm-studio" ? kind : "openai-compatible";
+    const kindLabel: LocalEndpointKind =
+      kind === "llama.cpp" || kind === "lm-studio" ? kind : "openai-compatible";
     const names: Record<string, string> = {
       "llama.cpp": "llama.cpp",
       "lm-studio": "LM Studio",
       "openai-compatible": "OpenAI-compatible server",
     };
-    return { id: `local-${port}`, baseUrl: `http://127.0.0.1:${port}`, port, kind: kindLabel, name: names[kindLabel], models: openAiModels };
+    return {
+      id: `sophos-local-${port}`,
+      baseUrl: `http://127.0.0.1:${port}`,
+      port,
+      kind: kindLabel,
+      name: names[kindLabel],
+      models: openAiModels,
+    };
   }
   return null;
 }
@@ -150,4 +238,64 @@ export async function scanLocalEndpoints(): Promise<LocalEndpoint[]> {
 /** Provider id used when selecting a model from a detected endpoint. */
 export function providerIdFor(endpoint: LocalEndpoint): string {
   return endpoint.id;
+}
+
+export function providerApiBaseUrl(baseUrl: string): string {
+  const normalized = baseUrl.trim().replace(/\/+$/, "");
+  return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
+}
+
+/** Probe a manually entered loopback endpoint and return its currently served models. */
+export async function probeLocalProvider(
+  baseUrl: string,
+  kind: "ollama" | "openai-compatible",
+): Promise<LocalDetectedModel[]> {
+  let base: URL;
+  try {
+    base = new URL(baseUrl);
+  } catch {
+    throw new Error("Enter a valid local URL, such as http://127.0.0.1:11434.");
+  }
+  const hostname = base.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const loopback =
+    hostname === "localhost" ||
+    hostname === "localhost." ||
+    hostname === "::1" ||
+    /^127(?:\.\d{1,3}){3}$/.test(hostname);
+  if (base.protocol !== "http:" || !loopback || base.username || base.password || base.search || base.hash) {
+    throw new Error("Local models must use an HTTP loopback URL (localhost, 127.x.x.x, or ::1).");
+  }
+  const root = base.toString().replace(/\/+$/, "");
+  const apiUrl = kind === "ollama" ? `${root}/api/tags` : `${providerApiBaseUrl(root)}/models`;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 1500);
+  try {
+    const response = await fetch(apiUrl, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+      redirect: "error",
+    });
+    if (!response.ok) throw new Error(`Local model server returned HTTP ${response.status}.`);
+    const rows = rowsFromCatalog(await readCatalogJson(response), kind === "ollama" ? "models" : "data");
+    if (!rows) throw new Error("Local model catalog has an invalid or excessive row list.");
+    const models = rows.flatMap((row) => {
+      if (!isRecord(row)) return [];
+      const id =
+        kind === "ollama"
+          ? isModelId(row.name)
+            ? row.name
+            : isModelId(row.model)
+              ? row.model
+              : ""
+          : isModelId(row.id)
+            ? row.id
+            : "";
+      return id ? [id] : [];
+    });
+    const unique = [...new Set(models)];
+    if (unique.length === 0) throw new Error("No local models were found at that endpoint.");
+    return unique.map((id) => ({ id, name: friendlyModelName(id) }));
+  } finally {
+    window.clearTimeout(timer);
+  }
 }

@@ -12,8 +12,24 @@ import type { AgentRow } from "../useAgents";
 const AGENT: AgentRow = { id: "agent-x", name: "Worker", kind: "daemon", status: "running" };
 
 const MESSAGES: AgentMessage[] = [
-  { id: "m1", fromAgentId: "agent-x", fromAgentName: "Worker", toAgentId: "self", text: "Hello from the child", timestamp: "2026-01-01T10:00:00.000Z", read: false },
-  { id: "m2", fromAgentId: "self", fromAgentName: "You", toAgentId: "agent-x", text: "Please proceed", timestamp: "2026-01-01T10:05:00.000Z", read: true },
+  {
+    id: "m1",
+    fromAgentId: "agent-x",
+    fromAgentName: "Worker",
+    toAgentId: "self",
+    text: "Hello from the child",
+    timestamp: "2026-01-01T10:00:00.000Z",
+    read: false,
+  },
+  {
+    id: "m2",
+    fromAgentId: "self",
+    fromAgentName: "You",
+    toAgentId: "agent-x",
+    text: "Please proceed",
+    timestamp: "2026-01-01T10:05:00.000Z",
+    read: true,
+  },
 ];
 
 function renderThread({

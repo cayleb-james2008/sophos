@@ -79,20 +79,27 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
         .getRuntimeInfo()
         .then((info) => {
           const disabledSet = new Set(disabled ?? []);
-          applySkills((info?.skills ?? [])
-            .filter((sk) => !disabledSet.has(sk.name))
-            .map((sk) => ({ name: sk.name, description: sk.description })));
+          applySkills(
+            (info?.skills ?? [])
+              .filter((sk) => !disabledSet.has(sk.name))
+              .map((sk) => ({ name: sk.name, description: sk.description })),
+          );
         })
         .catch(() => applySkills([]));
     };
-    ipc.getSettings().then((s) => {
-      if (mounted && s.subagentDefaultThinking) setThinking(s.subagentDefaultThinking);
-      fetchSkills(s.disabledSkills ?? []);
-    }).catch(() => {
-      // Settings unavailable — fall back to the runtime skill catalog only.
-      fetchSkills();
-    });
-    return () => { mounted = false; };
+    ipc
+      .getSettings()
+      .then((s) => {
+        if (mounted && s.subagentDefaultThinking) setThinking(s.subagentDefaultThinking);
+        fetchSkills(s.disabledSkills ?? []);
+      })
+      .catch(() => {
+        // Settings unavailable — fall back to the runtime skill catalog only.
+        fetchSkills();
+      });
+    return () => {
+      mounted = false;
+    };
   }, [ipc]);
 
   const toggleSkill = (name: string) => {
@@ -117,7 +124,11 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
         <span className={`ag-compbtn__caret${showComposition ? " ag-compbtn__caret--open" : ""}`}>▸</span>
         Composition
         {thinking !== "medium" ? <span className="ag-compbtn__hint">think {thinking}</span> : null}
-        {selectedSkills.length > 0 ? <span className="ag-compbtn__hint">{selectedSkills.length} skill{selectedSkills.length > 1 ? "s" : ""}</span> : null}
+        {selectedSkills.length > 0 ? (
+          <span className="ag-compbtn__hint">
+            {selectedSkills.length} skill{selectedSkills.length > 1 ? "s" : ""}
+          </span>
+        ) : null}
       </button>
 
       {showComposition ? (
@@ -135,7 +146,9 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
           <div className="ag-comp__skills">
             <label className="ag-comp__label">Skills ({selectedSkills.length} selected)</label>
             {skillsLoading ? (
-              <Text variant="micro" tone="dim">Loading skills…</Text>
+              <Text variant="micro" tone="dim">
+                Loading skills…
+              </Text>
             ) : skills.length > 0 ? (
               <div className="ag-comp__skillgrid">
                 {skills.map((sk) => {
@@ -183,13 +196,7 @@ export function AgentComposer({ agent, draft, setDraft, sending, onSend }: Agent
         <Text variant="micro" tone="dim" mono>
           {draft.length} / 2000
         </Text>
-        <Button
-          className="ag-sendbtn"
-          size="sm"
-          loading={sending}
-          disabled={!canSend}
-          onClick={onSend}
-        >
+        <Button className="ag-sendbtn" size="sm" loading={sending} disabled={!canSend} onClick={onSend}>
           Send
         </Button>
       </div>

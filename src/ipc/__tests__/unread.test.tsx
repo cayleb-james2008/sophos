@@ -127,7 +127,10 @@ describe("UnreadProvider", () => {
     await waitFor(() => expect(screen.getByTestId("count").textContent).toBe("1"));
 
     // Agent list refreshed — now two messages are unread.
-    (mockState.client.listInbox as ReturnType<typeof vi.fn>).mockResolvedValue([from("child-1"), from("child-2")]);
+    (mockState.client.listInbox as ReturnType<typeof vi.fn>).mockResolvedValue([
+      from("child-1"),
+      from("child-2"),
+    ]);
     act(() => {
       mockState.fire({ type: "agent_list", agents: [] });
     });

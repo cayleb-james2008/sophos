@@ -23,7 +23,14 @@ vi.mock("../../graph", async () => ({
   GraphFlow: ({ nodes, edges, children }: any) => (
     <div data-testid="graph-flow" data-nodes={nodes.length} data-edges={edges.length}>
       {nodes.map((n: any) => (
-        <div key={n.id} data-testid={`node-${n.id}`} data-kind={n.data?.kind} data-status={n.data?.status} data-label={n.data?.label} data-mono={n.data?.mono}>
+        <div
+          key={n.id}
+          data-testid={`node-${n.id}`}
+          data-kind={n.data?.kind}
+          data-status={n.data?.status}
+          data-label={n.data?.label}
+          data-mono={n.data?.mono}
+        >
           {n.data?.label}
         </div>
       ))}
@@ -35,7 +42,13 @@ vi.mock("../../graph", async () => ({
   dagreLayout: (nodes: any[]) => new Map(nodes.map((n) => [n.id, { x: 0, y: 0 }])),
 }));
 
-const worker: RlmChild = { id: "w-1", name: "api-reviewer", status: "running", parentId: "daemon", summary: "reviewing" };
+const worker: RlmChild = {
+  id: "w-1",
+  name: "api-reviewer",
+  status: "running",
+  parentId: "daemon",
+  summary: "reviewing",
+};
 
 describe("EngineGraph", () => {
   it("builds sidecar, daemon, and worker nodes", () => {

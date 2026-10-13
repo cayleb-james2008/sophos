@@ -36,7 +36,10 @@ describe("simulateResponse — browser-preview path follows the draft", () => {
     vi.useRealTimers();
   });
 
-  function runSim(userText: string, profile: string | import("../../profiles/profiles").AgentProfile | undefined) {
+  function runSim(
+    userText: string,
+    profile: string | import("../../profiles/profiles").AgentProfile | undefined,
+  ) {
     let msgs: TranscriptMessage[] = [];
     let done = 0;
     const cleanup = simulateResponse(
@@ -93,7 +96,15 @@ describe("simulateResponse — browser-preview path follows the draft", () => {
   });
 
   it("the Gauntlet profile object keeps its exact status block", () => {
-    const { cleanup, get } = runSim("hi", { id: "gauntlet", name: "Gauntlet", tagline: "Goal + bar first", description: "", workingStyle: [], systemPrompt: "", mode: "standard" });
+    const { cleanup, get } = runSim("hi", {
+      id: "gauntlet",
+      name: "Gauntlet",
+      tagline: "Goal + bar first",
+      description: "",
+      workingStyle: [],
+      systemPrompt: "",
+      mode: "standard",
+    });
     vi.advanceTimersByTime(20000);
     expect(get().msgs[0].content).toContain("Status — demo run");
     expect(get().msgs[0].content).toContain("Verified —");
@@ -145,7 +156,9 @@ describe("MockIpcClient — Tauri demo-shell path follows the draft", () => {
 
   it("resolves a persisted custom profile from settings and flavors the answer", async () => {
     const { client, events } = await freshClient();
-    await client.setSettings({ customProfiles: [customProfile()] } as unknown as import("../../../ipc/contract").Settings);
+    await client.setSettings({
+      customProfiles: [customProfile()],
+    } as unknown as import("../../../ipc/contract").Settings);
     await client.prompt("hello", { profile: "custom-abc" });
     await vi.advanceTimersByTimeAsync(30000);
     const text = textOf(events);
@@ -158,7 +171,12 @@ describe("MockIpcClient — Tauri demo-shell path follows the draft", () => {
     const { client, events } = await freshClient();
     await client.prompt("hello", {
       profile: "custom-draft",
-      profileFlavor: { name: "Draft Bot", tagline: "Draft tagline", workingStyle: ["Draft chip"], mode: "creator" },
+      profileFlavor: {
+        name: "Draft Bot",
+        tagline: "Draft tagline",
+        workingStyle: ["Draft chip"],
+        mode: "creator",
+      },
     });
     await vi.advanceTimersByTimeAsync(30000);
     const text = textOf(events);
@@ -171,7 +189,10 @@ describe("MockIpcClient — Tauri demo-shell path follows the draft", () => {
 
   it("leaves built-in (non-gauntlet) profiles unflavored", async () => {
     const { client, events } = await freshClient();
-    await client.prompt("hello", { profile: "minimal", profileFlavor: { name: "Minimal", tagline: "", workingStyle: [], mode: "minimal" } });
+    await client.prompt("hello", {
+      profile: "minimal",
+      profileFlavor: { name: "Minimal", tagline: "", workingStyle: [], mode: "minimal" },
+    });
     await vi.advanceTimersByTimeAsync(30000);
     const text = textOf(events);
     expect(text).not.toContain("custom profile");

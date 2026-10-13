@@ -1,12 +1,12 @@
 {
-  "version": "0.6.0",
-  "notes": "Sophos v0.6.0 (Beta) — demo mode for testing without a live provider, cua-driver e2e test harness (6 suites), 12 bug fixes from the computer-use testing pass, Engine Terminal demo mode. 984 unit tests. All versions before v1.0 are beta.",
-  "pub_date": "2026-08-16T00:00:00Z",
+  "version": "0.8.0",
+  "notes": "Sophos v0.8.0 (Beta) — enforced lint/format gate, stale session-lease recovery, reliability dispositions record, no untyped `any` in production code, and two real Rules-of-Hooks fixes. 1119 unit tests, 25 Rust tests, 8/8 cua-driver e2e suites green. All versions before v1.0 are beta.",
+  "pub_date": "2026-08-17T00:00:00Z",
   "channel": "beta",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcFljekNVYWQwYSt1QnFTRmpybyswTzhLVGx3S2tCcmhZVGF0Q3gvSGxlVEJYdkNlbmtOUlNtRUgzL0MwUElxUytTMGdqN0g5QlZrY3FHWEFQbmNJWXdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2ODQyOTIwCWZpbGU6U29waG9zXzAuNi4wX3g2NC1zZXR1cC5leGUKN1FOM3BDak14djNDclNBUmRLVlRXNnkxcGg1dTIrQjU4TzNkekxTNGVLQTRhR1JNNFRQZklYSk1CZ3JnY1ZBeWEwRDFGSnQxU2lBdkM2ZEtBNkFIQlE9PQo=",
-      "url": "https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.6.0/Sophos_0.6.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTN1ltVTJRTmxFcFY0SlRCb0VYY2g2bk82b2VVbHIyNG1rQW9XNHV2YkhEREFFRm5yOFRhaVpCQk1oSGpWOTFrcEVianMwUmtLMFM3YmE0SWpYOElEQUp5UDBQTWVUNlFzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg2OTkzNzg5CWZpbGU6U29waG9zXzAuOC4wX3g2NC1zZXR1cC5leGUKK1hVMlJiekxxbDNnVTRBeHF3dmJHSlorSHFVN2k1T1dRUUZNdU5LS3BkbG1ENzRTSTF0cnB3RDFCK1ZqY2JGekFhTWFzTWRuMDRISFE4anVNZGtMQVE9PQo=",
+      "url": "https://gitlab.com/api/v4/projects/85429532/packages/generic/sophos/0.8.0/Sophos_0.8.0_x64-setup.exe"
     }
   }
 }

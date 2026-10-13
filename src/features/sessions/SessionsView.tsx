@@ -59,7 +59,7 @@ export function SessionsView() {
       const list = await ipc.listSessions();
       setSessions(list);
       const ids = list.map((s) => s.id);
-      setSelectedId((cur) => (cur && ids.includes(cur) ? cur : list[0]?.id ?? null));
+      setSelectedId((cur) => (cur && ids.includes(cur) ? cur : (list[0]?.id ?? null)));
       const next: Record<string, SessionEnrichment> = {};
       await Promise.all(
         ids.map(async (id) => {
@@ -85,7 +85,6 @@ export function SessionsView() {
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ipc, conn.activeSessionId, conn.goals, conn.rlmChildren]);
 
   useEffect(() => {
@@ -197,13 +196,18 @@ export function SessionsView() {
           <Text variant="micro" tone="warning">
             {actionError}
           </Text>
-          <IconButton className="sessions__dismiss" title="Dismiss" size="sm" onClick={() => setActionError(undefined)}>
+          <IconButton
+            className="sessions__dismiss"
+            title="Dismiss"
+            size="sm"
+            onClick={() => setActionError(undefined)}
+          >
             ✕
           </IconButton>
         </div>
       )}
 
-        {/* Toolbar: view switch + filter + actions on one restrained row */}
+      {/* Toolbar: view switch + filter + actions on one restrained row */}
       <div className="sessions__toolbar">
         {/* View switch: graph vs context tree */}
         <div className="sessions__modeswitch" role="tablist" aria-label="Session view">
@@ -267,7 +271,12 @@ export function SessionsView() {
 
         {/* Actions */}
         <div className="sessions__actions">
-          <Button variant="ghost" icon={<RefreshIcon size={14} />} onClick={() => void refresh()} loading={loading}>
+          <Button
+            variant="ghost"
+            icon={<RefreshIcon size={14} />}
+            onClick={() => void refresh()}
+            loading={loading}
+          >
             Refresh
           </Button>
           <Button variant="primary" icon={<PlusIcon size={14} />} onClick={handleNew} disabled={daemonDown}>
@@ -309,7 +318,11 @@ export function SessionsView() {
                   <div className="sessions__graphblank__card">
                     <b>Sessions unavailable</b>
                     <span>{error}</span>
-                    <Button variant="ghost" className="sessions__graphblank__link" onClick={() => void refresh()}>
+                    <Button
+                      variant="ghost"
+                      className="sessions__graphblank__link"
+                      onClick={() => void refresh()}
+                    >
                       Try again
                     </Button>
                   </div>
@@ -319,7 +332,14 @@ export function SessionsView() {
                   <div className="sessions__graphblank__card">
                     <b>No sessions match your filter</b>
                     <span>Try a different name or status.</span>
-                    <Button variant="ghost" className="sessions__graphblank__link" onClick={() => { setFilter(""); setStatusFilter("all"); }}>
+                    <Button
+                      variant="ghost"
+                      className="sessions__graphblank__link"
+                      onClick={() => {
+                        setFilter("");
+                        setStatusFilter("all");
+                      }}
+                    >
                       Clear filter
                     </Button>
                   </div>
@@ -328,7 +348,11 @@ export function SessionsView() {
                 <div className="sessions__graphblank">
                   <div className="sessions__graphblank__card">
                     <b>No sessions in range</b>
-                    <span>{daemonDown ? "Start the daemon, then refresh." : "Create a session to begin persistent work."}</span>
+                    <span>
+                      {daemonDown
+                        ? "Start the daemon, then refresh."
+                        : "Create a session to begin persistent work."}
+                    </span>
                     {!daemonDown && (
                       <Button variant="ghost" className="sessions__graphblank__link" onClick={handleNew}>
                         New session
@@ -358,7 +382,11 @@ export function SessionsView() {
 
         {/* Backdrop — only meaningful below 900px when the inspector is an
             overlay (CSS-gated). Clicking it dismisses the inspector. */}
-        <div className="sessions__inspector-backdrop" onClick={() => setInspectorOpen(false)} aria-hidden="true" />
+        <div
+          className="sessions__inspector-backdrop"
+          onClick={() => setInspectorOpen(false)}
+          aria-hidden="true"
+        />
 
         <div className="sessions__detailwrap" id="session-inspector">
           {/* Close control — only rendered below 900px overlay mode (CSS-gated). */}
@@ -383,7 +411,9 @@ export function SessionsView() {
             <div className="detail__empty">
               <div className="radar">◈</div>
               <b>Select a session</b>
-              <p>Choose a session node in the graph to inspect its telemetry, transcript, goals, and subagents.</p>
+              <p>
+                Choose a session node in the graph to inspect its telemetry, transcript, goals, and subagents.
+              </p>
             </div>
           )}
         </div>
@@ -403,7 +433,13 @@ function ChevronGlyph({ dir }: { dir: "left" | "right" }) {
       aria-hidden
       style={dir === "right" ? { transform: "rotate(180deg)" } : undefined}
     >
-      <path d="M15 5l-7 7 7 7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M15 5l-7 7 7 7"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

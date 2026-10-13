@@ -6,21 +6,35 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, Spinner, Select, Button } from "../../design";
-import { useConnectionState } from "../../ipc/client";
-import { useModels, DEFAULT_PROVIDER, DEFAULT_MODEL, type ModelSelection, type ThinkingLevel } from "./useModels";
+import { isTauri, useConnectionState, useIpc } from "../../ipc/client";
+import {
+  useModels,
+  DEFAULT_PROVIDER,
+  DEFAULT_MODEL,
+  type ModelSelection,
+  type ThinkingLevel,
+} from "./useModels";
 import { ProviderGlyph } from "./providerGlyphs";
-import { scanLocalEndpoints, providerIdFor, type LocalEndpoint } from "./localDetection";
+import { scanLocalEndpoints, providerIdFor, providerApiBaseUrl, type LocalEndpoint } from "./localDetection";
+import type { Settings } from "../../ipc/contract";
 import "./providers.css";
 
-function currentSelection(stateModel: { provider: string; model: string; thinking?: string } | undefined): ModelSelection {
+function currentSelection(
+  stateModel: { provider: string; model: string; thinking?: string } | undefined,
+): ModelSelection {
   if (stateModel && stateModel.provider && stateModel.model) {
-    return { provider: stateModel.provider, model: stateModel.model, thinking: stateModel.thinking as ThinkingLevel | undefined };
+    return {
+      provider: stateModel.provider,
+      model: stateModel.model,
+      thinking: stateModel.thinking as ThinkingLevel | undefined,
+    };
   }
   return { provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL };
 }
 
 export function ModelSelector() {
   const state = useConnectionState();
+  const ipc = useIpc();
   const { providers, models, loading, error, setModel, thinking, setThinking, thinkingLevels } = useModels();
   const [open, setOpen] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -95,7 +109,24 @@ export function ModelSelector() {
       return;
     }
     setApplying(true);
-    await setModel(providerIdFor(endpoint), modelId, undefined);
+    const provider = isTauri ? providerIdFor(endpoint) : "local";
+    if (isTauri) {
+      const settings = await ipc.getSettings().catch(() => ({}) as Settings);
+      await ipc.setSettings({
+        ...settings,
+        localProviders: [
+          ...(settings.localProviders ?? []).filter((entry) => entry.id !== provider),
+          {
+            id: provider,
+            name: endpoint.name,
+            baseUrl: providerApiBaseUrl(endpoint.baseUrl),
+            kind: endpoint.kind === "ollama" ? "ollama" : "openai-compatible",
+            models: endpoint.models,
+          },
+        ],
+      });
+    }
+    await setModel(provider, modelId, undefined);
     setApplying(false);
     setOpen(false);
   };
@@ -129,7 +160,7 @@ export function ModelSelector() {
             {currentModel?.name ?? current.model}
           </Text>
         </span>
-          {applying ? (
+        {applying ? (
           <Spinner size={12} />
         ) : (
           <svg
@@ -150,11 +181,7 @@ export function ModelSelector() {
 
       {/* Panel */}
       {open ? (
-        <div
-          role="listbox"
-          aria-label="Model selector"
-          className="ms-panel"
-        >
+        <div role="listbox" aria-label="Model selector" className="ms-panel">
           <div className="ms-panelhead">
             <Text variant="micro" tone="dim" mono uppercase>
               Model
@@ -206,7 +233,11 @@ export function ModelSelector() {
                       className={`ms-option${isCurrent ? " ms-option--current" : ""}`}
                     >
                       <span className="ms-optionmain">
-                        <Text variant="label" weight={isCurrent ? "semibold" : "medium"} tone={isCurrent ? "default" : "muted"}>
+                        <Text
+                          variant="label"
+                          weight={isCurrent ? "semibold" : "medium"}
+                          tone={isCurrent ? "default" : "muted"}
+                        >
                           {m.name ?? m.id}
                         </Text>
                         {m.contextWindow ? (
@@ -217,7 +248,16 @@ export function ModelSelector() {
                         ) : null}
                       </span>
                       {isCurrent ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--pa-green-hover)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--pa-green-hover)"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       ) : null}
@@ -232,7 +272,16 @@ export function ModelSelector() {
           <div className="ms-local">
             <div className="ms-localhead">
               <span className="ms-localicon" aria-hidden="true">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <rect x="2" y="4" width="20" height="14" rx="2" />
                   <line x1="8" y1="22" x2="16" y2="22" />
                   <line x1="12" y1="18" x2="12" y2="22" />
@@ -243,7 +292,14 @@ export function ModelSelector() {
               </Text>
               <span className="ms-localactions">
                 {scanning ? <Spinner size={11} /> : null}
-                <Button variant="ghost" size="sm" className="ms-rescan" onClick={() => void rescan()} disabled={scanning} title="Rescan for local model servers">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ms-rescan"
+                  onClick={() => void rescan()}
+                  disabled={scanning}
+                  title="Rescan for local model servers"
+                >
                   Rescan
                 </Button>
               </span>
@@ -251,12 +307,15 @@ export function ModelSelector() {
 
             {scanning ? (
               <div className="ms-pad">
-                <Text variant="label" tone="muted">Scanning localhost for model servers…</Text>
+                <Text variant="label" tone="muted">
+                  Scanning localhost for model servers…
+                </Text>
               </div>
             ) : localEndpoints.length === 0 ? (
               <div className="ms-pad">
                 <Text variant="label" tone="muted">
-                  No local servers found. Start Ollama, LM Studio, llama.cpp, or any OpenAI-compatible server, then rescan.
+                  No local servers found. Start Ollama, LM Studio, llama.cpp, or any OpenAI-compatible server,
+                  then rescan.
                 </Text>
               </div>
             ) : (
@@ -269,11 +328,14 @@ export function ModelSelector() {
                   </div>
                   {endpoint.models.length === 0 ? (
                     <div className="ms-pad">
-                      <Text variant="micro" tone="dim">Connected — no models reported.</Text>
+                      <Text variant="micro" tone="dim">
+                        Connected — no models reported.
+                      </Text>
                     </div>
                   ) : (
                     endpoint.models.map((m) => {
-                      const isCurrent = current.provider === providerIdFor(endpoint) && current.model === m.id;
+                      const isCurrent =
+                        current.provider === providerIdFor(endpoint) && current.model === m.id;
                       return (
                         <Button
                           key={`${endpoint.id}:${m.id}`}
@@ -285,7 +347,11 @@ export function ModelSelector() {
                           className={`ms-option${isCurrent ? " ms-option--current" : ""}`}
                         >
                           <span className="ms-optionmain">
-                            <Text variant="label" weight={isCurrent ? "semibold" : "medium"} tone={isCurrent ? "default" : "muted"}>
+                            <Text
+                              variant="label"
+                              weight={isCurrent ? "semibold" : "medium"}
+                              tone={isCurrent ? "default" : "muted"}
+                            >
                               {m.name}
                             </Text>
                             <Text variant="micro" tone="dim" mono>
@@ -293,7 +359,16 @@ export function ModelSelector() {
                             </Text>
                           </span>
                           {isCurrent ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--pa-green-hover)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="var(--pa-green-hover)"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
                           ) : null}
@@ -308,7 +383,8 @@ export function ModelSelector() {
             {lastScan ? (
               <div className="ms-lastscan">
                 <Text variant="micro" tone="dim" mono>
-                  last scan {lastScan.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  last scan{" "}
+                  {lastScan.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                 </Text>
               </div>
             ) : null}
@@ -318,7 +394,16 @@ export function ModelSelector() {
             <div className="ms-thinking">
               <div className="ms-thinkinghead">
                 <span className="ms-thinkingicon">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M9 18h6" />
                     <path d="M12 12v6" />
                     <circle cx="12" cy="12" r="10" />

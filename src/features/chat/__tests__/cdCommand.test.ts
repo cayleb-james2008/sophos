@@ -5,11 +5,7 @@
 // same filter the autocomplete dropdown and Enter-insertion use.
 
 import { describe, expect, it } from "vitest";
-import {
-  CLIENT_SIDE_COMMANDS,
-  mergeClientSideCommands,
-  filterSlashCommands,
-} from "../SlashAutocomplete";
+import { CLIENT_SIDE_COMMANDS, mergeClientSideCommands, filterSlashCommands } from "../SlashAutocomplete";
 import type { SlashCommand } from "../../../ipc/contract";
 
 const DAEMON_COMMANDS: SlashCommand[] = [

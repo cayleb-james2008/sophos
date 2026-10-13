@@ -66,7 +66,10 @@ describe("useSideQuestions", () => {
     const id = result.current.sideQuestions[0].id;
 
     act(() => {
-      mockState.fire({ type: "session_event", event: { kind: "side_question_event", id, status: "complete" } });
+      mockState.fire({
+        type: "session_event",
+        event: { kind: "side_question_event", id, status: "complete" },
+      });
     });
     expect(result.current.sideQuestions[0].status).toBe("complete");
   });
@@ -93,7 +96,10 @@ describe("useSideQuestions", () => {
     const { result } = renderHook(() => useSideQuestions());
     act(() => result.current.askSideQuestion("side", "q"));
     act(() => {
-      mockState.fire({ type: "session_event", event: { kind: "side_question_event", id: "nope", status: "complete" } });
+      mockState.fire({
+        type: "session_event",
+        event: { kind: "side_question_event", id: "nope", status: "complete" },
+      });
       mockState.fire({ type: "session_event", event: { kind: "text", text: "hi" } });
       mockState.fire({ type: "connection_status" });
     });

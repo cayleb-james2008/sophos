@@ -49,8 +49,22 @@ vi.mock("../../graph", async () => ({
   dagreLayout: (nodes: any[]) => new Map(nodes.map((n) => [n.id, { x: 0, y: 0 }])),
 }));
 
-const daemon: AgentRow = { id: "a-1", name: "Reviewer", kind: "daemon", status: "running", summary: "checking PRs", model: "deepseek" };
-const rlm: AgentRow = { id: "r-1", name: "critic", kind: "rlm", status: "done", parentId: "a-1", summary: "reviewed" };
+const daemon: AgentRow = {
+  id: "a-1",
+  name: "Reviewer",
+  kind: "daemon",
+  status: "running",
+  summary: "checking PRs",
+  model: "deepseek",
+};
+const rlm: AgentRow = {
+  id: "r-1",
+  name: "critic",
+  kind: "rlm",
+  status: "done",
+  parentId: "a-1",
+  summary: "reviewed",
+};
 
 const connected: ConnectionStatus = { kind: "connected" };
 

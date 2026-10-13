@@ -67,7 +67,14 @@ export function filterSlashCommands(commands: SlashCommand[], query: string): Sl
     });
 }
 
-export function SlashAutocomplete({ commands, query, onSelect, onDismiss: _onDismiss, selectedIndex, onSelectedIndexChange }: Props) {
+export function SlashAutocomplete({
+  commands,
+  query,
+  onSelect,
+  onDismiss: _onDismiss,
+  selectedIndex,
+  onSelectedIndexChange,
+}: Props) {
   const matches = useMemo(() => filterSlashCommands(commands, query), [commands, query]);
 
   if (matches.length === 0) return null;
@@ -89,18 +96,12 @@ export function SlashAutocomplete({ commands, query, onSelect, onDismiss: _onDis
             onClick={() => onSelect(cmd)}
             onMouseDown={(e) => e.preventDefault()}
           >
-            <span className="slash-autocomplete-name">
-              /{cmd.name}
-            </span>
+            <span className="slash-autocomplete-name">/{cmd.name}</span>
             <span className="slash-autocomplete-desc">{cmd.description}</span>
           </button>
         );
       })}
-      {matches.length > 8 ? (
-        <div className="slash-autocomplete-more">
-          {matches.length - 8} more…
-        </div>
-      ) : null}
+      {matches.length > 8 ? <div className="slash-autocomplete-more">{matches.length - 8} more…</div> : null}
     </div>
   );
 }

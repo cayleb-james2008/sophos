@@ -54,7 +54,7 @@ const FALLBACK_MAX: Record<string, { contextWindow: number; maxOutputTokens: num
 
 function asThinkingLevel(value: unknown): ThinkingLevel | undefined {
   return typeof value === "string" && THINKING_LEVELS.some((level) => level.value === value)
-    ? value as ThinkingLevel
+    ? (value as ThinkingLevel)
     : undefined;
 }
 
@@ -79,10 +79,17 @@ const LOCAL_MODEL: ModelInfo = {
 };
 
 /** Apply overrides + append the mock local model when a local provider is connected. */
-function modelsForCatalog(mods: ModelInfo[], overrides: Record<string, ModelRuntimeConfig>, localConnected: boolean): ModelInfo[] {
+function modelsForCatalog(
+  mods: ModelInfo[],
+  overrides: Record<string, ModelRuntimeConfig>,
+  localConnected: boolean,
+): ModelInfo[] {
   const base = mods.map((m) => withEffectiveConfig(m, overrides[modelKey(m.provider, m.id)]));
   if (!localConnected) return base;
-  return [...base, withEffectiveConfig(LOCAL_MODEL, overrides[modelKey(LOCAL_MODEL.provider, LOCAL_MODEL.id)])];
+  return [
+    ...base,
+    withEffectiveConfig(LOCAL_MODEL, overrides[modelKey(LOCAL_MODEL.provider, LOCAL_MODEL.id)]),
+  ];
 }
 
 /** Clamp a token value into [min, max], returning a safe integer. */
@@ -134,7 +141,7 @@ export function useModels() {
       const savedThinking = asThinkingLevel(settings?.defaultThinking);
       if (savedThinking) setThinking(savedThinking);
       setProviders(provs);
-      const localConnected = !isTauri && !!(settings?.localProviders?.length);
+      const localConnected = !isTauri && !!settings?.localProviders?.length;
       setModels(modelsForCatalog(mods, overrides, localConnected));
       setError(null);
     } catch (err) {
@@ -154,7 +161,7 @@ export function useModels() {
         const savedThinking = asThinkingLevel(settings?.defaultThinking);
         if (savedThinking) setThinking(savedThinking);
         setProviders(provs);
-        const localConnected = !isTauri && !!(settings?.localProviders?.length);
+        const localConnected = !isTauri && !!settings?.localProviders?.length;
         setModels(modelsForCatalog(mods, overrides, localConnected));
         setError(null);
       })
@@ -192,7 +199,9 @@ export function useModels() {
     async (provider: string, model: string, runtime: ModelRuntimeConfig) => {
       const key = modelKey(provider, model);
       // Optimistic local update so the UI reflects the change immediately.
-      setModels((prev) => prev.map((m) => (m.provider === provider && m.id === model ? withEffectiveConfig(m, runtime) : m)));
+      setModels((prev) =>
+        prev.map((m) => (m.provider === provider && m.id === model ? withEffectiveConfig(m, runtime) : m)),
+      );
       setError(null);
       try {
         const settings = await client.getSettings().catch(() => undefined);
@@ -220,11 +229,14 @@ export function useModels() {
       const ceil = modelInfo
         ? {
             contextWindow: modelInfo.maxContextWindow ?? modelInfo.contextWindow ?? DEFAULT_MAX_CONTEXT,
-            maxOutputTokens: modelInfo.maxOutputTokensCeiling ?? modelInfo.maxOutputTokens ?? DEFAULT_MAX_OUTPUT,
+            maxOutputTokens:
+              modelInfo.maxOutputTokensCeiling ?? modelInfo.maxOutputTokens ?? DEFAULT_MAX_OUTPUT,
           }
         : undefined;
       // Optimistic local update back to the ceiling.
-      setModels((prev) => prev.map((m) => (m.provider === provider && m.id === model ? withEffectiveConfig(m, undefined) : m)));
+      setModels((prev) =>
+        prev.map((m) => (m.provider === provider && m.id === model ? withEffectiveConfig(m, undefined) : m)),
+      );
       setError(null);
       try {
         const settings = await client.getSettings().catch(() => undefined);
@@ -237,9 +249,7 @@ export function useModels() {
         // writes the ceiling into ~/.prime/agent/models.json, then setModel reloads
         // the daemon catalog). Passing an empty runtime would skip the models.json
         // write and leave the previously-lowered override active in the engine.
-        await client
-          .setModel(provider, model, thinking, ceil ?? {})
-          .catch(() => undefined);
+        await client.setModel(provider, model, thinking, ceil ?? {}).catch(() => undefined);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
@@ -247,5 +257,17 @@ export function useModels() {
     [client, thinking, models],
   );
 
-  return { providers, models, loading, error, reload, setModel, setModelConfig, resetModelConfig, thinking, setThinking, thinkingLevels: THINKING_LEVELS };
+  return {
+    providers,
+    models,
+    loading,
+    error,
+    reload,
+    setModel,
+    setModelConfig,
+    resetModelConfig,
+    thinking,
+    setThinking,
+    thinkingLevels: THINKING_LEVELS,
+  };
 }

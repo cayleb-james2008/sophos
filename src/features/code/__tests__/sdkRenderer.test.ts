@@ -13,7 +13,12 @@ import { BUILTIN_TOOLS, type ToolRegistryEntry } from "../toolRegistry";
 import { renderSdk, renderStub, toIdent, toParamType, propType } from "../sdkRenderer";
 
 const EXTRA: ToolRegistryEntry[] = [
-  { name: "create_issue", description: "Create a GitHub issue", category: "extension", source: "github-integration" },
+  {
+    name: "create_issue",
+    description: "Create a GitHub issue",
+    category: "extension",
+    source: "github-integration",
+  },
   { name: "fetch", description: "MCP tool from filesystem", category: "mcp", source: "filesystem" },
   { name: "release-audit", description: "Audit a release artifact", category: "skill", source: "project" },
 ];
@@ -75,7 +80,9 @@ describe("propType / toParamType", () => {
   it("degrades malformed schemas to a permissive contract", () => {
     expect(toParamType(undefined)).toBe("Record<string, unknown>");
     expect(toParamType({ type: "array" })).toBe("unknown");
-    expect(toParamType({ type: "object", properties: "nope" as unknown as Record<string, never> })).toBe("Record<string, unknown>");
+    expect(toParamType({ type: "object", properties: "nope" as unknown as Record<string, never> })).toBe(
+      "Record<string, unknown>",
+    );
     expect(toParamType({ type: "object", properties: {} })).toBe("Record<string, unknown>");
     expect(toParamType(null as unknown as undefined)).toBe("Record<string, unknown>");
   });
@@ -130,8 +137,16 @@ describe("renderSdk degradation", () => {
     const nasty: ToolRegistryEntry[] = [
       { name: "no_schema", category: "builtin" },
       { name: "bad_schema", category: "builtin", schema: { type: "array" } },
-      { name: "nasty_schema", category: "builtin", schema: { type: "object", properties: { x: { type: "date" } } } },
-      { name: "quoted_key", category: "builtin", schema: { type: "object", properties: { "a-b": { type: "string" } } } },
+      {
+        name: "nasty_schema",
+        category: "builtin",
+        schema: { type: "object", properties: { x: { type: "date" } } },
+      },
+      {
+        name: "quoted_key",
+        category: "builtin",
+        schema: { type: "object", properties: { "a-b": { type: "string" } } },
+      },
     ];
     const source = renderSdk(nasty);
     expect(source).toContain("noSchema");
@@ -145,7 +160,10 @@ describe("renderSdk degradation", () => {
       { name: "a" },
       { name: "b", schema: null as unknown as undefined },
       { name: "c", schema: { type: "object", properties: { p: null as unknown as undefined } } },
-      { name: "d", schema: { type: "object", properties: { p: { items: { type: 42 as unknown as string } } } } },
+      {
+        name: "d",
+        schema: { type: "object", properties: { p: { items: { type: 42 as unknown as string } } } },
+      },
     ] as ToolRegistryEntry[];
     for (const shape of shapes) {
       expect(() => renderStub(shape, new Set())).not.toThrow();
@@ -183,7 +201,9 @@ describe("type-stripped contract", () => {
 
   it("typed and stripped variants declare the same tools", () => {
     const typed = [...renderSdk(entries).matchAll(/export async function (\w+)\(/g)].map((m) => m[1]);
-    const stripped = [...renderSdk(entries, { stripTypes: true }).matchAll(/export async function (\w+)\(/g)].map((m) => m[1]);
+    const stripped = [
+      ...renderSdk(entries, { stripTypes: true }).matchAll(/export async function (\w+)\(/g),
+    ].map((m) => m[1]);
     expect(stripped).toEqual(typed);
   });
 });

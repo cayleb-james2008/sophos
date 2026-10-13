@@ -36,6 +36,7 @@ function socketPathFromArgs(args: readonly string[] = process.argv.slice(2)): st
 async function main(): Promise<void> {
   // Declare server first so the holder's onEvent callback can close over it
   // without a temporal-dead-zone trap if either order is ever swapped.
+  // eslint-disable-next-line prefer-const -- intentional two-phase init: `server` is assigned after `holder` is constructed.
   let server: RpcServer | undefined;
 
   // The bridge normally follows the daemon's default socket. Verification
@@ -95,6 +96,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  log(`fatal: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
+  log(`fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
   process.exit(1);
 });

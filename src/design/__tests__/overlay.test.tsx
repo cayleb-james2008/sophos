@@ -188,7 +188,7 @@ describe("ErrorBoundary", () => {
     };
     render(
       <ErrorBoundary label="Outer">
-        <ErrorBoundary label={<ThrowingLabel /> as unknown as string}>
+        <ErrorBoundary label={(<ThrowingLabel />) as unknown as string}>
           <Bomb />
         </ErrorBoundary>
       </ErrorBoundary>,

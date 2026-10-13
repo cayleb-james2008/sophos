@@ -45,14 +45,20 @@ export function InboxThread({ agent, messages, unreadCount, onMarkRead, onMarkAl
           <div className="ag-thread__welcome">
             <div className="ag-glyph">◈</div>
             <h2>Agent relay standing by</h2>
-            <p>Select an agent from the rail to inspect its thread and coordinate work. Incoming messages surface instantly with unread priority.</p>
+            <p>
+              Select an agent from the rail to inspect its thread and coordinate work. Incoming messages
+              surface instantly with unread priority.
+            </p>
             <span>WAITING FOR SIGNAL</span>
           </div>
         ) : messages.length === 0 ? (
           <div className="ag-thread__empty">
             <div className="ag-glyph">↗</div>
             <h2>Open a coordination line</h2>
-            <p>Send a precise brief, request an update, or hand off a bounded task. Replies arrive here in real time.</p>
+            <p>
+              Send a precise brief, request an update, or hand off a bounded task. Replies arrive here in real
+              time.
+            </p>
           </div>
         ) : (
           messages.map((m) => {
@@ -60,9 +66,10 @@ export function InboxThread({ agent, messages, unreadCount, onMarkRead, onMarkAl
             return (
               <article className={`ag-message ${outgoing ? "ag-message--out" : ""}`} key={m.id}>
                 <div className="ag-message__label">
-                  <b>{outgoing ? "YOU" : m.fromAgentName ?? target}</b>
+                  <b>{outgoing ? "YOU" : (m.fromAgentName ?? target)}</b>
                   <span>
-                    {m.timestamp ? formatDate(m.timestamp) : ""} {outgoing ? "" : !m.read ? "· UNREAD" : "· READ"}
+                    {m.timestamp ? formatDate(m.timestamp) : ""}{" "}
+                    {outgoing ? "" : !m.read ? "· UNREAD" : "· READ"}
                   </span>
                   {!outgoing && !m.read ? (
                     <IconButton

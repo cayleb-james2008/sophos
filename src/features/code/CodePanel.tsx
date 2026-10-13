@@ -35,11 +35,16 @@ function formatTime(iso: string): string {
 
 function categoryLabel(entry: ToolRegistryEntry): string {
   switch (entry.category) {
-    case "builtin": return "built-in";
-    case "extension": return `extension${entry.source ? ` · ${entry.source}` : ""}`;
-    case "mcp": return `mcp${entry.source ? ` · ${entry.source}` : ""}`;
-    case "skill": return `skill${entry.source ? ` · ${entry.source}` : ""}`;
-    default: return entry.category;
+    case "builtin":
+      return "built-in";
+    case "extension":
+      return `extension${entry.source ? ` · ${entry.source}` : ""}`;
+    case "mcp":
+      return `mcp${entry.source ? ` · ${entry.source}` : ""}`;
+    case "skill":
+      return `skill${entry.source ? ` · ${entry.source}` : ""}`;
+    default:
+      return entry.category;
   }
 }
 
@@ -77,9 +82,12 @@ export function CodePanel() {
     };
   }, [codeOpen, ipc]);
 
-  useEffect(() => () => {
-    if (copyTimer.current) window.clearTimeout(copyTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (copyTimer.current) window.clearTimeout(copyTimer.current);
+    },
+    [],
+  );
 
   const sdkSource = useMemo(() => (registry ? renderSdk(registry) : ""), [registry]);
   const counts = useMemo(() => (registry ? countByCategory(registry) : null), [registry]);
@@ -102,7 +110,13 @@ export function CodePanel() {
 
   const handleOpenTrajectory = () => {
     setCodeOpen(false);
-    record(activeSessionId, { kind: "system", label: "Trajectory", summary: "Opened Trajectory from Code Mode", detail: activeSessionId, source: "code-mode" });
+    record(activeSessionId, {
+      kind: "system",
+      label: "Trajectory",
+      summary: "Opened Trajectory from Code Mode",
+      detail: activeSessionId,
+      source: "code-mode",
+    });
     setTrajectoryOpen(true);
   };
 
@@ -113,12 +127,20 @@ export function CodePanel() {
       <aside className="cm__drawer" role="dialog" aria-label="Code Mode">
         <header className="cm__header">
           <div className="cm__heading">
-            <Text variant="micro" tone="dim" mono uppercase>One program, many tool calls</Text>
-            <Text variant="subtitle" weight="semibold">Code Mode</Text>
+            <Text variant="micro" tone="dim" mono uppercase>
+              One program, many tool calls
+            </Text>
+            <Text variant="subtitle" weight="semibold">
+              Code Mode
+            </Text>
           </div>
           <div className="cm__header-actions">
-            <IconButton title="Open Trajectory" onClick={handleOpenTrajectory} size="sm">⤳</IconButton>
-            <IconButton title="Close Code Mode" onClick={() => setCodeOpen(false)} size="sm">✕</IconButton>
+            <IconButton title="Open Trajectory" onClick={handleOpenTrajectory} size="sm">
+              ⤳
+            </IconButton>
+            <IconButton title="Close Code Mode" onClick={() => setCodeOpen(false)} size="sm">
+              ✕
+            </IconButton>
           </div>
         </header>
 
@@ -126,7 +148,9 @@ export function CodePanel() {
           {/* --- TypeScript SDK section --- */}
           <section className="cm__section">
             <div className="cm__section-head">
-              <Text variant="micro" tone="dim" mono uppercase>TypeScript SDK</Text>
+              <Text variant="micro" tone="dim" mono uppercase>
+                TypeScript SDK
+              </Text>
               {registry ? (
                 <Button variant="ghost" size="sm" onClick={handleCopy} title="Copy the generated SDK">
                   {copied ? "copied" : "copy"}
@@ -142,9 +166,13 @@ export function CodePanel() {
             </div>
             <div className="cm__sdk">
               {registryError ? (
-                <Text variant="micro" tone="danger">{registryError}</Text>
+                <Text variant="micro" tone="danger">
+                  {registryError}
+                </Text>
               ) : registry ? (
-                <pre className="cm__sdk-code" data-testid="sdk-source">{sdkSource}</pre>
+                <pre className="cm__sdk-code" data-testid="sdk-source">
+                  {sdkSource}
+                </pre>
               ) : (
                 <div className="cm__sdk-loading" aria-busy="true" aria-live="polite">
                   <Spinner size={14} />
@@ -152,33 +180,42 @@ export function CodePanel() {
               )}
             </div>
             <div className="cm__toolindex">
-              {registry ? (
-                registry.map((entry) => (
-                  <span key={`${entry.category}:${entry.name}`} className="cm__toolchip" title={`${entry.description ?? "No description"} — ${categoryLabel(entry)}`}>
-                    {entry.name}
-                    <span className="cm__toolchip-cat">{entry.category}</span>
-                  </span>
-                ))
-              ) : null}
+              {registry
+                ? registry.map((entry) => (
+                    <span
+                      key={`${entry.category}:${entry.name}`}
+                      className="cm__toolchip"
+                      title={`${entry.description ?? "No description"} — ${categoryLabel(entry)}`}
+                    >
+                      {entry.name}
+                      <span className="cm__toolchip-cat">{entry.category}</span>
+                    </span>
+                  ))
+                : null}
             </div>
           </section>
 
           {/* --- run_code programs section --- */}
           <section className="cm__section">
             <div className="cm__section-head">
-              <Text variant="micro" tone="dim" mono uppercase>run_code programs</Text>
+              <Text variant="micro" tone="dim" mono uppercase>
+                run_code programs
+              </Text>
               <Badge tone="neutral">{sessionRuns.length}</Badge>
             </div>
             <div className="cm__section-meta">
               <Text variant="micro" tone="muted">
-                {selection.mode === "code" ? "Programs decompose into individual tool-call cards — every call lands in the Trajectory log." : "Select the Code mode from the header profile chip, then send a prompt to run a program."}
+                {selection.mode === "code"
+                  ? "Programs decompose into individual tool-call cards — every call lands in the Trajectory log."
+                  : "Select the Code mode from the header profile chip, then send a prompt to run a program."}
               </Text>
             </div>
 
             {sessionRuns.length === 0 ? (
               <div className="cm__empty">
                 <Text variant="label" tone="muted">
-                  No run_code programs yet. Pick the Code profile in the header, then send a message — the simulated program will decompose here and in the Trajectory.
+                  No run_code programs yet. Pick the Code profile in the header, then send a message — the
+                  simulated program will decompose here and in the Trajectory.
                 </Text>
               </div>
             ) : (
@@ -193,7 +230,9 @@ export function CodePanel() {
 
         <footer className="cm__footer">
           <Text variant="micro" tone="dim">
-            The SDK is a typed declaration of the agent's tool contract, rendered deterministically from the live registry. In demo mode programs are simulated — a sandboxed TypeScript runtime on the live daemon is a known limitation (CHANGELOG/README).
+            The SDK is a typed declaration of the agent's tool contract, rendered deterministically from the
+            live registry. In demo mode programs are simulated — a sandboxed TypeScript runtime on the live
+            daemon is a known limitation (CHANGELOG/README).
           </Text>
         </footer>
       </aside>
@@ -208,7 +247,9 @@ function RunCard({ run }: { run: CodeRun }) {
         <Badge tone={run.status === "complete" ? "success" : run.status === "error" ? "danger" : "info"} dot>
           {run.status}
         </Badge>
-        <Text variant="micro" tone="dim" mono>{formatTime(run.createdAt)}</Text>
+        <Text variant="micro" tone="dim" mono>
+          {formatTime(run.createdAt)}
+        </Text>
         <Text variant="micro" tone="dim" className="cm__run-count">
           {run.calls.length} call{run.calls.length === 1 ? "" : "s"}
         </Text>
@@ -234,4 +275,3 @@ function RunCard({ run }: { run: CodeRun }) {
     </div>
   );
 }
-

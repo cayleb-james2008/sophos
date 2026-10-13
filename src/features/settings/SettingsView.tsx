@@ -3,6 +3,7 @@
 // Skills (discovery + management), and Advanced (context + RLM children +
 // agents + daemon diagnostics + MCP + extensions). Wired to the IPC client.
 
+import { isDemoMode } from "../../ipc/client";
 import { Tabs } from "../../design";
 import { useAppState } from "../../state/AppState";
 import { GeneralPanel } from "./GeneralPanel";
@@ -14,9 +15,19 @@ import { AdvancedPanel } from "./AdvancedPanel";
 import { LongRunningPanel } from "./LongRunningPanel";
 import { AboutPanel } from "./AboutPanel";
 import { FleetStrip } from "./FleetStrip";
+import { MigrationWizard } from "../migration";
+import { McpExplorer } from "../mcp";
+import { SecuritySandboxPanel } from "../security";
+import { CuaControlPanel } from "../cua";
+import { SkillDistillationPanel } from "../skills";
+import { ThoughtTreePanel } from "../tree";
+import { TwinSandboxPanel } from "../sandbox";
 import "./settings.css";
 
+const PREVIEW_TABS = new Set(["mcp", "security", "cua", "twins", "distill", "tree"]);
+
 export function SettingsView() {
+  const preview = isDemoMode();
   const { settingsTab: tab, setSettingsTab: setTab } = useAppState();
 
   return (
@@ -24,7 +35,7 @@ export function SettingsView() {
       <header className="settings__header">
         <div className="settings__eyebrow">CONTROL ROOM</div>
         <h1>Settings</h1>
-        <p>Providers, models, preferences, skills, extensions, and runtime telemetry.</p>
+        <p>Providers, models, preferences, skills, extensions, migration, and runtime telemetry.</p>
       </header>
 
       <FleetStrip />
@@ -34,25 +45,40 @@ export function SettingsView() {
         items={[
           { id: "general", label: "General" },
           { id: "providers", label: "Providers" },
+          { id: "mcp", label: "MCP Explorer" },
+          { id: "security", label: "Security & Sandbox" },
+          { id: "cua", label: "Desktop CUA" },
+          { id: "twins", label: "Workspace Twins" },
+          { id: "distill", label: "Skill Distillation" },
+          { id: "tree", label: "Tree of Thoughts" },
           { id: "subagents", label: "Subagents" },
           { id: "skills", label: "Skills" },
           { id: "extensions", label: "Extensions" },
           { id: "advanced", label: "Advanced" },
           { id: "longrunning", label: "Long-running" },
+          { id: "migration", label: "Import" },
           { id: "about", label: "About" },
-        ]}
+        ].filter((item) => preview || !PREVIEW_TABS.has(item.id))}
         activeId={tab}
         onChange={setTab}
       />
 
       <div className="settings__body">
+        {!preview && PREVIEW_TABS.has(tab) ? <p>Select a settings category above.</p> : null}
         {tab === "general" ? <GeneralPanel /> : null}
         {tab === "providers" ? <ProvidersPanel /> : null}
+        {preview && tab === "mcp" ? <McpExplorer /> : null}
+        {preview && tab === "security" ? <SecuritySandboxPanel /> : null}
+        {preview && tab === "cua" ? <CuaControlPanel /> : null}
+        {preview && tab === "twins" ? <TwinSandboxPanel /> : null}
+        {preview && tab === "distill" ? <SkillDistillationPanel /> : null}
+        {preview && tab === "tree" ? <ThoughtTreePanel /> : null}
         {tab === "subagents" ? <SubagentPolicyPanel /> : null}
         {tab === "skills" ? <SkillsPanel /> : null}
         {tab === "extensions" ? <ExtensionsPanel /> : null}
         {tab === "advanced" ? <AdvancedPanel /> : null}
         {tab === "longrunning" ? <LongRunningPanel /> : null}
+        {tab === "migration" ? <MigrationWizard /> : null}
         {tab === "about" ? <AboutPanel /> : null}
       </div>
     </main>

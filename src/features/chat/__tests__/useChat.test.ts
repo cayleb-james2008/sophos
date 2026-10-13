@@ -51,15 +51,30 @@ vi.mock("../../../ipc/client", async () => {
     },
     useConnectionState: () => mockState.conn,
     isTauri: true,
+    isDemoShell: () => false,
   };
 });
 
-const userMsg = (text: string) => ({ id: "u-1", role: "user", content: text, timestamp: "2026-01-01T00:00:00.000Z", status: "complete" });
+const userMsg = (text: string) => ({
+  id: "u-1",
+  role: "user",
+  content: text,
+  timestamp: "2026-01-01T00:00:00.000Z",
+  status: "complete",
+});
 
 function makeClient() {
   (mockState.client.getTranscript as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   (mockState.client.getContextStats as ReturnType<typeof vi.fn>).mockResolvedValue({ tokens: 10 });
-  for (const key of ["prompt", "steer", "abort", "runCommand", "setSessionName", "startSideQuestion", "retry"] as const) {
+  for (const key of [
+    "prompt",
+    "steer",
+    "abort",
+    "runCommand",
+    "setSessionName",
+    "startSideQuestion",
+    "retry",
+  ] as const) {
     (mockState.client[key] as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
   }
 }
@@ -75,10 +90,30 @@ describe("useChat", () => {
     const { result } = renderHook(() => useChat());
     const value = result.current;
     for (const key of [
-      "messages", "busy", "loaded", "error", "hasFirstMessage", "send", "steer", "abort",
-      "queueFollowUp", "clearFollowUps", "popFollowUp", "followUps", "steered", "shellNotice",
-      "askSideQuestion", "dismissSideQuestion", "sideQuestions", "runShell", "contextStats",
-      "setSessionName", "loadDemoMessages", "editDraft", "requestEdit", "retry",
+      "messages",
+      "busy",
+      "loaded",
+      "error",
+      "hasFirstMessage",
+      "send",
+      "steer",
+      "abort",
+      "queueFollowUp",
+      "clearFollowUps",
+      "popFollowUp",
+      "followUps",
+      "steered",
+      "shellNotice",
+      "askSideQuestion",
+      "dismissSideQuestion",
+      "sideQuestions",
+      "runShell",
+      "contextStats",
+      "setSessionName",
+      "loadDemoMessages",
+      "editDraft",
+      "requestEdit",
+      "retry",
     ]) {
       expect(value).toHaveProperty(key);
     }
@@ -205,7 +240,10 @@ describe("useChat", () => {
     expect(result.current.sideQuestions[0].status).toBe("running");
 
     act(() => {
-      mockState.fire({ type: "session_event", event: { kind: "side_question_event", id: result.current.sideQuestions[0].id, status: "complete" } });
+      mockState.fire({
+        type: "session_event",
+        event: { kind: "side_question_event", id: result.current.sideQuestions[0].id, status: "complete" },
+      });
     });
     expect(result.current.sideQuestions[0].status).toBe("complete");
 

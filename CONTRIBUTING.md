@@ -148,8 +148,10 @@ its archive nor the offline lifecycle check establishes a live spend cap.
   primitives under `src/design/` rather than ad-hoc values. Reuse existing
   tokens/components before introducing new ones.
 - **Imports.** Use the `@/` alias for imports into `src/`.
-- **Formatting.** Keep changes consistent with the surrounding file; there is
-  no separate formatter config, so match existing style.
+- **Formatting & lint.** Prettier (`.prettierrc.json`) owns formatting and
+  ESLint 9 (`eslint.config.mjs`) owns lint rules. Run `npm run format` and
+  `npm run lint:fix` before committing; CI fails on any lint warning or
+  formatting drift. `npm run check` reproduces the full gate locally.
 
 ## PR process
 
@@ -159,8 +161,8 @@ its archive nor the offline lifecycle check establishes a live spend cap.
    `feat/session-persistence` or `fix/named-pipe-fallback`.
 3. **Develop.** Keep changes scoped and follow the code style above. Prefer
    small, reviewable commits with clear messages.
-4. **Test before you submit.** Run `npx tsc --noEmit` and `npm test` locally;
-   both must pass.
+4. **Test before you submit.** Run `npm run check` (lint + format + type-check)
+   and `npm test` locally; both must pass.
 5. **Open a pull request** against `master`. Describe what the change does and
    why, and note any manual verification performed.
 6. **CI must pass.** The workflow builds the full pinned runtime from a fresh

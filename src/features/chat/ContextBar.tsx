@@ -19,10 +19,7 @@ export function ContextBar({ stats }: { stats: ContextStats | null }) {
   const messagesN = stats?.messages;
 
   const percent =
-    typeof tokensN === "number" &&
-    typeof windowN === "number" &&
-    Number.isFinite(windowN) &&
-    windowN > 0
+    typeof tokensN === "number" && typeof windowN === "number" && Number.isFinite(windowN) && windowN > 0
       ? Math.min(100, (tokensN / windowN) * 100)
       : undefined;
 

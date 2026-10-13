@@ -13,7 +13,24 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-const REF = process.env.REF || "C:/Users/Cayleb/Desktop/workspace/prime-agent-ref/packages/coding-agent";
+/** PRIME_AGENT_REF points at the prime-agent-ref checkout ROOT (same meaning
+ * as in scripts/bundle.mjs and the README); packages/coding-agent is derived.
+ * Throws a clear error when the checkout or the package is missing. */
+function resolvePrimeAgentRef() {
+  const checkout =
+    process.env.PRIME_AGENT_REF || "C:/Users/Cayleb/Desktop/workspace/prime-agent-ref";
+  const pkg = join(checkout, "packages", "coding-agent");
+  if (!existsSync(checkout) || !existsSync(pkg)) {
+    throw new Error(
+      `PRIME_AGENT_REF is not a usable prime-agent-ref checkout: ${checkout}\n` +
+        `(expected packages/coding-agent under it). Set PRIME_AGENT_REF to the ` +
+        `checkout root, or restore the default C:/Users/Cayleb/Desktop/workspace/prime-agent-ref.`,
+    );
+  }
+  return checkout;
+}
+
+const REF = join(resolvePrimeAgentRef(), "packages", "coding-agent");
 const BRIDGE = process.env.BRIDGE || join(process.cwd(), "bridge", "dist", "bridge", "src", "index.js");
 const PORT = Number(process.env.DAEMON_PORT || (48940 + Math.floor(Math.random() * 100)));
 const SOCKET = `tcp://127.0.0.1:${PORT}`;

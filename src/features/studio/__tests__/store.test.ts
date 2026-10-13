@@ -76,7 +76,14 @@ describe("parseCustomProfiles — guarded parsing", () => {
   });
 
   it("coerces malformed fields to safe defaults", () => {
-    const p = sanitizeCustomProfile({ id: "custom-y", name: 42, tools: "shell", skills: [1, "ok"], safety: "nope", mode: "wat" });
+    const p = sanitizeCustomProfile({
+      id: "custom-y",
+      name: 42,
+      tools: "shell",
+      skills: [1, "ok"],
+      safety: "nope",
+      mode: "wat",
+    });
     expect(p.name).toBe(""); // non-string name → empty (unusable, not crashing)
     expect(Array.isArray(p.tools)).toBe(true);
     // Garbage tools fall back to the built-in REGISTRY set — every default maps
@@ -157,7 +164,12 @@ describe("id generation + templates", () => {
 
 describe("system prompt synthesis", () => {
   it("embeds name, tagline, working style, and a mode note", () => {
-    const prompt = buildCustomSystemPrompt({ name: "Builder Bot", tagline: "Compose fast", workingStyle: ["Goal first", "Verify"], mode: "creator" });
+    const prompt = buildCustomSystemPrompt({
+      name: "Builder Bot",
+      tagline: "Compose fast",
+      workingStyle: ["Goal first", "Verify"],
+      mode: "creator",
+    });
     expect(prompt).toContain("Builder Bot");
     expect(prompt).toContain("Compose fast");
     expect(prompt).toContain("Goal first");
@@ -166,12 +178,24 @@ describe("system prompt synthesis", () => {
   });
 
   it("mentions the typed SDK for code-mode custom profiles", () => {
-    const prompt = buildCustomSystemPrompt({ name: "SDK Composer", tagline: "", workingStyle: [], mode: "code" });
+    const prompt = buildCustomSystemPrompt({
+      name: "SDK Composer",
+      tagline: "",
+      workingStyle: [],
+      mode: "code",
+    });
     expect(prompt).toContain("typed TypeScript SDK");
   });
 
   it("sanitize always re-synthesizes the prompt from the editable fields", () => {
-    const p = sanitizeCustomProfile({ id: "custom-1", name: "X", tagline: "T", workingStyle: ["A"], mode: "minimal", systemPrompt: "stale" });
+    const p = sanitizeCustomProfile({
+      id: "custom-1",
+      name: "X",
+      tagline: "T",
+      workingStyle: ["A"],
+      mode: "minimal",
+      systemPrompt: "stale",
+    });
     expect(p.systemPrompt).not.toBe("stale");
     expect(p.systemPrompt).toContain("X");
     expect(p.systemPrompt).toContain("Minimal mode");
@@ -191,7 +215,11 @@ describe("customComposition", () => {
 
 describe("customDemoFlavor — demo follows the draft", () => {
   it("renders name, tagline, and working-style chips", () => {
-    const flavor = customDemoFlavor({ name: "Builder Bot", tagline: "Compose fast", workingStyle: ["Goal first", "Verify with real runs"] });
+    const flavor = customDemoFlavor({
+      name: "Builder Bot",
+      tagline: "Compose fast",
+      workingStyle: ["Goal first", "Verify with real runs"],
+    });
     expect(flavor).toContain("Builder Bot");
     expect(flavor).toContain("Compose fast");
     expect(flavor).toContain("Goal first");

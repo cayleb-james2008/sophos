@@ -79,7 +79,11 @@ export const BUILTIN_TOOLS: ToolRegistryEntry[] = [
     name: "read_file",
     description: "Read a file from the session workspace.",
     category: "builtin",
-    schema: { type: "object", properties: { path: { type: "string", description: "Path of the file to read" } }, required: ["path"] },
+    schema: {
+      type: "object",
+      properties: { path: { type: "string", description: "Path of the file to read" } },
+      required: ["path"],
+    },
   },
   {
     name: "edit_file",
@@ -112,25 +116,166 @@ export const BUILTIN_TOOLS: ToolRegistryEntry[] = [
     name: "web_search",
     description: "Search the web for current information.",
     category: "builtin",
-    schema: { type: "object", properties: { query: { type: "string", description: "Search query" } }, required: ["query"] },
+    schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "Search query" } },
+      required: ["query"],
+    },
   },
   {
     name: "run_cell",
     description: "Run a code cell in the persistent kernel.",
     category: "builtin",
-    schema: { type: "object", properties: { code: { type: "string", description: "Cell source" } }, required: ["code"] },
+    schema: {
+      type: "object",
+      properties: { code: { type: "string", description: "Cell source" } },
+      required: ["code"],
+    },
   },
   {
     name: "refine",
     description: "Refine the session's goal and plan.",
     category: "builtin",
-    schema: { type: "object", properties: { prompt: { type: "string", description: "Optional refinement direction" } } },
+    schema: {
+      type: "object",
+      properties: { prompt: { type: "string", description: "Optional refinement direction" } },
+    },
   },
   {
     name: "inspect_runtime",
     description: "Inspect live runtime capabilities (kernel, skills, extensions).",
     category: "builtin",
     schema: { type: "object", properties: {} },
+  },
+  {
+    name: "ast_grep_search",
+    description: "Structural AST pattern search ignoring formatting and whitespace (ast-grep).",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        pattern: { type: "string", description: "AST syntax pattern to match" },
+        lang: { type: "string", description: "Language (typescript, rust, python, etc.)" },
+        path: { type: "string", description: "Target subdirectory or file" },
+      },
+      required: ["pattern"],
+    },
+  },
+  {
+    name: "ast_grep_outline",
+    description: "Extract symbols, functions, and exports from a file with AST parsing.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path to outline" },
+        lang: { type: "string", description: "Language identifier" },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "repomix_pack",
+    description: "Pack token-budgeted directory context with Tree-Sitter compression (repomix).",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Root path to pack" },
+        token_budget: { type: "number", description: "Strict token budget limit" },
+        compress: { type: "boolean", description: "Enable Tree-Sitter signature compression" },
+      },
+    },
+  },
+  {
+    name: "code_repo_map",
+    description: "Generate high-level call-graph and structural dependency map for the codebase.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Base path of repository" },
+        max_tokens: { type: "number", description: "Maximum token budget for the map" },
+      },
+    },
+  },
+  {
+    name: "memory_search",
+    description: "Semantic search across OpenViking / Letta multi-tier memory.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Semantic search query" },
+        tier: { type: "string", description: "Target tier: working | recall | archival" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "memory_store",
+    description: "Store a durable fact with bi-temporal validity tags into memory.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Fact summary title" },
+        content: { type: "string", description: "Detailed fact content" },
+        tier: { type: "string", description: "Storage tier: working | recall | archival" },
+        uri: { type: "string", description: "Optional viking:// URI identifier" },
+      },
+      required: ["title", "content"],
+    },
+  },
+  {
+    name: "memory_recall",
+    description: "Recall high-confidence facts and active scratchpad entries.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Lookup query" },
+        limit: { type: "number", description: "Max entries to return" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "memory_forget",
+    description: "Invalidate or prune an outdated memory entry.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Memory entry ID to invalidate" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "create_checkpoint",
+    description: "Create a durable session state checkpoint before risky actions or multi-turn loops.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        label: { type: "string", description: "Human-readable checkpoint label" },
+        summary: { type: "string", description: "Description of state delta" },
+      },
+      required: ["label"],
+    },
+  },
+  {
+    name: "restore_checkpoint",
+    description: "Roll back workspace and session state to a saved checkpoint.",
+    category: "builtin",
+    schema: {
+      type: "object",
+      properties: {
+        checkpoint_id: { type: "string", description: "ID of checkpoint to restore" },
+      },
+      required: ["checkpoint_id"],
+    },
   },
 ];
 
@@ -153,7 +298,15 @@ export interface RegistrySources {
  * sorting a copy never mutates the caller's array. */
 export function sortEntries(entries: ToolRegistryEntry[]): ToolRegistryEntry[] {
   return [...entries].sort((a, b) =>
-    a.name < b.name ? -1 : a.name > b.name ? 1 : a.category < b.category ? -1 : a.category > b.category ? 1 : 0,
+    a.name < b.name
+      ? -1
+      : a.name > b.name
+        ? 1
+        : a.category < b.category
+          ? -1
+          : a.category > b.category
+            ? 1
+            : 0,
   );
 }
 
@@ -205,9 +358,11 @@ export function countByCategory(entries: ToolRegistryEntry[]): Record<ToolCatego
 
 /** Read the persisted MCP server list from settings (additive field). */
 function readMcpServers(settings: Settings | null): McpServerConfig[] {
-  const raw = (settings as Settings & { mcpServers?: McpServerConfig[] } | null)?.mcpServers;
+  const raw = (settings as (Settings & { mcpServers?: McpServerConfig[] }) | null)?.mcpServers;
   if (!Array.isArray(raw)) return [];
-  return raw.filter((s): s is McpServerConfig => !!s && typeof s.name === "string" && typeof s.command === "string");
+  return raw.filter(
+    (s): s is McpServerConfig => !!s && typeof s.name === "string" && typeof s.command === "string",
+  );
 }
 
 /**
@@ -219,8 +374,14 @@ function readMcpServers(settings: Settings | null): McpServerConfig[] {
 export async function loadToolRegistry(client: IpcClient, settings?: Settings): Promise<ToolRegistryEntry[]> {
   const [runtime, extensions, s] = await Promise.all([
     client.getRuntimeInfo().catch(() => null),
-    typeof client.getExtensions === "function" ? client.getExtensions().catch(() => null) : Promise.resolve(null),
-    settings ? Promise.resolve(settings) : typeof client.getSettings === "function" ? client.getSettings().catch(() => null) : Promise.resolve(null),
+    typeof client.getExtensions === "function"
+      ? client.getExtensions().catch(() => null)
+      : Promise.resolve(null),
+    settings
+      ? Promise.resolve(settings)
+      : typeof client.getSettings === "function"
+        ? client.getSettings().catch(() => null)
+        : Promise.resolve(null),
   ]);
 
   const servers = readMcpServers(s);

@@ -53,7 +53,7 @@ describe("serializeCustomProfile — the human-readable file format", () => {
 
   it("is pretty-printed and human-readable (indented, not minified)", () => {
     const text = serializeCustomProfile(validProfile());
-    expect(text).toContain("\n  \"format\":");
+    expect(text).toContain('\n  "format":');
     expect(text).not.toContain('{"format"');
   });
 
@@ -64,7 +64,9 @@ describe("serializeCustomProfile — the human-readable file format", () => {
   });
 
   it("suggests a clean, shareable file name", () => {
-    expect(suggestProfileFileName(validProfile({ name: "My Builder!" }))).toBe("my-builder.sophos-profile.json");
+    expect(suggestProfileFileName(validProfile({ name: "My Builder!" }))).toBe(
+      "my-builder.sophos-profile.json",
+    );
     expect(suggestProfileFileName(validProfile({ name: "   " }))).toBe("custom-profile.sophos-profile.json");
   });
 });
@@ -89,7 +91,10 @@ describe("parseCustomProfileFile — guarded parsing", () => {
   });
 
   it("rejects malformed JSON with a clear error and never throws", () => {
-    expect(parseCustomProfileFile("{ not json !!")).toMatchObject({ ok: false, error: expect.stringContaining("not valid JSON") });
+    expect(parseCustomProfileFile("{ not json !!")).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("not valid JSON"),
+    });
     expect(parseCustomProfileFile("undefined")).toMatchObject({ ok: false });
   });
 
@@ -100,21 +105,28 @@ describe("parseCustomProfileFile — guarded parsing", () => {
   });
 
   it("rejects a future file version with an explicit message", () => {
-    const text = serializeCustomProfile(validProfile()).replace(`"version": ${PROFILE_FILE_VERSION}`, `"version": ${PROFILE_FILE_VERSION + 99}`);
+    const text = serializeCustomProfile(validProfile()).replace(
+      `"version": ${PROFILE_FILE_VERSION}`,
+      `"version": ${PROFILE_FILE_VERSION + 99}`,
+    );
     const parsed = parseCustomProfileFile(text);
     expect(parsed.ok).toBe(false);
     if (!parsed.ok) expect(parsed.error).toContain("version");
   });
 
   it("rejects an envelope with no profile object", () => {
-    expect(parseCustomProfileFile(JSON.stringify({ format: PROFILE_FILE_FORMAT, version: PROFILE_FILE_VERSION }))).toMatchObject({
+    expect(
+      parseCustomProfileFile(JSON.stringify({ format: PROFILE_FILE_FORMAT, version: PROFILE_FILE_VERSION })),
+    ).toMatchObject({
       ok: false,
       error: expect.stringContaining("no profile object"),
     });
   });
 
   it("rejects a foreign envelope instead of guessing", () => {
-    expect(parseCustomProfileFile(JSON.stringify({ format: "other-app", profile: { name: "X" } }))).toMatchObject({
+    expect(
+      parseCustomProfileFile(JSON.stringify({ format: "other-app", profile: { name: "X" } })),
+    ).toMatchObject({
       ok: false,
       error: expect.stringContaining("another app"),
     });
@@ -143,7 +155,9 @@ describe("parseCustomProfileFile — guarded parsing", () => {
   });
 
   it("tolerates unknown extra fields (forward-compatible)", () => {
-    const parsed = parseCustomProfileFile(JSON.stringify({ ...validProfile(), extraField: 42, nested: { a: 1 } }));
+    const parsed = parseCustomProfileFile(
+      JSON.stringify({ ...validProfile(), extraField: 42, nested: { a: 1 } }),
+    );
     expect(parsed.ok).toBe(true);
   });
 });
@@ -171,7 +185,12 @@ describe("mergeImportedProfile — never silently overwrite", () => {
     const { profile, resolution } = mergeImportedProfile(imported, existing);
     expect(profile.name).toBe("Builder Bot (copy)");
     expect(profile.id).toBe(imported.id);
-    expect(resolution).toMatchObject({ renamed: true, idChanged: false, originalName: "Builder Bot", finalName: "Builder Bot (copy)" });
+    expect(resolution).toMatchObject({
+      renamed: true,
+      idChanged: false,
+      originalName: "Builder Bot",
+      finalName: "Builder Bot (copy)",
+    });
   });
 
   it("handles id AND name colliding at once", () => {
@@ -264,7 +283,12 @@ describe("describeImportOutcome — the visible resolution notice", () => {
   it("phrases a collision resolution explicitly — never silent", () => {
     const outcome: CustomProfileImportResult = {
       profile: validProfile({ name: "Builder Bot (copy)" }),
-      resolution: { idChanged: false, renamed: true, originalName: "Builder Bot", finalName: "Builder Bot (copy)" },
+      resolution: {
+        idChanged: false,
+        renamed: true,
+        originalName: "Builder Bot",
+        finalName: "Builder Bot (copy)",
+      },
     };
     const { kind, message } = describeImportOutcome(outcome);
     expect(kind).toBe("collision");
@@ -292,7 +316,9 @@ describe("file I/O — browser-preview paths (no Tauri in jsdom)", () => {
       // The hidden input was created + "clicked" — simulate a real user pick.
       const input = clicked[0];
       expect(input).toBeTruthy();
-      const file = new File([serializeCustomProfile(validProfile())], "builder.sophos-profile.json", { type: "application/json" });
+      const file = new File([serializeCustomProfile(validProfile())], "builder.sophos-profile.json", {
+        type: "application/json",
+      });
       Object.defineProperty(input, "files", { value: [file], configurable: true });
       input.dispatchEvent(new Event("change", { bubbles: true }));
       const result = await promise;

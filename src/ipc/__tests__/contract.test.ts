@@ -111,7 +111,13 @@ describe("contract — data shapes used by the shell/views", () => {
   });
 
   it("ProviderInfo models api_key and subscription kinds", () => {
-    const p: ProviderInfo = { id: "prime-intellect", name: "Prime Intellect", kind: "subscription", connected: true, models: [] };
+    const p: ProviderInfo = {
+      id: "prime-intellect",
+      name: "Prime Intellect",
+      kind: "subscription",
+      connected: true,
+      models: [],
+    };
     expect(p.kind).toBe("subscription");
   });
 
@@ -133,7 +139,15 @@ describe("contract — data shapes used by the shell/views", () => {
 
   it("SessionTree nests message nodes", () => {
     const tree: SessionTree = {
-      tree: [{ id: "e1", type: "message", label: "brief", parentId: null, children: [{ id: "e2", type: "message", parentId: "e1" }] }],
+      tree: [
+        {
+          id: "e1",
+          type: "message",
+          label: "brief",
+          parentId: null,
+          children: [{ id: "e2", type: "message", parentId: "e1" }],
+        },
+      ],
       leafId: "e2",
     };
     expect(tree.leafId).toBe("e2");

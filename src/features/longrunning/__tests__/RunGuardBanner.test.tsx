@@ -67,7 +67,11 @@ describe("RunGuardBanner", () => {
   });
 
   it("surfaces the engine-down danger banner for an active goal loop", () => {
-    mockState.conn = { ...baseConn(), status: { kind: "disconnected" }, goals: [{ id: "g1", objective: "x", status: "active" }] };
+    mockState.conn = {
+      ...baseConn(),
+      status: { kind: "disconnected" },
+      goals: [{ id: "g1", objective: "x", status: "active" }],
+    };
     render(<RunGuardBanner />);
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent(/engine is down/i);
@@ -76,7 +80,11 @@ describe("RunGuardBanner", () => {
 
   it("keeps the engine-down banner even after Dismiss (engine-down is not dismissible)", async () => {
     const user = userEvent.setup();
-    mockState.conn = { ...baseConn(), status: { kind: "disconnected" }, goals: [{ id: "g1", objective: "x", status: "active" }] };
+    mockState.conn = {
+      ...baseConn(),
+      status: { kind: "disconnected" },
+      goals: [{ id: "g1", objective: "x", status: "active" }],
+    };
     render(<RunGuardBanner />);
     expect(screen.getByRole("alert")).toHaveTextContent(/engine is down/i);
     await user.click(screen.getByRole("button", { name: /dismiss/i }));
@@ -113,7 +121,11 @@ describe("RunGuardBanner", () => {
 
   it("pauses a goal loop then offers Resume which resumes it", async () => {
     const user = userEvent.setup();
-    mockState.conn = { ...baseConn(), goals: [{ id: "g1", objective: "x", status: "active" }], costStats: { totalCost: 60 } };
+    mockState.conn = {
+      ...baseConn(),
+      goals: [{ id: "g1", objective: "x", status: "active" }],
+      costStats: { totalCost: 60 },
+    };
     render(<RunGuardBanner />);
 
     await user.click(screen.getByRole("button", { name: /pause goal/i }));

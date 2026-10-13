@@ -2,10 +2,25 @@
 // its named pipe (the transport the Rust shell actually uses) and prove the
 // safety controls fire against the shipped binary.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const INST = "C:/Users/Cayleb/AppData/Local/Sophos";
+/** SOPHOS_INSTALL_DIR points at the installed Sophos app dir (node/node.exe is
+ * spawned from it). Throws a clear error when the install dir is missing. */
+function resolveInstallDir() {
+  const dir =
+    process.env.SOPHOS_INSTALL_DIR || "C:/Users/Cayleb/AppData/Local/Sophos";
+  if (!existsSync(dir) || !existsSync(join(dir, "node", "node.exe"))) {
+    throw new Error(
+      `SOPHOS_INSTALL_DIR is not an installed Sophos app directory: ${dir}\n` +
+        `(expected node/node.exe under it). Set SOPHOS_INSTALL_DIR to the install ` +
+        `dir, or restore the default C:/Users/Cayleb/AppData/Local/Sophos.`,
+    );
+  }
+  return dir;
+}
+
+const INST = resolveInstallDir();
 const PIPE = "\\\\.\\pipe\\prime-agent-daemon";
 const NODE = join(INST, "node", "node.exe");
 const CLI = join(INST, "daemon", "dist", "bundle", "cli.js");

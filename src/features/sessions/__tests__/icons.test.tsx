@@ -37,16 +37,13 @@ const ICONS = [
 ];
 
 describe("sessions feature icons", () => {
-  it.each(ICONS.map((Icon) => [Icon.name, Icon]))(
-    "%s renders an svg element",
-    (_name, Icon) => {
-      const { container } = render(<Icon />);
-      const svg = container.querySelector("svg");
-      expect(svg).not.toBeNull();
-      expect(svg).toHaveAttribute("viewBox", "0 0 24 24");
-      expect(svg).toHaveAttribute("fill", "none");
-    },
-  );
+  it.each(ICONS.map((Icon) => [Icon.name, Icon]))("%s renders an svg element", (_name, Icon) => {
+    const { container } = render(<Icon />);
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg).toHaveAttribute("viewBox", "0 0 24 24");
+    expect(svg).toHaveAttribute("fill", "none");
+  });
 
   it("defaults to 16px with currentColor and round joins", () => {
     const { container } = render(<PlayIcon />);

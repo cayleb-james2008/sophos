@@ -17,18 +17,36 @@
 // datum is absent we say so rather than inferring success.
 //
 // Usage: BRIDGE=<path to bridge dist index.js> node verify/live-safety-controls.mjs
+//        PRIME_AGENT_REF=<prime-agent-ref checkout root> (packages/coding-agent derived)
 
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 const REPO = resolve(import.meta.dirname, "..");
+/** PRIME_AGENT_REF points at the prime-agent-ref checkout ROOT (same meaning
+ * as in scripts/bundle.mjs and the README); packages/coding-agent is derived.
+ * Throws a clear error when the checkout or the package is missing. */
+function resolvePrimeAgentRef() {
+  const checkout =
+    process.env.PRIME_AGENT_REF || "C:/Users/Cayleb/Desktop/workspace/prime-agent-ref";
+  const pkg = join(checkout, "packages", "coding-agent");
+  if (!existsSync(checkout) || !existsSync(pkg)) {
+    throw new Error(
+      `PRIME_AGENT_REF is not a usable prime-agent-ref checkout: ${checkout}\n` +
+        `(expected packages/coding-agent under it). Set PRIME_AGENT_REF to the ` +
+        `checkout root, or restore the default C:/Users/Cayleb/Desktop/workspace/prime-agent-ref.`,
+    );
+  }
+  return checkout;
+}
+
 // Match verify/ipc-roundtrip.mjs exactly: the coding-agent CLI from the
 // reference checkout, launched with plain node in `--mode daemon`. That is the
 // configuration already proven to bring up a real daemon (56/56).
-const REF = process.env.REF || "C:/Users/Cayleb/Desktop/workspace/prime-agent-ref/packages/coding-agent";
+const REF = join(resolvePrimeAgentRef(), "packages", "coding-agent");
 const DAEMON = join(REF, "dist", "bundle", "cli.js");
 const BRIDGE = process.env.BRIDGE || join(REPO, "bridge", "dist", "bridge", "src", "index.js");
 const PORT = Number(process.env.DAEMON_PORT || (48300 + Math.floor(Math.random() * 500)));

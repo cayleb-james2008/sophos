@@ -151,15 +151,17 @@ fn default_bridge_cli() -> String {
     "bridge/dist/bridge/src/index.js".to_string()
 }
 
-/// The settings file location: `~/.prime/agent/settings.json`.
-pub fn settings_path() -> PathBuf {
+/// The shared agent state directory: `~/.prime/agent`.
+pub fn agent_dir() -> PathBuf {
     let home = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home)
-        .join(".prime")
-        .join("agent")
-        .join("settings.json")
+    PathBuf::from(home).join(".prime").join("agent")
+}
+
+/// The settings file location: `~/.prime/agent/settings.json`.
+pub fn settings_path() -> PathBuf {
+    agent_dir().join("settings.json")
 }
 
 /// Resolved runtime settings.

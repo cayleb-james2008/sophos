@@ -52,7 +52,9 @@ describe("DaemonStatusBanner", () => {
     setStatus({ kind: "reconnecting" });
     render(<DaemonStatusBanner />);
 
-    expect(await screen.findByText(/Reconnecting to the agent engine on its default local socket/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Reconnecting to the agent engine on its default local socket/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/TCP fallback is unsupported by pinned Prime Agent/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /enable tcp mode/i })).not.toBeInTheDocument();
     expect(mockClient.setSettings).not.toHaveBeenCalled();

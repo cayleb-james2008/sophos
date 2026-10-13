@@ -17,7 +17,9 @@ import "./inbox.css";
 const SELF = "self";
 const statusRank = { running: 0, idle: 1, saved: 2 } as const;
 
-function peerId(m: AgentMessage) { return m.fromAgentId === SELF ? m.toAgentId : m.fromAgentId; }
+function peerId(m: AgentMessage) {
+  return m.fromAgentId === SELF ? m.toAgentId : m.fromAgentId;
+}
 
 export function InboxView() {
   const ipc = useIpc();
@@ -52,24 +54,36 @@ export function InboxView() {
       setSelected((old) => old ?? peers[0]?.id ?? (inbox[0] ? peerId(inbox[0]) : undefined));
       setError(undefined);
       setLastSync(new Date());
-    } catch (e) { setError(e instanceof Error ? e.message : "Inbox unavailable"); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Inbox unavailable");
+    } finally {
+      setLoading(false);
+    }
   }, [ipc]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
   useIpcEvent((event) => {
     if (event.type === "agent_list") setAgents(event.agents);
-    if (event.type === "agent_status") setAgents((old) => [...old.filter((a) => a.id !== event.agent.id), event.agent]);
+    if (event.type === "agent_status")
+      setAgents((old) => [...old.filter((a) => a.id !== event.agent.id), event.agent]);
     if (event.type === "agent_message") {
-      setMessages((old) => old.some((m) => m.id === event.message.id) ? old : [...old, event.message]);
+      setMessages((old) => (old.some((m) => m.id === event.message.id) ? old : [...old, event.message]));
       if (!selected) setSelected(peerId(event.message));
     }
   });
 
-  const sortedAgents = useMemo(() => [...agents].sort((a, b) => statusRank[a.status] - statusRank[b.status]), [agents]);
+  const sortedAgents = useMemo(
+    () => [...agents].sort((a, b) => statusRank[a.status] - statusRank[b.status]),
+    [agents],
+  );
   const selectedAgent = agents.find((a) => a.id === selected);
   const thread = useMemo(
-    () => messages.filter((m) => peerId(m) === selected).sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? "")),
+    () =>
+      messages
+        .filter((m) => peerId(m) === selected)
+        .sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? "")),
     [messages, selected],
   );
   const unreadFor = useCallback(
@@ -82,7 +96,7 @@ export function InboxView() {
     setSelected(id);
     const unread = messages.filter((m) => peerId(m) === id && m.fromAgentId !== SELF && !m.read);
     if (unread.length) {
-      setMessages((old) => old.map((m) => unread.some((u) => u.id === m.id) ? { ...m, read: true } : m));
+      setMessages((old) => old.map((m) => (unread.some((u) => u.id === m.id) ? { ...m, read: true } : m)));
       await Promise.allSettled(unread.map((m) => ipc.markMessageRead(m.id)));
     }
   }
@@ -95,19 +109,40 @@ export function InboxView() {
     const messageId = rawId.startsWith("msg-") ? rawId.slice(4) : rawId;
     const m = messages.find((x) => x.id === messageId);
     if (!m || m.fromAgentId === SELF || m.read) return;
-    try { await ipc.markMessageRead(messageId); } catch { /* local mark */ }
+    try {
+      await ipc.markMessageRead(messageId);
+    } catch {
+      /* local mark */
+    }
     setMessages((old) => old.map((x) => (x.id === messageId ? { ...x, read: true } : x)));
   }
 
   async function send() {
-    const text = draft.trim(); if (!selected || !text || sending) return;
-    setSending(true); setError(undefined);
+    const text = draft.trim();
+    if (!selected || !text || sending) return;
+    setSending(true);
+    setError(undefined);
     try {
       await ipc.sendAgentMessage(selected, text);
-      setMessages((old) => [...old, { id: `local-${Date.now()}`, fromAgentId: SELF, fromAgentName: "You", toAgentId: selected, toAgentName: selectedAgent?.name, text, timestamp: new Date().toISOString(), read: true }]);
+      setMessages((old) => [
+        ...old,
+        {
+          id: `local-${Date.now()}`,
+          fromAgentId: SELF,
+          fromAgentName: "You",
+          toAgentId: selected,
+          toAgentName: selectedAgent?.name,
+          text,
+          timestamp: new Date().toISOString(),
+          read: true,
+        },
+      ]);
       setDraft("");
-    } catch (e) { setError(e instanceof Error ? e.message : "Message failed to send"); }
-    finally { setSending(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Message failed to send");
+    } finally {
+      setSending(false);
+    }
   }
 
   const empty = !loading && !error && agents.length === 0 && messages.length === 0;
@@ -116,14 +151,24 @@ export function InboxView() {
     <main className="inbox">
       <header className="inbox__header">
         <div>
-          <div className="inbox__eyebrow"><span className="pulse" /> MESSAGE FLOW</div>
-          <Text as="h1" variant="display">Inbox</Text>
-          <Text tone="muted">Relay traffic as a sender → message → receiver flow. Unread messages stay highlighted.</Text>
+          <div className="inbox__eyebrow">
+            <span className="pulse" /> MESSAGE FLOW
+          </div>
+          <Text as="h1" variant="display">
+            Inbox
+          </Text>
+          <Text tone="muted">
+            Relay traffic as a sender → message → receiver flow. Unread messages stay highlighted.
+          </Text>
         </div>
         <div className="inbox__telemetry">
-          <span><b>{agents.filter((a) => a.status === "running").length}</b> live</span>
+          <span>
+            <b>{agents.filter((a) => a.status === "running").length}</b> live
+          </span>
           <i />
-          <span><b>{totalUnread}</b> unread</span>
+          <span>
+            <b>{totalUnread}</b> unread
+          </span>
           <i />
           <span className="inbox__sync">● synchronized</span>
         </div>
@@ -132,7 +177,9 @@ export function InboxView() {
       {error && (
         <div className="inbox__error" role="alert">
           Relay degraded · {error}
-          <Button variant="danger" onClick={() => void refresh()}>Retry</Button>
+          <Button variant="danger" onClick={() => void refresh()}>
+            Retry
+          </Button>
         </div>
       )}
 
@@ -148,7 +195,9 @@ export function InboxView() {
               onClick={() => void selectAgent(agent.id)}
               title={agent.name ?? agent.id}
             >
-              <span className={`inbox__chip__dot${agent.status === "running" ? " inbox__chip__dot--running" : agent.status === "idle" ? " inbox__chip__dot--idle" : ""}`} />
+              <span
+                className={`inbox__chip__dot${agent.status === "running" ? " inbox__chip__dot--running" : agent.status === "idle" ? " inbox__chip__dot--idle" : ""}`}
+              />
               <span className="inbox__chip__name">{agent.name ?? agent.id}</span>
               {unread > 0 && <span className="inbox__chip__unread">{unread}</span>}
             </Button>
@@ -181,14 +230,20 @@ export function InboxView() {
               <div className="inbox__graphblank__card">
                 <b>Relay unavailable</b>
                 <span>{error}</span>
-                <Button variant="outline" className="inbox__graphblank__retry" onClick={() => void refresh()}>Retry</Button>
+                <Button variant="outline" className="inbox__graphblank__retry" onClick={() => void refresh()}>
+                  Retry
+                </Button>
               </div>
             </div>
           ) : empty ? (
             <div className="inbox__graphblank">
               <div className="inbox__graphblank__card">
                 <b>No relay traffic yet</b>
-                <span>The relay shows messages between you and peer agents. Agents appear here when they connect; send a message to open a coordination line. Expect unread messages to stay highlighted until read.</span>
+                <span>
+                  The relay shows messages between you and peer agents. Agents appear here when they connect;
+                  send a message to open a coordination line. Expect unread messages to stay highlighted until
+                  read.
+                </span>
               </div>
             </div>
           ) : !selected ? (
@@ -205,19 +260,28 @@ export function InboxView() {
         {selected && (
           <div className="composer">
             <div className="composer__label">
-              <span>MESSAGE TO <b>{selectedAgent?.name ?? "AGENT"}</b></span>
+              <span>
+                MESSAGE TO <b>{selectedAgent?.name ?? "AGENT"}</b>
+              </span>
               <span>⌘ ↵ TO SEND</span>
             </div>
             <textarea
               aria-label="Message agent"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
               placeholder="Transmit a clear, bounded instruction…"
             />
             <div className="composer__foot">
               <span>{draft.length}/2000 · relay channel</span>
-              <Button size="sm" loading={sending} disabled={!draft.trim()} onClick={() => void send()}>Send message ↗</Button>
+              <Button size="sm" loading={sending} disabled={!draft.trim()} onClick={() => void send()}>
+                Send message ↗
+              </Button>
             </div>
           </div>
         )}
@@ -228,10 +292,14 @@ export function InboxView() {
       <footer className="inbox__foot">
         <span className="inbox__foot__item">
           <span className="inbox__foot__dot" />
-          relay {agents.length} agent{agents.length === 1 ? "" : "s"} · {messages.length} message{messages.length === 1 ? "" : "s"}
+          relay {agents.length} agent{agents.length === 1 ? "" : "s"} · {messages.length} message
+          {messages.length === 1 ? "" : "s"}
         </span>
         <span className="inbox__foot__item">
-          last sync {lastSync ? lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"}
+          last sync{" "}
+          {lastSync
+            ? lastSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+            : "—"}
         </span>
         <span className="inbox__foot__item">
           {selectedAgent ? `peer ${selectedAgent.name ?? selectedAgent.id}` : "no peer selected"}

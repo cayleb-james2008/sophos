@@ -10,7 +10,7 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -19,6 +19,7 @@ import { getSessionRecoveryAssertions } from "./session-recovery-readiness.mjs";
 import { runRecoveryProbe } from "./recovery-probe.mjs";
 import { startBridgeAfterDaemonStartup } from "./startup-gate.mjs";
 import { isLifecycleCancellationMessage } from "./lifecycle-cancellation.mjs";
+import { writeE2EMockProviderConfig } from "../verify/e2e-mock-provider.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REF_ROOT = resolve(
@@ -40,6 +41,21 @@ function isolatedSocketPath() {
 }
 
 const SOCKET_PATH = process.env.BRIDGE_VERIFY_SOCKET || isolatedSocketPath();
+const VERIFY_HOME = mkdtempSync(join(tmpdir(), `sophos-bridge-verify-${process.pid}-`));
+process.env.HOME = VERIFY_HOME;
+process.env.USERPROFILE = VERIFY_HOME;
+process.env.APPDATA = join(VERIFY_HOME, "AppData", "Roaming");
+process.env.LOCALAPPDATA = join(VERIFY_HOME, "AppData", "Local");
+
+if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {
+  try {
+    writeE2EMockProviderConfig(VERIFY_HOME, process.env.BRIDGE_VERIFY_MOCK_BASE_URL);
+  } catch (error) {
+    rmSync(VERIFY_HOME, { recursive: true, force: true });
+    throw error;
+  }
+}
+
 function terminateProcessTree(proc) {
   if (!proc?.pid || proc.exitCode !== null) return;
   if (process.platform === "win32") {
@@ -304,6 +320,7 @@ async function startDaemon(onSpawn, signal) {
   const diagnostics = [];
   const proc = spawn(process.execPath, [DAEMON_CLI, "--mode", "daemon", "--daemon-socket", SOCKET_PATH, "--offline"], {
     stdio: ["ignore", "pipe", "pipe"],
+    env: process.env,
   });
   onSpawn?.(proc);
   proc.stdout.on("data", (chunk) => diagnostics.push(`[daemon] ${chunk.toString()}`));
@@ -433,7 +450,10 @@ async function run() {
     if (signalCleanupPromise) {
       void forceCleanup()
         .catch((error) => console.error("[signal-cleanup] forced cleanup failed:", error))
-        .finally(() => process.exit(130));
+        .finally(() => {
+          rmSync(VERIFY_HOME, { recursive: true, force: true });
+          process.exit(130);
+        });
       return;
     }
     signalCleanupPromise = (async () => {
@@ -446,6 +466,7 @@ async function run() {
         console.error("[signal-cleanup] graceful cleanup failed:", error);
         await forceCleanup().catch((forceError) => console.error("[signal-cleanup] forced cleanup failed:", forceError));
       }
+      rmSync(VERIFY_HOME, { recursive: true, force: true });
       process.exit(130);
     })();
   };
@@ -465,11 +486,13 @@ async function run() {
       startBridge: () => {
         bridge = spawn(process.execPath, [BRIDGE, "--daemon-socket", SOCKET_PATH], {
           stdio: ["pipe", "pipe", "pipe"],
+          env: process.env,
         });
       },
     });
     if (!startupCompleted || startupAbort.signal.aborted) {
       await startCleanup();
+      rmSync(VERIFY_HOME, { recursive: true, force: true });
       return;
     }
   } catch (err) {
@@ -480,6 +503,7 @@ async function run() {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     process.off("message", onLifecycleCancellation);
+    rmSync(VERIFY_HOME, { recursive: true, force: true });
     return;
   }
 
@@ -622,6 +646,29 @@ async function run() {
       Array.isArray(modelsResp.result) && modelsResp.result.length > 0,
       `${modelsResp.result?.length ?? 0} models`);
 
+    // Register one local-only catalog entry through the normal settings IPC.
+    // The test endpoint is never contacted; this verifies the real bridge to
+    // daemon catalog path without requiring a model server or cloud provider.
+    const localModelId = "sophos-local-runtime-check";
+    const localSettings = await send({ id: "c5l", method: "setSettings", params: { settings: {
+      localProviders: [{
+        id: "sophos-local-verify",
+        name: "Offline Verification Endpoint",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        kind: "openai-compatible",
+        models: [{ id: localModelId, name: "Offline Verification Model" }],
+      }],
+    } } });
+    const updatedModels = await send({ id: "c5lm", method: "getModels", params: {} });
+    const localModel = updatedModels.result?.find((model) => model.id === localModelId);
+    record("local endpoint registers in the real daemon model catalog",
+      !localSettings.error && localModel?.provider === "sophos-local-verify",
+      `registered=${Boolean(localModel)} settingsError=${localSettings.error?.message ?? "none"}`);
+    const clearedLocalSettings = await send({ id: "c5lr", method: "setSettings", params: { settings: { localProviders: [] } } });
+    const modelsAfterLocalCleanup = await send({ id: "c5lrm", method: "getModels", params: {} });
+    record("removing a local endpoint removes its daemon model catalog entry",
+      !clearedLocalSettings.error && !modelsAfterLocalCleanup.result?.some((model) => model.id === localModelId));
+
     // 6. getProviders
     const provResp = await send({ id: "c6", method: "getProviders", params: {} });
     record("getProviders returns provider list",
@@ -726,14 +773,44 @@ async function run() {
       notificationResponses.length === 0,
       `responseCount=${notificationResponses.length}`);
 
-    // 16. login/logout stubs
-    const loginResp = await send({ id: "c17", method: "login", params: { provider: "openrouter" } });
-    record("login acknowledges without mutating a key",
-      loginResp.result?.provider === "openrouter" && loginResp.result?.stored === false);
+    // 16. Login requires a key and only explicit logout removes it.
+    const authPath = join(VERIFY_HOME, ".prime", "agent", "auth.json");
+    const authBeforeInvalidLogin = existsSync(authPath)
+      ? JSON.parse(readFileSync(authPath, "utf8"))
+      : {};
+    const missingKeyLogin = await send({ id: "c17a", method: "login", params: { provider: "openrouter" } });
+    const blankKeyLogin = await send({ id: "c17b", method: "login", params: { provider: "openrouter", apiKey: "   " } });
+    const authAfterInvalidLogin = existsSync(authPath)
+      ? JSON.parse(readFileSync(authPath, "utf8"))
+      : {};
+    const authUnchangedByInvalidLogin = JSON.stringify(authBeforeInvalidLogin) === JSON.stringify(authAfterInvalidLogin);
+    record("login rejects missing or blank keys without changing auth credentials",
+      missingKeyLogin.error?.code === -32602
+        && blankKeyLogin.error?.code === -32602
+        && authUnchangedByInvalidLogin,
+      `missingError=${missingKeyLogin.error?.code ?? "none"}; blankError=${blankKeyLogin.error?.code ?? "none"}; authChanged=${!authUnchangedByInvalidLogin}`);
+
+    const fixtureKey = "test-key-never-sent-to-a-provider";
+    const loginResp = await send({ id: "c17", method: "login", params: { provider: "openrouter", apiKey: fixtureKey } });
+    const storedAuth = existsSync(authPath) ? JSON.parse(readFileSync(authPath, "utf8")) : {};
+    record("login stores a supplied key in the isolated auth store",
+      loginResp.result?.provider === "openrouter" && loginResp.result?.stored === true
+        && storedAuth.openrouter?.key === fixtureKey);
+
+    const blankReplacementLogin = await send({ id: "c17c", method: "login", params: { provider: "openrouter", apiKey: " " } });
+    const preservedAuth = existsSync(authPath) ? JSON.parse(readFileSync(authPath, "utf8")) : {};
+    record("blank login cannot delete or replace an existing key",
+      blankReplacementLogin.error?.code === -32602 && preservedAuth.openrouter?.key === fixtureKey);
+
+    const settingsResp = await send({ id: "c17d", method: "getSettings", params: {} });
+    record("getSettings does not expose provider credentials",
+      settingsResp.result?.auth === undefined && !JSON.stringify(settingsResp.result).includes(fixtureKey));
 
     const logoutResp = await send({ id: "c18", method: "logout", params: { provider: "openrouter" } });
-    record("logout acknowledges",
-      logoutResp.result?.provider === "openrouter" && logoutResp.result?.stored === false);
+    const loggedOutAuth = existsSync(authPath) ? JSON.parse(readFileSync(authPath, "utf8")) : {};
+    record("explicit logout removes the stored provider key",
+      logoutResp.result?.provider === "openrouter" && logoutResp.result?.stored === false
+        && !Object.hasOwn(loggedOutAuth, "openrouter"));
 
     // 17. listInbox / markMessageRead
     const inboxResp = await send({ id: "c19", method: "listInbox", params: {} });
@@ -761,10 +838,38 @@ async function run() {
 
     // 20. newSession with a real, existing cwd must create and attach a real daemon session.
     const sessionCwd = process.env.BRIDGE_VERIFY_SESSION_CWD || process.cwd();
-    const ns2 = await send({ id: "c22", method: "newSession", params: { cwd: sessionCwd } });
+    const profileInstructions = "Use the offline verification profile instructions.";
+    const ns2 = await send({ id: "c22", method: "newSession", params: {
+      cwd: sessionCwd,
+      profile: {
+        id: "verify-profile",
+        name: "Verify Profile",
+        mode: "standard",
+        systemPrompt: profileInstructions,
+      },
+    } });
     record("newSession({cwd}) creates a draft session and returns its real activeSessionId",
       typeof ns2.result?.activeSessionId === "string" && ns2.result.activeSessionId.length > 0,
       `result=${JSON.stringify(ns2.result)} err=${ns2.error ? ns2.error.code + " " + ns2.error.message : "none"}`);
+
+    if (typeof ns2.result?.activeSessionId === "string") {
+      const { DaemonAgentConnection, DaemonClient } = await import(pathToFileURL(join(REF_ROOT, "dist", "index.js")).href);
+      const profileClient = new DaemonClient(SOCKET_PATH);
+      let profileConnection;
+      try {
+        await profileClient.connect();
+        profileConnection = await DaemonAgentConnection.attach(profileClient, ns2.result.activeSessionId, {
+          closeClientOnDispose: true,
+          supportsExtensionUi: true,
+        });
+        const systemPrompt = await profileConnection.getSystemPrompt();
+        record("new-session profile instructions reach the daemon system prompt",
+          systemPrompt.includes(profileInstructions));
+      } finally {
+        await profileConnection?.dispose().catch(() => undefined);
+        if (!profileConnection) profileClient.close();
+      }
+    }
 
     const createdSessionId = ns2.result?.activeSessionId;
     const stateAfterCreate = await send({ id: "c24", method: "getState", params: {} });
@@ -974,6 +1079,7 @@ async function run() {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     process.off("message", onLifecycleCancellation);
+    rmSync(VERIFY_HOME, { recursive: true, force: true });
   }
 
   if (signalReceived) return;
@@ -995,5 +1101,6 @@ async function run() {
 
 run().catch((err) => {
   console.error("harness fatal:", err);
+  rmSync(VERIFY_HOME, { recursive: true, force: true });
   process.exit(2);
 });

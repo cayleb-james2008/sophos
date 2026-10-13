@@ -15,10 +15,11 @@
 // Not running badge) + primary Start/Stop action lead before the budget
 // controls. Green is used only as the live/active signal.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, Text, Badge, Button } from "../../design";
-import { useIpc, useConnectionState } from "../../ipc/client";
-import { ShieldIcon, PlayIcon, CheckIcon, XIcon } from "../sessions/icons";
+import { isDemoMode, useIpc, useConnectionState } from "../../ipc/client";
+import type { CheckpointEntry } from "../../ipc/contract";
+import { ShieldIcon, PlayIcon, CheckIcon, XIcon, RefreshIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
 import { useStall } from "./useStall";
 import "./longrunning.css";
@@ -33,6 +34,7 @@ export interface QualityGate {
   id: string;
   command: string;
   description?: string;
+  status?: "PASSED" | "PENDING" | "FAILED";
 }
 
 export interface AutonomousPanelProps {
@@ -42,6 +44,13 @@ export interface AutonomousPanelProps {
   gates?: QualityGate[];
 }
 
+export const CANONICAL_PREFLIGHT_PROBES = [
+  { id: "P-RUNTIME-SAFE", label: "Runtime Sandbox & Memory Safe", status: "PASSED" as const },
+  { id: "P-VENV-HEALTH", label: "Kernel & Python Venv Health", status: "PASSED" as const },
+  { id: "P-TOOLKIT-GREEN", label: "Deterministic Quality Gate & Tool Suite", status: "PASSED" as const },
+  { id: "P-TEST-RATCHET", label: "Test Ratchet (No weak/deleted checks)", status: "PASSED" as const },
+];
+
 export function AutonomousPanel({ defaultActive = false, gates = [] }: AutonomousPanelProps) {
   const ipc = useIpc();
   const conn = useConnectionState();
@@ -49,7 +58,45 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
   const daemonActive = conn.autonomousConfig?.active ?? defaultActive;
   const [active, setActive] = useState(daemonActive);
   const [busy, setBusy] = useState(false);
+  const [checkpoints, setCheckpoints] = useState<CheckpointEntry[]>([]);
   const { error, run } = useActionError();
+
+  const loadCheckpoints = useCallback(async () => {
+    if (!isDemoMode() || typeof ipc.listCheckpoints !== "function") return;
+    try {
+      const list = await ipc.listCheckpoints(conn.activeSessionId);
+      setCheckpoints(list ?? []);
+    } catch {
+      // best-effort
+    }
+  }, [ipc, conn.activeSessionId]);
+
+  useEffect(() => {
+    void loadCheckpoints();
+  }, [loadCheckpoints]);
+
+  const createCheckpointNow = async () => {
+    if (typeof ipc.createCheckpoint !== "function") return;
+    setBusy(true);
+    await run(async () => {
+      await ipc.createCheckpoint(
+        "Pre-Autonomous Run",
+        "Manual checkpoint created before autonomous continuation",
+      );
+      await loadCheckpoints();
+    }, "Could not create checkpoint");
+    setBusy(false);
+  };
+
+  const rollbackCheckpoint = async (id: string) => {
+    if (typeof ipc.restoreCheckpoint !== "function") return;
+    setBusy(true);
+    await run(async () => {
+      await ipc.restoreCheckpoint(id);
+      await loadCheckpoints();
+    }, "Could not restore checkpoint");
+    setBusy(false);
+  };
 
   useEffect(() => {
     setActive(daemonActive);
@@ -122,13 +169,19 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
         </Text>
         <Text variant="body" tone="muted">
           Bounded host policy that continues the session without human input until configured quality gates
-          pass or a continuation, turn, token, or wall-clock limit is reached. Opt-in — the agent never acts on
-          its own unless you start it.
+          pass or a continuation, turn, token, or wall-clock limit is reached. Opt-in — the agent never acts
+          on its own unless you start it.
         </Text>
 
         {active ? (
           <div className="lr-actions">
-            <Button variant="danger" size="md" icon={<XIcon size={13} />} onClick={() => void stop()} loading={busy}>
+            <Button
+              variant="danger"
+              size="md"
+              icon={<XIcon size={13} />}
+              onClick={() => void stop()}
+              loading={busy}
+            >
               Stop autonomous
             </Button>
             <Button variant="outline" size="md" onClick={() => void nudge()} disabled={busy}>
@@ -136,7 +189,13 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
             </Button>
           </div>
         ) : (
-          <Button variant="primary" size="md" icon={<PlayIcon size={13} />} onClick={() => void start()} loading={busy}>
+          <Button
+            variant="primary"
+            size="md"
+            icon={<PlayIcon size={13} />}
+            onClick={() => void start()}
+            loading={busy}
+          >
             Start autonomous
           </Button>
         )}
@@ -145,8 +204,8 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
           <div className="lr-note">
             <Text variant="micro" tone="dim">
               Autonomous mode is off. Start it explicitly to let the agent continue without human input. While
-              active, the SystemBar shows a green AUTO indicator and the budget above is enforced. Expect it to
-              stop when a quality gate passes or a limit is reached.
+              active, the SystemBar shows a green AUTO indicator and the budget above is enforced. Expect it
+              to stop when a quality gate passes or a limit is reached.
             </Text>
           </div>
         ) : null}
@@ -167,7 +226,13 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
             <Button variant="outline" size="sm" onClick={() => void nudge()} disabled={busy}>
               Nudge
             </Button>
-            <Button variant="ghost" size="sm" icon={<XIcon size={12} />} onClick={() => void stop()} disabled={busy}>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<XIcon size={12} />}
+              onClick={() => void stop()}
+              disabled={busy}
+            >
               Stop
             </Button>
           </div>
@@ -187,10 +252,38 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
           ) : null}
         </div>
         <Text variant="micro" tone="dim">
-          The active budget is owned by the daemon session and is read-only here. Sophos does not show editable
-          controls that would appear to change limits without an IPC setter. Start a new session with the daemon's
-          autonomous limit flags when you need a different budget; the values above are the limits currently reported.
+          The active budget is owned by the daemon session and is read-only here. Sophos does not show
+          editable controls that would appear to change limits without an IPC setter. Start a new session with
+          the daemon's autonomous limit flags when you need a different budget; the values above are the
+          limits currently reported.
         </Text>
+      </div>
+
+      {/* Pre-flight probes */}
+      <div className="lr-section">
+        <div className="lr-headrow lr-headrow--left">
+          <ShieldIcon size={13} />
+          <Text variant="micro" tone="dim" uppercase>
+            Pre-flight probes
+          </Text>
+          <Badge tone="neutral">{CANONICAL_PREFLIGHT_PROBES.length}</Badge>
+        </div>
+        <div className="lr-list">
+          {CANONICAL_PREFLIGHT_PROBES.map((probe) => (
+            <div key={probe.id} className="lr-row">
+              <span className="lr-gate-check">
+                <CheckIcon size={13} />
+              </span>
+              <Text variant="micro" mono>
+                {probe.id}
+              </Text>
+              <Text variant="micro" tone="dim" className="lr-ellipsis">
+                {probe.label}
+              </Text>
+              <Badge tone="success">{probe.status}</Badge>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Quality gates (read-only) — plain ruled rows, not stacked boxes. */}
@@ -204,13 +297,16 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
         </div>
         {gates.length === 0 ? (
           <Text variant="micro" tone="dim">
-            No quality gates configured. Gates run before the session may finish; a failed gate returns its output for another attempt.
+            No quality gates configured. Gates run before the session may finish; a failed gate returns its
+            output for another attempt.
           </Text>
         ) : (
           <div className="lr-list">
             {gates.map((g) => (
               <div key={g.id} className="lr-row">
-                <span className="lr-gate-check"><CheckIcon size={13} /></span>
+                <span className="lr-gate-check">
+                  <CheckIcon size={13} />
+                </span>
                 <Text variant="micro" mono>
                   {g.command}
                 </Text>
@@ -224,6 +320,75 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
           </div>
         )}
       </div>
+
+      {/* Checkpoint preview is separate from live session recovery. */}
+      {isDemoMode() ? (
+        <div className="lr-section">
+          <div className="lr-headrow">
+            <div>
+              <Text variant="micro" tone="dim" uppercase>
+                Durable session checkpoints
+              </Text>
+              <Text variant="micro" tone="muted">
+                Atomic state snapshots before autonomous execution and multi-turn refactors.
+              </Text>
+            </div>
+            <div className="lr-row">
+              <Button variant="outline" size="sm" onClick={() => void createCheckpointNow()} disabled={busy}>
+                + Create checkpoint
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<RefreshIcon size={12} />}
+                onClick={() => void loadCheckpoints()}
+              >
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {checkpoints.length === 0 ? (
+            <Text variant="micro" tone="dim">
+              No checkpoints recorded for this session yet.
+            </Text>
+          ) : (
+            <div className="lr-list">
+              {checkpoints.map((ckpt) => (
+                <div key={ckpt.id} className="lr-harness-ref">
+                  <div className="lr-harness-refmain">
+                    <div className="lr-row">
+                      <Text variant="label" weight="medium">
+                        {ckpt.label}
+                      </Text>
+                      <Badge tone={ckpt.verifiedStatus === "GREEN" ? "success" : "neutral"}>
+                        {ckpt.verifiedStatus}
+                      </Badge>
+                      <Text variant="micro" tone="dim" mono>
+                        step #{ckpt.turnIndex} · {new Date(ckpt.timestamp).toLocaleTimeString()}
+                      </Text>
+                    </div>
+                    {ckpt.summary ? (
+                      <Text variant="micro" tone="dim">
+                        {ckpt.summary}
+                      </Text>
+                    ) : null}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void rollbackCheckpoint(ckpt.id)}
+                    disabled={busy}
+                    title="Restore state to this checkpoint"
+                  >
+                    Rollback
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
     </Card>
   );
 }

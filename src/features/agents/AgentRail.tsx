@@ -54,7 +54,12 @@ export function AgentRail({
           <div className="ag-railerror" role="alert">
             <span className="ag-railerror__icon">⚡</span>
             <span className="ag-railerror__msg">{error}</span>
-            <Button variant="danger" className="ag-railerror__retry" onClick={() => onRetry()} aria-label="Retry">
+            <Button
+              variant="danger"
+              className="ag-railerror__retry"
+              onClick={() => onRetry()}
+              aria-label="Retry"
+            >
               Retry
             </Button>
           </div>
@@ -162,7 +167,16 @@ interface AgentRowItemProps {
   onSelect: (id: string) => void;
 }
 
-function AgentRowItem({ agent, selected, attached, unread, runtimeModel, onAttach, onDetach, onSelect }: AgentRowItemProps) {
+function AgentRowItem({
+  agent,
+  selected,
+  attached,
+  unread,
+  runtimeModel,
+  onAttach,
+  onDetach,
+  onSelect,
+}: AgentRowItemProps) {
   const idShort = agent.id.slice(0, 8).toUpperCase();
   const summary = agent.summary ?? (agent.sessionId ? `session ${agent.sessionId.slice(0, 8)}` : idShort);
   const model = agent.model ?? runtimeModel;
@@ -188,7 +202,10 @@ function AgentRowItem({ agent, selected, attached, unread, runtimeModel, onAttac
         {model ? <small className="ag-agent__model">{model}</small> : null}
       </span>
 
-      <i className={`ag-kind ag-kind--${agent.kind}`} title={agent.kind === "daemon" ? "Daemon-backed agent" : "RLM child subagent"}>
+      <i
+        className={`ag-kind ag-kind--${agent.kind}`}
+        title={agent.kind === "daemon" ? "Daemon-backed agent" : "RLM child subagent"}
+      >
         {agent.kind === "daemon" ? "Daemon" : "RLM"}
       </i>
 

@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { Modal, Button, Input, TextArea, Text } from "../../design";
 import { useIpc, isTauri } from "../../ipc/client";
+import { useProfile } from "../profiles/profiles";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 // Open a native folder picker via the Tauri dialog plugin. Returns the chosen
@@ -16,7 +17,6 @@ async function pickFolder(): Promise<string | null> {
     const selected = await openDialog({ directory: true, multiple: false });
     return typeof selected === "string" ? selected : null;
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error("[new-session] folder picker failed:", err);
     return null;
   }
@@ -32,6 +32,7 @@ export function NewSessionModal({
   onCreated: () => void;
 }) {
   const ipc = useIpc();
+  const { profile } = useProfile();
   const [cwd, setCwd] = useState("");
   const [goal, setGoal] = useState("");
   const [saveDefault, setSaveDefault] = useState(false);
@@ -71,7 +72,12 @@ export function NewSessionModal({
     setBusy(true);
     try {
       const trimmedCwd = cwd.trim();
-      await ipc.newSession(trimmedCwd || undefined, goal.trim() || undefined);
+      await ipc.newSession(trimmedCwd || undefined, goal.trim() || undefined, {
+        id: profile.id,
+        name: profile.name,
+        mode: profile.mode,
+        systemPrompt: profile.systemPrompt,
+      });
       // Persist the default working directory for future sessions.
       if (saveDefault) {
         try {
@@ -115,7 +121,11 @@ export function NewSessionModal({
             value={cwd}
             onChange={(e) => setCwd(e.target.value)}
             placeholder="C:\work\project"
-            hint={browseHint ? "Folder picker unavailable — type the full path instead." : "Where should this session work?"}
+            hint={
+              browseHint
+                ? "Folder picker unavailable — type the full path instead."
+                : "Where should this session work?"
+            }
           />
           <div className="ns-row">
             <Button variant="outline" size="sm" onClick={browse}>
@@ -141,7 +151,8 @@ export function NewSessionModal({
           placeholder="What should this session accomplish?"
         />
         <Text variant="micro" tone="dim">
-          The session starts fresh in the chosen folder and can be resumed or forked later from the session manager.
+          The session starts fresh in the chosen folder and can be resumed or forked later from the session
+          manager.
         </Text>
       </div>
     </Modal>

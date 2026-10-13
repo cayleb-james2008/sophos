@@ -19,5 +19,5 @@ export interface DaemonKernelMetadata {
 export async function readDaemonKernelState(connection: object): Promise<DaemonKernelMetadata | undefined> {
   const reader = (connection as { getKernelState?: unknown }).getKernelState;
   if (typeof reader !== "function") return undefined;
-  return await reader.call(connection) as DaemonKernelMetadata;
+  return (await reader.call(connection)) as DaemonKernelMetadata;
 }

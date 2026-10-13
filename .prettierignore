@@ -1,0 +1,10 @@
+node_modules/
+dist/
+bridge/dist/
+src-tauri/target/
+resources/
+public/
+coverage/
+package-lock.json
+bridge/package-lock.json
+*.md

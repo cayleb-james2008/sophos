@@ -16,11 +16,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useIpc, useIpcEvent, useConnectionState } from "../../ipc/client";
-import type { AgentInfo, AgentMessage, AgentMessageReceipt, AgentSessionState, AgentWatchEvent, RlmChild } from "../../ipc/contract";
+import type {
+  AgentInfo,
+  AgentMessage,
+  AgentMessageReceipt,
+  AgentSessionState,
+  AgentWatchEvent,
+  BlindCriticRubric,
+  RlmChild,
+  SquadMemberState,
+  SquadRole,
+  SquadTopology,
+} from "../../ipc/contract";
 import { useUnreadRefresh } from "../../ipc/unread";
 
 /** Where an agent process originates. */
-export type AgentKind = "daemon" | "rlm";
+export type AgentKind = "daemon" | "rlm" | "squad";
 /** Unified status, normalized from both AgentInfo ("saved") and RlmChild ("done"|"error"). */
 export type AgentStatus = "running" | "idle" | "saved" | "done" | "error";
 
@@ -33,6 +44,9 @@ export interface AgentRow {
   sessionId?: string;
   parentId?: string;
   model?: string;
+  squadRole?: SquadRole;
+  reviewRounds?: number;
+  latestRubric?: BlindCriticRubric;
 }
 
 /** The local client's own agent id. Mirrors the convention used by InboxView. */
@@ -44,7 +58,36 @@ function toAgentRow(a: AgentInfo): AgentRow {
 }
 
 function childToAgentRow(c: RlmChild): AgentRow {
-  return { id: c.id, name: c.name, kind: "rlm", status: c.status, summary: c.summary, parentId: c.parentId, sessionId: c.sessionId };
+  return {
+    id: c.id,
+    name: c.name,
+    kind: "rlm",
+    status: c.status,
+    summary: c.summary,
+    parentId: c.parentId,
+    sessionId: c.sessionId,
+  };
+}
+
+function squadMemberToAgentRow(m: SquadMemberState): AgentRow {
+  const status: AgentStatus =
+    m.status === "working" || m.status === "evaluating"
+      ? "running"
+      : m.status === "done"
+        ? "done"
+        : m.status === "error"
+          ? "error"
+          : "idle";
+  return {
+    id: m.id,
+    name: m.name,
+    kind: "squad",
+    status,
+    summary: m.targetPiece ? `Target: ${m.targetPiece}` : undefined,
+    squadRole: m.role,
+    reviewRounds: m.reviewRounds,
+    latestRubric: m.latestRubric,
+  };
 }
 
 export function useAgents() {
@@ -52,6 +95,7 @@ export function useAgents() {
   const conn = useConnectionState();
   const [daemonAgents, setDaemonAgents] = useState<AgentInfo[]>([]);
   const [rlmChildren, setRlmChildren] = useState<RlmChild[]>([]);
+  const [squadTopology, setSquadTopology] = useState<SquadTopology>();
   const [inbox, setInbox] = useState<AgentMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
   const [selectedAgentState, setSelectedAgentState] = useState<AgentSessionState>();
@@ -66,8 +110,12 @@ export function useAgents() {
   const unreadRefresh = useUnreadRefresh();
 
   const rows = useMemo<AgentRow[]>(
-    () => [...daemonAgents.map(toAgentRow), ...rlmChildren.map(childToAgentRow)],
-    [daemonAgents, rlmChildren],
+    () => [
+      ...daemonAgents.map(toAgentRow),
+      ...rlmChildren.map(childToAgentRow),
+      ...(squadTopology?.members ?? []).map(squadMemberToAgentRow),
+    ],
+    [daemonAgents, rlmChildren, squadTopology],
   );
 
   const selected = rows.find((r) => r.id === selectedId) ?? null;
@@ -88,16 +136,39 @@ export function useAgents() {
     setLoading(true);
     setError(undefined);
     try {
-      const [daemon, rlm, mb] = await Promise.all([ipc.listAgents(), ipc.getRlmChildren(), ipc.listInbox()]);
+      const [daemon, rlm, mb, sq] = await Promise.all([
+        typeof ipc.listAgents === "function" ? ipc.listAgents().catch(() => []) : Promise.resolve([]),
+        typeof ipc.getRlmChildren === "function" ? ipc.getRlmChildren().catch(() => []) : Promise.resolve([]),
+        typeof ipc.listInbox === "function" ? ipc.listInbox().catch(() => []) : Promise.resolve([]),
+        typeof ipc.getSquadTopology === "function"
+          ? ipc.getSquadTopology().catch(() => undefined)
+          : Promise.resolve(undefined),
+      ]);
       setDaemonAgents(daemon ?? []);
       setRlmChildren(rlm ?? []);
       setInbox(mb ?? []);
+      setSquadTopology(sq);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Agent relay unavailable");
     } finally {
       setLoading(false);
     }
   }, [ipc]);
+
+  const evaluatePiece = useCallback(
+    async (childId: string, pieceContract: string, bar: string, outputPaths: string[]) => {
+      setError(undefined);
+      try {
+        const rubric = await ipc.evaluateSquadPiece(childId, pieceContract, bar, outputPaths);
+        await refresh();
+        return rubric;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Blind critic evaluation failed");
+        throw e;
+      }
+    },
+    [ipc, refresh],
+  );
 
   useEffect(() => {
     void refresh();
@@ -122,29 +193,40 @@ export function useAgents() {
     // already selected.
     setSelectedAgentState(undefined);
     if (!selectedId) {
-      return () => { mounted = false; };
+      return () => {
+        mounted = false;
+      };
     }
-    ipc.getAgentState(selectedId).then((next) => {
-      if (mounted) setSelectedAgentState(next);
-    }).catch(() => {
-      if (mounted) setSelectedAgentState(undefined);
-    });
-    return () => { mounted = false; };
+    ipc
+      .getAgentState(selectedId)
+      .then((next) => {
+        if (mounted) setSelectedAgentState(next);
+      })
+      .catch(() => {
+        if (mounted) setSelectedAgentState(undefined);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [ipc, selectedId]);
 
   const applyWatchEvent = useCallback((event: AgentWatchEvent) => {
     if (event.kind === "attached") {
-      setAttachedIds((current) => current.includes(event.childId) ? current : [...current, event.childId]);
-      setSelectedAgentState((current) => current === undefined || current.id === event.childId ? event.state : current);
+      setAttachedIds((current) => (current.includes(event.childId) ? current : [...current, event.childId]));
+      setSelectedAgentState((current) =>
+        current === undefined || current.id === event.childId ? event.state : current,
+      );
       return;
     }
     if (event.kind === "detached") {
       setAttachedIds((current) => current.filter((id) => id !== event.childId));
       return;
     }
-    setSelectedAgentState((current) => current?.id === event.childId ? event.state : current);
+    setSelectedAgentState((current) => (current?.id === event.childId ? event.state : current));
     if (event.kind === "status") {
-      setRlmChildren((old) => old.map((child) => child.id === event.childId ? { ...child, status: event.status } : child));
+      setRlmChildren((old) =>
+        old.map((child) => (child.id === event.childId ? { ...child, status: event.status } : child)),
+      );
     }
   }, []);
 
@@ -180,14 +262,17 @@ export function useAgents() {
     [ipc, rows],
   );
 
-  const detach = useCallback(async (id: string) => {
-    setError(undefined);
-    try {
-      await ipc.detachAgent(id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Detach failed");
-    }
-  }, [ipc]);
+  const detach = useCallback(
+    async (id: string) => {
+      setError(undefined);
+      try {
+        await ipc.detachAgent(id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Detach failed");
+      }
+    },
+    [ipc],
+  );
 
   // ---- Messaging ----
   const send = useCallback(async () => {
@@ -241,29 +326,32 @@ export function useAgents() {
       setInbox((old) => old.map((m) => (m.id === messageId ? { ...m, read: true } : m)));
       unreadRefresh?.();
     },
-    [ipc],
+    [ipc, unreadRefresh],
   );
 
   const markAllRead = useCallback(async () => {
     const toMark = thread.filter((m) => incoming(m));
     await Promise.allSettled(toMark.map((m) => ipc.markMessageRead(m.id)));
-    setInbox((old) =>
-      old.map((m) => (toMark.some((t) => t.id === m.id) ? { ...m, read: true } : m)),
-    );
+    setInbox((old) => old.map((m) => (toMark.some((t) => t.id === m.id) ? { ...m, read: true } : m)));
     unreadRefresh?.();
-  }, [thread, ipc]);
+  }, [thread, ipc, unreadRefresh]);
 
   // Mark every incoming unread message addressed to a given agent as read.
+  // Bail out when there is nothing to mark: setInbox always produces a NEW
+  // array reference (Array.map), so without this guard the AgentsView
+  // auto-mark effect re-runs on every commit (markAgentRead's identity tracks
+  // inbox), driving an infinite setState -> re-render -> effect loop that
+  // React reports as "Maximum update depth exceeded" and eventually jams the
+  // main thread (caught by the visual regression harness on the Agents view).
   const markAgentRead = useCallback(
     async (id: string) => {
       const toMark = inbox.filter((m) => m.toAgentId === id && incoming(m));
+      if (toMark.length === 0) return;
       await Promise.allSettled(toMark.map((m) => ipc.markMessageRead(m.id)));
-      setInbox((old) =>
-        old.map((m) => (toMark.some((t) => t.id === m.id) ? { ...m, read: true } : m)),
-      );
+      setInbox((old) => old.map((m) => (toMark.some((t) => t.id === m.id) ? { ...m, read: true } : m)));
       unreadRefresh?.();
     },
-    [inbox, ipc],
+    [inbox, ipc, unreadRefresh],
   );
 
   return {
@@ -290,6 +378,8 @@ export function useAgents() {
     loading,
     error,
     refresh,
+    squadTopology,
+    evaluatePiece,
     runtimeModel,
     connectionStatus: conn.status,
     connectionModel: conn.model,

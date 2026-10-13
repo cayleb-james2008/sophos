@@ -98,10 +98,13 @@ export function usePromptQueue({ busy, busyRef, sendRef }: PromptQueueOptions) {
   }, [busy, tryFlushFollowUps, busyRef]);
 
   // Clear transient notices on unmount.
-  useEffect(() => () => {
-    if (steeredTimer.current) window.clearTimeout(steeredTimer.current);
-    if (shellTimer.current) window.clearTimeout(shellTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (steeredTimer.current) window.clearTimeout(steeredTimer.current);
+      if (shellTimer.current) window.clearTimeout(shellTimer.current);
+    },
+    [],
+  );
 
   return {
     followUps,

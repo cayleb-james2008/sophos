@@ -84,7 +84,11 @@ export function toParamType(schema: ToolSchema | undefined): string {
 
 /** Render one stub. `usedIdents` tracks identifiers so colliding tool names
  * get a numeric suffix deterministically. */
-export function renderStub(entry: ToolRegistryEntry, usedIdents: Set<string>, options: SdkRenderOptions = {}): string {
+export function renderStub(
+  entry: ToolRegistryEntry,
+  usedIdents: Set<string>,
+  options: SdkRenderOptions = {},
+): string {
   let ident = toIdent(entry?.name);
   if (usedIdents.has(ident)) {
     let suffix = 2;

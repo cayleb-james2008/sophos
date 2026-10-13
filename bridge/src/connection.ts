@@ -21,13 +21,14 @@ import {
   type AgentConnectionModel,
   type AgentConnectionSessionEvent,
   type AgentConnectionState,
+  FileAuthStorageBackend,
 } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { readDaemonKernelState } from "./kernel-state-compat.js";
 import type { DaemonKernelMetadata } from "./kernel-state-compat.js";
-
 // ---------------------------------------------------------------------------
 // Persistent settings file.
 //
@@ -42,6 +43,12 @@ const MODELS_JSON_PATH = join(PRIME_AGENT_DIR, "models.json");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function unsupportedRuntimeOperation(operation: string): never {
+  throw new Error(
+    `${operation} is unsupported by this Sophos build: the pinned Prime Agent runtime has no implementation for it.`,
+  );
 }
 
 function readSettingsFile(): Record<string, unknown> {
@@ -84,8 +91,75 @@ function normalizeString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+const LOCAL_PROVIDER_ID = /^sophos-local-[a-z0-9-]{1,32}$/;
+
+function isLoopbackHttpUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const loopback =
+      host === "localhost" || host === "localhost." || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host);
+    return url.protocol === "http:" && loopback && !url.username && !url.password && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeLocalProviders(value: unknown): NonNullable<Settings["localProviders"]> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    const id = normalizeString(entry.id);
+    const name = normalizeString(entry.name);
+    const baseUrl = normalizeString(entry.baseUrl);
+    const kind = entry.kind;
+    if (
+      !id ||
+      !LOCAL_PROVIDER_ID.test(id) ||
+      !name ||
+      name.length > 120 ||
+      !isLoopbackHttpUrl(baseUrl) ||
+      (kind !== "ollama" && kind !== "openai-compatible")
+    )
+      return [];
+    const models = Array.isArray(entry.models)
+      ? entry.models
+          .flatMap((model) => {
+            if (!isRecord(model)) return [];
+            const modelId = normalizeString(model.id);
+            const modelName = normalizeString(model.name);
+            if (
+              !modelId ||
+              modelId.length > 200 ||
+              [...modelId].some(
+                (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+              ) ||
+              !modelName ||
+              modelName.length > 120
+            )
+              return [];
+            return [{ id: modelId, name: modelName }];
+          })
+          .slice(0, 256)
+      : [];
+    const uniqueModels = models.filter(
+      (model, index) => models.findIndex((candidate) => candidate.id === model.id) === index,
+    );
+    return [{ id, name, baseUrl: baseUrl.replace(/\/+$/, ""), kind, models: uniqueModels }];
+  });
+}
+
 const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
-const STRING_SETTING_KEYS = ["shellPath", "sessionDir", "defaultCwd", "defaultProvider", "defaultModel", "defaultThinking", "daemonCliPath"] as const;
+const STRING_SETTING_KEYS = [
+  "shellPath",
+  "sessionDir",
+  "defaultCwd",
+  "defaultProvider",
+  "defaultModel",
+  "defaultThinking",
+  "daemonCliPath",
+] as const;
 
 function normalizeThinking(value: unknown): string | undefined {
   const thinking = normalizeString(value);
@@ -101,7 +175,11 @@ function normalizeTheme(value: unknown): Settings["theme"] {
 }
 
 function normalizeSettings(raw: Record<string, unknown>): Settings {
-  const out: Record<string, unknown> = { ...raw, theme: normalizeTheme(raw.theme) ?? "dark", daemonTcp: false };
+  const out: Record<string, unknown> = {
+    ...raw,
+    theme: normalizeTheme(raw.theme) ?? "dark",
+    daemonTcp: false,
+  };
 
   for (const key of STRING_SETTING_KEYS) {
     const value = normalizeStringSetting(key, raw[key]);
@@ -115,26 +193,10 @@ function normalizeSettings(raw: Record<string, unknown>): Settings {
   const modelConfig = normalizeModelConfig(raw.modelConfig);
   if (modelConfig) out.modelConfig = modelConfig;
   else delete out.modelConfig;
+  // Provider credentials belong in auth.json and are never returned by settings IPC.
+  delete out.auth;
 
-  if (isRecord(raw.auth)) {
-    out.auth = Object.fromEntries(
-      Object.entries(raw.auth).filter(([, value]) => typeof value === "string" && value.length > 0),
-    );
-  } else {
-    delete out.auth;
-  }
-
-  if (Array.isArray(raw.localProviders)) {
-    out.localProviders = raw.localProviders.filter((value): value is Record<string, unknown> => {
-      if (!isRecord(value)) return false;
-      return normalizeString(value.id) !== undefined
-        && normalizeString(value.name) !== undefined
-        && normalizeString(value.baseUrl) !== undefined
-        && (value.kind === "ollama" || value.kind === "openai-compatible");
-    });
-  } else {
-    delete out.localProviders;
-  }
+  out.localProviders = normalizeLocalProviders(raw.localProviders);
 
   return out as Settings;
 }
@@ -161,9 +223,11 @@ function normalizePatch(patch: Partial<Settings>): Record<string, unknown> {
     if (value === undefined) delete result.daemonTcp;
     else result.daemonTcp = value;
   }
-  if (Object.prototype.hasOwnProperty.call(raw, "modelConfig")) result.modelConfig = normalized.modelConfig ?? {};
-  if (Object.prototype.hasOwnProperty.call(raw, "auth")) result.auth = normalized.auth ?? {};
-  if (Object.prototype.hasOwnProperty.call(raw, "localProviders")) result.localProviders = normalized.localProviders ?? [];
+  if (Object.prototype.hasOwnProperty.call(raw, "modelConfig"))
+    result.modelConfig = normalized.modelConfig ?? {};
+  delete result.auth;
+  if (Object.prototype.hasOwnProperty.call(raw, "localProviders"))
+    result.localProviders = normalized.localProviders ?? [];
   return result;
 }
 
@@ -173,6 +237,45 @@ function writeSettingsSnapshot(settings: Record<string, unknown>): void {
 }
 
 const AUTH_PATH = join(PRIME_AGENT_DIR, "auth.json");
+
+type AuthStore = Record<string, unknown>;
+
+function ensurePrivateAuthDirectory(): void {
+  if (!existsSync(PRIME_AGENT_DIR)) mkdirSync(PRIME_AGENT_DIR, { recursive: true, mode: 0o700 });
+  if (process.platform !== "win32") chmodSync(PRIME_AGENT_DIR, 0o700);
+}
+
+function updateAuthStore(update: (auth: AuthStore) => boolean): void {
+  ensurePrivateAuthDirectory();
+  const storage = new FileAuthStorageBackend(AUTH_PATH);
+  storage.withLock((current) => {
+    const parsed: unknown = current === undefined ? {} : JSON.parse(current);
+    if (!isRecord(parsed)) throw new Error("Prime Agent auth.json must contain an object");
+    return update(parsed)
+      ? { result: undefined, next: JSON.stringify(parsed, null, 2) }
+      : { result: undefined };
+  });
+}
+
+function migrateLegacyAuth(value: unknown): void {
+  if (!isRecord(value)) return;
+  const legacyEntries = Object.entries(value).filter(
+    ([provider, key]) =>
+      /^[a-z0-9][a-z0-9._-]{0,63}$/i.test(provider) && typeof key === "string" && key.length > 0,
+  );
+  if (legacyEntries.length === 0) return;
+
+  updateAuthStore((auth) => {
+    let changed = false;
+    for (const [provider, key] of legacyEntries) {
+      if (!Object.prototype.hasOwnProperty.call(auth, provider)) {
+        auth[provider] = { type: "api_key", key };
+        changed = true;
+      }
+    }
+    return changed;
+  });
+}
 
 /**
  * Mirror a provider API key into the daemon's auth file (~/.prime/agent/auth.json).
@@ -186,41 +289,34 @@ const AUTH_PATH = join(PRIME_AGENT_DIR, "auth.json");
  *   - Read + merge, never clobber other providers' entries.
  *   - apiKey provided -> upsert { provider: { type: "api_key", key } }.
  *   - apiKey omitted -> remove only the provider's entry, preserve the rest.
- *   - Create ~/.prime/agent/ if missing; single-writer write is acceptable.
+ *   - Create ~/.prime/agent/ if missing; update under the daemon's shared auth-file lock.
  *   - Never called unless the user explicitly logged in/out via the IPC command.
  */
 export function writeAuthKey(provider: string, apiKey?: string): void {
-  try {
-    if (!existsSync(PRIME_AGENT_DIR)) mkdirSync(PRIME_AGENT_DIR, { recursive: true });
-    let auth: Record<string, { type: "api_key"; key: string }> = {};
-    if (existsSync(AUTH_PATH)) {
-      try {
-        auth = JSON.parse(readFileSync(AUTH_PATH, "utf8")) as Record<string, { type: "api_key"; key: string }>;
-        if (!auth || typeof auth !== "object" || Array.isArray(auth)) auth = {};
-      } catch {
-        auth = {};
-      }
-    }
-    if (apiKey) {
-      auth[provider] = { type: "api_key", key: apiKey };
-    } else {
-      delete auth[provider];
-    }
-    writeFileSync(AUTH_PATH, JSON.stringify(auth, null, 2) + "\n", "utf8");
-  } catch (err) {
-    if (typeof process !== "undefined" && process.stderr) {
-      const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`[bridge:auth] failed to write auth.json mirror: ${msg}\n`);
-    }
+  if (typeof provider !== "string" || !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(provider)) {
+    throw new Error("Invalid provider id");
   }
+  if (apiKey !== undefined && (typeof apiKey !== "string" || apiKey.trim().length === 0)) {
+    throw new Error("API key must be a non-empty string when provided");
+  }
+  updateAuthStore((auth) => {
+    if (apiKey !== undefined) {
+      auth[provider] = { type: "api_key", key: apiKey };
+      return true;
+    }
+    if (!Object.prototype.hasOwnProperty.call(auth, provider)) return false;
+    delete auth[provider];
+    return true;
+  });
 }
 
 import type { AgentMessage as PiAgentMessage } from "@earendil-works/pi-agent-core";
 import type {
-  AgentInfo,
   AgentMessage,
   AgentSessionState,
   AutonomousConfig,
+  BlindCriticRubric,
+  CheckpointEntry,
   ConnectionState,
   ConnectionStatus,
   ContextStats,
@@ -235,6 +331,9 @@ import type {
   KernelHealthDiagnostic,
   KernelHealthReason,
   KernelState,
+  MemoryState,
+  MemoryTier,
+  MemoryTierEntry,
   ModelInfo,
   ProviderInfo,
   QueueState,
@@ -246,7 +345,26 @@ import type {
   SessionTree,
   SessionTreeNode,
   Settings,
+  SquadTopology,
   TranscriptMessage,
+  // Local-model and desktop-runtime surfaces added on the GitLab branch.
+  BlastRadiusReport,
+  DesktopActionResult,
+  DesktopUiAction,
+  DesktopUiElement,
+  DesktopWindowInfo,
+  DistilledSkill,
+  McpResource,
+  McpServerDetails,
+  SecurityAuditEntry,
+  SquadWorkflowState,
+  SquadWorkflowType,
+  ThoughtTreeState,
+  TokenBudgetBreakdown,
+  TwinDiffReport,
+  TwinExecResult,
+  WorkspaceSecurityPolicy,
+  WorkspaceTwin,
 } from "../../src/ipc/contract.js";
 
 // Re-declared locally so we don't need a separate import for these shapes —
@@ -310,14 +428,13 @@ export type InternalStatus = "connecting" | "connected" | "disconnected" | "reco
 export function isRecoverableDaemonClose(reason: string): boolean {
   // Session lifecycle closures (completed, killed, replaced, shutdown, update)
   // are terminal. Only transport-loss errors should create a new attachment.
-  return reason.startsWith("Lost connection to the Prime Agent daemon.")
-    || reason.startsWith("Daemon reconnection failed:");
+  return (
+    reason.startsWith("Lost connection to the Prime Agent daemon.") ||
+    reason.startsWith("Daemon reconnection failed:")
+  );
 }
 
-export function toConnectionStatus(
-  status: InternalStatus,
-  reason?: string,
-): ConnectionStatus {
+export function toConnectionStatus(status: InternalStatus, reason?: string): ConnectionStatus {
   switch (status) {
     case "connecting":
       return { kind: "connecting" };
@@ -334,7 +451,10 @@ export function toConnectionStatus(
 // Mappers — AgentConnection → IPC contract
 // ---------------------------------------------------------------------------
 
-function mapModel(model: AgentConnectionModel | undefined, thinkingLevel: string | undefined): ConnectionState["model"] {
+function mapModel(
+  model: AgentConnectionModel | undefined,
+  thinkingLevel: string | undefined,
+): ConnectionState["model"] {
   if (!model) return undefined;
   return {
     provider: model.provider,
@@ -372,11 +492,12 @@ function mapGoals(state: AgentConnectionState): Goal[] | undefined {
     error: "cleared",
   };
   const status: Goal["status"] = statusMap[statusRaw] ?? (activeFlag ? "active" : "completed");
-  const id = typeof goal.goalId === "string" && goal.goalId
-    ? (goal.goalId as string)
-    : typeof goal.id === "string" && goal.id
-      ? (goal.id as string)
-      : "default";
+  const id =
+    typeof goal.goalId === "string" && goal.goalId
+      ? (goal.goalId as string)
+      : typeof goal.id === "string" && goal.id
+        ? (goal.id as string)
+        : "default";
   const progress = typeof goal.progress === "string" ? (goal.progress as string) : undefined;
   return [{ id, objective, status, progress }];
 }
@@ -467,13 +588,14 @@ function mapRlmChildren(snapshot: AgentConnectionSnapshot | undefined): RlmChild
     id: c.id,
     sessionId: c.activeSessionId,
     name: c.sessionName ?? c.label,
-    status: (c.status === "queued" || c.status === "running")
-      ? "running"
-      : c.status === "done"
-        ? "done"
-        : c.status === "error" || c.status === "cancelled"
-          ? "error"
-          : "idle",
+    status:
+      c.status === "queued" || c.status === "running"
+        ? "running"
+        : c.status === "done"
+          ? "done"
+          : c.status === "error" || c.status === "cancelled"
+            ? "error"
+            : "idle",
     parentId: c.parentId,
     summary: c.answerPreview,
   }));
@@ -645,11 +767,8 @@ export function mapAgentMessage(msg: PiAgentMessage, idx: number): TranscriptMes
   const m = msg as unknown as Record<string, unknown>;
   const role = (typeof m.role === "string" ? m.role : "system") as TranscriptMessage["role"];
   const id = typeof m.id === "string" ? m.id : `msg-${idx}`;
-  const timestamp = typeof m.timestamp === "string"
-    ? m.timestamp
-    : typeof m.createdAt === "string"
-      ? m.createdAt
-      : undefined;
+  const timestamp =
+    typeof m.timestamp === "string" ? m.timestamp : typeof m.createdAt === "string" ? m.createdAt : undefined;
 
   // Content can be string | ContentPart[].
   let content = "";
@@ -670,7 +789,11 @@ export function mapAgentMessage(msg: PiAgentMessage, idx: number): TranscriptMes
 
   let thinking: string | undefined;
   if (typeof m.thinking === "string") thinking = m.thinking;
-  else if (m.thinking && typeof m.thinking === "object" && "text" in (m.thinking as Record<string, unknown>)) {
+  else if (
+    m.thinking &&
+    typeof m.thinking === "object" &&
+    "text" in (m.thinking as Record<string, unknown>)
+  ) {
     thinking = String((m.thinking as Record<string, unknown>).text ?? "");
   }
 
@@ -678,8 +801,18 @@ export function mapAgentMessage(msg: PiAgentMessage, idx: number): TranscriptMes
     ? (m.toolCalls as Array<Record<string, unknown>>).map((tc, i) => ({
         id: typeof tc.id === "string" ? tc.id : `tc-${idx}-${i}`,
         name: typeof tc.name === "string" ? tc.name : typeof tc.toolName === "string" ? tc.toolName : "tool",
-        input: typeof tc.input === "string" ? tc.input : tc.input !== undefined ? JSON.stringify(tc.input) : undefined,
-        output: typeof tc.output === "string" ? tc.output : tc.output !== undefined ? JSON.stringify(tc.output) : undefined,
+        input:
+          typeof tc.input === "string"
+            ? tc.input
+            : tc.input !== undefined
+              ? JSON.stringify(tc.input)
+              : undefined,
+        output:
+          typeof tc.output === "string"
+            ? tc.output
+            : tc.output !== undefined
+              ? JSON.stringify(tc.output)
+              : undefined,
         status: (typeof tc.status === "string" ? tc.status : "complete") as "running" | "complete" | "error",
       }))
     : undefined;
@@ -703,34 +836,75 @@ export async function getTranscript(conn: AgentConnection): Promise<TranscriptMe
 function textFromContent(value: unknown): string {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return "";
-  return value.map((part) => {
-    if (!part || typeof part !== "object") return "";
-    const p = part as Record<string, unknown>;
-    return typeof p.text === "string" ? p.text : "";
-  }).join("");
+  return value
+    .map((part) => {
+      if (!part || typeof part !== "object") return "";
+      const p = part as Record<string, unknown>;
+      return typeof p.text === "string" ? p.text : "";
+    })
+    .join("");
 }
 
 const KERNEL_HEALTH_COPY: Record<KernelHealthReason, Omit<KernelHealthDiagnostic, "reason">> = {
-  healthy: { message: "The Python workspace is healthy and responding.", nextStep: "No action is needed.", action: "none" },
-  starting: { message: "The Python workspace is starting.", nextStep: "Wait a few seconds, then refresh this panel.", action: "wait" },
-  not_started: { message: "The Python workspace has not started yet.", nextStep: "Run a code cell to start it.", action: "run_cell" },
-  bootstrap_failed: { message: "The Python workspace could not start.", nextStep: "Refresh once. If it stays unavailable, restart the engine and check that Python support is installed.", action: "retry" },
-  dead: { message: "The Python workspace stopped unexpectedly.", nextStep: "Restart the engine to create a fresh workspace. In-memory variables will be lost.", action: "restart" },
-  namespace_unavailable: { message: "The Python workspace is running, but its live state could not be read.", nextStep: "Wait for the current cell to finish, then refresh this panel.", action: "refresh" },
-  browser_preview: { message: "The browser preview has no live Python workspace.", nextStep: "Open the Tauri app to inspect the live kernel.", action: "open_tauri" },
-  unavailable: { message: "Kernel health is temporarily unavailable.", nextStep: "Check the engine connection, then refresh this panel.", action: "refresh" },
+  healthy: {
+    message: "The Python workspace is healthy and responding.",
+    nextStep: "No action is needed.",
+    action: "none",
+  },
+  starting: {
+    message: "The Python workspace is starting.",
+    nextStep: "Wait a few seconds, then refresh this panel.",
+    action: "wait",
+  },
+  not_started: {
+    message: "The Python workspace has not started yet.",
+    nextStep: "Run a code cell to start it.",
+    action: "run_cell",
+  },
+  bootstrap_failed: {
+    message: "The Python workspace could not start.",
+    nextStep:
+      "Refresh once. If it stays unavailable, restart the engine and check that Python support is installed.",
+    action: "retry",
+  },
+  dead: {
+    message: "The Python workspace stopped unexpectedly.",
+    nextStep: "Restart the engine to create a fresh workspace. In-memory variables will be lost.",
+    action: "restart",
+  },
+  namespace_unavailable: {
+    message: "The Python workspace is running, but its live state could not be read.",
+    nextStep: "Wait for the current cell to finish, then refresh this panel.",
+    action: "refresh",
+  },
+  browser_preview: {
+    message: "The browser preview has no live Python workspace.",
+    nextStep: "Open the Tauri app to inspect the live kernel.",
+    action: "open_tauri",
+  },
+  unavailable: {
+    message: "Kernel health is temporarily unavailable.",
+    nextStep: "Check the engine connection, then refresh this panel.",
+    action: "refresh",
+  },
 };
 
 /** Map only allowlisted health fields; daemon errors never cross into the UI. */
 export function mapKernelDiagnostic(value: unknown): KernelHealthDiagnostic {
-  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const reason = typeof raw.reason === "string" && Object.prototype.hasOwnProperty.call(KERNEL_HEALTH_COPY, raw.reason)
-    ? raw.reason as KernelHealthReason
-    : "unavailable";
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const reason =
+    typeof raw.reason === "string" && Object.prototype.hasOwnProperty.call(KERNEL_HEALTH_COPY, raw.reason)
+      ? (raw.reason as KernelHealthReason)
+      : "unavailable";
   return { reason, ...KERNEL_HEALTH_COPY[reason] };
 }
 
-/** Build a visible notebook projection from daemon kernel metadata and real IPython tool details. */
+/**
+ * Build a visible notebook projection from the optional daemon kernel metadata
+ * API and the real IPython tool transcript. Older pinned daemon builds may not
+ * expose the metadata endpoint; the compatibility adapter reports that state
+ * honestly while preserving transcript-derived cell output.
+ */
 export async function getKernelState(conn: AgentConnection): Promise<KernelState> {
   const [daemonState, kernelState, messages] = await Promise.all([
     conn.getState(),
@@ -753,27 +927,36 @@ export async function getKernelState(conn: AgentConnection): Promise<KernelState
       if (!part || typeof part !== "object") continue;
       const block = part as Record<string, unknown>;
       if (block.type !== "toolCall" || block.name !== "ipython") continue;
-      const args = block.arguments && typeof block.arguments === "object"
-        ? block.arguments as Record<string, unknown>
-        : {};
+      const args =
+        block.arguments && typeof block.arguments === "object"
+          ? (block.arguments as Record<string, unknown>)
+          : {};
       const code = typeof args.code === "string" ? args.code : "";
       const id = typeof block.id === "string" ? block.id : `cell-${cells.length + 1}`;
       const result = results.get(id);
-      const details = result?.details && typeof result.details === "object"
-        ? result.details as Record<string, unknown>
-        : undefined;
+      const details =
+        result?.details && typeof result.details === "object"
+          ? (result.details as Record<string, unknown>)
+          : undefined;
       const stdout = typeof details?.stdout === "string" ? details.stdout : "";
       const resultText = typeof details?.result === "string" ? details.result : "";
       const output = stdout || resultText || (result ? textFromContent(result.content) : undefined);
-      const errorDetails = details?.error && typeof details.error === "object"
-        ? details.error as Record<string, unknown>
-        : undefined;
-      const error = typeof errorDetails?.evalue === "string"
-        ? errorDetails.evalue
-        : result?.isError === true ? (typeof details?.stderr === "string" ? details.stderr : output) : undefined;
-      const executionCount = typeof details?.executionCount === "number" && Number.isInteger(details.executionCount)
-        ? details.executionCount
-        : undefined;
+      const errorDetails =
+        details?.error && typeof details.error === "object"
+          ? (details.error as Record<string, unknown>)
+          : undefined;
+      const error =
+        typeof errorDetails?.evalue === "string"
+          ? errorDetails.evalue
+          : result?.isError === true
+            ? typeof details?.stderr === "string"
+              ? details.stderr
+              : output
+            : undefined;
+      const executionCount =
+        typeof details?.executionCount === "number" && Number.isInteger(details.executionCount)
+          ? details.executionCount
+          : undefined;
       cells.push({
         id,
         code,
@@ -786,13 +969,20 @@ export async function getKernelState(conn: AgentConnection): Promise<KernelState
     }
   }
   const latest = cells[cells.length - 1];
+  const kernelReady = activeTools.includes("ipython");
   const running = kernelState?.running === true && kernelState.namespace !== null;
   return {
-    status: !activeTools.includes("ipython") ? "unavailable" : latest?.status === "running" ? "running" : running ? "configured" : "unavailable",
-    persistent: activeTools.includes("ipython"),
-    toolAvailable: activeTools.includes("ipython"),
+    status: !kernelReady
+      ? "unavailable"
+      : latest?.status === "running"
+        ? "running"
+        : running
+          ? "configured"
+          : "unavailable",
+    persistent: kernelReady,
+    toolAvailable: kernelReady,
     sessionId: daemonState.sessionId,
-    executionCount: kernelState?.executionCount,
+    executionCount: kernelState?.executionCount ?? latest?.executionCount ?? 0,
     cells,
     variables: kernelState?.namespace?.names ?? [],
     imports: kernelState?.namespace?.imports ?? [],
@@ -806,7 +996,9 @@ function readJsonFile(path: string): Record<string, unknown> | undefined {
   try {
     if (!existsSync(path)) return undefined;
     const value = JSON.parse(readFileSync(path, "utf8"));
-    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
   } catch {
     return undefined;
   }
@@ -842,8 +1034,14 @@ export async function getHarnessState(conn: AgentConnection): Promise<HarnessSta
             content: typeof entry.content === "string" ? entry.content : "",
             path: typeof entry.path === "string" ? entry.path : undefined,
             scope: entry.scope === "local" ? "local" : "global",
-            reference: entry.reference && typeof entry.reference === "object" ? entry.reference as Record<string, unknown> : undefined,
-            arguments: entry.arguments && typeof entry.arguments === "object" ? entry.arguments as Record<string, unknown> : undefined,
+            reference:
+              entry.reference && typeof entry.reference === "object"
+                ? (entry.reference as Record<string, unknown>)
+                : undefined,
+            arguments:
+              entry.arguments && typeof entry.arguments === "object"
+                ? (entry.arguments as Record<string, unknown>)
+                : undefined,
             version: typeof entry.version === "number" ? entry.version : undefined,
             updatedAt: typeof entry.updated_at === "string" ? entry.updated_at : undefined,
           });
@@ -858,7 +1056,9 @@ export async function getHarnessState(conn: AgentConnection): Promise<HarnessSta
           id: typeof r.id === "string" ? r.id : `refinement-${refinements.length + 1}`,
           summary: typeof r.summary === "string" ? r.summary : undefined,
           trigger: typeof r.trigger === "string" ? r.trigger : undefined,
-          changes: Array.isArray(r.changes) ? r.changes.filter((x): x is string => typeof x === "string") : undefined,
+          changes: Array.isArray(r.changes)
+            ? r.changes.filter((x): x is string => typeof x === "string")
+            : undefined,
           outcome: typeof r.outcome === "string" ? r.outcome : undefined,
           timestamp: typeof r.created_at === "string" ? r.created_at : undefined,
           rollbackOf: typeof r.rollbackOf === "string" ? r.rollbackOf : undefined,
@@ -868,13 +1068,19 @@ export async function getHarnessState(conn: AgentConnection): Promise<HarnessSta
   }
   const historyPath = join(PRIME_AGENT_DIR, "harness", "refinements.jsonl");
   if (existsSync(historyPath)) {
-    for (const line of readFileSync(historyPath, "utf8").split(/\\r?\\n/).filter(Boolean)) {
+    for (const line of readFileSync(historyPath, "utf8")
+      .split(/\\r?\\n/)
+      .filter(Boolean)) {
       const value = readJsonFileFromText(line);
       if (!value || typeof value.id !== "string") continue;
       refinements.push({
         id: value.id,
         summary: typeof value.summary === "string" ? value.summary : undefined,
-        changes: Array.isArray(value.appliedEdits) ? value.appliedEdits.map((e) => `${e.applied ? "applied" : "failed"} ${e.action ?? "edit"} ${e.kind ?? ""}`) : undefined,
+        changes: Array.isArray(value.appliedEdits)
+          ? value.appliedEdits.map(
+              (e) => `${e.applied ? "applied" : "failed"} ${e.action ?? "edit"} ${e.kind ?? ""}`,
+            )
+          : undefined,
         timestamp: typeof value.id === "string" ? value.id : undefined,
         rollbackOf: typeof value.rollbackOf === "string" ? value.rollbackOf : undefined,
       });
@@ -883,10 +1089,311 @@ export async function getHarnessState(conn: AgentConnection): Promise<HarnessSta
   return { entries, refinements, source };
 }
 
+// ---------------------------------------------------------------------------
+// Multi-Tier Semantic Memory Architecture (OpenViking / Letta)
+// ---------------------------------------------------------------------------
+
+const MEMORY_DIR = join(PRIME_AGENT_DIR, "memory");
+const MEMORY_STORE_PATH = join(MEMORY_DIR, "tiered_memory.json");
+
+function readMemoryStore(): MemoryTierEntry[] {
+  try {
+    if (!existsSync(MEMORY_STORE_PATH)) return [];
+    const raw = JSON.parse(readFileSync(MEMORY_STORE_PATH, "utf8"));
+    return Array.isArray(raw) ? (raw as MemoryTierEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMemoryStore(entries: MemoryTierEntry[]): void {
+  try {
+    mkdirSync(MEMORY_DIR, { recursive: true });
+    writeFileSync(MEMORY_STORE_PATH, JSON.stringify(entries, null, 2), "utf8");
+  } catch {
+    // best-effort write
+  }
+}
+
+export async function getMemoryState(_conn: AgentConnection, tier?: MemoryTier): Promise<MemoryState> {
+  const all = readMemoryStore();
+  const entries = tier ? all.filter((e) => e.tier === tier) : all;
+  return {
+    working: entries.filter((e) => e.tier === "working"),
+    recall: entries.filter((e) => e.tier === "recall"),
+    archival: entries.filter((e) => e.tier === "archival"),
+    totalCount: entries.length,
+    uriIndex: entries.map((e) => e.uri).filter((u): u is string => Boolean(u)),
+  };
+}
+
+export async function searchMemory(
+  _conn: AgentConnection,
+  query: string,
+  tier?: MemoryTier,
+  maxResults = 10,
+): Promise<MemoryTierEntry[]> {
+  const q = query.toLowerCase();
+  const all = readMemoryStore();
+  return all
+    .filter(
+      (e) =>
+        (!tier || e.tier === tier) &&
+        (e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q)),
+    )
+    .slice(0, maxResults);
+}
+
+export async function storeMemory(
+  _conn: AgentConnection,
+  entry: Omit<MemoryTierEntry, "id">,
+): Promise<MemoryTierEntry> {
+  const all = readMemoryStore();
+  const created: MemoryTierEntry = {
+    ...entry,
+    id: `mem-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    temporalValidity: entry.temporalValidity ?? { assertedAt: new Date().toISOString() },
+  };
+  const updated = [created, ...all.filter((e) => e.id !== created.id)];
+  writeMemoryStore(updated);
+  return created;
+}
+
+export async function recallMemory(conn: AgentConnection, query: string, limit = 5): Promise<string[]> {
+  const hits = await searchMemory(conn, query, undefined, limit);
+  return hits.map((h) => `[${h.tier.toUpperCase()}] ${h.title}: ${h.content}`);
+}
+
+export async function forgetMemory(_conn: AgentConnection, id: string): Promise<void> {
+  const all = readMemoryStore();
+  writeMemoryStore(all.filter((e) => e.id !== id));
+}
+
+// ---------------------------------------------------------------------------
+// Durable Session Checkpointing (LangGraph / Temporal)
+// ---------------------------------------------------------------------------
+
+const CHECKPOINT_DIR = join(PRIME_AGENT_DIR, "checkpoints");
+const CHECKPOINT_INDEX_PATH = join(CHECKPOINT_DIR, "checkpoints.json");
+
+function readCheckpoints(): CheckpointEntry[] {
+  try {
+    if (!existsSync(CHECKPOINT_INDEX_PATH)) return [];
+    const raw = JSON.parse(readFileSync(CHECKPOINT_INDEX_PATH, "utf8"));
+    return Array.isArray(raw)
+      ? raw.flatMap((entry) =>
+          isRecord(entry)
+            ? [
+                {
+                  ...entry,
+                  // Earlier bridge builds wrote GREEN without checking workspace state.
+                  verifiedStatus: entry.verifiedStatus === "REFUTED" ? "REFUTED" : "UNVERIFIED",
+                } as unknown as CheckpointEntry,
+              ]
+            : [],
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCheckpoints(list: CheckpointEntry[]): void {
+  mkdirSync(CHECKPOINT_DIR, { recursive: true, mode: 0o700 });
+  if (process.platform !== "win32") chmodSync(CHECKPOINT_DIR, 0o700);
+  writeFileSync(CHECKPOINT_INDEX_PATH, JSON.stringify(list, null, 2), { encoding: "utf8", mode: 0o600 });
+  if (process.platform !== "win32") chmodSync(CHECKPOINT_INDEX_PATH, 0o600);
+}
+
+export async function createCheckpoint(
+  conn: AgentConnection,
+  label: string,
+  summary?: string,
+): Promise<CheckpointEntry> {
+  const state = await conn.getState();
+  const all = readCheckpoints();
+  const entry: CheckpointEntry = {
+    id: `ckpt-${Date.now()}-${randomUUID().slice(0, 8)}`,
+    sessionId: state.activeSessionId ?? state.sessionId,
+    turnIndex: state.messageCount,
+    timestamp: new Date().toISOString(),
+    label,
+    summary:
+      summary ?? "Session marker only; workspace files and process state were not captured or verified.",
+    verifiedStatus: "UNVERIFIED",
+    stateSnapshot: {
+      activeSessionId: state.activeSessionId,
+      workingDirectory: state.cwd,
+    },
+  };
+  writeCheckpoints([entry, ...all]);
+  return entry;
+}
+
+export async function restoreCheckpoint(_conn: AgentConnection, _id: string): Promise<CheckpointEntry> {
+  return unsupportedRuntimeOperation("restoreCheckpoint");
+}
+
+export async function listCheckpoints(
+  _conn: AgentConnection,
+  sessionId?: string,
+): Promise<CheckpointEntry[]> {
+  const all = readCheckpoints();
+  return sessionId ? all.filter((c) => c.sessionId === sessionId) : all;
+}
+
+// ---------------------------------------------------------------------------
+// Gauntlet-RLM Squad Topology & Evaluator-Optimizer
+// ---------------------------------------------------------------------------
+
+export async function getSquadTopology(_conn: AgentConnection): Promise<SquadTopology> {
+  return unsupportedRuntimeOperation("getSquadTopology");
+}
+
+export async function evaluateSquadPiece(
+  _conn: AgentConnection,
+  _childId: string,
+  _pieceContract: string,
+  _bar: string,
+  _outputPaths: string[],
+): Promise<BlindCriticRubric> {
+  return unsupportedRuntimeOperation("evaluateSquadPiece");
+}
+
+// ---------------------------------------------------------------------------
+// Model Context Protocol (MCP) Standard Bridge
+// ---------------------------------------------------------------------------
+
+export async function getMcpServers(_conn: AgentConnection): Promise<McpServerDetails[]> {
+  return unsupportedRuntimeOperation("getMcpServers");
+}
+
+export async function readMcpResource(
+  _conn: AgentConnection,
+  _serverName: string,
+  _uri: string,
+): Promise<McpResource> {
+  return unsupportedRuntimeOperation("readMcpResource");
+}
+
+export async function getMcpPrompt(
+  _conn: AgentConnection,
+  _serverName: string,
+  _name: string,
+  _args?: Record<string, string>,
+): Promise<{ description?: string; messages: Array<{ role: "user" | "assistant"; content: string }> }> {
+  return unsupportedRuntimeOperation("getMcpPrompt");
+}
+
+// ---------------------------------------------------------------------------
+// Autonomous Workspace Security & Blast Radius Bridge
+// ---------------------------------------------------------------------------
+
+export async function getSecurityPolicy(_conn: AgentConnection): Promise<{
+  policy: WorkspaceSecurityPolicy;
+  customBlockedPatterns: string[];
+}> {
+  return unsupportedRuntimeOperation("getSecurityPolicy");
+}
+
+export async function setSecurityPolicy(
+  _conn: AgentConnection,
+  _policy: WorkspaceSecurityPolicy,
+  _patterns?: string[],
+): Promise<void> {
+  return unsupportedRuntimeOperation("setSecurityPolicy");
+}
+
+export async function analyzeBlastRadius(
+  _conn: AgentConnection,
+  _command: string,
+  _targetFiles?: string[],
+): Promise<BlastRadiusReport> {
+  return unsupportedRuntimeOperation("analyzeBlastRadius");
+}
+
+export async function getSecurityAuditLog(_conn: AgentConnection): Promise<SecurityAuditEntry[]> {
+  return unsupportedRuntimeOperation("getSecurityAuditLog");
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic Squad Workflow Bridge (LangGraph / AutoGen 0.4)
+// ---------------------------------------------------------------------------
+
+export async function getSquadWorkflow(_conn: AgentConnection): Promise<SquadWorkflowState> {
+  return unsupportedRuntimeOperation("getSquadWorkflow");
+}
+
+export async function runSquadWorkflow(
+  _conn: AgentConnection,
+  _type: SquadWorkflowType,
+  _goal: string,
+  _bar: string,
+): Promise<SquadWorkflowState> {
+  return unsupportedRuntimeOperation("runSquadWorkflow");
+}
+
+export async function pauseSquadWorkflow(_conn: AgentConnection, _id: string): Promise<void> {
+  return unsupportedRuntimeOperation("pauseSquadWorkflow");
+}
+
+// ---------------------------------------------------------------------------
+// Context Token Budget & Compaction Bridge
+// ---------------------------------------------------------------------------
+
+export async function getTokenBudget(conn: AgentConnection): Promise<TokenBudgetBreakdown> {
+  const state = await conn.getState();
+  const usage = state.contextUsage;
+  if (!usage || !Number.isFinite(usage.tokens) || usage.tokens === null) {
+    throw new Error("Token usage is unavailable from the active Prime Agent session");
+  }
+  if (!Number.isFinite(usage.contextWindow) || usage.contextWindow <= 0) {
+    throw new Error("Context limit is unavailable from the active Prime Agent session");
+  }
+  const usagePercent = Number.isFinite(usage.percent)
+    ? usage.percent!
+    : Number(((usage.tokens / usage.contextWindow) * 100).toFixed(2));
+  return {
+    totalTokens: usage.tokens,
+    contextLimit: usage.contextWindow,
+    usagePercent,
+  };
+}
+
+export async function compactContext(
+  conn: AgentConnection,
+  strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
+): Promise<{ beforeTokens: number | null; afterTokens: number | null; savedTokens: number | null }> {
+  if (strategy !== "semantic-summarize") {
+    return unsupportedRuntimeOperation(`compactContext(${strategy})`);
+  }
+  const beforeState = await conn.getState();
+  const compaction = await conn.compact();
+  const afterState = await conn.getState();
+  const beforeTokens = Number.isFinite(compaction.tokensBefore)
+    ? compaction.tokensBefore
+    : Number.isFinite(beforeState.contextUsage?.tokens)
+      ? beforeState.contextUsage!.tokens
+      : null;
+  const afterTokens = Number.isFinite(afterState.contextUsage?.tokens)
+    ? afterState.contextUsage!.tokens
+    : null;
+  return {
+    beforeTokens,
+    afterTokens,
+    savedTokens:
+      beforeTokens !== null && afterTokens !== null && afterTokens <= beforeTokens
+        ? beforeTokens - afterTokens
+        : null,
+  };
+}
+
 function readJsonFileFromText(text: string): Record<string, unknown> | undefined {
   try {
     const value = JSON.parse(text);
-    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
   } catch {
     return undefined;
   }
@@ -966,11 +1473,7 @@ function mapSessionInfo(s: SavedSessionShape): SessionInfo {
     cwd: s.cwd,
     createdAt: s.created instanceof Date ? s.created.toISOString() : undefined,
     updatedAt: s.modified instanceof Date ? s.modified.toISOString() : undefined,
-    status: s.state?.status === "active"
-      ? "active"
-      : s.state?.status === "archived"
-        ? "idle"
-        : "saved",
+    status: s.state?.status === "active" ? "active" : s.state?.status === "archived" ? "idle" : "saved",
   };
 }
 
@@ -1077,8 +1580,14 @@ export function resolvePreferredModel(
   current?: { provider?: string; model?: string; id?: string },
 ): { provider: string; model: string } {
   return {
-    provider: normalizeString(settings.defaultProvider) ?? normalizeString(current?.provider) ?? DEFAULT_MODEL_SELECTION.provider,
-    model: normalizeString(settings.defaultModel) ?? normalizeString(current?.model ?? current?.id) ?? DEFAULT_MODEL_SELECTION.model,
+    provider:
+      normalizeString(settings.defaultProvider) ??
+      normalizeString(current?.provider) ??
+      DEFAULT_MODEL_SELECTION.provider,
+    model:
+      normalizeString(settings.defaultModel) ??
+      normalizeString(current?.model ?? current?.id) ??
+      DEFAULT_MODEL_SELECTION.model,
   };
 }
 
@@ -1110,8 +1619,11 @@ export function writeModelOverrideToModelsJson(
       }
     }
     const providersObj =
-      (root.providers as Record<string, unknown> | undefined) ?? (root.providers = {} as Record<string, unknown>);
-    const prov = (providersObj[provider] as Record<string, unknown> | undefined) ?? (providersObj[provider] = {} as Record<string, unknown>);
+      (root.providers as Record<string, unknown> | undefined) ??
+      (root.providers = {} as Record<string, unknown>);
+    const prov =
+      (providersObj[provider] as Record<string, unknown> | undefined) ??
+      (providersObj[provider] = {} as Record<string, unknown>);
 
     // 1) Custom model entry: providers[provider].models[] with matching id.
     const models = Array.isArray(prov.models) ? (prov.models as Array<Record<string, unknown>>) : undefined;
@@ -1137,32 +1649,100 @@ export function writeModelOverrideToModelsJson(
   }
 }
 
+/** Register Sophos local endpoints in Prime Agent's real model catalog. */
+export function writeLocalProvidersToModelsJson(
+  previous: NonNullable<Settings["localProviders"]>,
+  next: NonNullable<Settings["localProviders"]>,
+): void {
+  if (!existsSync(PRIME_AGENT_DIR)) mkdirSync(PRIME_AGENT_DIR, { recursive: true });
+  let root: Record<string, unknown> = {};
+  if (existsSync(MODELS_JSON_PATH)) {
+    const parsed: unknown = JSON.parse(readFileSync(MODELS_JSON_PATH, "utf8"));
+    if (!isRecord(parsed)) throw new Error("Prime Agent models.json must contain an object");
+    root = parsed;
+  }
+  if (root.providers !== undefined && !isRecord(root.providers)) {
+    throw new Error("Prime Agent models.json providers must be an object");
+  }
+  const providers = isRecord(root.providers) ? root.providers : {};
+  for (const prior of previous) {
+    if (LOCAL_PROVIDER_ID.test(prior.id)) delete providers[prior.id];
+  }
+  for (const local of next) {
+    if (!LOCAL_PROVIDER_ID.test(local.id)) continue;
+    const models = local.models ?? [];
+    if (models.length === 0) {
+      if (
+        Object.prototype.hasOwnProperty.call(providers, local.id) &&
+        !previous.some((item) => item.id === local.id)
+      ) {
+        throw new Error(
+          `Prime Agent provider ${local.id} already exists; refusing to replace its configuration`,
+        );
+      }
+      delete providers[local.id];
+      continue;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(providers, local.id) &&
+      !previous.some((item) => item.id === local.id)
+    ) {
+      throw new Error(
+        `Prime Agent provider ${local.id} already exists; refusing to replace its configuration`,
+      );
+    }
+    providers[local.id] = {
+      name: local.name,
+      baseUrl: local.baseUrl,
+      apiKey: "local",
+      api: "openai-completions",
+      models: models.map((model) => ({
+        id: model.id,
+        name: model.name,
+        contextWindow: 32768,
+        maxTokens: 4096,
+      })),
+    };
+  }
+  root.providers = providers;
+  const temporaryPath = `${MODELS_JSON_PATH}.sophos-tmp`;
+  writeFileSync(temporaryPath, JSON.stringify(root, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+  renameSync(temporaryPath, MODELS_JSON_PATH);
+}
+
 export class SettingsStore {
-  private current: Settings = normalizeSettings({
-    ...DEFAULT_SETTINGS,
-    ...readSettingsFile(),
-  });
+  private current: Settings;
+
+  constructor() {
+    const raw = readSettingsFile();
+    const hadLegacyAuth = Object.prototype.hasOwnProperty.call(raw, "auth");
+    if (hadLegacyAuth) {
+      // Preserve existing daemon credentials, migrate legacy plaintext settings
+      // only when needed, then remove the credential field before any read/write.
+      migrateLegacyAuth(raw.auth);
+      delete raw.auth;
+    }
+    this.current = normalizeSettings({ ...DEFAULT_SETTINGS, ...raw });
+    if (hadLegacyAuth) {
+      // If persistence fails, construction fails so callers cannot mistake the
+      // still-present legacy key for a completed migration.
+      writeSettingsSnapshot(this.current as unknown as Record<string, unknown>);
+    }
+  }
 
   get(): Settings {
     return {
       ...this.current,
       modelConfig: this.current.modelConfig ? { ...this.current.modelConfig } : undefined,
-      auth: this.current.auth ? { ...this.current.auth } : undefined,
       localProviders: this.current.localProviders?.map((provider) => ({ ...provider })),
     };
   }
 
   update(patch: Partial<Settings>): Settings {
     const normalizedPatch = normalizePatch(patch);
-    this.current = normalizeSettings({ ...this.current, ...normalizedPatch });
-    try {
-      writeSettingsSnapshot(this.current as unknown as Record<string, unknown>);
-    } catch (err) {
-      if (typeof process !== "undefined" && process.stderr) {
-        const msg = err instanceof Error ? err.message : String(err);
-        process.stderr.write(`[bridge:settings] failed to persist settings: ${msg}\n`);
-      }
-    }
+    const next = normalizeSettings({ ...this.current, ...normalizedPatch });
+    writeSettingsSnapshot(next as unknown as Record<string, unknown>);
+    this.current = next;
     return this.get();
   }
 }
@@ -1177,7 +1757,11 @@ export class InboxStore {
   private messages: AgentMessage[] = [];
   private nextId = 1;
 
-  add(fromAgentId: string, message: string, opts?: { fromAgentName?: string; toAgentId?: string; toAgentName?: string; threadId?: string }): AgentMessage {
+  add(
+    fromAgentId: string,
+    message: string,
+    opts?: { fromAgentName?: string; toAgentId?: string; toAgentName?: string; threadId?: string },
+  ): AgentMessage {
     const msg: AgentMessage = {
       id: `inbox-${this.nextId++}`,
       fromAgentId,
@@ -1246,9 +1830,10 @@ function mapChildSessionState(child: AgentConnectionRlmChild, messages: PiAgentM
     sessionId: child.activeSessionId,
     model: child.model,
     summary: child.recap ?? child.answerPreview,
-    activity: child.activity && typeof child.activity === "object"
-      ? (child.activity as { kind?: string }).kind
-      : undefined,
+    activity:
+      child.activity && typeof child.activity === "object"
+        ? (child.activity as { kind?: string }).kind
+        : undefined,
     tokenCount: child.tokenCount,
     toolUseCount: child.toolUseCount,
     transcript: messages.map((message, index) => mapAgentMessage(message, index)),
@@ -1259,11 +1844,13 @@ function transcriptChanged(before: TranscriptMessage[], after: TranscriptMessage
   if (before.length !== after.length) return true;
   return after.some((message, index) => {
     const previous = before[index];
-    return previous?.id !== message.id ||
+    return (
+      previous?.id !== message.id ||
       previous?.role !== message.role ||
       previous?.content !== message.content ||
       previous?.status !== message.status ||
-      JSON.stringify(previous?.toolCalls) !== JSON.stringify(message.toolCalls);
+      JSON.stringify(previous?.toolCalls) !== JSON.stringify(message.toolCalls)
+    );
   });
 }
 
@@ -1348,7 +1935,9 @@ export class ConnectionHolder {
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         if (typeof process !== "undefined" && process.stderr) {
-          process.stderr.write(`[bridge:connection] connect attempt ${attempt}/${maxAttempts} failed: ${reason}\n`);
+          process.stderr.write(
+            `[bridge:connection] connect attempt ${attempt}/${maxAttempts} failed: ${reason}\n`,
+          );
         }
         if (attempt >= maxAttempts) {
           this.setStatus("disconnected", reason);
@@ -1362,13 +1951,18 @@ export class ConnectionHolder {
     }
   }
 
-  private async tryConnectOnce(allowPreferredSession = true, emitFailure = true, recoverySessionId?: string): Promise<void> {
+  private async tryConnectOnce(
+    allowPreferredSession = true,
+    emitFailure = true,
+    recoverySessionId?: string,
+  ): Promise<void> {
     this.client = new DaemonClient(this.socketPath);
     try {
       await this.client.connect();
       // attach() requires an activeSessionId. Discover an existing session
       // via `list`, or create one if there are none.
-      const activeSessionId = recoverySessionId ?? await this.discoverOrCreateSession(undefined, allowPreferredSession);
+      const activeSessionId =
+        recoverySessionId ?? (await this.discoverOrCreateSession(undefined, allowPreferredSession));
       this.conn = await DaemonAgentConnection.attach(this.client, activeSessionId, {
         closeClientOnDispose: true,
         reconnectTimeoutMs: 8_000,
@@ -1481,6 +2075,17 @@ export class ConnectionHolder {
     }
   }
 
+  /** Re-issue the active model selection so Prime Agent reloads its model catalog. */
+  async refreshModelCatalog(): Promise<void> {
+    if (!this.conn) return;
+    const current = this.latestState?.model;
+    const provider = current && typeof current === "object" ? current.provider : undefined;
+    const model = current && typeof current === "object" ? current.id : undefined;
+    if (typeof provider === "string" && typeof model === "string") {
+      await this.conn.setModel(provider, model);
+    }
+  }
+
   /**
    * Discover an existing active session via the daemon `list` command, or
    * create a new one via `create`. Returns the activeSessionId to pass to
@@ -1499,7 +2104,10 @@ export class ConnectionHolder {
     // Try to attach to an existing session first.
     try {
       const listResp = await this.client.request({ type: "list" }, 10_000);
-      const sessions = (listResp as unknown as { data?: { sessions?: Array<{ activeSessionId?: string; id: string }> } }).data?.sessions;
+      if (!listResp.success) throw new Error(`daemon list failed: ${listResp.error}`);
+      const sessions = (
+        listResp.data as { sessions?: Array<{ activeSessionId?: string; id: string }> } | undefined
+      )?.sessions;
       if (Array.isArray(sessions) && sessions.length > 0) {
         const first = sessions[0];
         const id = first.activeSessionId ?? first.id;
@@ -1575,7 +2183,10 @@ export class ConnectionHolder {
   async resolveForkEntryId(conn: AgentConnection, pathOrId: string): Promise<string | undefined> {
     let forkable: Array<{ entryId?: string; text?: string }> = [];
     try {
-      const msgs = (await conn.getUserMessagesForForking()) as unknown as Array<{ entryId?: string; text?: string }>;
+      const msgs = (await conn.getUserMessagesForForking()) as unknown as Array<{
+        entryId?: string;
+        text?: string;
+      }>;
       if (Array.isArray(msgs)) forkable = msgs;
     } catch {
       // daemon lacks the read — fall through to tree-based resolution below
@@ -1620,7 +2231,9 @@ export class ConnectionHolder {
   }
 
   /** Attach one persistent watcher to a child session and publish its initial state. */
-  async attachChildAgent(child: AgentConnectionRlmChild): Promise<{ childId: string; sessionId: string; attached: true }> {
+  async attachChildAgent(
+    child: AgentConnectionRlmChild,
+  ): Promise<{ childId: string; sessionId: string; attached: true }> {
     const sessionId = child.activeSessionId;
     if (!sessionId) throw new Error(`agent not found or not attachable: ${child.id}`);
 
@@ -1643,13 +2256,19 @@ export class ConnectionHolder {
       state: mapChildSessionState(child, []),
       refreshTail: Promise.resolve(),
     };
-    watch.unsubscribe = watcher.subscribe((event) => { void this.handleChildWatchEvent(watch, event); });
+    watch.unsubscribe = watcher.subscribe((event) => {
+      void this.handleChildWatchEvent(watch, event);
+    });
     this.childWatches.set(sessionId, watch);
 
     try {
       watch.state = mapChildSessionState(child, await watcher.getMessages());
-      if (this.childWatches.get(sessionId) !== watch) throw new Error("child watcher was closed during attach");
-      this.events.onEvent({ type: "agent_watch", event: { kind: "attached", childId: child.id, sessionId, state: watch.state } });
+      if (this.childWatches.get(sessionId) !== watch)
+        throw new Error("child watcher was closed during attach");
+      this.events.onEvent({
+        type: "agent_watch",
+        event: { kind: "attached", childId: child.id, sessionId, state: watch.state },
+      });
       return { childId: child.id, sessionId, attached: true };
     } catch (error) {
       await this.closeChildWatch(sessionId, "attach failed");
@@ -1669,7 +2288,8 @@ export class ConnectionHolder {
 
   private publishChildState(watch: ChildWatch, next: AgentSessionState): void {
     if (this.childWatches.get(watch.sessionId) !== watch) return;
-    const statusChanged = next.status !== watch.state.status ||
+    const statusChanged =
+      next.status !== watch.state.status ||
       next.summary !== watch.state.summary ||
       next.activity !== watch.state.activity ||
       next.tokenCount !== watch.state.tokenCount ||
@@ -1692,9 +2312,15 @@ export class ConnectionHolder {
     if (messagesChanged) {
       const message = next.transcript[next.transcript.length - 1];
       if (message) {
-        this.events.onEvent({ type: "agent_watch", event: { kind: "message", childId: watch.childId, state: next, message } });
+        this.events.onEvent({
+          type: "agent_watch",
+          event: { kind: "message", childId: watch.childId, state: next, message },
+        });
       }
-      this.events.onEvent({ type: "agent_watch", event: { kind: "transcript", childId: watch.childId, state: next, message } });
+      this.events.onEvent({
+        type: "agent_watch",
+        event: { kind: "transcript", childId: watch.childId, state: next, message },
+      });
     }
   }
 
@@ -1704,27 +2330,29 @@ export class ConnectionHolder {
       await this.closeChildWatch(watch.sessionId, event.error ?? "child session closed");
       return;
     }
-    watch.refreshTail = watch.refreshTail.then(async () => {
-      if (this.childWatches.get(watch.sessionId) !== watch) return;
-      const messages = await watch.watcher.getMessages();
-      if (this.childWatches.get(watch.sessionId) !== watch) return;
-      const child = this.snapshot?.children?.find((candidate) => candidate.id === watch.childId);
-      const fallback: AgentConnectionRlmChild = {
-        id: watch.childId,
-        activeSessionId: watch.sessionId,
-        label: watch.childId,
-        status: watch.state.status as AgentConnectionRlmChild["status"],
-        sessionDir: "",
-      };
-      this.publishChildState(watch, mapChildSessionState(child ?? fallback, messages));
-    }).catch((error) => {
-      if (this.childWatches.get(watch.sessionId) !== watch) return;
-      this.publishChildState(watch, {
-        ...watch.state,
-        status: "error",
-        summary: error instanceof Error ? error.message : String(error),
+    watch.refreshTail = watch.refreshTail
+      .then(async () => {
+        if (this.childWatches.get(watch.sessionId) !== watch) return;
+        const messages = await watch.watcher.getMessages();
+        if (this.childWatches.get(watch.sessionId) !== watch) return;
+        const child = this.snapshot?.children?.find((candidate) => candidate.id === watch.childId);
+        const fallback: AgentConnectionRlmChild = {
+          id: watch.childId,
+          activeSessionId: watch.sessionId,
+          label: watch.childId,
+          status: watch.state.status as AgentConnectionRlmChild["status"],
+          sessionDir: "",
+        };
+        this.publishChildState(watch, mapChildSessionState(child ?? fallback, messages));
+      })
+      .catch((error) => {
+        if (this.childWatches.get(watch.sessionId) !== watch) return;
+        this.publishChildState(watch, {
+          ...watch.state,
+          status: "error",
+          summary: error instanceof Error ? error.message : String(error),
+        });
       });
-    });
     await watch.refreshTail;
   }
 
@@ -1734,11 +2362,16 @@ export class ConnectionHolder {
     this.childWatches.delete(sessionId);
     watch.unsubscribe();
     await watch.watcher.close().catch(() => {});
-    this.events.onEvent({ type: "agent_watch", event: { kind: "detached", childId: watch.childId, sessionId, reason } });
+    this.events.onEvent({
+      type: "agent_watch",
+      event: { kind: "detached", childId: watch.childId, sessionId, reason },
+    });
   }
 
   private async closeAllChildWatches(reason: string): Promise<void> {
-    await Promise.all([...this.childWatches.keys()].map((sessionId) => this.closeChildWatch(sessionId, reason)));
+    await Promise.all(
+      [...this.childWatches.keys()].map((sessionId) => this.closeChildWatch(sessionId, reason)),
+    );
   }
 
   /**
@@ -1753,11 +2386,24 @@ export class ConnectionHolder {
    * a follow-up newSession/list call will need to re-trigger `connect()` to
    * re-establish a working session.
    */
-  async createSessionWithConfig(opts: { cwd?: string; goal?: string }): Promise<string> {
+  async createSessionWithConfig(opts: {
+    cwd?: string;
+    goal?: string;
+    profile?: { id: string; name: string; mode: string; systemPrompt: string };
+  }): Promise<string> {
     if (!this.client) throw new Error("client not initialized");
     const config: Record<string, unknown> = {};
     if (opts.cwd) config.cwd = opts.cwd;
     if (opts.goal) config.initialGoal = { objective: opts.goal };
+    if (opts.profile) {
+      const profilePrompt = [
+        `Sophos profile: ${opts.profile.name} (${opts.profile.id}), mode ${opts.profile.mode}.`,
+        opts.profile.systemPrompt,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      config.appendSystemPrompt = [profilePrompt];
+    }
     const createResp = await this.client.request(
       { type: "create", ...(Object.keys(config).length > 0 ? { config } : {}) },
       30_000,
@@ -1839,7 +2485,8 @@ export class ConnectionHolder {
   private async reconnectFromClosed(reason: string): Promise<void> {
     if (this.stopping || this.reconnectPromise) return;
     const recovery = (async () => {
-      const recoverySessionId = this.activeSessionId ?? this.latestState?.activeSessionId ?? this.preferredSessionId;
+      const recoverySessionId =
+        this.activeSessionId ?? this.latestState?.activeSessionId ?? this.preferredSessionId;
       this.setStatus("reconnecting", reason);
       this.events.onEvent({ type: "connection_status", status: { kind: "reconnecting" } });
       await this.disposeConnectionOnly();
@@ -1855,12 +2502,17 @@ export class ConnectionHolder {
           lastError = error instanceof Error ? error.message : String(error);
           const remaining = deadline - Date.now();
           if (remaining <= 0) break;
-          await new Promise((resolve) => setTimeout(resolve, Math.min(remaining, 500 * 2 ** Math.min(attempt++, 3))));
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.min(remaining, 500 * 2 ** Math.min(attempt++, 3))),
+          );
         }
       }
       if (!this.stopping) {
         this.setStatus("disconnected", lastError);
-        this.events.onEvent({ type: "connection_status", status: { kind: "disconnected", reason: lastError } });
+        this.events.onEvent({
+          type: "connection_status",
+          status: { kind: "disconnected", reason: lastError },
+        });
       }
     })();
     this.reconnectPromise = recovery;
@@ -1929,9 +2581,10 @@ export class ConnectionHolder {
                   ...watch.state,
                   status: child.status,
                   summary: child.recap ?? child.answerPreview,
-                  activity: child.activity && typeof child.activity === "object"
-                    ? (child.activity as { kind?: string }).kind
-                    : undefined,
+                  activity:
+                    child.activity && typeof child.activity === "object"
+                      ? (child.activity as { kind?: string }).kind
+                      : undefined,
                   tokenCount: child.tokenCount,
                   toolUseCount: child.toolUseCount,
                 });
@@ -1952,9 +2605,10 @@ export class ConnectionHolder {
         if (innerType === "refine_complete" || innerType === "refine_failed") {
           this.events.onEvent({
             type: "refinement_result",
-            result: innerType === "refine_complete"
-              ? mapRefinementResult((evt.event as unknown as Record<string, unknown>).result)
-              : { error: refineEventError(evt.event) },
+            result:
+              innerType === "refine_complete"
+                ? mapRefinementResult((evt.event as unknown as Record<string, unknown>).result)
+                : { error: refineEventError(evt.event) },
           });
         }
         this.events.onEvent({ type: "session_event", event: mapSessionEvent(evt.event) });
@@ -2004,7 +2658,12 @@ export class ConnectionHolder {
       case "extension_error":
         this.events.onEvent({
           type: "session_event",
-          event: { kind: "extension_error", extensionPath: evt.extensionPath, event: evt.event, error: evt.error },
+          event: {
+            kind: "extension_error",
+            extensionPath: evt.extensionPath,
+            event: evt.event,
+            error: evt.error,
+          },
         });
         return;
       case "heartbeats_changed":
@@ -2049,7 +2708,10 @@ export class ConnectionHolder {
    * refresh. Generation-checking prevents a slow older read from publishing a
    * stale child roster after a newer event has already been processed.
    */
-  private async emitEnrichedSnapshot(kind: "snapshot" | "resynced", generation = ++this.snapshotEventGeneration): Promise<void> {
+  private async emitEnrichedSnapshot(
+    kind: "snapshot" | "resynced",
+    generation = ++this.snapshotEventGeneration,
+  ): Promise<void> {
     const conn = this.conn;
     if (!conn || !this.latestState) return;
     const base = mapConnectionState(this.latestState, this.status, this.disconnectReason, this.snapshot);
@@ -2063,6 +2725,131 @@ export class ConnectionHolder {
 // Header accessor — used by getTranscript and similar.
 // ---------------------------------------------------------------------------
 
-export async function getSessionHeader(conn: AgentConnection): Promise<AgentConnectionSessionHeader | undefined> {
+export async function getSessionHeader(
+  conn: AgentConnection,
+): Promise<AgentConnectionSessionHeader | undefined> {
   return conn.getSessionHeader();
+}
+
+// ---------------------------------------------------------------------------
+// Native Windows Computer-Use Action Space Bridge (CUA & UIA)
+// ---------------------------------------------------------------------------
+
+export async function listDesktopWindows(_conn: AgentConnection): Promise<DesktopWindowInfo[]> {
+  return unsupportedRuntimeOperation("listDesktopWindows");
+}
+
+export async function inspectDesktopWindow(
+  _conn: AgentConnection,
+  _windowId: string,
+): Promise<DesktopUiElement> {
+  return unsupportedRuntimeOperation("inspectDesktopWindow");
+}
+
+export async function dispatchDesktopAction(
+  _conn: AgentConnection,
+  _windowId: string,
+  _action: DesktopUiAction,
+): Promise<DesktopActionResult> {
+  return unsupportedRuntimeOperation("dispatchDesktopAction");
+}
+
+export async function captureDesktopScreenshot(_conn: AgentConnection, _windowId: string): Promise<string> {
+  return unsupportedRuntimeOperation("captureDesktopScreenshot");
+}
+
+// ---------------------------------------------------------------------------
+// Self-Evolving Skill Distillation Bridge (Voyager & Eureka)
+// ---------------------------------------------------------------------------
+
+export async function listDistilledSkills(_conn: AgentConnection): Promise<DistilledSkill[]> {
+  return unsupportedRuntimeOperation("listDistilledSkills");
+}
+
+export async function distillSkillFromTrajectory(
+  _conn: AgentConnection,
+  _sessionId: string,
+  _name?: string,
+): Promise<DistilledSkill> {
+  return unsupportedRuntimeOperation("distillSkillFromTrajectory");
+}
+
+export async function promoteSkill(
+  _conn: AgentConnection,
+  _skillId: string,
+): Promise<{ success: boolean; targetPath: string }> {
+  return unsupportedRuntimeOperation("promoteSkill");
+}
+
+export async function deleteDistilledSkill(_conn: AgentConnection, _skillId: string): Promise<void> {
+  return unsupportedRuntimeOperation("deleteDistilledSkill");
+}
+
+// ---------------------------------------------------------------------------
+// Speculative Tree-of-Thoughts Bridge (ToT / FoT)
+// ---------------------------------------------------------------------------
+
+export async function getThoughtTree(_conn: AgentConnection): Promise<ThoughtTreeState> {
+  return unsupportedRuntimeOperation("getThoughtTree");
+}
+
+export async function runSpeculativeBranch(
+  _conn: AgentConnection,
+  _parentNodeId: string,
+  _hypothesis: string,
+): Promise<ThoughtTreeState> {
+  return unsupportedRuntimeOperation("runSpeculativeBranch");
+}
+
+export async function pruneThoughtBranch(_conn: AgentConnection, _nodeId: string): Promise<ThoughtTreeState> {
+  return unsupportedRuntimeOperation("pruneThoughtBranch");
+}
+
+export async function promoteThoughtBranch(
+  _conn: AgentConnection,
+  _nodeId: string,
+): Promise<ThoughtTreeState> {
+  return unsupportedRuntimeOperation("promoteThoughtBranch");
+}
+
+// ---------------------------------------------------------------------------
+// Ephemeral Workspace Twin Bridge (Devin Sandbox / Worktrees)
+// ---------------------------------------------------------------------------
+
+export async function listWorkspaceTwins(_conn: AgentConnection): Promise<WorkspaceTwin[]> {
+  return unsupportedRuntimeOperation("listWorkspaceTwins");
+}
+
+export async function createWorkspaceTwin(
+  _conn: AgentConnection,
+  _name: string,
+  _baseBranch?: string,
+): Promise<WorkspaceTwin> {
+  return unsupportedRuntimeOperation("createWorkspaceTwin");
+}
+
+export async function executeInTwin(
+  _conn: AgentConnection,
+  _twinId: string,
+  _command: string,
+): Promise<TwinExecResult> {
+  return unsupportedRuntimeOperation("executeInTwin");
+}
+
+export async function diffWorkspaceTwin(_conn: AgentConnection, _twinId: string): Promise<TwinDiffReport> {
+  return unsupportedRuntimeOperation("diffWorkspaceTwin");
+}
+
+export async function mergeWorkspaceTwin(
+  _conn: AgentConnection,
+  _twinId: string,
+): Promise<{ success: boolean; mergedCommit: string }> {
+  return unsupportedRuntimeOperation("mergeWorkspaceTwin");
+}
+
+export async function rollbackWorkspaceTwin(
+  _conn: AgentConnection,
+  _twinId: string,
+): Promise<{ success: boolean; message: string }> {
+  return unsupportedRuntimeOperation("rollbackWorkspaceTwin");
 }

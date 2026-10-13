@@ -117,7 +117,11 @@ export function EngineGraph({ daemonAlive, sidecarAlive, workers, preview = fals
       source: "sidecar",
       target: "daemon",
       type: "pulse",
-      data: { pulse: live(connStatus(daemonAlive, preview)) && !preview, color: tokens.color.accent, animated: live(connStatus(daemonAlive, preview)) && !preview } as PulseEdgeData,
+      data: {
+        pulse: live(connStatus(daemonAlive, preview)) && !preview,
+        color: tokens.color.accent,
+        animated: live(connStatus(daemonAlive, preview)) && !preview,
+      } as PulseEdgeData,
     });
     for (const w of workers) {
       edges.push({
@@ -125,7 +129,11 @@ export function EngineGraph({ daemonAlive, sidecarAlive, workers, preview = fals
         source: "daemon",
         target: `worker-${w.id}`,
         type: "pulse",
-        data: { pulse: live(w.status) && !preview, color: live(w.status) ? tokens.color.ok : tokens.color.line, animated: live(w.status) && !preview } as PulseEdgeData,
+        data: {
+          pulse: live(w.status) && !preview,
+          color: live(w.status) ? tokens.color.ok : tokens.color.line,
+          animated: live(w.status) && !preview,
+        } as PulseEdgeData,
       });
     }
 
@@ -158,9 +166,18 @@ export function EngineGraph({ daemonAlive, sidecarAlive, workers, preview = fals
       maxZoom={2}
     >
       <div className="pg-legend">
-        <span><i className="pg-legend__swatch pg-legend__swatch--accent" />IPC link</span>
-        <span><i className="pg-legend__swatch pg-legend__swatch--ok" />worker running</span>
-        <span><i className="pg-legend__swatch pg-legend__swatch--err" />offline</span>
+        <span>
+          <i className="pg-legend__swatch pg-legend__swatch--accent" />
+          IPC link
+        </span>
+        <span>
+          <i className="pg-legend__swatch pg-legend__swatch--ok" />
+          worker running
+        </span>
+        <span>
+          <i className="pg-legend__swatch pg-legend__swatch--err" />
+          offline
+        </span>
         {preview ? <span className="pg-legend__preview">browser preview</span> : null}
       </div>
     </GraphFlow>

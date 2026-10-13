@@ -318,6 +318,37 @@ test("supports same-major security overrides for exact upstream package constrai
   );
 });
 
+test("allows only the tested basic-ftp cross-major security override", () => {
+  const ftpOverlay = {
+    overrides: {
+      "basic-ftp": {
+        version: "6.2.1",
+        constraints: ["^5.0.2"],
+      },
+    },
+  };
+  const lock = {
+    lockfileVersion: 3,
+    packages: {
+      "packages/ai": { dependencies: { "basic-ftp": "^5.0.2" } },
+    },
+  };
+
+  assert.doesNotThrow(() => assertOverrideConstraintsMatchLock(lock, ftpOverlay));
+  assert.throws(
+    () => assertOverrideConstraintsMatchLock(lock, {
+      overrides: { "basic-ftp": { version: "6.2.2", constraints: ["^5.0.2"] } },
+    }),
+    /not semver-compatible.*basic-ftp/i,
+  );
+  assert.throws(
+    () => assertOverrideConstraintsMatchLock(lock, {
+      overrides: { "basic-ftp": { version: "6.2.1", constraints: ["^5.0.3"] } },
+    }),
+    /lock dependency constraints mismatch.*basic-ftp/i,
+  );
+});
+
 test("includes workspace devDependencies when recording upstream constraints", () => {
   const lock = {
     lockfileVersion: 3,
