@@ -130,15 +130,14 @@ export function friendlyModelName(id: string): string {
 /** Try an Ollama-style probe on a port. Returns models or null. */
 async function probeOllama(port: number): Promise<LocalDetectedModel[] | null> {
   const url = `http://127.0.0.1:${port}/api/tags`;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
     const res = await fetch(url, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
       redirect: "error",
     });
-    window.clearTimeout(timer);
     if (!res.ok) return null;
     const list = rowsFromCatalog(await readCatalogJson(res), "models");
     if (!list) return null;
@@ -152,21 +151,22 @@ async function probeOllama(port: number): Promise<LocalDetectedModel[] | null> {
       .filter((m): m is LocalDetectedModel => m !== null);
   } catch {
     return null;
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
 /** Try an OpenAI-compatible /v1/models probe on a port. Returns models or null. */
 async function probeOpenAi(port: number): Promise<LocalDetectedModel[] | null> {
   const url = `http://127.0.0.1:${port}/v1/models`;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
     const res = await fetch(url, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
       redirect: "error",
     });
-    window.clearTimeout(timer);
     if (!res.ok) return null;
     const list = rowsFromCatalog(await readCatalogJson(res), "data");
     if (!list) return null;
@@ -179,6 +179,8 @@ async function probeOpenAi(port: number): Promise<LocalDetectedModel[] | null> {
       .filter((m): m is LocalDetectedModel => m !== null);
   } catch {
     return null;
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 

@@ -22,6 +22,25 @@ function jsonResponse(value: unknown): Response {
   } as unknown as Response;
 }
 
+function stalledResponse(signal: AbortSignal): Response {
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: {
+      getReader: () => ({
+        read: () =>
+          new Promise((_, reject) => {
+            if (signal.aborted) reject(new Error("aborted"));
+            else signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+          }),
+        releaseLock: () => undefined,
+        cancel: async () => undefined,
+      }),
+    },
+  } as unknown as Response;
+}
+
 describe("local provider setup", () => {
   it("normalizes OpenAI-compatible URLs to the API base path", () => {
     expect(providerApiBaseUrl("http://127.0.0.1:1234/")).toBe("http://127.0.0.1:1234/v1");
@@ -57,6 +76,26 @@ describe("local provider setup", () => {
       await expect(scanLocalEndpoints()).resolves.toEqual([]);
       expect(fetchMock).toHaveBeenCalled();
       expect(fetchMock.mock.calls.every(([, options]) => options.redirect === "error")).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps the discovery timeout active while reading a stalled catalog", async () => {
+    let stalledSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn((url: string, options: RequestInit) => {
+      if (url.endsWith(":11434/api/tags")) {
+        const signal = options.signal as AbortSignal;
+        stalledSignal = signal;
+        return Promise.resolve(stalledResponse(signal));
+      }
+      return Promise.resolve(jsonResponse({ models: [] }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const endpoints = await scanLocalEndpoints();
+      expect(endpoints.length).toBeGreaterThan(0);
+      expect(stalledSignal?.aborted).toBe(true);
     } finally {
       vi.unstubAllGlobals();
     }
