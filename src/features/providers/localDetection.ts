@@ -43,6 +43,64 @@ const CANDIDATES: Array<{ port: number; kind: LocalEndpointKind }> = [
 ];
 
 const SCAN_TIMEOUT_MS = 700;
+const MAX_CATALOG_BYTES = 1024 * 1024;
+const MAX_CATALOG_ROWS = 512;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isModelId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 256 &&
+    value.trim() === value &&
+    !Array.from(value).some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    })
+  );
+}
+
+async function readCatalogJson(response: Response): Promise<unknown> {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_CATALOG_BYTES) {
+    throw new Error("Local model catalog is too large.");
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Local model catalog response has no body.");
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > MAX_CATALOG_BYTES) {
+        await reader.cancel();
+        throw new Error("Local model catalog is too large.");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+}
+
+function rowsFromCatalog(value: unknown, key: string): unknown[] | null {
+  if (!isRecord(value)) return null;
+  const rows = value[key];
+  if (rows === undefined) return [];
+  return Array.isArray(rows) && rows.length <= MAX_CATALOG_ROWS ? rows : null;
+}
 
 /** Friendly display name for a model id (known families, else the raw id). */
 export function friendlyModelName(id: string): string {
@@ -75,15 +133,20 @@ async function probeOllama(port: number): Promise<LocalDetectedModel[] | null> {
   try {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
-    const res = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+      redirect: "error",
+    });
     window.clearTimeout(timer);
     if (!res.ok) return null;
-    const body = (await res.json()) as { models?: Array<{ name?: string; model?: string }> };
-    const list = body.models ?? [];
-    if (!Array.isArray(list) || list.length === 0) return [];
+    const list = rowsFromCatalog(await readCatalogJson(res), "models");
+    if (!list) return null;
+    if (list.length === 0) return [];
     return list
       .map((m) => {
-        const id = m.name ?? m.model ?? "";
+        if (!isRecord(m)) return null;
+        const id = isModelId(m.name) ? m.name : isModelId(m.model) ? m.model : "";
         return id ? { id, name: friendlyModelName(id) } : null;
       })
       .filter((m): m is LocalDetectedModel => m !== null);
@@ -98,15 +161,19 @@ async function probeOpenAi(port: number): Promise<LocalDetectedModel[] | null> {
   try {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), SCAN_TIMEOUT_MS);
-    const res = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+      redirect: "error",
+    });
     window.clearTimeout(timer);
     if (!res.ok) return null;
-    const body = (await res.json()) as { data?: Array<{ id?: string }> };
-    const list = body.data ?? [];
-    if (!Array.isArray(list) || list.length === 0) return [];
+    const list = rowsFromCatalog(await readCatalogJson(res), "data");
+    if (!list) return null;
+    if (list.length === 0) return [];
     return list
       .map((m) => {
-        const id = m.id ?? "";
+        const id = isRecord(m) && isModelId(m.id) ? m.id : "";
         return id ? { id, name: friendlyModelName(id) } : null;
       })
       .filter((m): m is LocalDetectedModel => m !== null);
@@ -204,17 +271,26 @@ export async function probeLocalProvider(
     const response = await fetch(apiUrl, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
+      redirect: "error",
     });
     if (!response.ok) throw new Error(`Local model server returned HTTP ${response.status}.`);
-    const body = (await response.json()) as {
-      models?: Array<{ name?: string; model?: string }>;
-      data?: Array<{ id?: string }>;
-    };
-    const models =
-      kind === "ollama"
-        ? (body.models ?? []).map((model) => model.name ?? model.model ?? "")
-        : (body.data ?? []).map((model) => model.id ?? "");
-    const unique = [...new Set(models.filter((id) => id.length > 0))];
+    const rows = rowsFromCatalog(await readCatalogJson(response), kind === "ollama" ? "models" : "data");
+    if (!rows) throw new Error("Local model catalog has an invalid or excessive row list.");
+    const models = rows.flatMap((row) => {
+      if (!isRecord(row)) return [];
+      const id =
+        kind === "ollama"
+          ? isModelId(row.name)
+            ? row.name
+            : isModelId(row.model)
+              ? row.model
+              : ""
+          : isModelId(row.id)
+            ? row.id
+            : "";
+      return id ? [id] : [];
+    });
+    const unique = [...new Set(models)];
     if (unique.length === 0) throw new Error("No local models were found at that endpoint.");
     return unique.map((id) => ({ id, name: friendlyModelName(id) }));
   } finally {

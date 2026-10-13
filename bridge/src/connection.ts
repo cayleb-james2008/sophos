@@ -1767,6 +1767,14 @@ export function writeLocalProvidersToModelsJson(
     if (!LOCAL_PROVIDER_ID.test(local.id)) continue;
     const models = local.models ?? [];
     if (models.length === 0) {
+      if (
+        Object.prototype.hasOwnProperty.call(providers, local.id) &&
+        !previous.some((item) => item.id === local.id)
+      ) {
+        throw new Error(
+          `Prime Agent provider ${local.id} already exists; refusing to replace its configuration`,
+        );
+      }
       delete providers[local.id];
       continue;
     }

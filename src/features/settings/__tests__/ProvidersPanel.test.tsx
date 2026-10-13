@@ -64,6 +64,27 @@ const DEFAULT_PROVIDERS = [
   { id: "openrouter", name: "OpenRouter", kind: "subscription", connected: false, models: [] },
 ];
 
+function jsonResponse(value: unknown): Response {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  let read = false;
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: {
+      getReader: () => ({
+        read: async () => {
+          if (read) return { done: true, value: undefined };
+          read = true;
+          return { done: false, value: bytes };
+        },
+        releaseLock: () => undefined,
+        cancel: async () => undefined,
+      }),
+    },
+  } as unknown as Response;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockModels.providers.splice(0, mockModels.providers.length, ...DEFAULT_PROVIDERS);
@@ -137,14 +158,7 @@ describe("ProvidersPanel", () => {
 
   it("connects a local endpoint from the local card modal", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({ models: [{ name: "qwen:7b" }] }),
-      }),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ models: [{ name: "qwen:7b" }] })));
     render(<ProvidersPanel />);
     await waitFor(() => expect(screen.getByText(/Not connected/i)).toBeInTheDocument());
 

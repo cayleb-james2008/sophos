@@ -69,6 +69,18 @@ check("local models register with the actual daemon API and preserve other provi
   && withLocal.providers["sophos-local-manual"].baseUrl === "http://127.0.0.1:11434/v1"
   && withLocal.providers["sophos-local-manual"].models[0].id === "qwen:7b"
   && Boolean(withLocal.providers.preserved));
+const collisionConfig = { ...localConfig, id: "sophos-local-collision", models: [] };
+writeFileSync(modelsPath, JSON.stringify({ providers: { "sophos-local-collision": { name: "user provider" } } }), "utf8");
+let refusedUnownedDelete = false;
+try {
+  writeLocalProvidersToModelsJson([], [collisionConfig]);
+} catch (error) {
+  refusedUnownedDelete = error instanceof Error && error.message.includes("already exists");
+}
+check("empty local discovery cannot delete an unowned daemon provider",
+  refusedUnownedDelete
+  && JSON.parse(readFileSync(modelsPath, "utf8")).providers["sophos-local-collision"].name === "user provider");
+writeFileSync(modelsPath, JSON.stringify(withLocal), "utf8");
 writeLocalProvidersToModelsJson([localConfig], []);
 const withoutLocal = JSON.parse(readFileSync(modelsPath, "utf8"));
 check("disconnect removes only Sophos-owned local model entries",
