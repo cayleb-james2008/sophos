@@ -16,9 +16,11 @@
 //  10. Report pass/fail (exit code 0 on success, 1 on failure).
 
 import { runSuite } from "./runner.mjs";
-import { getWindowState } from "./driver.mjs";
-import { findSophosWindow } from "./launch.mjs";
-import { navTo, takeScreenshot, getTextContent, waitForElement } from "./helpers.mjs";
+import { writeFileSync } from "node:fs";
+import { getWindowState, sleep } from "./driver.mjs";
+import { DEFAULT_APP_PATH, findSophosWindow } from "./launch.mjs";
+import { clickElement, findElement, navTo, takeScreenshot, getTextContent, waitForElement } from "./helpers.mjs";
+import { waitForAllElements } from "./find-util.mjs";
 import {
   assert,
   assertElementVisible,
@@ -27,8 +29,16 @@ import {
 } from "./assertions.mjs";
 
 /** Read a fresh window state for the app handle. */
-function freshState(appHandle) {
-  return getWindowState(appHandle.pid, appHandle.windowId, { include_screenshot: false });
+function freshState(appHandle, timeoutMs) {
+  const callOptions = Number.isFinite(timeoutMs)
+    ? { timeoutMs: Math.max(1, timeoutMs) }
+    : {};
+  return getWindowState(
+    appHandle.pid,
+    appHandle.windowId,
+    { include_screenshot: false },
+    callOptions,
+  );
 }
 
 const tests = [
@@ -44,10 +54,16 @@ const tests = [
 
   {
     name: "reads the UIA tree (nav buttons present)",
-    fn: (appHandle) => {
-      const state = freshState(appHandle);
-      assert(state.elements && state.elements.length > 0, "UIA tree is empty");
-      for (const view of ["Chat", "Sessions", "Agents", "Inbox", "Settings"]) {
+    fn: async (appHandle) => {
+      const views = ["Chat", "Sessions", "Agents", "Inbox", "Settings"];
+      const requiredNav = views.map((name) => ({ role: "Button", name }));
+      const state = await waitForAllElements(
+        (remainingMs) => freshState(appHandle, remainingMs),
+        requiredNav,
+        20000,
+      );
+      assert(state, `UIA tree did not expose every required nav button within 20s: ${views.join(", ")}`);
+      for (const view of views) {
         assertElementVisible(state, { role: "Button", name: view });
       }
     },
@@ -95,8 +111,55 @@ const tests = [
   },
 ];
 
+if (process.env.SOPHOS_EXPECT_ONBOARDING === "1") {
+  tests.unshift({
+    name: "fresh install skips onboarding without provider setup or inference",
+    fn: async (appHandle) => {
+      const initial = freshState(appHandle);
+      const skip = await waitForElement(initial, { role: "Button", name: "Skip for now" }, 30000);
+      assert(skip, "fresh public install did not show the Welcome-step Skip for now button");
+      takeScreenshot(appHandle.pid, "public-onboarding-before-skip", appHandle.windowId);
+
+      const current = freshState(appHandle);
+      clickElement(appHandle.pid, current, { role: "Button", name: "Skip for now" });
+      await sleep(600);
+      const after = freshState(appHandle);
+      assert(!findElement(after, { role: "Button", name: "Skip for now" }), "onboarding remained after Skip for now");
+      assert(!findElement(after, { role: "Button", name: "Get started" }), "onboarding advanced instead of being skipped");
+      takeScreenshot(appHandle.pid, "public-onboarding-after-skip", appHandle.windowId);
+      console.log("Verified first-run skip; provider setup and inference were not invoked");
+    },
+  });
+}
+
 // Run the suite. runSuite sets process.exitCode = 1 on any failure.
-const outcome = await runSuite("Sophos cua-driver smoke test", tests);
+let outcome;
+let setupError;
+try {
+  outcome = await runSuite(
+    process.env.SOPHOS_FEED_VERSION ? "Sophos public-installer app smoke" : "Sophos cua-driver smoke test",
+    tests,
+  );
+} catch (error) {
+  setupError = error;
+  throw error;
+} finally {
+  if (process.env.SOPHOS_CUA_REPORT_PATH) {
+    writeFileSync(process.env.SOPHOS_CUA_REPORT_PATH, JSON.stringify({
+      suite: "sophos-installed-app-smoke",
+      installerVersion: process.env.SOPHOS_FEED_VERSION ?? null,
+      installerSha256: process.env.SOPHOS_FEED_SHA256 ?? null,
+      executablePath: DEFAULT_APP_PATH,
+      onboardingRequired: process.env.SOPHOS_EXPECT_ONBOARDING === "1",
+      status: setupError ? "FAIL" : outcome?.failed === 0 ? "PASS" : "FAIL",
+      setupError: setupError?.message ?? null,
+      summary: outcome ? { passed: outcome.passed, failed: outcome.failed, totalMs: outcome.totalMs } : null,
+      results: outcome?.results ?? [],
+      providerSetupInvoked: false,
+      inferenceInvoked: false,
+    }, null, 2));
+  }
+}
 
 // Final summary line for CI / humans.
 if (outcome.failed === 0) {

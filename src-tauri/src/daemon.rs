@@ -6,12 +6,9 @@
 //! directly — it only owns the daemon process lifecycle (spawn, health check,
 //! graceful shutdown) so nothing is orphaned on app exit.
 //!
-//! TCP fallback: when settings.json has `daemonTcp: true`, the daemon is
-//! launched with `PRIME_DAEMON_TCP=1`, which makes `defaultDaemonSocketPath()`
-//! resolve to `tcp://127.0.0.1:48100` instead of the named pipe. The bridge is
-//! launched with the same env so both ends agree on the endpoint. This is the
-//! escape hatch for machines where named-pipe creation is broken while TCP
-//! loopback still works.
+//! The pinned Prime Agent v0.7.0 uses its default local socket (a Windows named
+//! pipe in packaged Windows builds). Sophos does not set `PRIME_DAEMON_TCP`:
+//! that unsupported setting would not change the upstream listener.
 //!
 //! stdout and stderr are both piped and forwarded to the frontend via
 //! `engine-log` Tauri events, so the daemon's output is visible inside the
@@ -22,17 +19,8 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
-
 use crate::engine_log::{spawn_reader, EngineLogSink, Proc, Stream};
 use crate::job::Job;
-
-/// Windows flag: do not create a console window for the child. Without this,
-/// spawning a console node process from a GUI app flashes a terminal window
-/// on every spawn (and every crash-loop restart).
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Owns the daemon child process and its lifecycle.
 pub struct DaemonManager {
@@ -42,7 +30,6 @@ pub struct DaemonManager {
     node_path: Mutex<String>,
     cli_path: Mutex<String>,
     preload_path: Mutex<String>,
-    daemon_tcp: Mutex<bool>,
     log_sink: Mutex<Option<Arc<EngineLogSink>>>,
 }
 
@@ -55,7 +42,6 @@ impl DaemonManager {
             node_path: Mutex::new(String::new()),
             cli_path: Mutex::new(String::new()),
             preload_path: Mutex::new(String::new()),
-            daemon_tcp: Mutex::new(false),
             log_sink: Mutex::new(None),
         })
     }
@@ -74,15 +60,12 @@ impl DaemonManager {
     }
 
     /// Spawn the daemon. Idempotent — if one is already running, this is a no-op.
-    ///
-    /// `daemon_tcp` selects the TCP-loopback fallback transport (sets
-    /// `PRIME_DAEMON_TCP=1` on the child). When false, the daemon keeps its
-    /// default named-pipe transport unchanged.
-    pub fn start(&self, node_path: &str, cli_path: &str, daemon_tcp: bool) {
+    /// The pinned runtime selects its supported default local socket; no TCP
+    /// override is injected by the shell.
+    pub fn start(&self, node_path: &str, cli_path: &str) {
         if self.is_alive() {
             return;
         }
-        *self.daemon_tcp.lock().unwrap() = daemon_tcp;
         self.running.store(true, Ordering::SeqCst);
         let mut cmd = Command::new(node_path);
         // Inject the child_process windowsHide preload BEFORE the CLI path so it
@@ -100,19 +83,12 @@ impl DaemonManager {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        if daemon_tcp {
-            cmd.env("PRIME_DAEMON_TCP", "1");
-        }
         // The daemon's own kernel bootstrap selects the platform-correct
         // interpreter path. Do not inject a guessed override here: a stale or
         // partial venv would disable bootstrap and leave the app without a
         // kernel. The child is still hidden so GUI startup stays silent.
-        #[cfg(windows)]
-        cmd.creation_flags(CREATE_NO_WINDOW);
-        match cmd.spawn() {
+        match self.job.spawn(&mut cmd) {
             Ok(mut child) => {
-                self.job.assign(&child);
-
                 // Capture stdout and stderr, forward to the frontend.
                 if let Some(sink) = self.log_sink.lock().unwrap().as_ref() {
                     if let Some(stdout) = child.stdout.take() {
@@ -124,11 +100,11 @@ impl DaemonManager {
                 }
 
                 *self.child.lock().unwrap() = Some(child);
-                let transport = if daemon_tcp { "tcp-loopback" } else { "named-pipe" };
                 let preload_desc = if preload.is_empty() { String::new() } else { format!(" --require {preload}") };
-                eprintln!("[daemon] spawned ({transport}):{preload_desc} {node_path} {cli_path} --mode daemon");
+                eprintln!("[daemon] spawned (default local socket):{preload_desc} {node_path} {cli_path} --mode daemon");
             }
             Err(e) => {
+                self.running.store(false, Ordering::SeqCst);
                 eprintln!("[daemon] failed to spawn: {e}");
                 if let Some(sink) = self.log_sink.lock().unwrap().as_ref() {
                     sink.push(
@@ -152,8 +128,7 @@ impl DaemonManager {
             if let Some(sink) = self.log_sink.lock().unwrap().as_ref() {
                 sink.push(Proc::Daemon, Stream::Stdout, "[daemon] restarting...".to_string());
             }
-            let tcp = *self.daemon_tcp.lock().unwrap();
-            self.start(&node, &cli, tcp);
+            self.start(&node, &cli);
         }
     }
 

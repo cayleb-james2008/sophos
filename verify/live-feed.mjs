@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// verify/live-feed.mjs — LIVE update-feed integrity check (v0.7.2).
+// verify/live-feed.mjs — LIVE update-feed integrity and installer check.
 //
 // Verifies the published auto-updater feed exactly as the app's updater
 // would consume it, against the LIVE endpoint configured in tauri.conf.json:
@@ -19,14 +19,24 @@
 //
 // Run:  node verify/live-feed.mjs   (or `npm run test:live-feed`)
 
-import { readFileSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createHash, createPublicKey, verify } from "node:crypto";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  MAX_INSTALLER_BYTES,
+  persistVerifiedInstaller,
+  prepareVerifiedInstallerOutputs,
+  readInstallerResponse,
+  validateInstallerDownloadUrl,
+  validateInstallerResponseUrl,
+} from "./live-feed-download.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, "..");
-const REPORT_PATH = join(__dirname, "live-feed-report.json");
+const REPORT_PATH = resolve(process.env.SOPHOS_VERIFY_REPORT_PATH || join(__dirname, "live-feed-report.json"));
+const VERIFIED_INSTALLER_OUTPUT = process.env.SOPHOS_VERIFIED_INSTALLER_OUTPUT;
+const VERIFIED_INSTALLER_METADATA_OUTPUT = process.env.SOPHOS_VERIFIED_INSTALLER_METADATA_OUTPUT;
 const MANIFEST_TIMEOUT_MS = 20_000;
 const INSTALLER_TIMEOUT_MS = 120_000; // a ~100 MB installer download is slow
 
@@ -42,6 +52,17 @@ function has(detail) {
 
 async function main() {
   console.log("=== Sophos Live Update-Feed Integrity Check ===\n");
+
+  try {
+    prepareVerifiedInstallerOutputs({
+      installerPath: VERIFIED_INSTALLER_OUTPUT,
+      metadataPath: VERIFIED_INSTALLER_METADATA_OUTPUT,
+      reportPath: REPORT_PATH,
+    });
+  } catch (e) {
+    check("verified installer output paths are safe", false, e.message);
+    return finish(1);
+  }
 
   // The exact endpoint + pubkey the app is configured with.
   const tauriConf = JSON.parse(readFileSync(join(REPO, "src-tauri", "tauri.conf.json"), "utf-8"));
@@ -79,25 +100,44 @@ async function main() {
   if (!entry) return finish(1);
 
   const { url, signature } = entry;
-  check("platform entry has a download url", typeof url === "string" && url.startsWith("https"), has(url));
   check("platform entry has a signature", typeof signature === "string" && signature.length > 0, has(`len=${signature?.length}`));
-  if (!url || !signature) return finish(1);
+  if (!signature) return finish(1);
+
+  let validatedInstallerUrl;
+  try {
+    validatedInstallerUrl = validateInstallerDownloadUrl(url, manifest.version);
+    check("platform entry has an HTTPS versioned NSIS installer URL", true, has(validatedInstallerUrl.safeUrl));
+  } catch (e) {
+    check("platform entry has an HTTPS versioned NSIS installer URL", false, e.message);
+    return finish(1);
+  }
 
   // Download the announced installer.
   let bytes;
   try {
-    const dl = await fetch(url, { signal: AbortSignal.timeout(INSTALLER_TIMEOUT_MS) });
+    const dl = await fetch(validatedInstallerUrl.url, { signal: AbortSignal.timeout(INSTALLER_TIMEOUT_MS) });
     check("installer downloads from the manifest url", dl.ok, `status=${dl.status}`);
     if (!dl.ok) return finish(1);
     try {
-      bytes = Buffer.from(await dl.arrayBuffer());
-      check("downloaded installer has content", bytes.length > 0, `${(bytes.length / 1e6).toFixed(1)} MB`);
+      validateInstallerResponseUrl(dl.url);
+      check("final installer response remains HTTPS", true, has(dl.url ? new URL(dl.url).origin : "same-origin response"));
     } catch (e) {
-      check("downloaded installer has content", false, e.message);
+      check("final installer response remains HTTPS", false, e.message);
+      return finish(1);
+    }
+    try {
+      bytes = await readInstallerResponse(dl, MAX_INSTALLER_BYTES);
+      check("downloaded installer is non-empty and within the size limit", true, `${(bytes.length / 1e6).toFixed(1)} MB`);
+    } catch (e) {
+      const detail = /^(?:installer exceeds the \d+-byte size limit|installer response is empty)$/.test(e.message)
+        ? e.message
+        : [e.name || "Error", e.code ? `code=${e.code}` : ""].filter(Boolean).join(" ");
+      check("downloaded installer is non-empty and within the size limit", false, detail);
       return finish(1);
     }
   } catch (e) {
-    check("installer downloads from the manifest url", false, e.message);
+    const detail = [e.name || "Error", e.code ? `code=${e.code}` : ""].filter(Boolean).join(" ");
+    check("installer downloads from the manifest url", false, detail);
     return finish(1);
   }
 
@@ -164,6 +204,42 @@ async function main() {
     results.push({ name: "local byte comparison", status: "info", detail: "no local installer" });
   }
 
+  const signatureVerified = results.some(
+    (result) => result.name === "Ed25519 signature verifies over the downloaded installer" && result.status === true,
+  );
+  const tamperingRejected = results.some(
+    (result) => result.name === "tampered binary is correctly REJECTED" && result.status === true,
+  );
+  if (VERIFIED_INSTALLER_OUTPUT && signatureVerified && tamperingRejected && !results.some((result) => result.status === false)) {
+    const installerPath = VERIFIED_INSTALLER_OUTPUT;
+    const installerSha256 = createHash("sha256").update(bytes).digest("hex");
+    const metadata = {
+        schema: "sophos-verified-updater-installer/v1",
+        verifiedAt: new Date().toISOString(),
+        endpoint,
+        version: manifest.version,
+        pub_date: manifest.pub_date,
+        url: validatedInstallerUrl.safeUrl,
+        filename: validatedInstallerUrl.filename,
+        bytes: bytes.length,
+        sha256: installerSha256,
+        signatureVerified,
+        tamperingRejected,
+    };
+    try {
+      persistVerifiedInstaller({
+        installerPath,
+        metadataPath: VERIFIED_INSTALLER_METADATA_OUTPUT,
+        bytes,
+        metadata,
+      });
+      check("verified installer and metadata are saved atomically", true, installerPath);
+      console.log(`Verified installer saved: ${installerPath} (sha256 ${installerSha256})`);
+    } catch (e) {
+      check("verified installer and metadata are saved atomically", false, e.message);
+    }
+  }
+
   finish(results.some((r) => r.status === false) ? 1 : 0);
 }
 
@@ -177,6 +253,7 @@ function finish(exitCode) {
     results,
     summary: { total: results.length, passed, failed, info, overall: exitCode === 0 ? "PASS" : "FAIL" },
   };
+  mkdirSync(dirname(REPORT_PATH), { recursive: true });
   writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2));
   console.log(`\n=== Result: ${exitCode === 0 ? "PASS" : "FAIL"} (${passed} passed, ${failed} failed${info ? `, ${info} informational` : ""}) ===`);
   console.log(`Report: ${REPORT_PATH}`);
@@ -185,5 +262,19 @@ function finish(exitCode) {
 
 main().catch((e) => {
   console.error("live-feed check failed with error:", e.message);
+  results.push({ name: "live-feed verifier completed", status: false, detail: e.message });
+  mkdirSync(dirname(REPORT_PATH), { recursive: true });
+  writeFileSync(REPORT_PATH, JSON.stringify({
+    suite: "sophos-live-feed",
+    startedAt: new Date().toISOString(),
+    results,
+    summary: {
+      total: results.length,
+      passed: results.filter((result) => result.status === true).length,
+      failed: results.filter((result) => result.status === false).length,
+      info: results.filter((result) => result.status === "info").length,
+      overall: "FAIL",
+    },
+  }, null, 2));
   process.exit(1);
 });

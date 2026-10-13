@@ -3,13 +3,14 @@ name: CI
 on:
   push:
     branches: ["**"]
-    tags: ["v*"]
   pull_request:
     branches: ["**"]
 
 jobs:
   test:
-    # Run on Windows to match the release target and the cua-e2e job.
+    # verify/e2e.mjs runs the real staged daemon + bridge: it uses the bundled
+    # Windows Node executable and named-pipe IPC on Windows, or the host Node
+    # and Unix-domain sockets on POSIX. The workflow tests the Windows path.
     runs-on: windows-latest
 
     defaults:
@@ -19,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -26,19 +29,56 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Prepare a secure Windows source checkout
+        shell: pwsh
+        run: |
+          $privateParent = (node -p "require('node:fs').mkdtempSync(require('node:path').join(require('node:fs').realpathSync(require('node:os').tmpdir()), 'sophos-secure-'))").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $privateParent) { throw 'Could not create a unique checkout root under canonical Node system TEMP' }
+          $safeRepo = Join-Path $privateParent 'repo'
+          if (Test-Path -LiteralPath $safeRepo) { throw 'Refusing to reuse a secure checkout path' }
+          # GITHUB_REPOSITORY is the base repository on pull_request events and
+          # the pushing repository on branch events; fetch only the pinned event ref/SHA below.
+          $serverUrl = [Uri]$env:GITHUB_SERVER_URL
+          $repositorySlug = $env:GITHUB_REPOSITORY
+          if ($serverUrl.Scheme -ne 'https' -or $repositorySlug -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid GitHub event repository URL' }
+          $repositoryUrl = "$($serverUrl.AbsoluteUri.TrimEnd('/'))/$repositorySlug.git"
+          git clone --quiet --depth=1 --no-tags --no-checkout --no-hardlinks $repositoryUrl $safeRepo
+          if ($LASTEXITCODE -ne 0) { throw 'Anonymous Sophos source clone failed' }
+          git -C $safeRepo config core.autocrlf false
+          if ($LASTEXITCODE -ne 0) { throw 'Could not disable Git line-ending conversion in secure checkout' }
+          git -C $safeRepo fetch --quiet --no-tags --depth=1 origin $env:GITHUB_REF
+          if ($LASTEXITCODE -ne 0) { throw "Could not fetch event ref $env:GITHUB_REF" }
+          git -C $safeRepo checkout --quiet --detach $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Could not check out event SHA $env:GITHUB_SHA" }
+          $actualSha = (git -C $safeRepo rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actualSha -ne $env:GITHUB_SHA) { throw "Secure checkout SHA mismatch: $actualSha" }
+          $dirty = git -C $safeRepo status --porcelain --untracked-files=all
+          if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Secure checkout is not clean after the pinned checkout' }
+          Push-Location $safeRepo
+          try {
+            node --input-type=module -e 'import("./scripts/prepare-dependency-overlay.mjs").then(({ assertSecureProjectRoot }) => assertSecureProjectRoot(process.cwd()).then((root) => console.log("Validated secure project root: " + root))).catch((error) => { console.error(error); process.exitCode = 1; })'
+            if ($LASTEXITCODE -ne 0) { throw 'Secure Windows project-root ACL validation failed' }
+          } finally { Pop-Location }
+          Add-Content -Path $env:GITHUB_ENV -Value "SAFE_WINDOWS_REPO=$safeRepo"
+          Write-Output "Pinned secure checkout: $actualSha"
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Native Windows job containment and fault regression tests
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: cargo test --locked --manifest-path verify/job-containment/Cargo.toml --test windows -- --test-threads=1
+
       - name: Install dependencies
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm ci
 
       - name: Type-check
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npx tsc --noEmit
 
-      - name: Lint (zero warnings)
-        run: npm run lint
-
-      - name: Format check
-        run: npm run format:check
-
       - name: Unit tests
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npx vitest run
 
       - name: Updater harness (config + keys + signature crypto)
@@ -47,6 +87,7 @@ jobs:
         # signing key pair hygiene, Ed25519 signature crypto (incl. tamper
         # rejection), and the local dummy feed. Pure local Node, so a failure
         # must red the build.
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm run test:updater
 
       - name: Live update-feed integrity check
@@ -56,30 +97,65 @@ jobs:
         # the bytes with the configured pubkey, reject tampering). A broken
         # feed means the auto-updater is broken for every user, so a failure
         # must red the build. Network-dependent (hits the live GitLab feed).
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node verify/live-feed.mjs
 
-  # cua-e2e — drives the REAL Sophos desktop app (Tauri v2 release build) via
-  # the cua-driver CLI and UIA accessibility automation (verify/cua/*). These
-  # tests run in DEMO MODE (the `--demo` flag skips the daemon + sidecar and
-  # injects window.__SOPHOS_DEMO__ = true, so the frontend uses the
-  # MockIpcClient with simulated Sessions/Agents data). The cua-driver suite
-  # only needs the compiled exe + the cua-driver binary — both produced
-  # entirely here from source. So this job is BLOCKING: a failure must red the
-  # build and stop the
-  # merge, because it exercises real UI behavior that unit tests cannot.
-  #
-  # Requires a desktop session (UIA/window automation) and WebView2, both
-  # available on windows-latest runners, so we build and run on Windows.
-  cua-e2e:
-    runs-on: windows-latest
+      - name: Runtime helper and fail-closed gate regression tests
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node --test scripts/daemon-runtime-package.test.mjs scripts/node-runtime.test.mjs scripts/prime-agent-ref.test.mjs scripts/apply-prime-agent-overlay.test.mjs scripts/prepare-dependency-overlay.test.mjs scripts/prepare-prime-agent-security-build.test.mjs verify/e2e-result.test.mjs verify/runtime-executable.test.mjs verify/e2e-failure-exit.test.mjs verify/e2e-home-cleanup.test.mjs verify/e2e-mock-provider.test.mjs scripts/bundle.test.mjs bridge/verify.test.mjs bridge/session-recovery-readiness.test.mjs bridge/recovery-probe.test.mjs bridge/startup-gate.test.mjs bridge/verify-lifecycle.test.mjs bridge/lifecycle-cancellation.test.mjs verify/live-bounded-spend-test.test.mjs verify/cua/driver.test.mjs verify/cua/inbox-import.test.mjs verify/live-feed-download.test.mjs
 
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}
+      - name: Platform provenance and Tauri resource tests
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node --test scripts/native-runtime-platform.test.mjs scripts/bundle-platform.test.mjs scripts/tauri-license-resource.test.mjs scripts/tauri-package-license.test.mjs
+
+      # Build ignored runtime inputs from the event-SHA-pinned private checkout
+      # under canonical system TEMP; the bundler revalidates the ACL and every
+      # upstream source/patch/lock hash before staging.
+      - name: Build complete runtime bundle
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node scripts/bundle.mjs
+
+      - name: Verify standalone lifecycle on staged Windows bundle
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: npm --prefix bridge run verify:lifecycle
+
+      - name: Load production Windows native modules
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node scripts/verify-native-runtime.mjs
+
+      - name: Focused JSON-RPC wire regression
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node bridge/verify-rpc-errors.test.mjs
+
+      - name: Build guarded Tauri MSI
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node scripts/build-windows-installer.mjs
+
+      - name: Verify MIT notice is inside the built MSI
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node scripts/verify-tauri-package.mjs
+
+      - name: Verify bridge compatibility with the pinned daemon
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: npm --prefix bridge run test:kernel-compat
+
+      # Exercise the real staged daemon + bridge together over the platform's
+      # supported local-socket transport; the harness also validates the pinned
+      # upstream commit, packaged Node checksum, runtime dependencies, and daemon
+      # reconnect behavior. TCP fallback is explicitly not assumed.
+      - name: End-to-end verification
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node verify/e2e.mjs
+
+  lifecycle-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -89,116 +165,341 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run standalone lifecycle and retired-harness regression tests
+        run: node --test bridge/verify-lifecycle.test.mjs bridge/lifecycle-cancellation.test.mjs verify/live-bounded-spend-test.test.mjs
+
+  # cua-e2e drives the real Tauri release executable through UI Automation
+  # (verify/cua/*), using the disclosed demo IPC path (no provider inference).
+  # The screenshot directory includes checked-in baseline frames, so clear it
+  # in the secure clone before execution; uploaded artifacts then contain only
+  # frames produced by this current CUA attempt. Keep the gate blocking.
+  cua-e2e:
+    runs-on: windows-latest
+    timeout-minutes: 150
+
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Prepare a secure Windows source checkout
+        shell: pwsh
+        run: |
+          $privateParent = (node -p "require('node:fs').mkdtempSync(require('node:path').join(require('node:fs').realpathSync(require('node:os').tmpdir()), 'sophos-secure-'))").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $privateParent) { throw 'Could not create a unique checkout root under canonical Node system TEMP' }
+          $safeRepo = Join-Path $privateParent 'repo'
+          if (Test-Path -LiteralPath $safeRepo) { throw 'Refusing to reuse a secure checkout path' }
+          # GITHUB_REPOSITORY is the base repository on pull_request events and
+          # the pushing repository on branch events; fetch only the pinned event ref/SHA below.
+          $serverUrl = [Uri]$env:GITHUB_SERVER_URL
+          $repositorySlug = $env:GITHUB_REPOSITORY
+          if ($serverUrl.Scheme -ne 'https' -or $repositorySlug -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid GitHub event repository URL' }
+          $repositoryUrl = "$($serverUrl.AbsoluteUri.TrimEnd('/'))/$repositorySlug.git"
+          git clone --quiet --depth=1 --no-tags --no-checkout --no-hardlinks $repositoryUrl $safeRepo
+          if ($LASTEXITCODE -ne 0) { throw 'Anonymous Sophos source clone failed' }
+          git -C $safeRepo config core.autocrlf false
+          if ($LASTEXITCODE -ne 0) { throw 'Could not disable Git line-ending conversion in secure checkout' }
+          git -C $safeRepo fetch --quiet --no-tags --depth=1 origin $env:GITHUB_REF
+          if ($LASTEXITCODE -ne 0) { throw "Could not fetch event ref $env:GITHUB_REF" }
+          git -C $safeRepo checkout --quiet --detach $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Could not check out event SHA $env:GITHUB_SHA" }
+          $actualSha = (git -C $safeRepo rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $actualSha -ne $env:GITHUB_SHA) { throw "Secure checkout SHA mismatch: $actualSha" }
+          $dirty = git -C $safeRepo status --porcelain --untracked-files=all
+          if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Secure checkout is not clean after the pinned checkout' }
+          Push-Location $safeRepo
+          try {
+            node --input-type=module -e 'import("./scripts/prepare-dependency-overlay.mjs").then(({ assertSecureProjectRoot }) => assertSecureProjectRoot(process.cwd()).then((root) => console.log("Validated secure project root: " + root))).catch((error) => { console.error(error); process.exitCode = 1; })'
+            if ($LASTEXITCODE -ne 0) { throw 'Secure Windows project-root ACL validation failed' }
+          } finally { Pop-Location }
+          Add-Content -Path $env:GITHUB_ENV -Value "SAFE_WINDOWS_REPO=$safeRepo"
+          Write-Output "Pinned secure checkout: $actualSha"
+
+      - name: Install dependencies
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: npm ci
+
+      - name: Test CUA driver, path, and readiness helpers
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node --test verify/cua/driver.test.mjs verify/cua/driver-session.test.mjs verify/cua/driver-screenshot-context.test.mjs verify/cua/find-util.test.mjs verify/cua/smoke-readiness.test.mjs verify/cua/chat-app-path.test.mjs verify/cua/screenshot-path.test.mjs verify/cua/driver-path.test.mjs verify/cua/driver-foreground-fallback.test.mjs verify/cua/thread-visibility.node-test.mjs
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build frontend
         # tsc && vite build — emits dist/ that the Tauri shell embeds.
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm run build
 
-      - name: Rust unit tests
-        # cargo test runs the Rust shell's unit tests (lease sweep, settings
-        # probe, engine_log, etc.) against the compiled crate.
-        working-directory: src-tauri
-        run: cargo test
+      - name: Build actual pinned runtime resources
+        # Even the simulated UI build uses real pinned resources and the upstream
+        # MIT notice. No placeholder runtime is counted as packaging evidence.
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node scripts/bundle.mjs
 
       - name: Build Tauri release exe
+        id: build_release
         # cargo build --release compiles the Rust shell and embeds the
         # frontend from ../dist, producing
         # src-tauri/target/release/prime-agent-windows.exe. We deliberately do
         # NOT run `npx tauri build`, which would try to bundle installers and
         # needs the gitignored resources/ directory. The raw exe is all the
         # cua-driver e2e tests need.
-        working-directory: src-tauri
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}/src-tauri
         run: cargo build --release
 
       - name: Install cua-driver
-        # The cua-driver binary is installed to
-        # %LOCALAPPDATA%\Programs\Cua\cua-driver\bin\cua-driver.exe and found
-        # by verify/cua/driver.mjs (overridable via CUA_DRIVER_BIN).
+        id: install_cua_driver
+        if: ${{ always() && env.SAFE_WINDOWS_REPO != '' }}
+        # Pin the installed executable path for the next step. Hosted runners
+        # use a per-job profile (for example runneradmin), not the developer's
+        # local C:\Users\Cayleb profile.
         shell: pwsh
-        run: irm https://cua.ai/driver/install.ps1 | iex
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: |
+          $env:CUA_DRIVER_RS_VERSION = '0.34.0'
+          irm https://cua.ai/driver/install.ps1 | iex
+          $driverBin = Join-Path $env:LOCALAPPDATA 'Programs\Cua\cua-driver\bin\cua-driver.exe'
+          if (-not (Test-Path -LiteralPath $driverBin -PathType Leaf)) { throw "Installed cua-driver binary is missing: $driverBin" }
+          $versionOutput = (& $driverBin --version | Out-String).Trim()
+          $driverExit = $LASTEXITCODE
+          if ($driverExit -ne 0) { throw "Installed cua-driver version probe failed (exit $driverExit): $driverBin" }
+          if ($versionOutput -notmatch '\b0\.34\.0\b') { throw "Expected pinned cua-driver 0.34.0, got: $versionOutput" }
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value "CUA_DRIVER_BIN=$driverBin"
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value 'CUA_DRIVER_VERSION=0.34.0'
+          Write-Output "Configured pinned cua-driver 0.34.0 at $driverBin"
 
-      - name: Run cua-driver e2e suite
-        # BLOCKING — deliberately no continue-on-error. Run-all drives the real
-        # app in demo mode through every cua-driver e2e suite; it exits 0 on
-        # all-pass and 1 on any failure.
-        run: node verify/cua/run-all.mjs
+      - name: Prepare isolated CUA evidence paths
+        id: prepare_cua_artifacts
+        if: ${{ always() && env.SAFE_WINDOWS_REPO != '' }}
+        shell: pwsh
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $artifactRoot = Join-Path $env:RUNNER_TEMP "sophos-cua-$($env:GITHUB_RUN_ID)-$($env:GITHUB_RUN_ATTEMPT)"
+          $publicScreenshotDir = Join-Path $artifactRoot 'public-install-screenshots'
+          $demoScreenshotDir = Join-Path $artifactRoot 'release-demo-screenshots'
+          New-Item -ItemType Directory -Path $publicScreenshotDir -Force | Out-Null
+          New-Item -ItemType Directory -Path $demoScreenshotDir -Force | Out-Null
+          $installerPath = Join-Path $env:RUNNER_TEMP "sophos-public-feed-installer-$($env:GITHUB_RUN_ID).exe"
+          $installerMetadata = Join-Path $artifactRoot 'verified-installer.json'
+          $feedReport = Join-Path $artifactRoot 'live-feed-report.json'
+          $driverReport = Join-Path $artifactRoot 'cua-driver-version.json'
+          $installReport = Join-Path $artifactRoot 'public-install-report.json'
+          $smokeReport = Join-Path $artifactRoot 'public-app-smoke.json'
+          $smokeLog = Join-Path $artifactRoot 'public-install-cua.log'
+          $releaseSmokeLog = Join-Path $artifactRoot 'release-cua.log'
+          $pidFile = Join-Path $artifactRoot 'cua-app.pid'
+          "SOPHOS_CUA_ARTIFACT_ROOT=$artifactRoot" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "SOPHOS_PUBLIC_SCREENSHOT_DIR=$publicScreenshotDir" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "SOPHOS_DEMO_SCREENSHOT_DIR=$demoScreenshotDir" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "SOPHOS_VERIFIED_INSTALLER_OUTPUT=$installerPath" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "SOPHOS_VERIFIED_INSTALLER_METADATA_OUTPUT=$installerMetadata" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "SOPHOS_VERIFY_REPORT_PATH=$feedReport" | Add-Content -LiteralPath $env:GITHUB_ENV
+          [ordered]@{ schema = 'sophos-cua-driver/v1'; version = $env:CUA_DRIVER_VERSION; expectedVersion = '0.34.0' } |
+            ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $driverReport -Encoding utf8
+          "SOPHOS_INSTALL_REPORT_PATH=$installReport" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "SOPHOS_PUBLIC_SMOKE_REPORT_PATH=$smokeReport" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "SOPHOS_PUBLIC_SMOKE_LOG_PATH=$smokeLog" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "SOPHOS_RELEASE_CUA_LOG_PATH=$releaseSmokeLog" | Add-Content -LiteralPath $env:GITHUB_ENV
+          "SOPHOS_CUA_PID_FILE=$pidFile" | Add-Content -LiteralPath $env:GITHUB_ENV
+          Write-Output "Prepared isolated CUA evidence root: $artifactRoot"
 
-  # release — runs ONLY on tag pushes (v*). Gated on test + cua-e2e, which
-  # already build the exe and run the full e2e suite on the tag; this job adds
-  # the two release-specific checks: the live update-feed integrity check and
-  # (when the gitignored runtime bundle is present) the NSIS installer build.
-  #
-  # The NSIS installer needs resources/daemon/dist, resources/bridge/dist,
-  # resources/node_modules and resources/node/…/node.exe — all gitignored and
-  # assembled locally by `node scripts/bundle.mjs` from the (locally-modified)
-  # prime-agent-ref checkout + AppData node_modules. That bundle is not
-  # reproducible on a fresh hosted runner, so the installer step builds only
-  # when the bundle is present (e.g. a self-hosted runner with the full local
-  # checkout) and otherwise skips with a warning — the live-feed check always
-  # runs, so a tag is still verified. See docs/installer-reproducibility-0.8.0.md
-  # for the exact blocker and the operator steps to make this reproducible.
-  release:
-    runs-on: windows-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [test, cua-e2e]
-    defaults:
-      run:
-        working-directory: ${{ github.workspace }}
-    env:
-      # Optional — configure these two secrets to produce a SIGNED installer in
-      # CI. Without them the installer still builds, but no .sig is generated
-      # (sign with `npx tauri signer sign` at release time).
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Live update-feed integrity check
-        # BLOCKING — verifies the published feed (manifest + installer download
-        # + Ed25519 signature) exactly as the app consumes it.
+      - name: Download and verify the configured public updater installer
+        id: live_feed
+        if: ${{ always() && steps.prepare_cua_artifacts.outcome == 'success' }}
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        env:
+          SOPHOS_VERIFIED_INSTALLER_OUTPUT: ${{ env.SOPHOS_VERIFIED_INSTALLER_OUTPUT }}
+          SOPHOS_VERIFIED_INSTALLER_METADATA_OUTPUT: ${{ env.SOPHOS_VERIFIED_INSTALLER_METADATA_OUTPUT }}
+          SOPHOS_VERIFY_REPORT_PATH: ${{ env.SOPHOS_VERIFY_REPORT_PATH }}
         run: node verify/live-feed.mjs
 
-      - name: Build NSIS installer (when the runtime bundle is present)
-        id: installer
+      - name: Install the verified public updater package in the runner profile
+        id: install_public_installer
+        if: ${{ always() && steps.live_feed.outcome == 'success' }}
+        shell: pwsh
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        env:
+          SOPHOS_VERIFIED_INSTALLER_OUTPUT: ${{ env.SOPHOS_VERIFIED_INSTALLER_OUTPUT }}
+          SOPHOS_VERIFIED_INSTALLER_METADATA_OUTPUT: ${{ env.SOPHOS_VERIFIED_INSTALLER_METADATA_OUTPUT }}
+          SOPHOS_INSTALL_REPORT_PATH: ${{ env.SOPHOS_INSTALL_REPORT_PATH }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $report = [ordered]@{
+            schema = 'sophos-public-installer-smoke/v1'
+            status = 'RUNNING'
+            installerVersion = $null
+            installerUrl = $null
+            installerSha256 = $null
+            installerExitCode = $null
+            registryDisplayName = $null
+            registryDisplayVersion = $null
+            installRoot = $null
+            executablePath = $null
+            executableProductVersion = $null
+            executableSha256 = $null
+            error = $null
+          }
+          try {
+            $metadata = Get-Content -LiteralPath $env:SOPHOS_VERIFIED_INSTALLER_METADATA_OUTPUT -Raw | ConvertFrom-Json
+            if ($metadata.schema -ne 'sophos-verified-updater-installer/v1' -or -not $metadata.signatureVerified -or -not $metadata.tamperingRejected) { throw 'Verified installer metadata is incomplete or did not pass signature/tamper checks' }
+            $report.installerVersion = [string]$metadata.version
+            $report.installerUrl = [string]$metadata.url
+            $report.installerSha256 = ([string]$metadata.sha256).ToLowerInvariant()
+            $installerPath = $env:SOPHOS_VERIFIED_INSTALLER_OUTPUT
+            if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) { throw "Verified public installer is missing: $installerPath" }
+            $actualInstallerSha = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualInstallerSha -ne $report.installerSha256) { throw "Downloaded installer SHA-256 mismatch: $actualInstallerSha" }
+
+            $installer = Start-Process -FilePath $installerPath -ArgumentList '/S' -PassThru -WindowStyle Hidden
+            try {
+              Wait-Process -Id $installer.Id -Timeout 180 -ErrorAction Stop
+            } catch {
+              & taskkill.exe /PID $installer.Id /T /F | Out-Null
+              throw "Public NSIS installer did not finish within 180 seconds: $($_.Exception.Message)"
+            }
+            $installer.Refresh()
+            $report.installerExitCode = $installer.ExitCode
+            if ($installer.ExitCode -ne 0) { throw "Public NSIS installer returned exit code $($installer.ExitCode)" }
+
+            $uninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+            $record = $null
+            $deadline = (Get-Date).AddSeconds(20)
+            do {
+              $record = Get-ChildItem -LiteralPath $uninstallRoot -ErrorAction SilentlyContinue |
+                ForEach-Object { Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue } |
+                Where-Object { $_.DisplayName -eq 'Sophos' } |
+                Select-Object -First 1
+              if ($record) { break }
+              Start-Sleep -Seconds 1
+            } while ((Get-Date) -lt $deadline)
+            if (-not $record) { throw 'Per-user Sophos uninstall registration was not created by the installer' }
+            $report.registryDisplayName = [string]$record.DisplayName
+            $report.registryDisplayVersion = [string]$record.DisplayVersion
+
+            $installRoot = ([string]$record.InstallLocation).Trim().Trim('"')
+            if ([string]::IsNullOrWhiteSpace($installRoot)) {
+              $uninstallerMatch = [regex]::Match([string]$record.UninstallString, '(?i)^\s*"(?<path>[^"]*uninstall\.exe)"')
+              if (-not $uninstallerMatch.Success) { throw 'Could not resolve the per-user install directory from the uninstall registration' }
+              $installRoot = Split-Path -Parent $uninstallerMatch.Groups['path'].Value
+            }
+            $report.installRoot = $installRoot
+            $appPath = Join-Path $installRoot 'prime-agent-windows.exe'
+            if (-not (Test-Path -LiteralPath $appPath -PathType Leaf)) { throw "Installed Sophos executable is missing: $appPath" }
+            $productVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($appPath).ProductVersion
+            $expectedVersion = [regex]::Escape($report.installerVersion)
+            if (-not $productVersion -or $productVersion -notmatch "^$expectedVersion(?:$|[+.-])") { throw "Installed executable version '$productVersion' does not match signed feed version '$($report.installerVersion)'" }
+            $report.executablePath = $appPath
+            $report.executableProductVersion = $productVersion
+            $report.executableSha256 = (Get-FileHash -LiteralPath $appPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            $report.status = 'PASS'
+            "SOPHOS_INSTALLED_EXE=$appPath" | Add-Content -LiteralPath $env:GITHUB_ENV
+            "SOPHOS_INSTALLED_FEED_VERSION=$($report.installerVersion)" | Add-Content -LiteralPath $env:GITHUB_ENV
+            "SOPHOS_INSTALLED_FEED_SHA256=$($report.installerSha256)" | Add-Content -LiteralPath $env:GITHUB_ENV
+            Write-Output "Installed signed Sophos $($report.installerVersion) to $appPath"
+          } catch {
+            $report.status = 'FAIL'
+            $report.error = $_.Exception.Message
+            throw
+          } finally {
+            $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $env:SOPHOS_INSTALL_REPORT_PATH -Encoding utf8
+          }
+
+      - name: Run fresh-profile, non-demo UI smoke on the installed public binary
+        id: public_app_smoke
+        if: ${{ always() && steps.install_public_installer.outcome == 'success' && steps.install_cua_driver.outcome == 'success' }}
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        env:
+          SOPHOS_EXE: ${{ env.SOPHOS_INSTALLED_EXE }}
+          SOPHOS_FEED_VERSION: ${{ env.SOPHOS_INSTALLED_FEED_VERSION }}
+          SOPHOS_FEED_SHA256: ${{ env.SOPHOS_INSTALLED_FEED_SHA256 }}
+          SOPHOS_EXPECT_ONBOARDING: '1'
+          SOPHOS_CUA_REPORT_PATH: ${{ env.SOPHOS_PUBLIC_SMOKE_REPORT_PATH }}
+          SOPHOS_PUBLIC_CUA_LOG_PATH: ${{ env.SOPHOS_PUBLIC_SMOKE_LOG_PATH }}
+          CUA_SCREENSHOT_DIR: ${{ env.SOPHOS_PUBLIC_SCREENSHOT_DIR }}
+          CUA_SESSION_LIFECYCLE: '1'
+        run: |
+          node verify/cua/smoke.mjs 2>&1 | Tee-Object -FilePath $env:SOPHOS_PUBLIC_CUA_LOG_PATH
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Clean up public-install CUA processes before release-suite run
+        if: ${{ always() && steps.prepare_cua_artifacts.outcome == 'success' }}
         shell: pwsh
         run: |
-          $need = @(
-            "resources/node/node-v24.18.0-win-x64/node.exe",
-            "resources/daemon/dist/cli.js",
-            "resources/bridge/dist/bridge/src/index.js",
-            "resources/node_modules"
-          )
-          $missing = @($need | Where-Object { -not (Test-Path $_) })
-          if ($missing.Count -gt 0) {
-            Write-Host "::warning::Installer build skipped: gitignored runtime bundle not assembled in CI (missing $($missing -join ', ')). Run 'node scripts/bundle.mjs' then 'npm run tauri build' locally."
-            "INSTALLER_BUILT=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-            exit 0
+          $ErrorActionPreference = 'Continue'
+          if ($env:SOPHOS_CUA_PID_FILE -and (Test-Path -LiteralPath $env:SOPHOS_CUA_PID_FILE)) {
+            $rawPid = (Get-Content -LiteralPath $env:SOPHOS_CUA_PID_FILE -Raw).Trim()
+            if ($rawPid -match '^\d+$') {
+              $appProcess = Get-Process -Id ([int]$rawPid) -ErrorAction SilentlyContinue
+              if ($appProcess -and $appProcess.ProcessName -eq 'prime-agent-windows') {
+                & taskkill.exe /PID ([int]$rawPid) /T /F | Out-Null
+              }
+            }
           }
-          npm run tauri build
-          "INSTALLER_BUILT=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Get-Process -Name 'prime-agent-windows' -ErrorAction SilentlyContinue | ForEach-Object {
+            & taskkill.exe /PID $_.Id /T /F | Out-Null
+          }
+          if ($env:CUA_DRIVER_BIN -and (Test-Path -LiteralPath $env:CUA_DRIVER_BIN -PathType Leaf)) {
+            & $env:CUA_DRIVER_BIN stop
+            if ($LASTEXITCODE -ne 0) { Write-Output "cua-driver stop returned $LASTEXITCODE (daemon may already be stopped)" }
+          }
+          $LASTEXITCODE = 0
 
-      - name: Upload NSIS installer artifact
-        if: steps.installer.outputs.INSTALLER_BUILT == 'true'
+      - name: Run cua-driver e2e suite
+        id: release_cua_suite
+        if: ${{ always() && steps.build_release.outcome == 'success' && steps.install_cua_driver.outcome == 'success' && steps.prepare_cua_artifacts.outcome == 'success' }}
+        # Keep failures blocking; a green result must mean all native UI suites ran.
+        timeout-minutes: 60
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        env:
+          CUA_SCREENSHOT_DIR: ${{ env.SOPHOS_DEMO_SCREENSHOT_DIR }}
+          CUA_SESSION_LIFECYCLE: '1'
+          SOPHOS_RELEASE_CUA_LOG_PATH: ${{ env.SOPHOS_RELEASE_CUA_LOG_PATH }}
+        run: |
+          node verify/cua/run-all.mjs 2>&1 | Tee-Object -FilePath $env:SOPHOS_RELEASE_CUA_LOG_PATH
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Clean up remaining release-suite CUA processes
+        if: ${{ always() && steps.prepare_cua_artifacts.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          if ($env:SOPHOS_CUA_PID_FILE -and (Test-Path -LiteralPath $env:SOPHOS_CUA_PID_FILE)) {
+            $rawPid = (Get-Content -LiteralPath $env:SOPHOS_CUA_PID_FILE -Raw).Trim()
+            if ($rawPid -match '^\d+$') {
+              $appProcess = Get-Process -Id ([int]$rawPid) -ErrorAction SilentlyContinue
+              if ($appProcess -and $appProcess.ProcessName -eq 'prime-agent-windows') {
+                & taskkill.exe /PID ([int]$rawPid) /T /F | Out-Null
+              }
+            }
+          }
+          Get-Process -Name 'prime-agent-windows' -ErrorAction SilentlyContinue | ForEach-Object {
+            & taskkill.exe /PID $_.Id /T /F | Out-Null
+          }
+          if ($env:CUA_DRIVER_BIN -and (Test-Path -LiteralPath $env:CUA_DRIVER_BIN -PathType Leaf)) {
+            & $env:CUA_DRIVER_BIN stop
+            if ($LASTEXITCODE -ne 0) { Write-Output "cua-driver stop returned $LASTEXITCODE (daemon may already be stopped)" }
+          }
+          $LASTEXITCODE = 0
+
+      - name: Upload CUA and public-installer evidence
+        if: ${{ always() && steps.prepare_cua_artifacts.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: Sophos-${{ github.ref_name }}-x64-setup
-          path: |
-            src-tauri/target/release/bundle/nsis/Sophos_*_x64-setup.exe
-            src-tauri/target/release/bundle/nsis/Sophos_*_x64-setup.exe.sig
-          if-no-files-found: error
+          name: sophos-windows-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SOPHOS_CUA_ARTIFACT_ROOT }}
+          if-no-files-found: warn
+          retention-days: 14

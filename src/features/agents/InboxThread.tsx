@@ -35,7 +35,12 @@ export function InboxThread({ agent, messages, unreadCount, onMarkRead, onMarkAl
         <div className="ag-thread__id">THREAD / {(agent?.id ?? "").slice(0, 8).toUpperCase()}</div>
       </div>
 
-      <div className="ag-thread__messages">
+      <div
+        className="ag-thread__messages"
+        role="region"
+        aria-label="Agent coordination messages"
+        tabIndex={0}
+      >
         {!agent ? (
           <div className="ag-thread__welcome">
             <div className="ag-glyph">◈</div>

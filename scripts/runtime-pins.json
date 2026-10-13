@@ -1,0 +1,16 @@
+{
+  "primeAgent": {
+    "repository": "https://github.com/PrimeIntellect-ai/prime-agent.git",
+    "ref": "v0.7.0",
+    "commit": "be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387",
+    "version": "0.7.0",
+    "license": "MIT"
+  },
+  "nodeRuntime": {
+    "version": "24.18.0",
+    "platform": "win-x64",
+    "url": "https://nodejs.org/dist/v24.18.0/win-x64/node.exe",
+    "checksumSource": "https://nodejs.org/dist/v24.18.0/SHASUMS256.txt",
+    "sha256": "9a4eb5f1c29c6a2e93852ead46b999e284a6a5ca8bab4d4e241d587d025a52de"
+  }
+}

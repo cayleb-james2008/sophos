@@ -1,0 +1,1 @@
+Introducing Sophos: Prime Intellect's Prime Agent as a Windows-native desktop app — Tauri v2, React, 1,118 tests passing, upstream credited.

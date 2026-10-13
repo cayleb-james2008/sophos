@@ -94,14 +94,17 @@ import {
 // field because the Rust shell uses method-tagged objects).
 // ---------------------------------------------------------------------------
 
+type RpcId = string | number | null;
+
 interface RpcRequest {
-  id?: string | number | null;
+  jsonrpc?: "2.0";
+  id?: RpcId;
   method: string;
   params?: unknown;
 }
 
 interface RpcResponse {
-  id: string | number | null;
+  id: RpcId;
   result?: unknown;
   error?: { code: number; message: string; data?: unknown };
 }
@@ -169,25 +172,26 @@ export class RpcServer {
   // -------------------------------------------------------------------------
 
   private async handleLine(line: string): Promise<void> {
-    let parsed: RpcRequest;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(line);
     } catch (err) {
-      await this.respondError(null, JSON_RPC_ERROR.parseError, "parse error", String(err));
+      await this.respondError(true, null, JSON_RPC_ERROR.parseError, "parse error", String(err));
       return;
     }
-    if (!parsed || typeof parsed !== "object" || typeof parsed.method !== "string") {
-      await this.respondError(null, JSON_RPC_ERROR.invalidRequest, "invalid request");
+    if (!isRpcRequest(parsed)) {
+      await this.respondError(true, null, JSON_RPC_ERROR.invalidRequest, "invalid request");
       return;
     }
-    const id = (parsed.id ?? null) as string | number | null;
+    const hasId = Object.prototype.hasOwnProperty.call(parsed, "id");
+    const id = hasId ? parsed.id! : null;
     try {
       const result = await this.dispatch(parsed.method, parsed.params);
-      await this.respondOk(id, result);
+      await this.respondOk(hasId, id, result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const code = (err as { code?: number })?.code ?? JSON_RPC_ERROR.internalError;
-      await this.respondError(id, code, message);
+      await this.respondError(hasId, id, code, message);
     }
   }
 
@@ -310,6 +314,12 @@ export class RpcServer {
           goal?: string;
           profile?: { id: string; name: string; mode: string; systemPrompt: string };
         } = {};
+        if (p.cwd !== undefined && typeof p.cwd !== "string") {
+          throw rpcError(JSON_RPC_ERROR.invalidParams, "cwd must be a string");
+        }
+        if (p.goal !== undefined && typeof p.goal !== "string") {
+          throw rpcError(JSON_RPC_ERROR.invalidParams, "goal must be a string");
+        }
         if (typeof p.cwd === "string") opts.cwd = p.cwd;
         if (typeof p.goal === "string") opts.goal = p.goal;
         if (p.profile && typeof p.profile === "object") {
@@ -1105,19 +1115,20 @@ export class RpcServer {
     return conn;
   }
 
-  private async respondOk(id: string | number | null, result: unknown): Promise<void> {
-    if (id === null) return; // notification; no response
+  private async respondOk(shouldRespond: boolean, id: RpcId, result: unknown): Promise<void> {
+    if (!shouldRespond) return;
     const payload: RpcResponse = { id, result: result ?? null };
     await this.writeLine(JSON.stringify(payload) + "\n");
   }
 
   private async respondError(
-    id: string | number | null,
+    shouldRespond: boolean,
+    id: RpcId,
     code: number,
     message: string,
     data?: unknown,
   ): Promise<void> {
-    if (id === null) return;
+    if (!shouldRespond) return;
     const payload: RpcResponse = { id, error: { code, message, data } };
     await this.writeLine(JSON.stringify(payload) + "\n");
   }
@@ -1156,6 +1167,25 @@ function rpcError(code: number, message: string, data?: unknown): Error & { code
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function isRpcRequest(value: unknown): value is RpcRequest {
+  if (!isPlainObject(value) || typeof value.method !== "string") return false;
+  if (Object.prototype.hasOwnProperty.call(value, "jsonrpc") && value.jsonrpc !== "2.0") return false;
+  if (Object.prototype.hasOwnProperty.call(value, "id") && !isRpcId(value.id)) return false;
+  if (
+    Object.prototype.hasOwnProperty.call(value, "params") &&
+    value.params !== null &&
+    !isPlainObject(value.params) &&
+    !Array.isArray(value.params)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function isRpcId(value: unknown): value is RpcId {
+  return value === null || typeof value === "string" || (typeof value === "number" && Number.isFinite(value));
 }
 
 function requireParams<T extends Record<string, unknown>>(

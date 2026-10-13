@@ -13,20 +13,21 @@
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { call, getWindowState, click, sleep } from "./driver.mjs";
+import { call, getWindowState, getWindowStateForPixelClick, click, sleep } from "./driver.mjs";
 import { DEFAULT_APP_PATH, waitForWindow } from "./launch.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** Enable WebView2 accessibility by clicking once on the web content.
  * Retries on UIA timeout (the provider can be briefly unresponsive right
- * after a launch, especially under multi-instance contention). */
+ * after a launch, especially under multi-instance contention). The initial
+ * get_window_state includes the screenshot context required by the center click. */
 export async function enableWebContentAccessibility(pid, windowId) {
   let state;
   // Retry the initial getWindowState (UIA can be briefly unresponsive).
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      state = getWindowState(pid, windowId, { include_screenshot: false });
+      state = getWindowStateForPixelClick(pid, windowId);
       break;
     } catch (err) {
       if (attempt < 4 && /timed out|unresponsive/i.test(err.message)) {

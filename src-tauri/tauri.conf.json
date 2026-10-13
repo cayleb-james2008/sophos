@@ -32,6 +32,7 @@
     "resources": {
       "../resources/daemon/dist": "daemon/dist",
       "../resources/daemon/package.json": "daemon/package.json",
+      "../resources/daemon/LICENSE": "daemon/LICENSE",
       "../resources/bridge/dist": "bridge/dist",
       "../resources/node_modules": "node_modules",
       "../resources/node/node-v24.18.0-win-x64": "node",

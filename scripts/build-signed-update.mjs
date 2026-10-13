@@ -3,7 +3,12 @@
 // Build a signed update package for the Tauri v2 auto-updater.
 // Signs the update binary with the Ed25519 private key using the Tauri CLI signer.
 //
-// Usage: node scripts/build-signed-update.mjs [--version 0.2.0]
+// Usage: node scripts/build-signed-update.mjs [--version 0.2.0] [--key <path>]
+//
+// The signing key defaults to scripts/updater.key. For CI machines without
+// the production private key, pass --key <ephemeral-key-path> (or set
+// SOPHOS_UPDATER_KEY_PATH) to sign with an ephemeral keypair kept OUTSIDE
+// the repo tree — the ephemeral private key is never written into the repo.
 //
 // Output:
 //   scripts/update-binary.bin  → the update binary (dummy for testing)
@@ -26,14 +31,18 @@ const REPO = join(__dirname, "..");
 const args = process.argv.slice(2);
 const versionIdx = args.indexOf("--version");
 const version = versionIdx !== -1 ? args[versionIdx + 1] : "0.2.0";
-
-const keyPath = join(__dirname, "updater.key");
+const keyIdx = args.indexOf("--key");
+const keyPath =
+  keyIdx !== -1 && args[keyIdx + 1]
+    ? args[keyIdx + 1]
+    : process.env.SOPHOS_UPDATER_KEY_PATH || join(__dirname, "updater.key");
 const updatePath = join(__dirname, "update-binary.bin");
 const sigPath = join(__dirname, "update.sig");
 
 if (!existsSync(keyPath)) {
-  console.error("Private key not found at scripts/updater.key");
-  console.error("Run `node scripts/gen-updater-keys.mjs` first.");
+  console.error(`Private key not found at ${keyPath}`);
+  console.error("Run `node scripts/gen-updater-keys.mjs` first,");
+  console.error("or pass --key <ephemeral-key-path> (CI-mode ephemeral signing).");
   process.exit(1);
 }
 
@@ -99,7 +108,7 @@ try {
 } catch (e) {
   console.error("Failed to sign update binary:", e.message);
   console.error("\nMake sure:");
-  console.error("  1. The private key exists at scripts/updater.key");
+  console.error(`  1. The private key exists at ${keyPath}`);
   console.error("  2. The TAURI_SIGNING_PRIVATE_KEY_PASSWORD env var is set correctly");
   console.error("  3. The Tauri CLI is installed (npm install)");
   process.exit(1);

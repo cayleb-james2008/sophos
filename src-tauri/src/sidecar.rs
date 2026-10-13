@@ -20,20 +20,11 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
-
 use tauri::{AppHandle, Emitter};
 
 use crate::contract::IpcEvent;
 use crate::engine_log::{spawn_reader, EngineLogSink, Proc, Stream};
 use crate::job::Job;
-
-/// Windows flag: do not create a console window for the child. Without this,
-/// spawning a console node process from a GUI app flashes a terminal window
-/// on every spawn (and every crash-loop restart).
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 fn can_recover_after_eof(running: bool, current_generation: u64, eof_generation: u64) -> bool {
     running && current_generation == eof_generation
@@ -52,10 +43,6 @@ pub struct SidecarManager {
     job: Arc<Job>,
     node_path: String,
     bridge_path: String,
-    /// When true, spawn the bridge with `PRIME_DAEMON_TCP=1` so its
-    /// `defaultDaemonSocketPath()` resolves to the same TCP-loopback endpoint
-    /// the daemon is listening on. Must match the daemon's transport.
-    daemon_tcp: bool,
     log_sink: Mutex<Option<Arc<EngineLogSink>>>,
 }
 
@@ -65,7 +52,6 @@ impl SidecarManager {
         job: Arc<Job>,
         node_path: String,
         bridge_path: String,
-        daemon_tcp: bool,
     ) -> Arc<Self> {
         Arc::new(Self {
             app,
@@ -77,7 +63,6 @@ impl SidecarManager {
             job,
             node_path,
             bridge_path,
-            daemon_tcp,
             log_sink: Mutex::new(None),
         })
     }
@@ -108,15 +93,9 @@ impl SidecarManager {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())  // JSON-RPC responses
             .stderr(Stdio::piped()); // logs — captured
-        if self.daemon_tcp {
-            cmd.env("PRIME_DAEMON_TCP", "1");
-        }
-        #[cfg(windows)]
-        cmd.creation_flags(CREATE_NO_WINDOW);
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
-        match cmd.spawn() {
+        match self.job.spawn(&mut cmd) {
             Ok(mut child) => {
-                self.job.assign(&child);
                 let stdin = child.stdin.take();
                 let stdout = child.stdout.take();
                 let stderr = child.stderr.take();

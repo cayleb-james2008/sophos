@@ -102,15 +102,10 @@ export function AgentDetail({
                 value={`${agent.squadRole.toUpperCase()} (Round ${agent.reviewRounds ?? 1})`}
               />
             ) : null}
-            {agent.summary ? (
-              <Row icon={<LayersIcon size={14} />} label="Summary" value={agent.summary} />
-            ) : null}
+            {agent.summary ? <Row icon={<LayersIcon size={14} />} label="Summary" value={agent.summary} /> : null}
             {agent.latestRubric ? (
-              <Row
-                icon={<PlugIcon size={14} />}
-                label="Critic rubric"
-                value={`Goal: ${(agent.latestRubric.goalScore * 100).toFixed(0)}% · Bar: ${(agent.latestRubric.barScore * 100).toFixed(0)}% · Verdict: ${agent.latestRubric.barVerdict}`}
-              />
+              <Row icon={<PlugIcon size={14} />} label="Critic rubric"
+                value={`Goal: ${(agent.latestRubric.goalScore * 100).toFixed(0)}% · Bar: ${(agent.latestRubric.barScore * 100).toFixed(0)}% · Verdict: ${agent.latestRubric.barVerdict}`} />
             ) : null}
             {sessionState ? (
               <Row
@@ -119,33 +114,23 @@ export function AgentDetail({
                 value={`${sessionState.status}${sessionState.activity ? ` · ${sessionState.activity}` : ""}${sessionState.tokenCount ? ` · ${sessionState.tokenCount} tokens` : ""}`}
               />
             ) : null}
-          </div>
-          {agent.latestRubric?.quotedDefects && agent.latestRubric.quotedDefects.length > 0 ? (
-            <div className="ag-detail__state">
-              <small>BLIND CRITIC DEFECTS · {agent.latestRubric.quotedDefects.length} items</small>
-              {agent.latestRubric.quotedDefects.map((defect, idx) => (
-                <div key={idx}>
-                  <b>Defect #{idx + 1}</b>
-                  <span>
-                    {typeof defect === "string"
-                      ? defect
-                      : `${defect.defect}${defect.recommendation ? ` (Fix: ${defect.recommendation})` : ""}`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          {sessionState ? (
-            <div className="ag-detail__state">
+            {/* Keep variable transcript and rubric details inside the bounded scroller so they cannot push the composer below the viewport. */}
+            {agent.latestRubric?.quotedDefects && agent.latestRubric.quotedDefects.length > 0 ? (
+              <div className="ag-detail__state">
+                <small>BLIND CRITIC DEFECTS · {agent.latestRubric.quotedDefects.length} items</small>
+                {agent.latestRubric.quotedDefects.map((defect, idx) => (
+                  <div key={idx}>
+                    <b>Defect #{idx + 1}</b>
+                    <span>{typeof defect === "string" ? defect : `${defect.defect}${defect.recommendation ? ` (Fix: ${defect.recommendation})` : ""}`}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {sessionState ? <div className="ag-detail__state">
               <small>LIVE SESSION STATE · {sessionState.transcript.length} messages</small>
-              {sessionState.transcript.slice(-3).map((message) => (
-                <div key={message.id}>
-                  <b>{message.role}</b>
-                  <span>{message.content || "(tool activity)"}</span>
-                </div>
-              ))}
-            </div>
-          ) : null}
+              {sessionState.transcript.slice(-3).map((message) => <div key={message.id}><b>{message.role}</b><span>{message.content || "(tool activity)"}</span></div>)}
+            </div> : null}
+          </div>
 
           {/* Actions */}
           <div className="ag-detail__actions">
@@ -171,14 +156,27 @@ export function AgentDetail({
       ) : null}
 
       <div className="ag-detail__thread">
-        <InboxThread
+        {/* Keep the inspector thread landmark; the nested messages viewport owns keyboard scrolling. */}
+        <div
+          className="ag-detail__thread-scroll"
+          role="region"
+          aria-label="Agent coordination thread"
+        >
+          <InboxThread
+            agent={agent}
+            messages={thread}
+            unreadCount={unreadCount}
+            onMarkRead={onMarkRead}
+            onMarkAllRead={onMarkAllRead}
+          />
+        </div>
+        <AgentComposer
           agent={agent}
-          messages={thread}
-          unreadCount={unreadCount}
-          onMarkRead={onMarkRead}
-          onMarkAllRead={onMarkAllRead}
+          draft={draft}
+          setDraft={setDraft}
+          sending={sending}
+          onSend={onSend}
         />
-        <AgentComposer agent={agent} draft={draft} setDraft={setDraft} sending={sending} onSend={onSend} />
       </div>
     </aside>
   );

@@ -131,6 +131,20 @@ describe("AgentComposer", () => {
     expect(screen.queryByText("release-audit")).not.toBeInTheDocument();
   });
 
+  it("keeps the expanded composition panel bounded while retaining the composer controls", async () => {
+    const user = userEvent.setup();
+    renderComposer();
+    const composer = document.querySelector(".ag-composer");
+    expect(composer).not.toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /composition/i }));
+
+    expect(composer).toHaveClass("ag-composer--expanded");
+    expect(composer).toContainElement(screen.getByLabelText("Message to Reviewer"));
+    expect(composer).toContainElement(screen.getByRole("button", { name: /send/i }));
+    expect(screen.getByRole("button", { name: /composition/i })).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("defaults the thinking level from the subagent policy", async () => {
     renderComposer();
     await userEvent.click(screen.getByRole("button", { name: /composition/i }));

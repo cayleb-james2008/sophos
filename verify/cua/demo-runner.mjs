@@ -14,11 +14,18 @@ import { startDaemon, stopDaemon, sleep } from "./driver.mjs";
 import { closeApp } from "./launch.mjs";
 import { takeScreenshot } from "./helpers.mjs";
 import { launchDemoApp } from "./demo-launch.mjs";
+import { rmSync, writeFileSync } from "node:fs";
 
 /** Shared app handle populated by beforeAll. */
 export const app = { pid: null, windowId: null };
 
 let daemonStartedByRunner = false;
+
+function recordAppPid() {
+  if (app.pid && process.env.SOPHOS_CUA_PID_FILE) {
+    writeFileSync(process.env.SOPHOS_CUA_PID_FILE, `${app.pid}\n`, "utf8");
+  }
+}
 
 /** Start the daemon (if needed) and launch the app in demo mode. */
 export async function beforeAll() {
@@ -27,6 +34,7 @@ export async function beforeAll() {
   const launched = await launchDemoApp();
   app.pid = launched.pid;
   app.windowId = launched.windowId;
+  recordAppPid();
   // Give the MockIpcClient's 600ms connect simulation time to settle.
   await sleep(1200);
   return app;
@@ -34,6 +42,7 @@ export async function beforeAll() {
 
 /** Tear down: final screenshot, close the app, stop the daemon if we started it. */
 export async function afterAll() {
+  let appCloseFailed = false;
   if (app.pid) {
     try {
       takeScreenshot(app.pid, "final-state", app.windowId);
@@ -42,8 +51,9 @@ export async function afterAll() {
     }
     try {
       closeApp(app.pid);
-    } catch {
-      // already closed
+    } catch (error) {
+      appCloseFailed = true;
+      console.error(`App close deferred to job cleanup: ${error.message}`);
     }
     app.pid = null;
     app.windowId = null;
@@ -51,6 +61,9 @@ export async function afterAll() {
   if (daemonStartedByRunner) {
     stopDaemon();
     daemonStartedByRunner = false;
+  }
+  if (!appCloseFailed && process.env.SOPHOS_CUA_PID_FILE) {
+    rmSync(process.env.SOPHOS_CUA_PID_FILE, { force: true });
   }
 }
 
@@ -80,6 +93,7 @@ async function relaunchApp() {
       const launched = await launchDemoApp();
       app.pid = launched.pid;
       app.windowId = launched.windowId;
+      recordAppPid();
       await sleep(1200);
       return;
     } catch (err) {
@@ -120,25 +134,28 @@ export async function runTest(name, fn) {
 /** Run a suite of tests in demo mode. Sets process.exitCode = 1 on failure. */
 export async function runDemoSuite(name, tests) {
   console.log(`\n=== ${name} ===`);
-  // Retry the initial launch if the window is torn down externally before it
-  // settles (e.g. another agent relaunching the shared release exe).
-  for (let attempt = 1; ; attempt++) {
-    try {
-      await beforeAll();
-      break;
-    } catch (err) {
-      if ((isStaleWindow(err) || /timed out|unresponsive/i.test(err.message)) && attempt < 5) {
-        console.log(`  ~ initial launch failed; relaunching (attempt ${attempt})`);
-        continue;
-      }
-      throw err;
-    }
-  }
   const results = [];
-  for (const test of tests) {
-    results.push(await runTest(test.name, test.fn));
+  try {
+    // Retry the initial launch if the window is torn down externally before it
+    // settles (e.g. another agent relaunching the shared release exe).
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await beforeAll();
+        break;
+      } catch (err) {
+        if ((isStaleWindow(err) || /timed out|unresponsive/i.test(err.message)) && attempt < 5) {
+          console.log(`  ~ initial launch failed; relaunching (attempt ${attempt})`);
+          continue;
+        }
+        throw err;
+      }
+    }
+    for (const test of tests) {
+      results.push(await runTest(test.name, test.fn));
+    }
+  } finally {
+    await afterAll();
   }
-  await afterAll();
 
   const passed = results.filter((r) => r.pass).length;
   const failed = results.length - passed;

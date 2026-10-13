@@ -23,11 +23,20 @@ submit changes.
 
 ### Setup
 
-Install all frontend dependencies from the repository root:
+Install the locked frontend dependencies from the repository root:
 
 ```sh
-npm install
+npm ci
 ```
+
+The Prime Agent runtime is a pinned public source dependency, not an npm
+package tarball. On Windows x64, `node scripts/bundle.mjs` clones/validates the
+exact v0.7.0 commit into ignored `.deps/prime-agent`, installs its lockfile with
+normal npm lifecycle scripts, builds the daemon and bridge, and stages the
+verified runtime. Linux/macOS developers can run
+`node scripts/bundle.mjs --diagnostic` for source/Unix-socket diagnostics; its
+native dependencies are explicitly marked ineligible for a Windows installer.
+No machine-local AppData checkout is required.
 
 ### Development
 
@@ -46,9 +55,18 @@ npm run tauri dev
 ### Production build
 
 ```sh
-npm run build      # tsc && vite build (frontend)
-npm run tauri build # bundled desktop installer
+npm ci                                  # frontend dependencies
+node scripts/bundle.mjs                # Windows x64: pinned runtime + native dependency staging
+node verify/e2e.mjs                    # real offline daemon/bridge protocol smoke test
+node scripts/verify-native-runtime.mjs  # real Windows bundled-Node native addon load
+node scripts/build-windows-installer.mjs # guarded Tauri MSI build
+node scripts/verify-tauri-package.mjs   # extract MSI and compare packaged MIT notice
 ```
+
+On Linux/macOS, replace the bundle command with
+`node scripts/bundle.mjs --diagnostic`; do not pass that host-native dependency
+tree to Tauri's Windows release build. The installer helper rejects diagnostic
+or cross-platform manifest provenance.
 
 The `verify/` suite requires a bundled runtime. Build it first with
 `node scripts/bundle.mjs`, then run the verifiers (see Testing).
@@ -58,11 +76,15 @@ The `verify/` suite requires a bundled runtime. Build it first with
 Unit / component tests run on **Vitest** with jsdom and React Testing Library.
 
 ```sh
-npm test             # run once (CI mode), exits non-zero on failure
-npx vitest run       # same as npm test
+npm test             # Vitest, then the package.json Node regression test list
+npx vitest run       # frontend/unit/component Vitest tests only
 npm run test:watch   # watch mode for development
 npm run test:ui      # interactive Vitest UI (requires @vitest/ui)
 ```
+
+Both commands exit non-zero on failure, but have different scope. The hosted
+workflow also names its runtime, native and CUA checks separately; passing
+Vitest alone does not establish complete workflow or installer acceptance.
 
 Test files live next to the code they cover as `src/**/*.test.{ts,tsx}`, and
 share a global setup at `src/test/setup.ts` (imports `@testing-library/jest-dom`
@@ -71,17 +93,51 @@ tests import exactly like source code. `npm run test:ui` requires the optional
 `@vitest/ui` package (`npm i -D @vitest/ui`); without it, use `npm test` or
 `npm run test:watch`.
 
-**What is covered:** currently the unit-test harness and CI wiring are in
-place; test files for individual features land as features are added. The CI
-workflow additionally runs a TypeScript check and the headless end-to-end
-verifier (`node verify/e2e.mjs`, which exercises the offline daemon protocol
-and bridge sidecar on Windows).
+**What is covered:** the CI workflow installs from locked dependencies, builds
+the pinned upstream daemon and TypeScript bridge from public source, stages the
+hash-verified Node runtime, and runs the bridge/daemon JSON-RPC verifier
+(`node verify/e2e.mjs`). Recovery uses an isolated loopback mock provider so the
+test can verify session persistence without live model inference. On Windows it
+exercises the named-pipe path with bundled Node; on Linux/macOS it uses host
+Node and a Unix-domain socket. Non-Windows results do not validate
+Windows-native setup.
+The Windows workflow also configures a bundled-Node native-module smoke, guarded
+MSI build, and MSI license-extraction check; these steps still need a Windows
+runner result before installer or native-module claims are considered verified.
 
 ### Verifiers
 
-The `verify/` directory holds model-free offline verification scripts, run
-via `npm run verify:safety` and `node verify/e2e.mjs`. These are
-Windows-specific and drive the bundled daemon over named pipes/TCP.
+The `verify/` directory includes offline checks and historical/manual harnesses;
+do not assume every script is safe to execute with provider credentials.
+`node verify/e2e.mjs` requires a freshly assembled `resources/` bundle and drives
+the real daemon and bridge together, including reconnect recovery. Its recovery
+probe uses a deterministic loopback mock provider; it does not test external
+provider API access, live inference, TCP fallback, Tauri installer creation, or
+Windows behavior when run on another OS.
+
+For the focused standalone bridge lifecycle check, stage a fresh bundle first:
+
+```sh
+node scripts/bundle.mjs               # Windows x64
+# Linux/macOS instead: node scripts/bundle.mjs --diagnostic
+npm --prefix bridge run verify:lifecycle
+```
+
+This command runs the staged `resources/bridge` and `resources/daemon` with the
+complete shared production dependencies in `resources/node_modules`, not the
+compile-only `bridge/node_modules` copies. It checks the bundle's declared
+source pin and overlay metadata, ignores inherited `REF`/`BRIDGE` overrides,
+and fails with staging instructions if the bundle is absent or mismatched.
+Rebundle after changing bridge or daemon source; the command does not compile
+or silently run unstaged edits. It keeps an isolated HOME, an allowlisted child
+environment, fail-closed loopback model selection, and owned-process cleanup.
+On Windows it uses the hash-verified bundled Node; elsewhere it uses host Node.
+For complete build provenance validation, use `node verify/e2e.mjs` as well.
+
+The former `verify/live-bounded-spend-test.mjs` is retired and exits nonzero
+without launching anything. Its broken, unsafe historical source is retained
+as non-executable text in `verify/archive/`; see that directory's README. Neither
+its archive nor the offline lifecycle check establishes a live spend cap.
 
 ## Code style
 
@@ -109,12 +165,10 @@ Windows-specific and drive the bundled daemon over named pipes/TCP.
    and `npm test` locally; both must pass.
 5. **Open a pull request** against `master`. Describe what the change does and
    why, and note any manual verification performed.
-6. **CI must pass.** The CI workflow (`.github/workflows/ci.yml`) runs the
-   type-check and unit tests on every push and PR; both must be green. The
-   end-to-end verification step runs **best-effort** in CI (`continue-on-error`)
-   because `verify/e2e.mjs` needs the bundled runtime, which is gitignored and
-   can only be assembled locally via `node scripts/bundle.mjs`. Before merge,
-   run `node scripts/bundle.mjs && node verify/e2e.mjs` locally and confirm it
-   passes.
+6. **CI must pass.** The workflow builds the full pinned runtime from a fresh
+   source checkout and runs the daemon/bridge end-to-end verifier as a required
+   Windows job. Native CUA is also a blocking Windows job; it exercises both
+   the signed public updater installation and the checkout release executable.
+   Do not treat diagnostic-only runs or skipped native checks as acceptance.
 
 Thank you for contributing to Sophos.

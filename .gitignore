@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 bridge/node_modules/
+.deps/
 
 # Build output
 dist/
@@ -94,4 +95,4 @@ verify/visual/diffs/
 
 # Smoke test screenshots
 verify/screenshots/
-
+verify/cua/screenshots/

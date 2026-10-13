@@ -239,15 +239,12 @@ fn install_update(app: AppHandle) -> Result<(), String> {
 ///
 /// Rust owns process lifecycle only; it cannot see through the bridge to the
 /// daemon's pipe/socket, so the bridge is authoritative for the live
-/// connection detail. Here we report process-level health, and when the daemon
-/// process is dead (e.g. its `net.createServer().listen(pipe)` threw on the
-/// wedged named-pipe path) we surface a plain-English reason that points at the
-/// TCP escape hatch.
+/// connection detail. Here we report process-level health and keep remediation
+/// language aligned with the pinned runtime's supported default local socket.
 fn spawn_health_monitor(
     app: AppHandle,
     daemon: Arc<DaemonManager>,
     sidecar: Arc<SidecarManager>,
-    daemon_tcp: bool,
 ) {
     std::thread::spawn(move || loop {
         let daemon_ok = daemon.is_alive();
@@ -255,19 +252,10 @@ fn spawn_health_monitor(
         let status = match (daemon_ok, sidecar_ok) {
             (true, true) => ConnectionStatus::Connected,
             (false, false) => {
-                let reason = if daemon_tcp {
-                    "Engine (daemon) is not running on the TCP-loopback transport."
-                        .to_string()
-                } else {
-                    #[cfg(windows)]
-                    {
-                        "Engine (daemon) is not running. If the daemon couldn't start because Windows named-pipe creation is blocked (ERROR_INVALID_NAME while TCP loopback still works), enable TCP mode in Settings → Advanced.".to_string()
-                    }
-                    #[cfg(not(windows))]
-                    {
-                        "Engine (daemon) is not running.".to_string()
-                    }
-                };
+                #[cfg(windows)]
+                let reason = "Engine (daemon) is not running on its default named-pipe transport.".to_string();
+                #[cfg(not(windows))]
+                let reason = "Engine (daemon) is not running on its default local socket.".to_string();
                 ConnectionStatus::Disconnected { reason: Some(reason) }
             }
             _ => ConnectionStatus::Reconnecting,
@@ -289,10 +277,10 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let handle = app.handle().clone();
-            let job = Arc::new(Job::new().unwrap_or_else(|| {
-                eprintln!("[job] failed to create job object; orphans possible on hard kill");
-                Job::null()
-            }));
+            let job = Arc::new(Job::new().map_err(|error| {
+                eprintln!("[job] containment unavailable; refusing engine startup: {error}");
+                error
+            })?);
             // Demo mode: launched with `--demo` (cua-driver e2e) or
             // SOPHOS_DEMO_MODE=1. The app skips the daemon + sidecar and the
             // frontend uses the MockIpcClient, so the full UI is demonstrable
@@ -307,12 +295,6 @@ pub fn run() {
             // Resolve the child_process windowsHide preload (may be None if not
             // found; daemon then spawns without --require).
             let preload_path = settings::resolve_preload_path(resource_dir.as_deref()).unwrap_or_default();
-            // `daemonTcp` selects the TCP-loopback fallback transport. The daemon
-            // and the bridge are launched with the SAME flag so both resolve
-            // `defaultDaemonSocketPath()` to the same endpoint.
-            let settings = settings::Settings::load();
-            let daemon_tcp = settings.daemon_tcp;
-
             // Create the engine log sink (shared ring buffer + event emitter).
             let log_sink = EngineLogSink::new(handle.clone());
 
@@ -326,17 +308,15 @@ pub fn run() {
                 job.clone(),
                 node_path.clone(),
                 bridge_path,
-                daemon_tcp,
             );
             sidecar.set_log_sink(log_sink.clone());
 
             if demo_mode {
                 eprintln!("[sophos] DEMO MODE — daemon/sidecar skipped, using mock IPC");
             } else {
-                // Conservative startup recovery: clear crash-leftover lease
-                // debris and reclaim stale session leases (dead owner + past
-                // grace) BEFORE the daemon spawns, so a previously-crashed
-                // host never bricks every resume (upstream #667/#841/D39b).
+                // Recover crash-leftover lease debris and stale session leases
+                // before the daemon starts. The sweep removes only leases with
+                // a provably dead owner that are older than the grace period.
                 let lease_summary = lease::sweep_stale_leases(
                     &settings::agent_dir(),
                     lease::DEFAULT_LEASE_GRACE_MS,
@@ -350,7 +330,7 @@ pub fn run() {
                         lease_summary.kept,
                     );
                 }
-                daemon.start(&node_path, &daemon_path, daemon_tcp);
+                daemon.start(&node_path, &daemon_path);
                 sidecar.start();
             }
 
@@ -360,7 +340,7 @@ pub fn run() {
             // owned here (spawn_health_monitor takes it by value).
             spawn_update_check(handle.clone());
             if !demo_mode {
-                spawn_health_monitor(handle, daemon.clone(), sidecar.clone(), daemon_tcp);
+                spawn_health_monitor(handle, daemon.clone(), sidecar.clone());
             }
 
             app.manage(AppState {

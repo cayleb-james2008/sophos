@@ -4,8 +4,9 @@
 //
 // Animation timing is passed via CSS custom properties so the host stays
 // free of inline style composition. The class `.pa-fade` / `.pa-slide-up` /
-// `.pa-view-transition` defines the static part of the animation, while the
-// caller can tune duration / delay through `--pa-motion-duration` and
+// `.pa-view-transition--animated` defines the animation; the separate
+// `.pa-view-transition` class preserves full-height layout when motion is reduced,
+// while callers can tune duration / delay through `--pa-motion-duration` and
 // `--pa-motion-delay`.
 
 import React, { useEffect, useState } from "react";
@@ -129,7 +130,11 @@ export function ViewTransition({
   return (
     <div
       key={transitionKey}
-      className={[reduced ? null : "pa-view-transition", className].filter(Boolean).join(" ") || undefined}
+      className={[
+        "pa-view-transition",
+        reduced ? null : "pa-view-transition--animated",
+        className,
+      ].filter(Boolean).join(" ") || undefined}
       style={motionVars(tokens.motion.base, 0)}
     >
       {children}
