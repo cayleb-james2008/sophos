@@ -19,6 +19,7 @@ import { getSessionRecoveryAssertions } from "./session-recovery-readiness.mjs";
 import { runRecoveryProbe } from "./recovery-probe.mjs";
 import { startBridgeAfterDaemonStartup } from "./startup-gate.mjs";
 import { isLifecycleCancellationMessage } from "./lifecycle-cancellation.mjs";
+import { writeE2EMockProviderConfig } from "../verify/e2e-mock-provider.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REF_ROOT = resolve(
@@ -45,6 +46,15 @@ process.env.HOME = VERIFY_HOME;
 process.env.USERPROFILE = VERIFY_HOME;
 process.env.APPDATA = join(VERIFY_HOME, "AppData", "Roaming");
 process.env.LOCALAPPDATA = join(VERIFY_HOME, "AppData", "Local");
+
+if (process.env.BRIDGE_VERIFY_RECOVERY === "1") {
+  try {
+    writeE2EMockProviderConfig(VERIFY_HOME, process.env.BRIDGE_VERIFY_MOCK_BASE_URL);
+  } catch (error) {
+    rmSync(VERIFY_HOME, { recursive: true, force: true });
+    throw error;
+  }
+}
 
 function terminateProcessTree(proc) {
   if (!proc?.pid || proc.exitCode !== null) return;
@@ -765,10 +775,20 @@ async function run() {
 
     // 16. Login requires a key and only explicit logout removes it.
     const authPath = join(VERIFY_HOME, ".prime", "agent", "auth.json");
+    const authBeforeInvalidLogin = existsSync(authPath)
+      ? JSON.parse(readFileSync(authPath, "utf8"))
+      : {};
     const missingKeyLogin = await send({ id: "c17a", method: "login", params: { provider: "openrouter" } });
     const blankKeyLogin = await send({ id: "c17b", method: "login", params: { provider: "openrouter", apiKey: "   " } });
-    record("login rejects missing or blank keys without creating auth state",
-      missingKeyLogin.error?.code === -32602 && blankKeyLogin.error?.code === -32602 && !existsSync(authPath));
+    const authAfterInvalidLogin = existsSync(authPath)
+      ? JSON.parse(readFileSync(authPath, "utf8"))
+      : {};
+    const authUnchangedByInvalidLogin = JSON.stringify(authBeforeInvalidLogin) === JSON.stringify(authAfterInvalidLogin);
+    record("login rejects missing or blank keys without changing auth credentials",
+      missingKeyLogin.error?.code === -32602
+        && blankKeyLogin.error?.code === -32602
+        && authUnchangedByInvalidLogin,
+      `missingError=${missingKeyLogin.error?.code ?? "none"}; blankError=${blankKeyLogin.error?.code ?? "none"}; authChanged=${!authUnchangedByInvalidLogin}`);
 
     const fixtureKey = "test-key-never-sent-to-a-provider";
     const loginResp = await send({ id: "c17", method: "login", params: { provider: "openrouter", apiKey: fixtureKey } });

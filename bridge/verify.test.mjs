@@ -48,6 +48,8 @@ test("recovery probe requires successful isolated model selection before dispatc
 test("standalone lifecycle verifier provisions only the loopback recovery fixture", () => {
   assert.ok(lifecycleSource.includes("startE2EMockProvider()"));
   assert.ok(lifecycleSource.includes("writeE2EMockProviderConfig(isolatedHome, mockProvider.baseUrl)"));
+  assert.ok(lifecycleSource.includes("BRIDGE_VERIFY_MOCK_BASE_URL: mockProvider.baseUrl"));
+  assert.ok(verifySource.includes("writeE2EMockProviderConfig(VERIFY_HOME, process.env.BRIDGE_VERIFY_MOCK_BASE_URL)"));
   assert.ok(lifecycleSource.includes("BRIDGE_VERIFY_MODEL_PROVIDER: E2E_MOCK_PROVIDER_ID"));
   assert.ok(lifecycleSource.includes("BRIDGE_VERIFY_MODEL_ID: E2E_MOCK_MODEL_ID"));
   assert.ok(lifecycleSource.includes('PI_OFFLINE: "1"'));

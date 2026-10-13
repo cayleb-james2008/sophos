@@ -182,6 +182,7 @@ async function main() {
       REF: join(RESOURCES, "daemon"),
       BRIDGE: BRIDGE_CLI,
       BRIDGE_VERIFY_RECOVERY: "1",
+      BRIDGE_VERIFY_MOCK_BASE_URL: mockProvider.baseUrl,
       BRIDGE_VERIFY_SESSION_CWD: sessionCwd,
       BRIDGE_VERIFY_MODEL_PROVIDER: E2E_MOCK_PROVIDER_ID,
       BRIDGE_VERIFY_MODEL_ID: E2E_MOCK_MODEL_ID,
