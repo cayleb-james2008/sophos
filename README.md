@@ -189,15 +189,17 @@ Save required to see the effect.
   incoming profile becomes a unique copy (`"Name (copy)"`) with a visible
   notice saying nothing was overwritten.
 
-> **Known limitation:** a custom profile's instructions are an **additive
-> UI-layer hint, exactly like the built-in profiles** — the daemon contract
-> has no seam to apply the composed system prompt / tool set / safety posture
-> to live sessions (the bridge forwards only `streamingBehavior` and
-> `queueIfBusy` from prompt options). Custom profiles therefore visibly drive
-> the header chip, composer hint, composition summary, and demo responses,
-> and persist in settings — but wiring them into the live daemon needs a
-> bridge/daemon contract change (a future release). See CHANGELOG for the
-> full limitation and the `custom-protocol` build note.
+**Live-session behavior:** creating a new session appends the selected profile's
+instructions to the daemon system prompt. Existing sessions keep their
+original profile setup; select a profile before starting a new session to apply
+it. The tool, skill, and safety composition remains descriptive guidance in
+Sophos today and does not change daemon permissions. Code Mode's `run_code`
+program execution is still a demo simulation, not a sandboxed runtime.
+
+Local connections are restricted to HTTP loopback endpoints. Sophos probes the
+endpoint's model list, registers those models in Prime Agent's local model
+catalog, and selects them through the normal daemon `set_model` path. No
+provider credentials or cloud fallback are used for a local endpoint.
 
 ---
 
@@ -222,11 +224,14 @@ node scripts/bundle.mjs
 
 # 2. Build the native installer:
 npm run tauri build
-# → src-tauri/target/release/bundle/nsis/Sophos_0.8.0_x64-setup.exe
+# → src-tauri/target/release/bundle/nsis/Sophos_0.12.0_x64-setup.exe
 #   (native binary at src-tauri/target/release/prime-agent-windows.exe)
 ```
 
-The `bundle.mjs` manifest is written to `resources/.bundle-manifest.json`.
+The `bundle.mjs` manifest is written to `resources/.bundle-manifest.json`. It
+records the exact app and daemon source commits and whether either checkout had
+tracked or untracked changes when the runtime bundle was staged. A dirty source
+checkout is useful for local testing but is not a reproducible release input.
 Flags: `--no-frontend`, `--no-bridge`, `--no-node-modules`, `--layout-check-only`, `--help`.
 
 ### Environment variables
@@ -296,12 +301,12 @@ path exceeding Windows `MAX_PATH` (260 chars). This is **non-blocking** — the
 native binary, frontend, and bundle are all built; only the final `.exe`
 wrapper fails.
 
-> **Verified 2026-08-08:** the build succeeded end-to-end from this worktree
-> (`src-tauri/target/release/bundle/nsis/Sophos_0.8.0_x64-setup.exe`, ~93 MB).
-> The blocker only triggers when the staged path pushes the deepest
-> `@mistralai` file past 260 chars — the current `prime-agent-windows`
-> worktree path keeps it at ~221 chars. If you ever hit it, shorten the
-> worktree path or apply a workaround below.
+> **Historical verification:** a v0.8.0 build succeeded on 2026-08-08. That
+> result does not verify the current v0.12.0 installer or a build from another
+> checkout. Check the generated bundle manifest and validate the native
+> installer on Windows before distribution. The blocker only triggers when the
+> staged path pushes the deepest `@mistralai` file past 260 chars; if you hit
+> it, shorten the worktree path or apply a workaround below.
 
 Workarounds:
 

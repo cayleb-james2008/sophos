@@ -16,9 +16,11 @@ import type { SessionInfo } from "../ipc/contract";
 import { SigmaGlyph, SearchIcon } from "./icons";
 import { NAV_ITEMS, type View } from "./nav";
 import { relativeTime } from "../features/sessions/format";
+import { useProfile } from "../features/profiles/profiles";
 
 export function Sidebar({ active, onNavigate }: { active: View; onNavigate: (view: View) => void }) {
   const ipc = useIpc();
+  const { profile } = useProfile();
   const conn = useConnectionState();
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [query, setQuery] = useState("");
@@ -49,7 +51,12 @@ export function Sidebar({ active, onNavigate }: { active: View; onNavigate: (vie
 
   const handleNewChat = async () => {
     try {
-      await ipc.newSession();
+      await ipc.newSession(undefined, undefined, {
+        id: profile.id,
+        name: profile.name,
+        mode: profile.mode,
+        systemPrompt: profile.systemPrompt,
+      });
     } catch {
       // Best-effort: the Sessions panel is the authoritative creator.
     }

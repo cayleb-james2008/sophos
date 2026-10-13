@@ -48,6 +48,7 @@ const mockModels = vi.hoisted(() => {
 });
 
 vi.mock("../../../ipc/client", async () => ({
+  isTauri: false,
   useIpc: () => mockClient,
   useIpcEvent: () => undefined,
   useConnectionState: () => ({ status: { kind: "connected" } }),
@@ -136,6 +137,14 @@ describe("ProvidersPanel", () => {
 
   it("connects a local endpoint from the local card modal", async () => {
     const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ models: [{ name: "qwen:7b" }] }),
+      }),
+    );
     render(<ProvidersPanel />);
     await waitFor(() => expect(screen.getByText(/Not connected/i)).toBeInTheDocument());
 
@@ -147,9 +156,20 @@ describe("ProvidersPanel", () => {
 
     await user.click(within(dialog).getByRole("button", { name: "Connect" }));
 
-    await waitFor(() => expect(mockClient.login).toHaveBeenCalledWith("local"));
-    expect(mockClient.setSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ localProviders: [expect.objectContaining({ id: "local" })] }),
+    await waitFor(() =>
+      expect(mockClient.setSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          localProviders: [
+            expect.objectContaining({
+              id: "local",
+              baseUrl: "http://localhost:11434/v1",
+              models: [expect.objectContaining({ id: "qwen:7b" })],
+            }),
+          ],
+        }),
+      ),
     );
+    expect(mockClient.login).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

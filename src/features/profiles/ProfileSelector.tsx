@@ -153,6 +153,12 @@ export function ProfileSelector() {
               Agent profile
             </Text>
           </div>
+          <div className="pr-panelhead">
+            <Text variant="micro" tone="muted">
+              Instructions apply when you create a session. Existing sessions keep their original setup; tool
+              and safety toggles are guidance, not enforced permissions.
+            </Text>
+          </div>
 
           <div className="pr-list">
             {PROFILES.map((p) => {

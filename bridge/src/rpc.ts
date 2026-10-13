@@ -65,6 +65,7 @@ import {
   storeMemory as connStoreMemory,
   writeAuthKey,
   writeModelOverrideToModelsJson,
+  writeLocalProvidersToModelsJson,
   analyzeBlastRadius as connAnalyzeBlastRadius,
   compactContext as connCompactContext,
   listDesktopWindows as connListDesktopWindows,
@@ -298,10 +299,34 @@ export class RpcServer {
         // client) which accepts AgentSessionRuntimeConfig.{cwd,initialGoal}.
         // The resulting session then needs to be re-attached, so we tear down
         // the current connection and start a fresh attach cycle.
-        const p = optionalParams<{ cwd?: string; goal?: string }>(params) ?? {};
-        const opts: { cwd?: string; goal?: string } = {};
+        const p =
+          optionalParams<{
+            cwd?: string;
+            goal?: string;
+            profile?: { id?: unknown; name?: unknown; mode?: unknown; systemPrompt?: unknown };
+          }>(params) ?? {};
+        const opts: {
+          cwd?: string;
+          goal?: string;
+          profile?: { id: string; name: string; mode: string; systemPrompt: string };
+        } = {};
         if (typeof p.cwd === "string") opts.cwd = p.cwd;
         if (typeof p.goal === "string") opts.goal = p.goal;
+        if (p.profile && typeof p.profile === "object") {
+          const { id, name, mode, systemPrompt } = p.profile;
+          if (
+            typeof id === "string" &&
+            /^[a-zA-Z0-9._-]{1,64}$/.test(id) &&
+            typeof name === "string" &&
+            name.trim().length > 0 &&
+            name.length <= 100 &&
+            (mode === "standard" || mode === "minimal" || mode === "creator" || mode === "code") &&
+            typeof systemPrompt === "string" &&
+            systemPrompt.length <= 12000
+          ) {
+            opts.profile = { id, name: name.trim(), mode, systemPrompt: systemPrompt.trim() };
+          }
+        }
         if (Object.keys(opts).length === 0) {
           const conn = this.requireConn();
           const result = await conn.newSession();
@@ -455,7 +480,22 @@ export class RpcServer {
 
       case "setSettings": {
         const p = requireParams<{ settings: Record<string, unknown> }>(params, ["settings"]);
-        const updated = this.holder.getSettingsStore().update(p.settings as Partial<Settings>);
+        const store = this.holder.getSettingsStore();
+        const previousSettings = store.get();
+        const previousLocalProviders = previousSettings.localProviders ?? [];
+        const updated = store.update(p.settings as Partial<Settings>);
+        if (Object.prototype.hasOwnProperty.call(p.settings, "localProviders")) {
+          try {
+            writeLocalProvidersToModelsJson(previousLocalProviders, updated.localProviders ?? []);
+          } catch (error) {
+            // Keep the UI settings and daemon model catalog in sync when the
+            // filesystem refuses the provider update (for example, malformed
+            // models.json or a permissions failure).
+            store.update({ localProviders: previousLocalProviders });
+            throw error;
+          }
+          await this.holder.refreshModelCatalog().catch(() => undefined);
+        }
         return updated;
       }
 

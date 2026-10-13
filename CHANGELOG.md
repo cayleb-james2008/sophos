@@ -5,6 +5,13 @@ All notable changes to Sophos are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+- **Profile instructions reach live sessions** — creating a session through either New Session or New Chat appends the selected profile's instructions to Prime Agent's runtime system prompt. Resumed sessions retain their original setup; profile tool, skill, and safety toggles remain descriptive guidance and do not enforce permissions.
+- **Local models use Prime Agent's model catalog** — detected and manually configured loopback servers provide their model IDs to the bridge, which safely updates the custom model catalog and then selects the model through the daemon. Manual endpoint setup probes the server first and rejects non-loopback URLs; local requests never fall back to cloud providers.
+- **Live profile prompt hints removed** — the bridge no longer accepts demo-only profile display fields on live chat prompts; demo simulation still uses them in the preview.
+
 ## [0.12.0] — 2026-08-28 (Ephemeral Workspace Twin Sandbox & Zero-Copy Worktrees)
 
 ### Added

@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { Modal, Button, Input, TextArea, Text } from "../../design";
 import { useIpc, isTauri } from "../../ipc/client";
+import { useProfile } from "../profiles/profiles";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 // Open a native folder picker via the Tauri dialog plugin. Returns the chosen
@@ -31,6 +32,7 @@ export function NewSessionModal({
   onCreated: () => void;
 }) {
   const ipc = useIpc();
+  const { profile } = useProfile();
   const [cwd, setCwd] = useState("");
   const [goal, setGoal] = useState("");
   const [saveDefault, setSaveDefault] = useState(false);
@@ -70,7 +72,12 @@ export function NewSessionModal({
     setBusy(true);
     try {
       const trimmedCwd = cwd.trim();
-      await ipc.newSession(trimmedCwd || undefined, goal.trim() || undefined);
+      await ipc.newSession(trimmedCwd || undefined, goal.trim() || undefined, {
+        id: profile.id,
+        name: profile.name,
+        mode: profile.mode,
+        systemPrompt: profile.systemPrompt,
+      });
       // Persist the default working directory for future sessions.
       if (saveDefault) {
         try {

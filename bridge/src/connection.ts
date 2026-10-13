@@ -22,26 +22,14 @@ import {
   type AgentConnectionSessionEvent,
   type AgentConnectionState,
 } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type {
   BlastRadiusReport,
-  CheckpointEntry,
-  KernelHealthDiagnostic,
-  KernelHealthReason,
-  KernelState,
   McpResource,
   McpServerDetails,
-  MemoryState,
-  MemoryTier,
-  MemoryTierEntry,
-  ModelInfo,
-  ProviderInfo,
   SecurityAuditEntry,
-  Settings,
-  SquadTopology,
-  BlindCriticRubric,
   SquadWorkflowState,
   SquadWorkflowType,
   TokenBudgetBreakdown,
@@ -113,6 +101,65 @@ function normalizeString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+const LOCAL_PROVIDER_ID = /^sophos-local-[a-z0-9-]{1,32}$/;
+
+function isLoopbackHttpUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const loopback =
+      host === "localhost" || host === "localhost." || host === "::1" || /^127(?:\.\d{1,3}){3}$/.test(host);
+    return url.protocol === "http:" && loopback && !url.username && !url.password && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeLocalProviders(value: unknown): NonNullable<Settings["localProviders"]> {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    const id = normalizeString(entry.id);
+    const name = normalizeString(entry.name);
+    const baseUrl = normalizeString(entry.baseUrl);
+    const kind = entry.kind;
+    if (
+      !id ||
+      !LOCAL_PROVIDER_ID.test(id) ||
+      !name ||
+      name.length > 120 ||
+      !isLoopbackHttpUrl(baseUrl) ||
+      (kind !== "ollama" && kind !== "openai-compatible")
+    )
+      return [];
+    const models = Array.isArray(entry.models)
+      ? entry.models
+          .flatMap((model) => {
+            if (!isRecord(model)) return [];
+            const modelId = normalizeString(model.id);
+            const modelName = normalizeString(model.name);
+            if (
+              !modelId ||
+              modelId.length > 200 ||
+              [...modelId].some(
+                (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+              ) ||
+              !modelName ||
+              modelName.length > 120
+            )
+              return [];
+            return [{ id: modelId, name: modelName }];
+          })
+          .slice(0, 256)
+      : [];
+    const uniqueModels = models.filter(
+      (model, index) => models.findIndex((candidate) => candidate.id === model.id) === index,
+    );
+    return [{ id, name, baseUrl: baseUrl.replace(/\/+$/, ""), kind, models: uniqueModels }];
+  });
+}
+
 const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
 const STRING_SETTING_KEYS = [
   "shellPath",
@@ -165,19 +212,7 @@ function normalizeSettings(raw: Record<string, unknown>): Settings {
     delete out.auth;
   }
 
-  if (Array.isArray(raw.localProviders)) {
-    out.localProviders = raw.localProviders.filter((value): value is Record<string, unknown> => {
-      if (!isRecord(value)) return false;
-      return (
-        normalizeString(value.id) !== undefined &&
-        normalizeString(value.name) !== undefined &&
-        normalizeString(value.baseUrl) !== undefined &&
-        (value.kind === "ollama" || value.kind === "openai-compatible")
-      );
-    });
-  } else {
-    delete out.localProviders;
-  }
+  out.localProviders = normalizeLocalProviders(raw.localProviders);
 
   return out as Settings;
 }
@@ -1224,7 +1259,7 @@ export async function getMcpServers(conn: AgentConnection): Promise<McpServerDet
     latencyMs: 25,
     protocolVersion: "2024-11-05",
     capabilities: { tools: true, resources: true, prompts: true },
-    tools: ext.tools?.map((t) => ({ name: t.name, description: t.description })) ?? [],
+    tools: [],
     resources: [],
     prompts: [],
   }));
@@ -1418,7 +1453,7 @@ export async function pauseSquadWorkflow(_conn: AgentConnection, _id: string): P
 
 export async function getTokenBudget(conn: AgentConnection): Promise<TokenBudgetBreakdown> {
   const state = await conn.getState().catch(() => null);
-  const total = (state?.sessionCost as number) ?? 32000;
+  const total = (state as unknown as { sessionCost?: number } | null)?.sessionCost ?? 32000;
   return {
     totalTokens: total,
     contextLimit: 128000,
@@ -1707,6 +1742,59 @@ export function writeModelOverrideToModelsJson(
       process.stderr.write(`[bridge:settings] failed to write models.json override: ${msg}\n`);
     }
   }
+}
+
+/** Register Sophos local endpoints in Prime Agent's real model catalog. */
+export function writeLocalProvidersToModelsJson(
+  previous: NonNullable<Settings["localProviders"]>,
+  next: NonNullable<Settings["localProviders"]>,
+): void {
+  if (!existsSync(PRIME_AGENT_DIR)) mkdirSync(PRIME_AGENT_DIR, { recursive: true });
+  let root: Record<string, unknown> = {};
+  if (existsSync(MODELS_JSON_PATH)) {
+    const parsed: unknown = JSON.parse(readFileSync(MODELS_JSON_PATH, "utf8"));
+    if (!isRecord(parsed)) throw new Error("Prime Agent models.json must contain an object");
+    root = parsed;
+  }
+  if (root.providers !== undefined && !isRecord(root.providers)) {
+    throw new Error("Prime Agent models.json providers must be an object");
+  }
+  const providers = isRecord(root.providers) ? root.providers : {};
+  for (const prior of previous) {
+    if (LOCAL_PROVIDER_ID.test(prior.id)) delete providers[prior.id];
+  }
+  for (const local of next) {
+    if (!LOCAL_PROVIDER_ID.test(local.id)) continue;
+    const models = local.models ?? [];
+    if (models.length === 0) {
+      delete providers[local.id];
+      continue;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(providers, local.id) &&
+      !previous.some((item) => item.id === local.id)
+    ) {
+      throw new Error(
+        `Prime Agent provider ${local.id} already exists; refusing to replace its configuration`,
+      );
+    }
+    providers[local.id] = {
+      name: local.name,
+      baseUrl: local.baseUrl,
+      apiKey: "local",
+      api: "openai-completions",
+      models: models.map((model) => ({
+        id: model.id,
+        name: model.name,
+        contextWindow: 32768,
+        maxTokens: 4096,
+      })),
+    };
+  }
+  root.providers = providers;
+  const temporaryPath = `${MODELS_JSON_PATH}.sophos-tmp`;
+  writeFileSync(temporaryPath, JSON.stringify(root, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+  renameSync(temporaryPath, MODELS_JSON_PATH);
 }
 
 export class SettingsStore {
@@ -2058,6 +2146,17 @@ export class ConnectionHolder {
     }
   }
 
+  /** Re-issue the active model selection so Prime Agent reloads its model catalog. */
+  async refreshModelCatalog(): Promise<void> {
+    if (!this.conn) return;
+    const current = this.latestState?.model;
+    const provider = current && typeof current === "object" ? current.provider : undefined;
+    const model = current && typeof current === "object" ? current.id : undefined;
+    if (typeof provider === "string" && typeof model === "string") {
+      await this.conn.setModel(provider, model);
+    }
+  }
+
   /**
    * Discover an existing active session via the daemon `list` command, or
    * create a new one via `create`. Returns the activeSessionId to pass to
@@ -2356,11 +2455,24 @@ export class ConnectionHolder {
    * a follow-up newSession/list call will need to re-trigger `connect()` to
    * re-establish a working session.
    */
-  async createSessionWithConfig(opts: { cwd?: string; goal?: string }): Promise<string> {
+  async createSessionWithConfig(opts: {
+    cwd?: string;
+    goal?: string;
+    profile?: { id: string; name: string; mode: string; systemPrompt: string };
+  }): Promise<string> {
     if (!this.client) throw new Error("client not initialized");
     const config: Record<string, unknown> = {};
     if (opts.cwd) config.cwd = opts.cwd;
     if (opts.goal) config.initialGoal = { objective: opts.goal };
+    if (opts.profile) {
+      const profilePrompt = [
+        `Sophos profile: ${opts.profile.name} (${opts.profile.id}), mode ${opts.profile.mode}.`,
+        opts.profile.systemPrompt,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      config.appendSystemPrompt = [profilePrompt];
+    }
     const createResp = await this.client.request(
       { type: "create", ...(Object.keys(config).length > 0 ? { config } : {}) },
       30_000,

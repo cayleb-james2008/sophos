@@ -12,22 +12,6 @@ import { setTranscriptMessages } from "./chatBridge";
 
 const nowIso = () => new Date().toISOString();
 
-/** The live display flavor of the active profile — rides on demo prompts so
- * simulation follows the studio draft even before Save (additive; the bridge
- * strips it before the daemon). */
-function profileFlavorOf(profile: AgentProfile): {
-  name: string;
-  tagline: string;
-  workingStyle: string[];
-  mode: string;
-} {
-  return {
-    name: profile.name,
-    tagline: profile.tagline,
-    workingStyle: profile.workingStyle ?? [],
-    mode: profile.mode,
-  };
-}
 const userMsg = (content: string): TranscriptMessage => ({
   id: `u-${Date.now()}`,
   role: "user",
@@ -263,11 +247,7 @@ export function useTranscript({ setBusy, setError, busyRef }: TranscriptOptions)
       setBusy(true);
       setError(null);
       if (isTauri) {
-        void (
-          profile
-            ? client.prompt(trimmed, { profile: profile.id, profileFlavor: profileFlavorOf(profile) })
-            : client.prompt(trimmed)
-        ).catch((err) => {
+        void client.prompt(trimmed).catch((err) => {
           setError(err instanceof Error ? err.message : String(err));
           setBusy(false);
         });
@@ -349,9 +329,7 @@ export function useTranscript({ setBusy, setError, busyRef }: TranscriptOptions)
       setBusy(true);
       if (isTauri) {
         try {
-          await (profile
-            ? client.prompt(trimmed, { profile: profile.id, profileFlavor: profileFlavorOf(profile) })
-            : client.prompt(trimmed));
+          await client.prompt(trimmed);
         } catch (err) {
           setError(err instanceof Error ? err.message : String(err));
           setBusy(false);

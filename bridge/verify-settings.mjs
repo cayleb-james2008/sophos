@@ -6,7 +6,7 @@ const home = mkdtempSync(join(tmpdir(), "sophos-settings-"));
 process.env.HOME = home;
 process.env.USERPROFILE = home;
 
-const { SettingsStore, resolvePreferredModel, writeModelOverrideToModelsJson } = await import("./dist/bridge/src/connection.js");
+const { SettingsStore, resolvePreferredModel, writeModelOverrideToModelsJson, writeLocalProvidersToModelsJson } = await import("./dist/bridge/src/connection.js");
 const settingsPath = join(home, ".prime", "agent", "settings.json");
 const results = [];
 
@@ -34,7 +34,7 @@ first.update({
     "ollama-cloud:deepseek-v4-flash:0731-cloud": { contextWindow: 100000, maxOutputTokens: 8192 },
   },
   auth: { "ollama-cloud": "secret" },
-  localProviders: [{ id: "local", name: "Local", baseUrl: "http://127.0.0.1:11434", kind: "ollama" }],
+  localProviders: [{ id: "sophos-local-manual", name: "Local", baseUrl: "http://127.0.0.1:11434/v1", kind: "ollama", models: [{ id: "qwen:7b", name: "Qwen 7B" }] }],
   skills: ["C:/skills/example"],
   mcpServers: [{ name: "local-tools" }],
 });
@@ -60,6 +60,20 @@ const modelsPath = join(home, ".prime", "agent", "models.json");
 check("model runtime overrides reach the engine catalog", JSON.parse(readFileSync(modelsPath, "utf8"))
   .providers["ollama-cloud"].modelOverrides["deepseek-v4-flash:0731-cloud"].contextWindow === 100000);
 
+const localConfig = roundTrip.localProviders?.[0];
+writeFileSync(modelsPath, JSON.stringify({ providers: { preserved: { baseUrl: "https://example.invalid" } } }), "utf8");
+writeLocalProvidersToModelsJson([], [localConfig]);
+const withLocal = JSON.parse(readFileSync(modelsPath, "utf8"));
+check("local models register with the actual daemon API and preserve other providers",
+  withLocal.providers["sophos-local-manual"].api === "openai-completions"
+  && withLocal.providers["sophos-local-manual"].baseUrl === "http://127.0.0.1:11434/v1"
+  && withLocal.providers["sophos-local-manual"].models[0].id === "qwen:7b"
+  && Boolean(withLocal.providers.preserved));
+writeLocalProvidersToModelsJson([localConfig], []);
+const withoutLocal = JSON.parse(readFileSync(modelsPath, "utf8"));
+check("disconnect removes only Sophos-owned local model entries",
+  !withoutLocal.providers["sophos-local-manual"] && Boolean(withoutLocal.providers.preserved));
+
 writeFileSync(settingsPath, JSON.stringify({
   theme: "neon",
   daemonTcp: "maybe",
@@ -70,7 +84,7 @@ writeFileSync(settingsPath, JSON.stringify({
     malformed: "nope",
   },
   auth: "not-an-object",
-  localProviders: [{ id: "missing-fields" }, { id: "ok", name: "OK", baseUrl: "http://localhost", kind: "ollama" }],
+  localProviders: [{ id: "missing-fields" }, { id: "ok", name: "OK", baseUrl: "http://localhost", kind: "ollama" }, { id: "sophos-local-remote", name: "Remote", baseUrl: "http://192.168.1.20:11434/v1", kind: "ollama" }],
 }), "utf8");
 const invalid = new SettingsStore().get();
 check("invalid known values are ignored without losing valid data", invalid.theme === "dark"
@@ -79,7 +93,7 @@ check("invalid known values are ignored without losing valid data", invalid.them
   && invalid.modelConfig?.good?.contextWindow === 4096
   && !invalid.modelConfig?.bad
   && !invalid.auth
-  && invalid.localProviders?.length === 1);
+  && invalid.localProviders?.length === 0);
 
 check("explicit saved model beats the daemon's current model", resolvePreferredModel(
   { defaultProvider: "saved-provider", defaultModel: "saved-model" },

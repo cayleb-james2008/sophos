@@ -48,6 +48,8 @@ const mockModels = vi.hoisted(() => {
 });
 
 vi.mock("../../../ipc/client", () => ({
+  isTauri: false,
+  useIpc: () => ({}),
   useConnectionState: () => ({ model: mockState.model }),
 }));
 

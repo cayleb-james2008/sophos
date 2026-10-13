@@ -371,8 +371,8 @@ export function StudioPanel() {
               ))}
             </div>
             <Text variant="micro" tone="muted">
-              Sets the profile's runtime mode and demo behavior; the toggles below define exactly which tools
-              and skills it composes.
+              Sets the profile's mode and preview behavior. Instructions apply to new sessions; tool, skill,
+              and safety toggles describe the composition but do not change daemon permissions.
             </Text>
           </section>
 

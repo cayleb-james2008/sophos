@@ -22,7 +22,14 @@ export type IpcCommand =
         maxOutputTokens?: number;
       };
     }
-  | { method: "newSession"; params: { cwd?: string; goal?: string } }
+  | {
+      method: "newSession";
+      params: {
+        cwd?: string;
+        goal?: string;
+        profile?: { id: string; name: string; mode: string; systemPrompt: string };
+      };
+    }
   | { method: "switchSession"; params: { id: string } }
   | { method: "resumeSession"; params: { pathOrId: string } }
   | { method: "forkSession"; params: { pathOrId: string } }
@@ -587,6 +594,11 @@ export interface ProviderInfo {
 
 export type LocalProviderKind = "ollama" | "openai-compatible";
 
+export interface LocalProviderModel {
+  id: string;
+  name: string;
+}
+
 /**
  * A local (self-hosted) model endpoint — Ollama or an OpenAI-compatible
  * server. Unlike daemon-discovered cloud providers, this is a user-specified
@@ -598,6 +610,8 @@ export interface LocalProviderConfig {
   name: string;
   baseUrl: string;
   kind: LocalProviderKind;
+  /** Models discovered from the loopback server and registered with Prime Agent. */
+  models?: LocalProviderModel[];
 }
 
 export interface SessionInfo {

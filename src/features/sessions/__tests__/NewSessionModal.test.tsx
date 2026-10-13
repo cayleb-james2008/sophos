@@ -30,6 +30,17 @@ vi.mock("@tauri-apps/plugin-dialog", async () => ({
   open: mockDialog.open,
 }));
 
+vi.mock("../../profiles/profiles", () => ({
+  useProfile: () => ({
+    profile: {
+      id: "standard",
+      name: "Standard",
+      mode: "standard",
+      systemPrompt: "Use the standard verification profile.",
+    },
+  }),
+}));
+
 function renderModal(open = true) {
   const onClose = vi.fn();
   const onCreated = vi.fn();
@@ -69,7 +80,12 @@ describe("NewSessionModal", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /create session/i }));
     await waitFor(() =>
-      expect(mockClient.newSession).toHaveBeenCalledWith("C:\\work\\project", "Ship the release"),
+      expect(mockClient.newSession).toHaveBeenCalledWith("C:\\work\\project", "Ship the release", {
+        id: "standard",
+        name: "Standard",
+        mode: "standard",
+        systemPrompt: "Use the standard verification profile.",
+      }),
     );
     expect(onCreated).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -82,7 +98,14 @@ describe("NewSessionModal", () => {
     // The saved default is present — clear it so cwd is empty.
     await userEvent.clear(screen.getByLabelText("Working directory"));
     await userEvent.click(screen.getByRole("button", { name: /create session/i }));
-    await waitFor(() => expect(mockClient.newSession).toHaveBeenCalledWith(undefined, undefined));
+    await waitFor(() =>
+      expect(mockClient.newSession).toHaveBeenCalledWith(undefined, undefined, {
+        id: "standard",
+        name: "Standard",
+        mode: "standard",
+        systemPrompt: "Use the standard verification profile.",
+      }),
+    );
   });
 
   it("persists the working directory as default when the checkbox is checked", async () => {

@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, Spinner, Select, Button } from "../../design";
-import { useConnectionState } from "../../ipc/client";
+import { isTauri, useConnectionState, useIpc } from "../../ipc/client";
 import {
   useModels,
   DEFAULT_PROVIDER,
@@ -15,7 +15,8 @@ import {
   type ThinkingLevel,
 } from "./useModels";
 import { ProviderGlyph } from "./providerGlyphs";
-import { scanLocalEndpoints, providerIdFor, type LocalEndpoint } from "./localDetection";
+import { scanLocalEndpoints, providerIdFor, providerApiBaseUrl, type LocalEndpoint } from "./localDetection";
+import type { Settings } from "../../ipc/contract";
 import "./providers.css";
 
 function currentSelection(
@@ -33,6 +34,7 @@ function currentSelection(
 
 export function ModelSelector() {
   const state = useConnectionState();
+  const ipc = useIpc();
   const { providers, models, loading, error, setModel, thinking, setThinking, thinkingLevels } = useModels();
   const [open, setOpen] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -107,7 +109,23 @@ export function ModelSelector() {
       return;
     }
     setApplying(true);
-    await setModel(providerIdFor(endpoint), modelId, undefined);
+    const provider = isTauri ? providerIdFor(endpoint) : "local";
+    if (isTauri) {
+      const settings = await ipc.getSettings().catch(() => ({}) as Settings);
+      await ipc.setSettings({
+        ...settings,
+        localProviders: [
+          {
+            id: provider,
+            name: endpoint.name,
+            baseUrl: providerApiBaseUrl(endpoint.baseUrl),
+            kind: endpoint.kind === "ollama" ? "ollama" : "openai-compatible",
+            models: endpoint.models,
+          },
+        ],
+      });
+    }
+    await setModel(provider, modelId, undefined);
     setApplying(false);
     setOpen(false);
   };

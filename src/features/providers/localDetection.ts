@@ -120,7 +120,7 @@ async function probePort(port: number, kind: LocalEndpointKind): Promise<LocalEn
   const ollamaModels = await probeOllama(port);
   if (ollamaModels !== null) {
     return {
-      id: `local-${port}`,
+      id: `sophos-local-${port}`,
       baseUrl: `http://127.0.0.1:${port}`,
       port,
       kind: "ollama",
@@ -139,7 +139,7 @@ async function probePort(port: number, kind: LocalEndpointKind): Promise<LocalEn
       "openai-compatible": "OpenAI-compatible server",
     };
     return {
-      id: `local-${port}`,
+      id: `sophos-local-${port}`,
       baseUrl: `http://127.0.0.1:${port}`,
       port,
       kind: kindLabel,
@@ -169,4 +169,55 @@ export async function scanLocalEndpoints(): Promise<LocalEndpoint[]> {
 /** Provider id used when selecting a model from a detected endpoint. */
 export function providerIdFor(endpoint: LocalEndpoint): string {
   return endpoint.id;
+}
+
+export function providerApiBaseUrl(baseUrl: string): string {
+  const normalized = baseUrl.trim().replace(/\/+$/, "");
+  return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
+}
+
+/** Probe a manually entered loopback endpoint and return its currently served models. */
+export async function probeLocalProvider(
+  baseUrl: string,
+  kind: "ollama" | "openai-compatible",
+): Promise<LocalDetectedModel[]> {
+  let base: URL;
+  try {
+    base = new URL(baseUrl);
+  } catch {
+    throw new Error("Enter a valid local URL, such as http://127.0.0.1:11434.");
+  }
+  const hostname = base.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const loopback =
+    hostname === "localhost" ||
+    hostname === "localhost." ||
+    hostname === "::1" ||
+    /^127(?:\.\d{1,3}){3}$/.test(hostname);
+  if (base.protocol !== "http:" || !loopback || base.username || base.password || base.search || base.hash) {
+    throw new Error("Local models must use an HTTP loopback URL (localhost, 127.x.x.x, or ::1).");
+  }
+  const root = base.toString().replace(/\/+$/, "");
+  const apiUrl = kind === "ollama" ? `${root}/api/tags` : `${providerApiBaseUrl(root)}/models`;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 1500);
+  try {
+    const response = await fetch(apiUrl, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`Local model server returned HTTP ${response.status}.`);
+    const body = (await response.json()) as {
+      models?: Array<{ name?: string; model?: string }>;
+      data?: Array<{ id?: string }>;
+    };
+    const models =
+      kind === "ollama"
+        ? (body.models ?? []).map((model) => model.name ?? model.model ?? "")
+        : (body.data ?? []).map((model) => model.id ?? "");
+    const unique = [...new Set(models.filter((id) => id.length > 0))];
+    if (unique.length === 0) throw new Error("No local models were found at that endpoint.");
+    return unique.map((id) => ({ id, name: friendlyModelName(id) }));
+  } finally {
+    window.clearTimeout(timer);
+  }
 }

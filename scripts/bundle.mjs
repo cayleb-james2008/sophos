@@ -129,10 +129,20 @@ async function sizeOf(p) {
   return total;
 }
 
+function gitProvenance(cwd) {
+  const revision = spawnSync("git", ["rev-parse", "--verify", "HEAD"], { cwd, encoding: "utf8" });
+  if (revision.status !== 0) return { path: cwd, commit: null, dirty: null, changedPathCount: null };
+  const status = spawnSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], { cwd, encoding: "utf8" });
+  if (status.status !== 0) return { path: cwd, commit: revision.stdout.trim(), dirty: null, changedPathCount: null };
+  const changedPathCount = status.stdout.split(/\r?\n/).filter(Boolean).length;
+  return { path: cwd, commit: revision.stdout.trim(), dirty: changedPathCount > 0, changedPathCount };
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const flags = new Set(args);
-  const manifest = { generatedAt: new Date().toISOString(), worktree: WORKTREE, ref: PRIME_AGENT_REF, components: [], layout: {} };
+  const manifest = { generatedAt: new Date().toISOString(), worktree: WORKTREE, ref: PRIME_AGENT_REF,
+    provenance: { appSource: gitProvenance(WORKTREE), daemonSource: gitProvenance(PRIME_AGENT_REF) }, components: [], layout: {} };
 
   const record = (name, comp) => { manifest.components.push({ name, ...comp }); };
 

@@ -104,7 +104,11 @@ export interface IpcClient {
   abort(): Promise<void>;
   steer(text: string): Promise<void>;
   setModel(provider: string, model: string, thinking?: string, runtime?: ModelRuntimeConfig): Promise<void>;
-  newSession(cwd?: string, goal?: string): Promise<void>;
+  newSession(
+    cwd?: string,
+    goal?: string,
+    profile?: { id: string; name: string; mode: string; systemPrompt: string },
+  ): Promise<void>;
   switchSession(id: string): Promise<void>;
   resumeSession(pathOrId: string): Promise<void>;
   forkSession(pathOrId: string): Promise<void>;
@@ -353,8 +357,12 @@ export class TauriIpcClient implements IpcClient {
       ...(runtime?.maxOutputTokens != null ? { maxOutputTokens: runtime.maxOutputTokens } : {}),
     }) as Promise<void>;
   }
-  newSession(cwd?: string, goal?: string): Promise<void> {
-    return this.send("newSession", { cwd, goal }) as Promise<void>;
+  newSession(
+    cwd?: string,
+    goal?: string,
+    profile?: { id: string; name: string; mode: string; systemPrompt: string },
+  ): Promise<void> {
+    return this.send("newSession", { cwd, goal, profile }) as Promise<void>;
   }
   switchSession(id: string): Promise<void> {
     return this.send("switchSession", { id }) as Promise<void>;

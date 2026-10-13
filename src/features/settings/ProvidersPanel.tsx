@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import { tokens } from "../../design/tokens";
 import { Text, Card, Badge, Button, Modal, Input, Select, Spinner } from "../../design";
-import { useIpc } from "../../ipc/client";
+import { isTauri, useIpc } from "../../ipc/client";
 import type {
   LocalProviderConfig,
   LocalProviderKind,
@@ -21,6 +21,7 @@ import type {
   Settings,
 } from "../../ipc/contract";
 import { useModels, modelKey } from "../providers/useModels";
+import { probeLocalProvider, providerApiBaseUrl } from "../providers/localDetection";
 import { KeyIcon, LogoutIcon, PlugIcon, CpuIcon } from "../sessions/icons";
 
 export function ProvidersPanel() {
@@ -58,7 +59,6 @@ export function ProvidersPanel() {
 
   const connectLocal = async (config: LocalProviderConfig) => {
     await ipc.setSettings({ localProviders: [config] } as Settings);
-    await ipc.login("local");
     setLocalOpen(false);
     setLocalVersion((v) => v + 1);
     void reload();
@@ -66,7 +66,6 @@ export function ProvidersPanel() {
 
   const logoutLocal = async () => {
     await ipc.setSettings({ localProviders: [] } as Settings);
-    await ipc.logout("local");
     setLocalVersion((v) => v + 1);
     void reload();
   };
@@ -85,7 +84,7 @@ export function ProvidersPanel() {
               is never touched. */}
           <LocalProviderCard
             config={localConfig}
-            models={models.filter((m) => m.provider === "local")}
+            models={models.filter((m) => m.provider === localConfig?.id)}
             onConnect={() => setLocalOpen(true)}
             onLogout={() => void logoutLocal()}
           />
@@ -528,16 +527,23 @@ function LocalConnectModal({
   const [baseUrl, setBaseUrl] = useState("http://localhost:11434");
   const [kind, setKind] = useState<LocalProviderKind>("ollama");
   const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const submit = async () => {
     setBusy(true);
     try {
+      const trimmedBaseUrl = baseUrl.trim() || "http://localhost:11434";
+      const models = await probeLocalProvider(trimmedBaseUrl, kind);
       await onConnect({
-        id: "local",
+        id: isTauri ? "sophos-local-manual" : "local",
         name: name.trim() || "My Local Model",
-        baseUrl: baseUrl.trim() || "http://localhost:11434",
+        baseUrl: providerApiBaseUrl(trimmedBaseUrl),
         kind,
+        models,
       });
+      setLocalError(null);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
@@ -563,6 +569,11 @@ function LocalConnectModal({
         <Text variant="micro" tone="dim">
           Point Sophos at a local (self-hosted) model endpoint. The config is stored in your settings.
         </Text>
+        {localError ? (
+          <Text variant="label" tone="danger">
+            {localError}
+          </Text>
+        ) : null}
         <Input
           label="Name"
           value={name}

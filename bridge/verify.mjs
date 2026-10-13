@@ -62,7 +62,11 @@ function terminateProcessTree(proc) {
     }
     return;
   }
-  try { proc.kill("SIGTERM"); } catch {}
+  try {
+    process.kill(-proc.pid, "SIGTERM");
+  } catch {
+    try { proc.kill("SIGTERM"); } catch {}
+  }
 }
 
 function record(label, ok, detail) {
@@ -95,6 +99,7 @@ async function startDaemon() {
   const diagnostics = [];
   const proc = spawn(process.execPath, [DAEMON_CLI, "--mode", "daemon", "--daemon-socket", SOCKET_PATH, "--offline"], {
     stdio: ["ignore", "pipe", "pipe"],
+    detached: process.platform !== "win32",
   });
   proc.stdout.on("data", (chunk) => diagnostics.push(`[daemon] ${chunk.toString()}`));
   proc.stderr.on("data", (chunk) => diagnostics.push(`[daemon-err] ${chunk.toString()}`));
@@ -111,24 +116,31 @@ async function run() {
   let daemon = firstDaemon.proc;
   const daemonDiagnostics = [...firstDaemon.diagnostics];
   let bridge;
-  const cleanup = () => {
+  const cleanup = async () => {
     try { bridge?.stdin.end(); } catch {}
     terminateProcessTree(bridge);
     terminateProcessTree(daemon);
+    const exited = await Promise.all([waitForExit(bridge), waitForExit(daemon)]);
+    for (const [index, proc] of [bridge, daemon].entries()) {
+      if (proc && !exited[index] && process.platform !== "win32") {
+        try { process.kill(-proc.pid, "SIGKILL"); } catch { try { proc.kill("SIGKILL"); } catch {} }
+      }
+    }
+    await Promise.all([waitForExit(bridge, 1000), waitForExit(daemon, 1000)]);
   };
   const onSignal = () => {
-    cleanup();
-    process.exit(130);
+    void cleanup().finally(() => process.exit(130));
   };
   process.once("SIGINT", onSignal);
   process.once("SIGTERM", onSignal);
   try {
     bridge = spawn(process.execPath, [BRIDGE, "--daemon-socket", SOCKET_PATH], {
       stdio: ["pipe", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
   } catch (err) {
     record("spawn bridge", false, err.message);
-    cleanup();
+    await cleanup();
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     return;
@@ -243,6 +255,23 @@ async function run() {
       Array.isArray(modelsResp.result) && modelsResp.result.length > 0,
       `${modelsResp.result?.length ?? 0} models`);
 
+    const localModelId = "sophos-local-runtime-check";
+    const localSettings = await send({ id: "c5l", method: "setSettings", params: { settings: {
+      localProviders: [{
+        id: "sophos-local-verify",
+        name: "Offline Verification Endpoint",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        kind: "openai-compatible",
+        models: [{ id: localModelId, name: "Offline Verification Model" }],
+      }],
+    } } });
+    const updatedModels = await send({ id: "c5lm", method: "getModels", params: {} });
+    const localModel = updatedModels.result?.find((model) => model.id === localModelId);
+    record("runtime local endpoint registers in the daemon model catalog",
+      Array.isArray(updatedModels.result) && localModel?.provider === "sophos-local-verify",
+      `registered=${Boolean(localModel)} settings=${!localSettings.error}`);
+    await send({ id: "c5lr", method: "setSettings", params: { settings: { localProviders: [] } } });
+
     // 6. getProviders
     const provResp = await send({ id: "c6", method: "getProviders", params: {} });
     record("getProviders returns provider list",
@@ -342,17 +371,39 @@ async function run() {
       ns1.result !== undefined && (typeof ns1.result.cancelled === "boolean" || typeof ns1.result.activeSessionId === "string"),
       `result=${JSON.stringify(ns1.result)}`);
 
-    // 20. newSession with cwd + goal: must thread through daemon create (fix #1).
-    // We don't strictly require success in this environment (the daemon may
-    // reject a bogus cwd), but the call must dispatch and not be silently
-    // dropped — a JSON-RPC error from the daemon is acceptable, a silent
-    // no-op is not.
-    const ns2 = await send({ id: "c22", method: "newSession", params: { cwd: "C:/tmp", goal: "verify harness session" } });
+    // 20. Create a real offline session with a profile and verify the prompt
+    // reached the daemon's runtime system prompt.
+    const ns2 = await send({ id: "c22", method: "newSession", params: {
+      cwd: process.cwd(),
+      goal: "verify harness session",
+      profile: {
+        id: "verify-profile",
+        name: "Verify Profile",
+        mode: "standard",
+        systemPrompt: "Use the offline verification profile instructions.",
+      },
+    } });
     record("newSession({cwd,goal}) threads through daemon create (no silent drop)",
-      // Either succeeds or returns a clean JSON-RPC error from the daemon —
-      // never an undefined/null result with no indication.
-      ns2.result !== undefined || (typeof ns2.error === "object" && typeof ns2.error.code === "number"),
+      typeof ns2.result?.activeSessionId === "string" && ns2.result.activeSessionId.length > 0,
       `result=${JSON.stringify(ns2.result)} err=${ns2.error ? ns2.error.code + " " + ns2.error.message : "none"}`);
+    if (typeof ns2.result?.activeSessionId === "string") {
+      const { DaemonAgentConnection, DaemonClient } = await import("@earendil-works/pi-coding-agent");
+      const profileClient = new DaemonClient(SOCKET_PATH);
+      let profileConnection;
+      try {
+        await profileClient.connect();
+        profileConnection = await DaemonAgentConnection.attach(profileClient, ns2.result.activeSessionId, {
+          closeClientOnDispose: true,
+          supportsExtensionUi: true,
+        });
+        const systemPrompt = await profileConnection.getSystemPrompt();
+        record("new session profile instructions reach daemon system prompt",
+          systemPrompt.includes("Use the offline verification profile instructions."));
+      } finally {
+        await profileConnection?.dispose().catch(() => undefined);
+        if (!profileConnection) profileClient.close();
+      }
+    }
 
     // 21. forkSession with an entry id (short hex string) must dispatch to AgentConnection.fork
     // without throwing on the type-mismatch path (fix #2). The daemon may reject
@@ -365,7 +416,7 @@ async function run() {
   } catch (err) {
     record("test harness", false, err.message);
   } finally {
-    cleanup();
+    await cleanup();
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
   }
