@@ -40,7 +40,17 @@ test(
   async (t) => {
     let activeDataSocket;
     let passiveServer;
+    let fixtureSocketError;
+    let retrievalAcknowledged = false;
+    let resolveControlClosed;
+    const controlClosed = new Promise((resolve) => {
+      resolveControlClosed = resolve;
+    });
     const controlServer = createServer((control) => {
+      control.on("error", (error) => {
+        fixtureSocketError ??= error;
+      });
+      control.once("close", resolveControlClosed);
       control.setEncoding("utf8");
       control.write("220 local fixture ready\r\n");
       let pending = "";
@@ -64,6 +74,9 @@ test(
           } else if (upper === "EPSV") {
             passiveServer = createServer((socket) => {
               activeDataSocket = socket;
+              socket.on("error", (error) => {
+                fixtureSocketError ??= error;
+              });
             });
             passiveServer.listen(0, "127.0.0.1", () => {
               const address = passiveServer.address();
@@ -81,7 +94,13 @@ test(
               upper === "MLSD"
                 ? "type=file;size=14;modify=20241013120000; safe.txt\r\n"
                 : "local fixture payload";
-            data.once("close", () => control.write("226 transfer complete\r\n"));
+            data.once("close", () =>
+              setTimeout(() => {
+                if (control.destroyed) return;
+                control.write("226 transfer complete\r\n");
+                if (upper === "RETR") retrievalAcknowledged = true;
+              }, 25),
+            );
             data.end(body);
             passiveServer.close();
             passiveServer = undefined;
@@ -113,6 +132,26 @@ test(
       stream.once("end", resolveEnd);
       stream.once("error", reject);
     });
+
+    // get-uri exposes the download stream's EOF before its FTP transfer promise
+    // receives the final 226 reply and closes the control socket. Wait for that
+    // protocol completion so Windows cleanup does not reset an active socket.
+    let closeTimeout;
+    try {
+      await Promise.race([
+        controlClosed,
+        new Promise((_, reject) => {
+          closeTimeout = setTimeout(
+            () => reject(new Error("FTP control connection did not close after RETR")),
+            2_000,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(closeTimeout);
+    }
+    assert.equal(fixtureSocketError, undefined, `FTP fixture socket failed: ${fixtureSocketError?.message}`);
+    assert.equal(retrievalAcknowledged, true, "FTP client must receive the final RETR completion reply");
 
     assert.equal(Buffer.concat(chunks).toString("utf8"), "local fixture payload");
     assert.ok(stream.lastModified instanceof Date);
