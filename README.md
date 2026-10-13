@@ -6,14 +6,14 @@
 
 **A graphical interface and enhanced interpretation of Prime Agent for Windows.**
 
-I’m building Sophos to bring [Prime Intellect’s](https://www.primeintellect.ai/)
-open-source Prime Agent concept to Windows through a graphical desktop app.
+Sophos brings [Prime Intellect’s](https://www.primeintellect.ai/)
+open-source Prime Agent to Windows through a graphical desktop app.
 Sophos adds a Tauri v2/Rust shell, React views for sessions and agents,
 packaging, and reliability layers around the upstream runtime. Prime Intellect
 created the agent runtime, daemon, and bridge;
 Sophos pins their public v0.7.0 source and includes the upstream MIT notice.
 
-**Windows-only.** I’m building Sophos for Windows 10/11 developers who want
+**Windows-only.** Sophos is for Windows 10/11 developers who want
 Prime Agent in a desktop app instead of a terminal. The GitLab Releases page
 currently lists v0.6.0 as its latest tagged release; the signed updater feed
 separately announces a v0.7.2 package. Those are different publication
@@ -77,13 +77,16 @@ the verification boundary.
 
 ## Verification status
 
-**Current local source checks (not release evidence).** The working tree now
+**Implemented desktop and source checks.** Sophos
 covers daemon-backed sessions and persisted transcripts across restart, saved
 profiles whose instructions apply to new sessions, loopback local-model
 discovery and catalog registration, and real daemon token-budget and semantic
 compaction calls. Profile tool/skill/safety choices remain descriptive; they do
 not grant permissions. The source passed 1,224 Vitest tests across 147 files,
-82 Node tests, and eight Rust lease tests locally. Fresh GitHub CI is pending.
+82 Node tests, and eight Rust lease tests locally. The bridge boundary suite
+passes nine checks, including concurrent credential updates and failed settings
+writes. [PR #20 checks](https://github.com/cayleb-james2008/sophos/pull/20/checks)
+record the hosted Windows results for the corresponding source head.
 This does not establish current-source installer acceptance or live provider
 inference. The CI and installer records below remain tied to their named
 historical commits and packages.

@@ -7,9 +7,10 @@ source, retains its MIT notice, and adds the desktop shell, views, packaging
 and reliability work described here. These additions do not establish
 independent authorship of the upstream agent engine.
 
-This account describes the local source candidate after merged baseline
-`48d6cbdc011fcf762a872f1353f926419c994e29` (2026-10-08). Fresh GitHub CI for
-the current changes is pending. Earlier issue counts, visual scores, and
+This account describes the implemented desktop capabilities after baseline
+`48d6cbdc011fcf762a872f1353f926419c994e29` (2026-10-08).
+[PR #20 checks](https://github.com/cayleb-james2008/sophos/pull/20/checks) record
+the hosted Windows results for the corresponding source head. Earlier issue counts, visual scores, and
 installed-runtime claims are dated records, not current acceptance results;
 the original text remains in Git history and the research remains in
 `research/`.
@@ -23,12 +24,11 @@ the original text remains in Git history and the research remains in
 | Context budget and compaction | The panel reads measured token totals from the active daemon session and calls the daemon's semantic compactor. | Per-tier estimates are not reported. The daemon may not return before/after totals; savings remain unknown until a later model response. Prune/evict controls are unavailable outside demo mode. |
 | Advanced panels | Code Mode, MCP access, CUA/UIA actions, workspace-security policy, squad workflows, thought-tree operations, distilled-skill mutation, workspace twins, and checkpoint restore are not native capabilities in this build. | The bridge explicitly rejects unsupported operations. Related panels and program cards are UI previews, not evidence that those actions ran. |
 | Profile safety and refinement UI | Profile Studio saves profile text and shows composition previews; refinement events can be displayed. | Tool/safety toggles do not enforce permissions, and Apply/Discard controls are not a verified native approval gate. Sophos is not a security sandbox. |
-| Runtime, packaging and attribution | The Rust shell and bundler stage the pinned upstream runtime and preserve its MIT notice. | Current changes await fresh GitHub CI. A candidate MSI build is not an install; the signed public updater-feed package is not proven to contain this source revision. Windows is the supported product target; macOS/Linux and all Windows versions are not certified. |
+| Runtime, packaging and attribution | The Rust shell and bundler stage the pinned upstream runtime and preserve its MIT notice. | Hosted checks are linked above. A candidate MSI build is not an install; the signed public updater-feed package is not proven to contain this source revision. Windows is the supported product target; macOS/Linux and all Windows versions are not certified. |
 
-The current working tree passed 1,224 Vitest tests across 147 files, 82 Node
+The current source passed 1,224 Vitest tests across 147 files, 82 Node
 tests, and eight Rust lease tests locally. This is source-tree evidence only;
-fresh GitHub CI is pending, as are current-source installer acceptance and live
-provider inference. The source does include real session/profile persistence,
+current-source installer acceptance and live provider inference remain separate. The source does include real session/profile persistence,
 loopback model registration, and daemon-backed semantic compaction.
 
 The corresponding source is in `src/features/`, `src-tauri/src/`, `bridge/`
