@@ -123,16 +123,19 @@ were superseded by the exact-head and post-merge runs listed above. The stale
 UIA identity after reconnect was fixed and the merged-master 50/50 recovery E2E
 and native Agents CUA both passed.
 
-The pinned Prime Agent production dependency graph still has five high npm
-audit records (zero critical): two unresolved `extract-zip` symlink/path
-advisories and an FTP/proxy dependency advisory whose compatible clean upgrade
-requires an untested major-version change. Root development dependencies also
-retain audit findings. The ZIP helper auto-install path is disabled; no clean-
-audit claim is made. The staged standalone lifecycle command's compile-only
-package-layout defect is addressed in a separate, non-runtime tooling follow-up.
-Its direct standalone verification is Linux-local; the Windows package/E2E
-evidence above does not substitute for a hosted Windows invocation of that
-developer command.
+The pinned Prime Agent production graph is staged by the same bundler for the
+diagnostic and Windows release paths. A reviewed `basic-ftp@6.2.1` override
+removes the FTP listing advisory while retaining `get-uri@6.0.5`,
+`pac-proxy-agent@7.2.0`, and `proxy-agent@6.5.0`; a local FTP fixture verifies
+the complete access/list/download path. The latest staged production audit
+reports one high package record containing two unresolved `extract-zip`
+symlink/path advisories (zero critical, no fix available). The Windows ZIP
+helper auto-install path remains disabled, and no clean-audit claim is made.
+Root development dependencies also retain audit findings. The staged standalone
+lifecycle command's compile-only package-layout defect is addressed in a
+separate, non-runtime tooling follow-up. Its direct standalone verification is
+Linux-local; the Windows package/E2E evidence above does not substitute for a
+hosted Windows invocation of that developer command.
 
 ### Reviewed follow-up publication
 

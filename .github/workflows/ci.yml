@@ -115,6 +115,10 @@ jobs:
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: node scripts/bundle.mjs
 
+      - name: Verify patched FTP dependency compatibility and listing bounds
+        working-directory: ${{ env.SAFE_WINDOWS_REPO }}
+        run: node --test scripts/dependency-hardening/basic-ftp-compat.test.mjs
+
       - name: Verify standalone lifecycle on staged Windows bundle
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}
         run: npm --prefix bridge run verify:lifecycle

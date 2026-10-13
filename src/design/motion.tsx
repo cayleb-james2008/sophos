@@ -130,11 +130,11 @@ export function ViewTransition({
   return (
     <div
       key={transitionKey}
-      className={[
-        "pa-view-transition",
-        reduced ? null : "pa-view-transition--animated",
-        className,
-      ].filter(Boolean).join(" ") || undefined}
+      className={
+        ["pa-view-transition", reduced ? null : "pa-view-transition--animated", className]
+          .filter(Boolean)
+          .join(" ") || undefined
+      }
       style={motionVars(tokens.motion.base, 0)}
     >
       {children}

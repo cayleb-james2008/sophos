@@ -22,7 +22,7 @@
     "uniqueAdvisoryEntries": 31
   },
   "registry": "https://registry.npmjs.org/",
-  "overlayLockSha256": "34af8ac9c47ee1147cfaf30f0f10773a5b3e2c75406fb4a4b1b69a7d48668003",
+  "overlayLockSha256": "d676dce6f953eb274a0a831dcc9bc23cd0f06bda3af65640d321e3b77dfe87ca",
   "npmPolicy": {
     "lockfileVersion": 3,
     "minimumReleaseAgeDays": 7,
@@ -31,6 +31,18 @@
     "releaseAgeOverrideUsed": false
   },
   "overrides": {
+    "basic-ftp": {
+      "version": "6.2.1",
+      "engines": { "node": ">=10.0.0" },
+      "constraints": ["^5.0.2"],
+      "integrity": "sha512-bK67isD+lKq46AU8vNtjvMaT2ZqAOAmNCbxUHlFBRD4k15NWxyEjmaKtZPlgce58So4BNTjITGQOVTjL9y0ECA==",
+      "resolved": "https://registry.npmjs.org/basic-ftp/-/basic-ftp-6.2.1.tgz",
+      "publishedAt": "2026-08-27T19:42:01.078Z",
+      "license": "MIT",
+      "baseline": "5.3.1",
+      "advisories": ["GHSA-c475-qrg2-pj4r"],
+      "compatibilityTest": "scripts/dependency-hardening/basic-ftp-compat.test.mjs"
+    },
     "brace-expansion": {
       "version": "5.0.12",
       "engines": {
@@ -134,14 +146,6 @@
       "advisories": ["GHSA-jmr9-qjv8-65gv", "GHSA-7pqw-9j4j-h8q3"],
       "status": "path-disabled",
       "reason": "npm registry has no later extract-zip release and the advisory has no first-patched version. The exact Windows .zip helper-tool auto-install path is disabled in the pinned overlay and providers remain network-capable, but the vulnerable package remains in the production dependency graph and npm audit still flags it. Do not claim a clean dependency audit; remove the unused dependency or integrate a reviewed bounded extractor before re-enabling this path."
-    },
-    "basic-ftp": {
-      "version": "5.3.1",
-      "advisories": ["GHSA-c475-qrg2-pj4r"],
-      "status": "unresolved",
-      "firstPatchedVersion": "6.2.1",
-      "constraint": "^5.0.2",
-      "reason": "The pinned Prime Agent runtime resolves basic-ftp 5.3.1 through get-uri 6.0.5, whose declared dependency is ^5.0.2; the fix is in basic-ftp 6.x. No cross-major override was selected without compatibility and PAC/FTP runtime tests; npm also suggests a proxy-agent 5.x major-version change. This remains a production audit finding."
     }
   }
 }

@@ -37,7 +37,8 @@ export function DaemonStatusBanner({ onRestartRequest }: { onRestartRequest?: ()
           {plainEnglishReason(status)}
         </Text>
         <Text variant="micro" tone="muted">
-          TCP fallback is unsupported by pinned Prime Agent v0.7.0. Sophos continues using the supported default local socket.
+          TCP fallback is unsupported by pinned Prime Agent v0.7.0. Sophos continues using the supported
+          default local socket.
         </Text>
 
         {onRestartRequest && (

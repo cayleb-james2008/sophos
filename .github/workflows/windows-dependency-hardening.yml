@@ -90,12 +90,12 @@ jobs:
           $resultText = $resultLines -join "`n"
           Write-Output $resultText
           $result = $resultText | ConvertFrom-Json
-          if ($result.commit -ne 'be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387' -or $result.packageLockSha256 -ne '34af8ac9c47ee1147cfaf30f0f10773a5b3e2c75406fb4a4b1b69a7d48668003') { throw 'Windows-generated overlay provenance or lock hash mismatch' }
+          if ($result.commit -ne 'be9e2fa0714e7cd1c6bd9bdb1b554d2cc6550387' -or $result.packageLockSha256 -ne 'd676dce6f953eb274a0a831dcc9bc23cd0f06bda3af65640d321e3b77dfe87ca') { throw 'Windows-generated overlay provenance or lock hash mismatch' }
           $manifestHash = (Get-FileHash -Algorithm SHA256 (Join-Path $destination 'package.json')).Hash.ToLowerInvariant()
           $lockHash = (Get-FileHash -Algorithm SHA256 (Join-Path $destination 'package-lock.json')).Hash.ToLowerInvariant()
           Write-Output "overlay package.json SHA-256: $manifestHash"
           Write-Output "overlay package-lock.json SHA-256: $lockHash"
-          if ($manifestHash -ne 'b3fb95b4564002d65f575c4013006d7052a2d6d3ee878315c11ae91c2ff7592a' -or $lockHash -ne '34af8ac9c47ee1147cfaf30f0f10773a5b3e2c75406fb4a4b1b69a7d48668003') { throw 'Windows-generated overlay bytes changed from reviewed manifest or lock' }
+          if ($manifestHash -ne '997a0b02442c841019f1b749765a21fb8c3c38477a692cdbf09919451670e305' -or $lockHash -ne 'd676dce6f953eb274a0a831dcc9bc23cd0f06bda3af65640d321e3b77dfe87ca') { throw 'Windows-generated overlay bytes changed from reviewed manifest or lock' }
       - name: Run dependency overlay tests on native Windows ACLs
         shell: pwsh
         working-directory: ${{ env.SAFE_WINDOWS_REPO }}

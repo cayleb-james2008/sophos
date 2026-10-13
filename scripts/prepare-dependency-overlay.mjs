@@ -107,6 +107,13 @@ function assertOverrideVersionCompatible(packageName, version, constraints) {
     throw new Error(`overlay must record the upstream semver constraints for ${packageName}`);
   }
   const target = parseVersion(version, `${packageName} overlay version`);
+  // Prime Agent pins get-uri 6.0.5, whose Client API remains compatible with
+  // basic-ftp 6.2.1. Keep this cross-major override narrow and cover its local
+  // FTP access/list/download path in the staged production dependency tree.
+  if (packageName === "basic-ftp" && version === "6.2.1"
+    && constraints.length === 1 && constraints[0] === "^5.0.2") {
+    return;
+  }
   for (const constraint of constraints) {
     const caretMatch = /^\^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(constraint);
     const exactMatch = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(constraint);

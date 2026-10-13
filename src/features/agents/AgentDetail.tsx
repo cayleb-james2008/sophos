@@ -102,10 +102,15 @@ export function AgentDetail({
                 value={`${agent.squadRole.toUpperCase()} (Round ${agent.reviewRounds ?? 1})`}
               />
             ) : null}
-            {agent.summary ? <Row icon={<LayersIcon size={14} />} label="Summary" value={agent.summary} /> : null}
+            {agent.summary ? (
+              <Row icon={<LayersIcon size={14} />} label="Summary" value={agent.summary} />
+            ) : null}
             {agent.latestRubric ? (
-              <Row icon={<PlugIcon size={14} />} label="Critic rubric"
-                value={`Goal: ${(agent.latestRubric.goalScore * 100).toFixed(0)}% · Bar: ${(agent.latestRubric.barScore * 100).toFixed(0)}% · Verdict: ${agent.latestRubric.barVerdict}`} />
+              <Row
+                icon={<PlugIcon size={14} />}
+                label="Critic rubric"
+                value={`Goal: ${(agent.latestRubric.goalScore * 100).toFixed(0)}% · Bar: ${(agent.latestRubric.barScore * 100).toFixed(0)}% · Verdict: ${agent.latestRubric.barVerdict}`}
+              />
             ) : null}
             {sessionState ? (
               <Row
@@ -121,15 +126,26 @@ export function AgentDetail({
                 {agent.latestRubric.quotedDefects.map((defect, idx) => (
                   <div key={idx}>
                     <b>Defect #{idx + 1}</b>
-                    <span>{typeof defect === "string" ? defect : `${defect.defect}${defect.recommendation ? ` (Fix: ${defect.recommendation})` : ""}`}</span>
+                    <span>
+                      {typeof defect === "string"
+                        ? defect
+                        : `${defect.defect}${defect.recommendation ? ` (Fix: ${defect.recommendation})` : ""}`}
+                    </span>
                   </div>
                 ))}
               </div>
             ) : null}
-            {sessionState ? <div className="ag-detail__state">
-              <small>LIVE SESSION STATE · {sessionState.transcript.length} messages</small>
-              {sessionState.transcript.slice(-3).map((message) => <div key={message.id}><b>{message.role}</b><span>{message.content || "(tool activity)"}</span></div>)}
-            </div> : null}
+            {sessionState ? (
+              <div className="ag-detail__state">
+                <small>LIVE SESSION STATE · {sessionState.transcript.length} messages</small>
+                {sessionState.transcript.slice(-3).map((message) => (
+                  <div key={message.id}>
+                    <b>{message.role}</b>
+                    <span>{message.content || "(tool activity)"}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {/* Actions */}
@@ -157,11 +173,7 @@ export function AgentDetail({
 
       <div className="ag-detail__thread">
         {/* Keep the inspector thread landmark; the nested messages viewport owns keyboard scrolling. */}
-        <div
-          className="ag-detail__thread-scroll"
-          role="region"
-          aria-label="Agent coordination thread"
-        >
+        <div className="ag-detail__thread-scroll" role="region" aria-label="Agent coordination thread">
           <InboxThread
             agent={agent}
             messages={thread}
@@ -170,13 +182,7 @@ export function AgentDetail({
             onMarkAllRead={onMarkAllRead}
           />
         </div>
-        <AgentComposer
-          agent={agent}
-          draft={draft}
-          setDraft={setDraft}
-          sending={sending}
-          onSend={onSend}
-        />
+        <AgentComposer agent={agent} draft={draft} setDraft={setDraft} sending={sending} onSend={onSend} />
       </div>
     </aside>
   );

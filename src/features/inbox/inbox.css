@@ -594,7 +594,10 @@
 }
 @media (max-height: 640px) {
   /* Preserve room for the composer/footer at the Tauri window's 600px minimum. */
-  .inbox { padding: 12px 20px; gap: 12px; }
+  .inbox {
+    padding: 12px 20px;
+    gap: 12px;
+  }
 }
 .inbox__graphblank {
   position: absolute;
