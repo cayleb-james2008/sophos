@@ -3,14 +3,39 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
-import { useIpc, useIpcEvent, isTauri } from "../../ipc/client";
+import { useIpc, useIpcEvent, isDemoShell, isTauri } from "../../ipc/client";
 import type { SessionEvent, ToolCall, TranscriptMessage } from "../../ipc/contract";
 import type { AgentProfile } from "../profiles/profiles";
+import { isCustomId } from "../studio/store";
 // Demo helpers — DEV-only, tree-shaken in production (import.meta.env.DEV).
 import { demoSeedLarge, simulateResponse } from "./demo";
 import { setTranscriptMessages } from "./chatBridge";
 
 const nowIso = () => new Date().toISOString();
+
+/** Keep demo-only profile flavoring inside the Tauri demo shell. The live
+ * client sends the caller's normal prompt unchanged to the provider route. */
+function demoPromptOptions(profile?: AgentProfile) {
+  if (!isDemoShell() || !profile || profile.id === "standard") return undefined;
+  return {
+    profile: profile.id,
+    ...(isCustomId(profile.id)
+      ? {
+          profileFlavor: {
+            name: profile.name,
+            tagline: profile.tagline,
+            workingStyle: profile.workingStyle,
+            mode: profile.mode,
+          },
+        }
+      : {}),
+  };
+}
+
+function promptWithDemoProfile(client: ReturnType<typeof useIpc>, text: string, profile?: AgentProfile) {
+  const options = demoPromptOptions(profile);
+  return options ? client.prompt(text, options) : client.prompt(text);
+}
 
 const userMsg = (content: string): TranscriptMessage => ({
   id: `u-${Date.now()}`,
@@ -247,7 +272,7 @@ export function useTranscript({ setBusy, setError, busyRef }: TranscriptOptions)
       setBusy(true);
       setError(null);
       if (isTauri) {
-        void client.prompt(trimmed).catch((err) => {
+        void promptWithDemoProfile(client, trimmed, profile).catch((err) => {
           setError(err instanceof Error ? err.message : String(err));
           setBusy(false);
         });
@@ -329,7 +354,7 @@ export function useTranscript({ setBusy, setError, busyRef }: TranscriptOptions)
       setBusy(true);
       if (isTauri) {
         try {
-          await client.prompt(trimmed);
+          await promptWithDemoProfile(client, trimmed, profile);
         } catch (err) {
           setError(err instanceof Error ? err.message : String(err));
           setBusy(false);

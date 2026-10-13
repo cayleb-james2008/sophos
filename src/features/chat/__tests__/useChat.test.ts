@@ -51,6 +51,7 @@ vi.mock("../../../ipc/client", async () => {
     },
     useConnectionState: () => mockState.conn,
     isTauri: true,
+    isDemoShell: () => false,
   };
 });
 

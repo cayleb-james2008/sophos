@@ -275,8 +275,8 @@ const tests = [
       assertText(ref, "No pending changes");
 
       // Harness state section (6th inner tab).
-      const hs = await clickInnerTab(appHandle, "Harness state", "Continual harness state");
-      assertText(hs, "Continual harness state");
+      const hs = await clickInnerTab(appHandle, "Harness state", "Continual harness & memory architecture");
+      assertText(hs, "Continual harness & memory architecture");
 
       takeScreenshot(appHandle.pid, "settings-longrunning", appHandle.windowId);
     },

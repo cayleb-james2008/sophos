@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { sanitizeMockSettings } from "../mockClient";
 import type { Settings } from "../contract";
 
@@ -11,6 +11,13 @@ describe("sanitizeMockSettings — demo-mode persisted settings", () => {
   it("drops a non-string defaultProvider (regression: crashed ProviderGlyph)", () => {
     const out = sanitizeMockSettings({ defaultProvider: { broken: "shape" } });
     expect(out).not.toHaveProperty("defaultProvider");
+  });
+
+  it("accepts only a valid persisted profile selection shape", () => {
+    expect(sanitizeMockSettings({ agentProfile: "gauntlet" })).not.toHaveProperty("agentProfile");
+    expect(sanitizeMockSettings({ agentProfile: { id: "custom-x", mode: "unsafe" } })).not.toHaveProperty(
+      "agentProfile",
+    );
   });
 
   it("keeps valid string settings and drops invalid ones", () => {
@@ -90,16 +97,44 @@ describe("sanitizeMockSettings — demo-mode persisted settings", () => {
         defaultProvider: { broken: "shape" },
         mcpServers: { filesystem: { command: "npx" } },
         theme: "dark",
-        agentProfile: "gauntlet",
+        agentProfile: { id: "gauntlet", mode: "standard" },
       }),
     );
     // Re-read through the same sanitizer the mock's readLocalSettings uses.
     const raw = localStorage.getItem("prime-agent.settings.v1");
     const out = sanitizeMockSettings(JSON.parse(raw!));
-    const clean = { theme: "dark", agentProfile: "gauntlet" };
+    const clean = { theme: "dark", agentProfile: { id: "gauntlet", mode: "standard" } };
     expect(ext(out)).toEqual(clean);
     // Persisting the sanitized value keeps the store clean for the next launch.
     localStorage.setItem("prime-agent.settings.v1", JSON.stringify(out));
     expect(JSON.parse(localStorage.getItem("prime-agent.settings.v1")!)).toEqual(clean);
+  });
+
+  it("restores a persisted custom profile selection after a demo client restart", async () => {
+    const selection = { id: "custom-builder", mode: "creator" };
+    const customProfile = {
+      id: selection.id,
+      name: "Builder Bot",
+      tagline: "Compose fast, verify always",
+      workingStyle: ["Goal first", "Verify with real runs"],
+      mode: selection.mode,
+      tools: ["shell"],
+      skills: [],
+      safety: { autoApprove: false, confirm: [] },
+    };
+    localStorage.setItem(
+      "prime-agent.settings.v1",
+      JSON.stringify({ agentProfile: selection, customProfiles: [customProfile] }),
+    );
+
+    // Re-evaluate module initialization the way a fresh desktop process reads
+    // the WebView's persisted settings after restart.
+    vi.resetModules();
+    const { MockIpcClient } = await import("../mockClient");
+    const restartedClient = new MockIpcClient();
+    const restored = await restartedClient.getSettings();
+
+    expect(ext(restored).agentProfile).toEqual(selection);
+    expect(ext(restored).customProfiles).toEqual([customProfile]);
   });
 });

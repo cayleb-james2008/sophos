@@ -92,10 +92,10 @@ const MOCK_STRING_SETTING_KEYS = [
   "subagentDefaultProvider",
   "subagentDefaultModel",
   "subagentDefaultThinking",
-  "agentProfile",
 ] as const;
 
 const MOCK_THEMES = ["dark", "light", "system"] as const;
+const PROFILE_MODES = ["standard", "minimal", "creator", "code"] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -118,6 +118,16 @@ export function sanitizeMockSettings(raw: unknown): Settings {
   for (const key of MOCK_STRING_SETTING_KEYS) {
     const value = input[key];
     if (typeof value === "string") out[key] = value;
+  }
+  const agentProfile = input.agentProfile;
+  if (
+    isRecord(agentProfile) &&
+    typeof agentProfile.id === "string" &&
+    agentProfile.id.trim().length > 0 &&
+    typeof agentProfile.mode === "string" &&
+    (PROFILE_MODES as readonly string[]).includes(agentProfile.mode)
+  ) {
+    out.agentProfile = { id: agentProfile.id, mode: agentProfile.mode };
   }
   const theme = input.theme;
   if (typeof theme === "string" && (MOCK_THEMES as readonly string[]).includes(theme)) {
