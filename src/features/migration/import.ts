@@ -15,6 +15,7 @@ export interface McpServerConfig {
   command: string;
   args: string[];
   enabled: boolean;
+  env?: Record<string, string>;
 }
 
 /** The runtime mode a suggested custom profile should run in. */
@@ -163,6 +164,15 @@ function extractMcpServers(raw: unknown): McpServerConfig[] {
       command: asString(value.command),
       args: asStringArray(value.args),
       enabled: value.enabled === undefined ? true : value.enabled !== false,
+      ...(isRecord(value.env)
+        ? {
+            env: Object.fromEntries(
+              Object.entries(value.env).filter(
+                (entry): entry is [string, string] => typeof entry[1] === "string",
+              ),
+            ),
+          }
+        : {}),
     });
   };
 
@@ -183,7 +193,7 @@ function baseSuggestedProfile(sourceLabel: string): ImportedProfile {
   return {
     name: `Imported from ${sourceLabel}`,
     tagline: `Migrated from ${sourceLabel}`,
-    workingStyle: ["Bring-your-own instructions", "Provider keys carried over", "MCP servers attached"],
+    workingStyle: ["Bring-your-own instructions", "Provider keys carried over", "MCP configuration retained"],
     mode: "standard",
     toolsHint: "Standard toolset (shell, file editor, file search, web search, kernel, refine)",
     safety: { autoApprove: false, confirm: ["Destructive shell"] },
@@ -229,7 +239,9 @@ export function parseClaudeConfig(json: unknown): ImportResult {
   const mcp = extractMcpServers(json.mcpServers);
   if (mcp.length > 0) {
     patch.mcpServers = mcp;
-    notes.push(`Imported ${mcp.length} MCP server(s) into Settings (mcpServers).`);
+    notes.push(
+      `Retained ${mcp.length} MCP server configuration(s) in Settings; activation requires a supported MCP runtime.`,
+    );
   }
 
   // Hooks are deliberately NOT auto-imported — honest about the gap.
@@ -312,7 +324,9 @@ export function parseCodexConfig(input: string | unknown): ImportResult {
   const mcp = extractMcpServers(obj.mcpServers);
   if (mcp.length > 0) {
     patch.mcpServers = mcp;
-    notes.push(`Imported ${mcp.length} MCP server(s) into Settings (mcpServers).`);
+    notes.push(
+      `Retained ${mcp.length} MCP server configuration(s) in Settings; activation requires a supported MCP runtime.`,
+    );
   }
 
   // Codex approval policy maps to nothing automatic — noted as manual.

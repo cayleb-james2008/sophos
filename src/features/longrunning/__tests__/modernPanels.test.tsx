@@ -8,6 +8,7 @@ const mockClient = new MockIpcClient();
 
 vi.mock("../../../ipc/client", async () => ({
   useIpc: () => mockClient,
+  isDemoMode: () => true,
   useConnectionState: () => ({
     status: { kind: "connected" },
     autonomousConfig: { active: false },

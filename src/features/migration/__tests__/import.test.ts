@@ -46,6 +46,14 @@ describe("parseClaudeConfig", () => {
     expect(r.suggestedProfile.name).toContain("Claude Desktop");
   });
 
+  it("preserves server environment values without carrying foreign types", () => {
+    const result = parseClaudeConfig({
+      mcpServers: { db: { command: "node", env: { DATABASE_URL: "local-fixture", RETRIES: 3 } } },
+    });
+    expect(result.settingsPatch.mcpServers?.[0].env).toEqual({ DATABASE_URL: "local-fixture" });
+    expect(result.notes.join(" ")).toContain("activation requires a supported MCP runtime");
+  });
+
   it("splits a provider/model form", () => {
     const r = parseClaudeConfig({ model: "anthropic/claude-3-5-sonnet" });
     expect(r.settingsPatch.defaultProvider).toBe("anthropic");

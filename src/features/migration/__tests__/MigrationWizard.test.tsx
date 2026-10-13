@@ -9,6 +9,7 @@ import { MigrationWizard } from "../MigrationWizard";
 const mockClient = vi.hoisted(() => ({
   getSettings: vi.fn(),
   setSettings: vi.fn(),
+  login: vi.fn(),
 }));
 
 vi.mock("../../../ipc/client", () => ({
@@ -22,6 +23,7 @@ beforeEach(() => {
     theme: "dark",
     customProfiles: [],
   });
+  mockClient.login.mockResolvedValue(undefined);
   (mockClient.setSettings as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 });
 
@@ -91,7 +93,6 @@ describe("MigrationWizard", () => {
       expect(mockClient.setSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           defaultModel: "claude-opus-4",
-          auth: { anthropic: "sk-ant" },
           customProfiles: expect.arrayContaining([
             expect.objectContaining({
               name: "Imported from Claude Desktop",
@@ -102,6 +103,8 @@ describe("MigrationWizard", () => {
       );
     });
 
+    expect(mockClient.login).toHaveBeenCalledWith("anthropic", "sk-ant");
+    expect(mockClient.setSettings.mock.calls[0][0]).not.toHaveProperty("auth");
     expect(screen.getByText(/Imported and set model "claude-opus-4"/i)).toBeInTheDocument();
   });
 

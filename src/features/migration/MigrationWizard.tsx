@@ -134,7 +134,9 @@ export function MigrationWizard() {
       const base = (await ipc.getSettings().catch(() => ({}))) as Settings & {
         customProfiles?: unknown;
       };
-      const merged = { ...base, ...combined.settingsPatch } as Settings;
+      const { auth, ...settingsPatch } = combined.settingsPatch;
+      const merged = { ...base, ...settingsPatch } as Settings;
+      delete merged.auth;
 
       const sp = combined.suggestedProfile;
       const draft = createCustomProfileDraft({
@@ -165,6 +167,9 @@ export function MigrationWizard() {
         [CUSTOM_PROFILES_SETTINGS_KEY]: [...existing, profile],
       } as Settings;
 
+      for (const [provider, apiKey] of Object.entries(auth ?? {})) {
+        await ipc.login(provider, apiKey);
+      }
       await ipc.setSettings(finalSettings);
 
       const bits: string[] = [];
@@ -172,7 +177,7 @@ export function MigrationWizard() {
       if (combined.settingsPatch.auth)
         bits.push(`${Object.keys(combined.settingsPatch.auth).length} API key(s)`);
       if (combined.settingsPatch.mcpServers)
-        bits.push(`${combined.settingsPatch.mcpServers.length} MCP server(s)`);
+        bits.push(`${combined.settingsPatch.mcpServers.length} MCP configuration(s)`);
       const patchText = bits.length ? ` and set ${bits.join(", ")}` : "";
       setStatus(
         `Imported${patchText}. Created custom profile “${finalName}”${claudeMd.instructions ? " with your CLAUDE.md instructions" : ""}. Review it in the Profile Studio.`,

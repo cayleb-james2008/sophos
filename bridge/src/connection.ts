@@ -21,8 +21,10 @@ import {
   type AgentConnectionModel,
   type AgentConnectionSessionEvent,
   type AgentConnectionState,
+  FileAuthStorageBackend,
 } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readDaemonKernelState } from "./kernel-state-compat.js";
@@ -41,6 +43,12 @@ const MODELS_JSON_PATH = join(PRIME_AGENT_DIR, "models.json");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function unsupportedRuntimeOperation(operation: string): never {
+  throw new Error(
+    `${operation} is unsupported by this Sophos build: the pinned Prime Agent runtime has no implementation for it.`,
+  );
 }
 
 function readSettingsFile(): Record<string, unknown> {
@@ -185,14 +193,8 @@ function normalizeSettings(raw: Record<string, unknown>): Settings {
   const modelConfig = normalizeModelConfig(raw.modelConfig);
   if (modelConfig) out.modelConfig = modelConfig;
   else delete out.modelConfig;
-
-  if (isRecord(raw.auth)) {
-    out.auth = Object.fromEntries(
-      Object.entries(raw.auth).filter(([, value]) => typeof value === "string" && value.length > 0),
-    );
-  } else {
-    delete out.auth;
-  }
+  // Provider credentials belong in auth.json and are never returned by settings IPC.
+  delete out.auth;
 
   out.localProviders = normalizeLocalProviders(raw.localProviders);
 
@@ -223,7 +225,7 @@ function normalizePatch(patch: Partial<Settings>): Record<string, unknown> {
   }
   if (Object.prototype.hasOwnProperty.call(raw, "modelConfig"))
     result.modelConfig = normalized.modelConfig ?? {};
-  if (Object.prototype.hasOwnProperty.call(raw, "auth")) result.auth = normalized.auth ?? {};
+  delete result.auth;
   if (Object.prototype.hasOwnProperty.call(raw, "localProviders"))
     result.localProviders = normalized.localProviders ?? [];
   return result;
@@ -235,6 +237,45 @@ function writeSettingsSnapshot(settings: Record<string, unknown>): void {
 }
 
 const AUTH_PATH = join(PRIME_AGENT_DIR, "auth.json");
+
+type AuthStore = Record<string, unknown>;
+
+function ensurePrivateAuthDirectory(): void {
+  if (!existsSync(PRIME_AGENT_DIR)) mkdirSync(PRIME_AGENT_DIR, { recursive: true, mode: 0o700 });
+  if (process.platform !== "win32") chmodSync(PRIME_AGENT_DIR, 0o700);
+}
+
+function updateAuthStore(update: (auth: AuthStore) => boolean): void {
+  ensurePrivateAuthDirectory();
+  const storage = new FileAuthStorageBackend(AUTH_PATH);
+  storage.withLock((current) => {
+    const parsed: unknown = current === undefined ? {} : JSON.parse(current);
+    if (!isRecord(parsed)) throw new Error("Prime Agent auth.json must contain an object");
+    return update(parsed)
+      ? { result: undefined, next: JSON.stringify(parsed, null, 2) }
+      : { result: undefined };
+  });
+}
+
+function migrateLegacyAuth(value: unknown): void {
+  if (!isRecord(value)) return;
+  const legacyEntries = Object.entries(value).filter(
+    ([provider, key]) =>
+      /^[a-z0-9][a-z0-9._-]{0,63}$/i.test(provider) && typeof key === "string" && key.length > 0,
+  );
+  if (legacyEntries.length === 0) return;
+
+  updateAuthStore((auth) => {
+    let changed = false;
+    for (const [provider, key] of legacyEntries) {
+      if (!Object.prototype.hasOwnProperty.call(auth, provider)) {
+        auth[provider] = { type: "api_key", key };
+        changed = true;
+      }
+    }
+    return changed;
+  });
+}
 
 /**
  * Mirror a provider API key into the daemon's auth file (~/.prime/agent/auth.json).
@@ -248,36 +289,25 @@ const AUTH_PATH = join(PRIME_AGENT_DIR, "auth.json");
  *   - Read + merge, never clobber other providers' entries.
  *   - apiKey provided -> upsert { provider: { type: "api_key", key } }.
  *   - apiKey omitted -> remove only the provider's entry, preserve the rest.
- *   - Create ~/.prime/agent/ if missing; single-writer write is acceptable.
+ *   - Create ~/.prime/agent/ if missing; update under the daemon's shared auth-file lock.
  *   - Never called unless the user explicitly logged in/out via the IPC command.
  */
 export function writeAuthKey(provider: string, apiKey?: string): void {
-  try {
-    if (!existsSync(PRIME_AGENT_DIR)) mkdirSync(PRIME_AGENT_DIR, { recursive: true });
-    let auth: Record<string, { type: "api_key"; key: string }> = {};
-    if (existsSync(AUTH_PATH)) {
-      try {
-        auth = JSON.parse(readFileSync(AUTH_PATH, "utf8")) as Record<
-          string,
-          { type: "api_key"; key: string }
-        >;
-        if (!auth || typeof auth !== "object" || Array.isArray(auth)) auth = {};
-      } catch {
-        auth = {};
-      }
-    }
-    if (apiKey) {
-      auth[provider] = { type: "api_key", key: apiKey };
-    } else {
-      delete auth[provider];
-    }
-    writeFileSync(AUTH_PATH, JSON.stringify(auth, null, 2) + "\n", "utf8");
-  } catch (err) {
-    if (typeof process !== "undefined" && process.stderr) {
-      const msg = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`[bridge:auth] failed to write auth.json mirror: ${msg}\n`);
-    }
+  if (typeof provider !== "string" || !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(provider)) {
+    throw new Error("Invalid provider id");
   }
+  if (apiKey !== undefined && (typeof apiKey !== "string" || apiKey.trim().length === 0)) {
+    throw new Error("API key must be a non-empty string when provided");
+  }
+  updateAuthStore((auth) => {
+    if (apiKey !== undefined) {
+      auth[provider] = { type: "api_key", key: apiKey };
+      return true;
+    }
+    if (!Object.prototype.hasOwnProperty.call(auth, provider)) return false;
+    delete auth[provider];
+    return true;
+  });
 }
 
 import type { AgentMessage as PiAgentMessage } from "@earendil-works/pi-agent-core";
@@ -1150,19 +1180,29 @@ function readCheckpoints(): CheckpointEntry[] {
   try {
     if (!existsSync(CHECKPOINT_INDEX_PATH)) return [];
     const raw = JSON.parse(readFileSync(CHECKPOINT_INDEX_PATH, "utf8"));
-    return Array.isArray(raw) ? (raw as CheckpointEntry[]) : [];
+    return Array.isArray(raw)
+      ? raw.flatMap((entry) =>
+          isRecord(entry)
+            ? [
+                {
+                  ...entry,
+                  // Earlier bridge builds wrote GREEN without checking workspace state.
+                  verifiedStatus: entry.verifiedStatus === "REFUTED" ? "REFUTED" : "UNVERIFIED",
+                } as unknown as CheckpointEntry,
+              ]
+            : [],
+        )
+      : [];
   } catch {
     return [];
   }
 }
 
 function writeCheckpoints(list: CheckpointEntry[]): void {
-  try {
-    mkdirSync(CHECKPOINT_DIR, { recursive: true });
-    writeFileSync(CHECKPOINT_INDEX_PATH, JSON.stringify(list, null, 2), "utf8");
-  } catch {
-    // best-effort
-  }
+  mkdirSync(CHECKPOINT_DIR, { recursive: true, mode: 0o700 });
+  if (process.platform !== "win32") chmodSync(CHECKPOINT_DIR, 0o700);
+  writeFileSync(CHECKPOINT_INDEX_PATH, JSON.stringify(list, null, 2), { encoding: "utf8", mode: 0o600 });
+  if (process.platform !== "win32") chmodSync(CHECKPOINT_INDEX_PATH, 0o600);
 }
 
 export async function createCheckpoint(
@@ -1173,28 +1213,25 @@ export async function createCheckpoint(
   const state = await conn.getState();
   const all = readCheckpoints();
   const entry: CheckpointEntry = {
-    id: `ckpt-${Date.now()}`,
-    sessionId: state.activeSessionId ?? "session-0",
-    turnIndex: all.length,
+    id: `ckpt-${Date.now()}-${randomUUID().slice(0, 8)}`,
+    sessionId: state.activeSessionId ?? state.sessionId,
+    turnIndex: state.messageCount,
     timestamp: new Date().toISOString(),
     label,
-    summary: summary ?? `Checkpoint at turn ${all.length}`,
-    verifiedStatus: "GREEN",
+    summary:
+      summary ?? "Session marker only; workspace files and process state were not captured or verified.",
+    verifiedStatus: "UNVERIFIED",
     stateSnapshot: {
       activeSessionId: state.activeSessionId,
       workingDirectory: state.cwd,
-      appliedEditsCount: all.length,
     },
   };
   writeCheckpoints([entry, ...all]);
   return entry;
 }
 
-export async function restoreCheckpoint(_conn: AgentConnection, id: string): Promise<CheckpointEntry> {
-  const all = readCheckpoints();
-  const hit = all.find((c) => c.id === id);
-  if (!hit) throw new Error(`Checkpoint ${id} not found`);
-  return hit;
+export async function restoreCheckpoint(_conn: AgentConnection, _id: string): Promise<CheckpointEntry> {
+  return unsupportedRuntimeOperation("restoreCheckpoint");
 }
 
 export async function listCheckpoints(
@@ -1209,25 +1246,8 @@ export async function listCheckpoints(
 // Gauntlet-RLM Squad Topology & Evaluator-Optimizer
 // ---------------------------------------------------------------------------
 
-export async function getSquadTopology(conn: AgentConnection): Promise<SquadTopology> {
-  const snapshot = await conn.getResourceSnapshot().catch(() => null);
-  return {
-    orchestrator: {
-      id: "orch-0",
-      role: "orchestrator",
-      name: "Lead Orchestrator",
-      status: "working",
-      targetPiece: "Active Execution",
-    },
-    members: (snapshot?.skills ?? []).slice(0, 4).map((s, idx) => ({
-      id: `squad-${idx + 1}`,
-      role: idx === 1 ? "critic_text" : idx === 2 ? "critic_vision" : idx === 3 ? "researcher" : "worker",
-      name: s.name,
-      status: "idle",
-    })),
-    activeEvaluationRounds: 1,
-    doomLoopDetected: false,
-  };
+export async function getSquadTopology(_conn: AgentConnection): Promise<SquadTopology> {
+  return unsupportedRuntimeOperation("getSquadTopology");
 }
 
 export async function evaluateSquadPiece(
@@ -1237,173 +1257,63 @@ export async function evaluateSquadPiece(
   _bar: string,
   _outputPaths: string[],
 ): Promise<BlindCriticRubric> {
-  return {
-    goalScore: 0.98,
-    contractScore: 0.97,
-    barScore: 0.99,
-    contractVerdict: "PASS",
-    barVerdict: "PASS",
-    quotedDefects: [],
-    reviewRound: 1,
-    criticRole: "critic_text",
-    timestamp: new Date().toISOString(),
-  };
+  return unsupportedRuntimeOperation("evaluateSquadPiece");
 }
 
 // ---------------------------------------------------------------------------
 // Model Context Protocol (MCP) Standard Bridge
 // ---------------------------------------------------------------------------
 
-export async function getMcpServers(conn: AgentConnection): Promise<McpServerDetails[]> {
-  const snapshot = await conn.getResourceSnapshot().catch(() => null);
-  const mcpList: McpServerDetails[] = (snapshot?.extensions ?? []).map((ext) => ({
-    name: ext.path.split(/[/\\]/).pop() ?? "mcp-server",
-    command: "npx",
-    args: [ext.path],
-    enabled: true,
-    status: "connected",
-    latencyMs: 25,
-    protocolVersion: "2024-11-05",
-    capabilities: { tools: true, resources: true, prompts: true },
-    tools: [],
-    resources: [],
-    prompts: [],
-  }));
-
-  if (mcpList.length === 0) {
-    mcpList.push({
-      name: "filesystem",
-      command: "npx",
-      args: ["-y", "@modelcontextprotocol/server-filesystem", "."],
-      enabled: true,
-      status: "connected",
-      latencyMs: 12,
-      protocolVersion: "2024-11-05",
-      capabilities: { tools: true, resources: true, prompts: true },
-      tools: [
-        { name: "read_file", description: "Read file contents" },
-        { name: "write_file", description: "Write file contents" },
-      ],
-      resources: [
-        { uri: "file:///workspace/README.md", name: "README.md", mimeType: "text/markdown" },
-        { uri: "file:///workspace/package.json", name: "package.json", mimeType: "application/json" },
-      ],
-      prompts: [{ name: "code_review", description: "Standard codebase review template" }],
-    });
-  }
-  return mcpList;
+export async function getMcpServers(_conn: AgentConnection): Promise<McpServerDetails[]> {
+  return unsupportedRuntimeOperation("getMcpServers");
 }
 
 export async function readMcpResource(
   _conn: AgentConnection,
-  serverName: string,
-  uri: string,
+  _serverName: string,
+  _uri: string,
 ): Promise<McpResource> {
-  return {
-    uri,
-    name: uri.split("/").pop() ?? "resource",
-    mimeType: uri.endsWith(".json") ? "application/json" : "text/plain",
-    text: `Content of ${uri} streamed from MCP server [${serverName}]`,
-  };
+  return unsupportedRuntimeOperation("readMcpResource");
 }
 
 export async function getMcpPrompt(
   _conn: AgentConnection,
-  serverName: string,
-  name: string,
-  args?: Record<string, string>,
+  _serverName: string,
+  _name: string,
+  _args?: Record<string, string>,
 ): Promise<{ description?: string; messages: Array<{ role: "user" | "assistant"; content: string }> }> {
-  const argText = args ? JSON.stringify(args) : "none";
-  return {
-    description: `MCP Prompt Template [${name}] from ${serverName}`,
-    messages: [
-      {
-        role: "user",
-        content: `Execute template [${name}] with args: ${argText}`,
-      },
-    ],
-  };
+  return unsupportedRuntimeOperation("getMcpPrompt");
 }
 
 // ---------------------------------------------------------------------------
 // Autonomous Workspace Security & Blast Radius Bridge
 // ---------------------------------------------------------------------------
 
-let activeSecurityPolicy: WorkspaceSecurityPolicy = "confirm-risky";
-let customBlockedPatterns: string[] = [".git/**", "**/.env*", "**/.ssh/**", "**/credentials.json"];
-
 export async function getSecurityPolicy(_conn: AgentConnection): Promise<{
   policy: WorkspaceSecurityPolicy;
   customBlockedPatterns: string[];
 }> {
-  return { policy: activeSecurityPolicy, customBlockedPatterns };
+  return unsupportedRuntimeOperation("getSecurityPolicy");
 }
 
 export async function setSecurityPolicy(
   _conn: AgentConnection,
-  policy: WorkspaceSecurityPolicy,
-  patterns?: string[],
+  _policy: WorkspaceSecurityPolicy,
+  _patterns?: string[],
 ): Promise<void> {
-  activeSecurityPolicy = policy;
-  if (patterns) customBlockedPatterns = patterns;
+  return unsupportedRuntimeOperation("setSecurityPolicy");
 }
 
 export async function analyzeBlastRadius(
   _conn: AgentConnection,
-  command: string,
-  targetFiles?: string[],
+  _command: string,
+  _targetFiles?: string[],
 ): Promise<BlastRadiusReport> {
-  const files = targetFiles ?? [];
-  const forbiddenHits: string[] = [];
-  const reasons: string[] = [];
-  const normalized = (command + " " + files.join(" ")).toLowerCase();
-
-  for (const pattern of customBlockedPatterns) {
-    const clean = pattern.replace(/\*+/g, "").replace(/^\/|\/$/g, "");
-    if (clean && normalized.includes(clean.toLowerCase())) {
-      forbiddenHits.push(pattern);
-      reasons.push(`Target touches guarded security zone: ${pattern}`);
-    }
-  }
-
-  let riskLevel: "low" | "medium" | "high" | "critical" = "low";
-  if (forbiddenHits.length > 0) riskLevel = "critical";
-  else if (files.length > 10 || /rm -rf|drop table/i.test(command)) riskLevel = "high";
-  else if (files.length > 3) riskLevel = "medium";
-
-  const requiresConfirmation =
-    activeSecurityPolicy === "strict-sandbox" ||
-    (activeSecurityPolicy === "confirm-risky" && (riskLevel === "high" || riskLevel === "critical"));
-
-  return {
-    filesTargeted: files.length,
-    forbiddenPathsHit: forbiddenHits,
-    riskLevel,
-    requiresConfirmation,
-    reasons,
-    suggestedAction: requiresConfirmation ? "Require explicit operator confirmation" : "Safe to proceed",
-  };
+  return unsupportedRuntimeOperation("analyzeBlastRadius");
 }
 
 export async function getSecurityAuditLog(_conn: AgentConnection): Promise<SecurityAuditEntry[]> {
-  return [
-    {
-      id: "sec-001",
-      timestamp: new Date().toISOString(),
-      command: "workspace verification sweep",
-      policy: activeSecurityPolicy,
-      blastRadius: {
-        filesTargeted: 0,
-        forbiddenPathsHit: [],
-        riskLevel: "low",
-        requiresConfirmation: false,
-        reasons: ["Read-only telemetry check"],
-        suggestedAction: "Execute immediately",
-      },
-      status: "auto-passed",
-      actor: "assistant",
-    },
-  ];
+  return unsupportedRuntimeOperation("getSecurityAuditLog");
 }
 
 // ---------------------------------------------------------------------------
@@ -1411,81 +1321,70 @@ export async function getSecurityAuditLog(_conn: AgentConnection): Promise<Secur
 // ---------------------------------------------------------------------------
 
 export async function getSquadWorkflow(_conn: AgentConnection): Promise<SquadWorkflowState> {
-  return {
-    id: "wf-1",
-    name: "Gauntlet Multi-Agent Execution Graph",
-    type: "sequential",
-    nodes: [
-      { id: "node-1", role: "Planner", status: "completed", round: 1 },
-      { id: "node-2", role: "Worker", status: "running", round: 1 },
-      { id: "node-3", role: "Blind Critic", status: "idle", round: 1 },
-    ],
-    activeNodeId: "node-2",
-    consensusScore: 0.96,
-    totalRounds: 1,
-    maxRounds: 3,
-    barVerdict: "PASS",
-  };
+  return unsupportedRuntimeOperation("getSquadWorkflow");
 }
 
 export async function runSquadWorkflow(
   _conn: AgentConnection,
-  type: SquadWorkflowType,
-  goal: string,
+  _type: SquadWorkflowType,
+  _goal: string,
   _bar: string,
 ): Promise<SquadWorkflowState> {
-  return {
-    id: `wf-${Date.now()}`,
-    name: `${type.toUpperCase()} Squad: ${goal.slice(0, 30)}`,
-    type,
-    nodes: [
-      { id: "node-1", role: "Planner", status: "completed", round: 1 },
-      { id: "node-2", role: "Implementer", status: "running", round: 1 },
-      { id: "node-3", role: "Critic", status: "idle", round: 1 },
-    ],
-    activeNodeId: "node-2",
-    consensusScore: 0.98,
-    totalRounds: 1,
-    maxRounds: 3,
-    barVerdict: "PASS",
-  };
+  return unsupportedRuntimeOperation("runSquadWorkflow");
 }
 
-export async function pauseSquadWorkflow(_conn: AgentConnection, _id: string): Promise<void> {}
+export async function pauseSquadWorkflow(_conn: AgentConnection, _id: string): Promise<void> {
+  return unsupportedRuntimeOperation("pauseSquadWorkflow");
+}
 
 // ---------------------------------------------------------------------------
 // Context Token Budget & Compaction Bridge
 // ---------------------------------------------------------------------------
 
 export async function getTokenBudget(conn: AgentConnection): Promise<TokenBudgetBreakdown> {
-  const state = await conn.getState().catch(() => null);
-  const total = (state as unknown as { sessionCost?: number } | null)?.sessionCost ?? 32000;
+  const state = await conn.getState();
+  const usage = state.contextUsage;
+  if (!usage || !Number.isFinite(usage.tokens) || usage.tokens === null) {
+    throw new Error("Token usage is unavailable from the active Prime Agent session");
+  }
+  if (!Number.isFinite(usage.contextWindow) || usage.contextWindow <= 0) {
+    throw new Error("Context limit is unavailable from the active Prime Agent session");
+  }
+  const usagePercent = Number.isFinite(usage.percent)
+    ? usage.percent!
+    : Number(((usage.tokens / usage.contextWindow) * 100).toFixed(2));
   return {
-    totalTokens: total,
-    contextLimit: 128000,
-    usagePercent: Number(((total / 128000) * 100).toFixed(2)),
-    tiers: {
-      systemPrompt: 2500,
-      toolsAndSchemas: 4500,
-      workingMemory: 3500,
-      episodicRecall: 2000,
-      semanticArchival: 1500,
-      chatHistory: 16500,
-      checkpoints: 1500,
-    },
-    autoCompactionThreshold: 90000,
+    totalTokens: usage.tokens,
+    contextLimit: usage.contextWindow,
+    usagePercent,
   };
 }
 
 export async function compactContext(
-  _conn: AgentConnection,
+  conn: AgentConnection,
   strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
-): Promise<{ beforeTokens: number; afterTokens: number; savedTokens: number }> {
-  const saved = strategy === "semantic-summarize" ? 8000 : strategy === "prune-oldest" ? 6000 : 2500;
+): Promise<{ beforeTokens: number | null; afterTokens: number | null; savedTokens: number | null }> {
+  if (strategy !== "semantic-summarize") {
+    return unsupportedRuntimeOperation(`compactContext(${strategy})`);
+  }
+  const beforeState = await conn.getState();
+  const compaction = await conn.compact();
+  const afterState = await conn.getState();
+  const beforeTokens = Number.isFinite(compaction.tokensBefore)
+    ? compaction.tokensBefore
+    : Number.isFinite(beforeState.contextUsage?.tokens)
+      ? beforeState.contextUsage!.tokens
+      : null;
+  const afterTokens = Number.isFinite(afterState.contextUsage?.tokens)
+    ? afterState.contextUsage!.tokens
+    : null;
   return {
-    beforeTokens: 32000,
-    afterTokens: 32000 - saved,
-    savedTokens: saved,
+    beforeTokens,
+    afterTokens,
+    savedTokens:
+      beforeTokens !== null && afterTokens !== null && afterTokens <= beforeTokens
+        ? beforeTokens - afterTokens
+        : null,
   };
 }
 
@@ -1812,31 +1711,38 @@ export function writeLocalProvidersToModelsJson(
 }
 
 export class SettingsStore {
-  private current: Settings = normalizeSettings({
-    ...DEFAULT_SETTINGS,
-    ...readSettingsFile(),
-  });
+  private current: Settings;
+
+  constructor() {
+    const raw = readSettingsFile();
+    const hadLegacyAuth = Object.prototype.hasOwnProperty.call(raw, "auth");
+    if (hadLegacyAuth) {
+      // Preserve existing daemon credentials, migrate legacy plaintext settings
+      // only when needed, then remove the credential field before any read/write.
+      migrateLegacyAuth(raw.auth);
+      delete raw.auth;
+    }
+    this.current = normalizeSettings({ ...DEFAULT_SETTINGS, ...raw });
+    if (hadLegacyAuth) {
+      // If persistence fails, construction fails so callers cannot mistake the
+      // still-present legacy key for a completed migration.
+      writeSettingsSnapshot(this.current as unknown as Record<string, unknown>);
+    }
+  }
 
   get(): Settings {
     return {
       ...this.current,
       modelConfig: this.current.modelConfig ? { ...this.current.modelConfig } : undefined,
-      auth: this.current.auth ? { ...this.current.auth } : undefined,
       localProviders: this.current.localProviders?.map((provider) => ({ ...provider })),
     };
   }
 
   update(patch: Partial<Settings>): Settings {
     const normalizedPatch = normalizePatch(patch);
-    this.current = normalizeSettings({ ...this.current, ...normalizedPatch });
-    try {
-      writeSettingsSnapshot(this.current as unknown as Record<string, unknown>);
-    } catch (err) {
-      if (typeof process !== "undefined" && process.stderr) {
-        const msg = err instanceof Error ? err.message : String(err);
-        process.stderr.write(`[bridge:settings] failed to persist settings: ${msg}\n`);
-      }
-    }
+    const next = normalizeSettings({ ...this.current, ...normalizedPatch });
+    writeSettingsSnapshot(next as unknown as Record<string, unknown>);
+    this.current = next;
     return this.get();
   }
 }
@@ -2830,94 +2736,26 @@ export async function getSessionHeader(
 // ---------------------------------------------------------------------------
 
 export async function listDesktopWindows(_conn: AgentConnection): Promise<DesktopWindowInfo[]> {
-  return [
-    {
-      id: "win-sophos",
-      title: "Sophos — Desktop AI Coding Harness",
-      processName: "sophos.exe",
-      pid: process.pid,
-      bounds: { x: 100, y: 80, width: 1280, height: 800 },
-      isMinimized: false,
-      isVisible: true,
-    },
-    {
-      id: "win-vscode",
-      title: "Visual Studio Code — sophos [WSL: Ubuntu]",
-      processName: "code.exe",
-      pid: 8940,
-      bounds: { x: 40, y: 40, width: 1440, height: 920 },
-      isMinimized: false,
-      isVisible: true,
-    },
-    {
-      id: "win-browser",
-      title: "Anthropic MCP v1.2 Documentation — Google Chrome",
-      processName: "chrome.exe",
-      pid: 11200,
-      bounds: { x: 180, y: 120, width: 1160, height: 780 },
-      isMinimized: false,
-      isVisible: true,
-    },
-  ];
+  return unsupportedRuntimeOperation("listDesktopWindows");
 }
 
 export async function inspectDesktopWindow(
   _conn: AgentConnection,
-  windowId: string,
+  _windowId: string,
 ): Promise<DesktopUiElement> {
-  return {
-    id: `root-${windowId}`,
-    name: `Window [${windowId}]`,
-    role: "window",
-    bounds: { x: 100, y: 80, width: 1280, height: 800 },
-    isEnabled: true,
-    isFocused: true,
-    children: [
-      {
-        id: `titlebar-${windowId}`,
-        name: "TitleBar",
-        role: "titlebar",
-        bounds: { x: 100, y: 80, width: 1280, height: 32 },
-        isEnabled: true,
-        isFocused: false,
-      },
-      {
-        id: `content-${windowId}`,
-        name: "Client Area",
-        role: "pane",
-        bounds: { x: 100, y: 112, width: 1280, height: 768 },
-        isEnabled: true,
-        isFocused: true,
-        children: [
-          {
-            id: `btn-run-${windowId}`,
-            name: "Run Test Suite",
-            role: "button",
-            bounds: { x: 200, y: 140, width: 140, height: 36 },
-            isEnabled: true,
-            isFocused: false,
-          },
-        ],
-      },
-    ],
-  };
+  return unsupportedRuntimeOperation("inspectDesktopWindow");
 }
 
 export async function dispatchDesktopAction(
   _conn: AgentConnection,
-  windowId: string,
-  action: DesktopUiAction,
+  _windowId: string,
+  _action: DesktopUiAction,
 ): Promise<DesktopActionResult> {
-  return {
-    success: true,
-    durationMs: 42,
-    message: `Dispatched ${action.kind} on window ${windowId}`,
-    screenshot: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" fill="%231a1a1a"><rect width="100%" height="100%" fill="%23121212"/><text x="20" y="40" fill="%2310b981" font-family="monospace">Action: ${action.kind} on ${windowId}</text></svg>`,
-  };
+  return unsupportedRuntimeOperation("dispatchDesktopAction");
 }
 
-export async function captureDesktopScreenshot(_conn: AgentConnection, windowId: string): Promise<string> {
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="100%" height="100%" fill="%230f141c"/><rect x="10" y="10" width="620" height="32" fill="%231a2332" rx="4"/><circle cx="28" cy="26" r="5" fill="%23ef4444"/><circle cx="44" cy="26" r="5" fill="%23f59e0b"/><circle cx="60" cy="26" r="5" fill="%2310b981"/><text x="80" y="30" fill="%2394a3b8" font-size="12" font-family="sans-serif">CUA Target: ${windowId}</text><rect x="10" y="50" width="620" height="340" fill="%23131b28" rx="4"/><text x="30" y="90" fill="%2310b981" font-family="monospace" font-size="14">[Windows UI Automation Live Stream]</text></svg>`;
+export async function captureDesktopScreenshot(_conn: AgentConnection, _windowId: string): Promise<string> {
+  return unsupportedRuntimeOperation("captureDesktopScreenshot");
 }
 
 // ---------------------------------------------------------------------------
@@ -2925,68 +2763,26 @@ export async function captureDesktopScreenshot(_conn: AgentConnection, windowId:
 // ---------------------------------------------------------------------------
 
 export async function listDistilledSkills(_conn: AgentConnection): Promise<DistilledSkill[]> {
-  return [
-    {
-      id: "skill-act-remediator",
-      name: "vitest-async-act-remediator",
-      description: "Auto-detects and wraps async testing-library state transitions in Vitest suites",
-      triggers: ["act() warning", "state update not wrapped in act", "vitest react 19 async"],
-      skillMarkdown:
-        "# Vitest Async Act Remediator\n\nAutomatically identifies React 19 testing-library state update warnings and applies deterministic waitFor wraps.",
-      successRate: 0.96,
-      runsObserved: 14,
-      createdAt: "2026-08-28T09:40:00Z",
-      isPromoted: true,
-      sourceSessionId: "session-fix-mcp-tests",
-    },
-    {
-      id: "skill-ipc-sync",
-      name: "tauri-ipc-schema-synchronizer",
-      description: "Bidirectionally syncs Rust Tauri command descriptors with TypeScript contract interfaces",
-      triggers: ["tauri command mismatch", "invoke schema error", "IPC contract out of sync"],
-      skillMarkdown:
-        "# Tauri IPC Schema Synchronizer\n\nAnalyzes Rust #[tauri::command] signatures and generates TypeScript client method bindings with zero runtime overhead.",
-      successRate: 0.92,
-      runsObserved: 8,
-      createdAt: "2026-08-28T10:15:00Z",
-      isPromoted: false,
-      sourceSessionId: "session-add-cua-commands",
-    },
-  ];
+  return unsupportedRuntimeOperation("listDistilledSkills");
 }
 
 export async function distillSkillFromTrajectory(
   _conn: AgentConnection,
-  sessionId: string,
-  name?: string,
+  _sessionId: string,
+  _name?: string,
 ): Promise<DistilledSkill> {
-  const skillName = name ?? `distilled-skill-${Date.now().toString(36)}`;
-  return {
-    id: `skill-${Date.now().toString(36)}`,
-    name: skillName,
-    description: `Autonomously distilled workflow from session ${sessionId}`,
-    triggers: [`trigger-${skillName}`, `session-${sessionId}`],
-    skillMarkdown: `# ${skillName}\n\nAutonomously distilled by Voyager Experience Engine from trajectory \`${sessionId}\`.\n`,
-    successRate: 1.0,
-    runsObserved: 1,
-    createdAt: new Date().toISOString(),
-    isPromoted: false,
-    sourceSessionId: sessionId,
-  };
+  return unsupportedRuntimeOperation("distillSkillFromTrajectory");
 }
 
 export async function promoteSkill(
   _conn: AgentConnection,
-  skillId: string,
+  _skillId: string,
 ): Promise<{ success: boolean; targetPath: string }> {
-  return {
-    success: true,
-    targetPath: `C:\\Users\\Cayleb\\.skill-library\\active\\${skillId}`,
-  };
+  return unsupportedRuntimeOperation("promoteSkill");
 }
 
 export async function deleteDistilledSkill(_conn: AgentConnection, _skillId: string): Promise<void> {
-  return undefined;
+  return unsupportedRuntimeOperation("deleteDistilledSkill");
 }
 
 // ---------------------------------------------------------------------------
@@ -2994,99 +2790,26 @@ export async function deleteDistilledSkill(_conn: AgentConnection, _skillId: str
 // ---------------------------------------------------------------------------
 
 export async function getThoughtTree(_conn: AgentConnection): Promise<ThoughtTreeState> {
-  return {
-    id: "tree-refactor-sandbox",
-    rootId: "node-root",
-    goal: "Isolate spec execution in ephemeral worktrees with automated rollback",
-    nodes: [
-      {
-        id: "node-root",
-        type: "hypothesis",
-        label: "Hypothesis: Zero-copy Git worktrees vs Container sandbox",
-        score: 0.88,
-        status: "active",
-        depth: 0,
-        childrenIds: ["node-b1", "node-b2"],
-        rationale: "Evaluating resource overhead on GMKtec EVO-X2 architecture",
-      },
-      {
-        id: "node-b1",
-        parentId: "node-root",
-        type: "plan",
-        label: "Branch A: Native Git zero-copy worktree pool",
-        score: 0.94,
-        status: "active",
-        depth: 1,
-        childrenIds: ["node-b1-diff"],
-        rationale: "Instant spin-up (<50ms), shares local object database without RAM bloat",
-      },
-      {
-        id: "node-b1-diff",
-        parentId: "node-b1",
-        type: "code_diff",
-        label: "Code Diff: src-tauri/src/worktree.rs",
-        score: 0.96,
-        status: "promoted",
-        depth: 2,
-        diffSnippet:
-          "+ pub fn create_worktree(repo: &Repository, branch: &str) -> Result<PathBuf> {\n+     let target = repo.worktree_add(branch, &path)?;\n+     Ok(target)\n+ }",
-        rationale: "All 25 unit tests pass; verified clean teardown",
-      },
-      {
-        id: "node-b2",
-        parentId: "node-root",
-        type: "plan",
-        label: "Branch B: Docker containerized sandbox runner",
-        score: 0.58,
-        status: "pruned",
-        depth: 1,
-        rationale: "High cold-start latency (>4.5s) and violates background headless focus rule",
-      },
-    ],
-    activeBranchPath: ["node-root", "node-b1", "node-b1-diff"],
-    bestNodeId: "node-b1-diff",
-  };
+  return unsupportedRuntimeOperation("getThoughtTree");
 }
 
 export async function runSpeculativeBranch(
-  conn: AgentConnection,
-  parentNodeId: string,
-  hypothesis: string,
+  _conn: AgentConnection,
+  _parentNodeId: string,
+  _hypothesis: string,
 ): Promise<ThoughtTreeState> {
-  const tree = await getThoughtTree(conn);
-  const newNodeId = `node-spec-${Date.now().toString(36)}`;
-  tree.nodes.push({
-    id: newNodeId,
-    parentId: parentNodeId,
-    type: "plan",
-    label: hypothesis,
-    score: 0.92,
-    status: "active",
-    depth: 2,
-    rationale: "Speculative evaluation from local model",
-    childrenIds: [],
-  });
-  tree.activeBranchPath.push(newNodeId);
-  return tree;
+  return unsupportedRuntimeOperation("runSpeculativeBranch");
 }
 
-export async function pruneThoughtBranch(conn: AgentConnection, nodeId: string): Promise<ThoughtTreeState> {
-  const tree = await getThoughtTree(conn);
-  const node = tree.nodes.find((n) => n.id === nodeId);
-  if (node) {
-    node.status = "pruned";
-  }
-  return tree;
+export async function pruneThoughtBranch(_conn: AgentConnection, _nodeId: string): Promise<ThoughtTreeState> {
+  return unsupportedRuntimeOperation("pruneThoughtBranch");
 }
 
-export async function promoteThoughtBranch(conn: AgentConnection, nodeId: string): Promise<ThoughtTreeState> {
-  const tree = await getThoughtTree(conn);
-  const node = tree.nodes.find((n) => n.id === nodeId);
-  if (node) {
-    node.status = "promoted";
-    tree.bestNodeId = nodeId;
-  }
-  return tree;
+export async function promoteThoughtBranch(
+  _conn: AgentConnection,
+  _nodeId: string,
+): Promise<ThoughtTreeState> {
+  return unsupportedRuntimeOperation("promoteThoughtBranch");
 }
 
 // ---------------------------------------------------------------------------
@@ -3094,97 +2817,39 @@ export async function promoteThoughtBranch(conn: AgentConnection, nodeId: string
 // ---------------------------------------------------------------------------
 
 export async function listWorkspaceTwins(_conn: AgentConnection): Promise<WorkspaceTwin[]> {
-  return [
-    {
-      id: "twin-refactor-security",
-      name: "twin-refactor-security",
-      branch: "twin/refactor-security-interlocks",
-      worktreePath: "C:\\Users\\Cayleb\\Desktop\\workspace\\.twins\\twin-refactor-security",
-      status: "clean",
-      modifiedFilesCount: 4,
-      createdAt: "2026-08-28T11:00:00Z",
-      lastActiveAt: "2026-08-28T11:45:00Z",
-      baseCommit: "d9e02f7",
-    },
-    {
-      id: "twin-vitest-migration",
-      name: "twin-vitest-migration",
-      branch: "twin/vitest-async-act-remediation",
-      worktreePath: "C:\\Users\\Cayleb\\Desktop\\workspace\\.twins\\twin-vitest-migration",
-      status: "dirty",
-      modifiedFilesCount: 2,
-      createdAt: "2026-08-28T11:20:00Z",
-      lastActiveAt: "2026-08-28T11:50:00Z",
-      baseCommit: "d9e02f7",
-    },
-  ];
+  return unsupportedRuntimeOperation("listWorkspaceTwins");
 }
 
 export async function createWorkspaceTwin(
   _conn: AgentConnection,
-  name: string,
-  baseBranch?: string,
+  _name: string,
+  _baseBranch?: string,
 ): Promise<WorkspaceTwin> {
-  const cleanName = name.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
-  return {
-    id: `twin-${cleanName}-${Date.now().toString(36)}`,
-    name: cleanName,
-    branch: `twin/${cleanName}`,
-    worktreePath: `C:\\Users\\Cayleb\\Desktop\\workspace\\.twins\\twin-${cleanName}`,
-    status: "clean",
-    modifiedFilesCount: 0,
-    createdAt: new Date().toISOString(),
-    lastActiveAt: new Date().toISOString(),
-    baseCommit: baseBranch ?? "HEAD",
-  };
+  return unsupportedRuntimeOperation("createWorkspaceTwin");
 }
 
 export async function executeInTwin(
   _conn: AgentConnection,
-  twinId: string,
-  command: string,
+  _twinId: string,
+  _command: string,
 ): Promise<TwinExecResult> {
-  return {
-    twinId,
-    command,
-    exitCode: 0,
-    stdout: `[TWIN WORKTREE ISOLATION] Executed "${command}" inside branch\nAll test suites passed. Primary branch unaffected.`,
-    stderr: "",
-    durationMs: 45,
-  };
+  return unsupportedRuntimeOperation("executeInTwin");
 }
 
-export async function diffWorkspaceTwin(_conn: AgentConnection, twinId: string): Promise<TwinDiffReport> {
-  return {
-    twinId,
-    filesChanged: [
-      "src/features/security/SecuritySandboxPanel.tsx",
-      "src/ipc/contract.ts",
-      "src-tauri/src/worktree.rs",
-    ],
-    insertions: 84,
-    deletions: 12,
-    diffText: `diff --git a/src-tauri/src/worktree.rs b/src-tauri/src/worktree.rs\n+ pub struct EphemeralWorktree {\n+     pub path: PathBuf,\n+     pub branch: String,\n+ }`,
-    isMergeable: true,
-  };
+export async function diffWorkspaceTwin(_conn: AgentConnection, _twinId: string): Promise<TwinDiffReport> {
+  return unsupportedRuntimeOperation("diffWorkspaceTwin");
 }
 
 export async function mergeWorkspaceTwin(
   _conn: AgentConnection,
   _twinId: string,
 ): Promise<{ success: boolean; mergedCommit: string }> {
-  return {
-    success: true,
-    mergedCommit: `merge-${Date.now().toString(36)}`,
-  };
+  return unsupportedRuntimeOperation("mergeWorkspaceTwin");
 }
 
 export async function rollbackWorkspaceTwin(
   _conn: AgentConnection,
   _twinId: string,
 ): Promise<{ success: boolean; message: string }> {
-  return {
-    success: true,
-    message: `Pruned zero-copy worktree and deleted branch cleanly. Zero residue.`,
-  };
+  return unsupportedRuntimeOperation("rollbackWorkspaceTwin");
 }

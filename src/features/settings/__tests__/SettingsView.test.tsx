@@ -7,6 +7,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsView } from "../SettingsView";
 
+const mockMode = vi.hoisted(() => ({ preview: true }));
+vi.mock("../../../ipc/client", () => ({ isDemoMode: () => mockMode.preview }));
+
 const mockSetSettingsTab = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../state/AppState", async () => ({
@@ -34,6 +37,7 @@ vi.mock("../../sandbox", async () => ({ TwinSandboxPanel: () => <div>twins-stub<
 describe("SettingsView", () => {
   beforeEach(() => {
     mockSetSettingsTab.mockClear();
+    mockMode.preview = true;
   });
 
   it("renders the header, fleet strip, and tab bar", () => {
@@ -80,6 +84,21 @@ describe("SettingsView", () => {
       "About",
     ]) {
       expect(screen.getByRole("tab", { name: new RegExp(label, "i") })).toBeInTheDocument();
+    }
+  });
+  it("limits the live settings surface to implemented runtime capabilities", () => {
+    mockMode.preview = false;
+    render(<SettingsView />);
+    expect(screen.getByRole("tab", { name: "Providers" })).toBeInTheDocument();
+    for (const label of [
+      "MCP Explorer",
+      "Security & Sandbox",
+      "Desktop CUA",
+      "Workspace Twins",
+      "Skill Distillation",
+      "Tree of Thoughts",
+    ]) {
+      expect(screen.queryByRole("tab", { name: label })).not.toBeInTheDocument();
     }
   });
 });

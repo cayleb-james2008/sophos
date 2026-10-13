@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { tokens } from "../design/tokens";
 import { Text, Tooltip, IconButton } from "../design";
-import { useConnectionState, useIpc, isDemoMode } from "../ipc/client";
+import { isDemoMode, useConnectionState, useIpc } from "../ipc/client";
 import type { AgentInfo } from "../ipc/contract";
 import { useRefinementGate } from "../features/longrunning/useRefinementGate";
 import { ChevronDownIcon, TerminalIcon, SigmaGlyph } from "./icons";
@@ -253,16 +253,20 @@ export function SystemBar({
               {cost?.totalCost != null ? (
                 <DetailRow label="Total cost" value={formatCost(cost.totalCost)} />
               ) : null}
-              <DetailRow
-                label="Autonomous"
-                value={autoActive ? autoBudget || "active" : "off"}
-                accent={autoActive}
-              />
-              <DetailRow
-                label="Refinement"
-                value={refinePending ? "awaiting review" : "none pending"}
-                accent={refinePending}
-              />
+              {isDemoMode() ? (
+                <>
+                  <DetailRow
+                    label="Autonomous"
+                    value={autoActive ? autoBudget || "active" : "off"}
+                    accent={autoActive}
+                  />
+                  <DetailRow
+                    label="Refinement"
+                    value={refinePending ? "awaiting review" : "none pending"}
+                    accent={refinePending}
+                  />{" "}
+                </>
+              ) : null}
             </div>
           </>
         ) : null}

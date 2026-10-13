@@ -673,7 +673,7 @@ export interface Settings {
    * the engine on selection and persisted here so it survives reconnects.
    */
   modelConfig?: Record<string, ModelRuntimeConfig>;
-  /** API keys per provider, stored/removed by login/logout (persisted to settings). */
+  /** Legacy import input only; getSettings never returns keys. Use login/logout to write auth.json. */
   auth?: Record<string, string>;
   /**
    * Local (Ollama / OpenAI-compatible) endpoint configs, keyed by id. A non-empty
@@ -861,8 +861,9 @@ export interface TokenBudgetBreakdown {
   totalTokens: number;
   contextLimit: number;
   usagePercent: number;
-  tiers: TokenBudgetTiers;
-  autoCompactionThreshold: number;
+  // Prime Agent does not expose per-tier attribution or this threshold.
+  tiers?: TokenBudgetTiers;
+  autoCompactionThreshold?: number;
   compactionSavingsTokens?: number;
 }
 

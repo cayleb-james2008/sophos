@@ -10,6 +10,7 @@
 // overlay when there's nothing to show. All IPC wiring from the prior console
 // is preserved — this is a representation change only.
 
+import { isDemoMode } from "../../ipc/client";
 import { useEffect, useState } from "react";
 import { Text, StatusDot, Button, Spinner, Tabs } from "../../design";
 import type { StatusDotState } from "../../design";
@@ -37,6 +38,7 @@ function toDot(status: ConnectionStatus): StatusDotState {
 }
 
 export function AgentsView() {
+  const preview = isDemoMode();
   const [agentsTab, setAgentsTab] = useState<string>("fleet");
   const {
     rows,
@@ -83,9 +85,9 @@ export function AgentsView() {
           the fleet graph below is the primary object. */}
       <header className="ag-header">
         <div className="ag-heading">
-          <div className="ag-eyebrow">AGENT FLEET & SQUAD WORKFLOWS</div>
+          <div className="ag-eyebrow">AGENT FLEET</div>
           <h1>Agent command center</h1>
-          <p>Live topology of the agent fleet and dynamic LangGraph squad execution workflows.</p>
+          <p>Live agent status, coordination messages, and session connections.</p>
         </div>
 
         <div className="ag-headband">
@@ -124,13 +126,13 @@ export function AgentsView() {
           items={[
             { id: "fleet", label: `Fleet Hierarchy (${rows.length})` },
             { id: "squad", label: "Squad Workflows (DAG)" },
-          ]}
+          ].filter((item) => preview || item.id !== "squad")}
           activeId={agentsTab}
           onChange={setAgentsTab}
         />
       </div>
 
-      {agentsTab === "squad" ? (
+      {preview && agentsTab === "squad" ? (
         <div style={{ padding: "0 var(--space-4) var(--space-4)" }}>
           <SquadWorkflowGraph />
         </div>

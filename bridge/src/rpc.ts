@@ -456,30 +456,19 @@ export class RpcServer {
       }
 
       case "login": {
-        // The daemon's AgentConnection exposes no auth flow. Interim solution
-        // (scope limitation, per orchestrator): persist the key in the bridge
-        // settings store AND mirror it into ~/.prime/agent/auth.json — the file
-        // the daemon actually reads (AuthStorageData / ApiKeyCredential shape) —
-        // so a login from the UI reaches the daemon like its own /login flow.
-        const p = requireParams<{ provider: string; apiKey?: string }>(params, ["provider"]);
-        const store = this.holder.getSettingsStore();
-        const current = store.get();
-        const auth = { ...(current.auth ?? {}) };
-        if (p.apiKey) auth[p.provider] = p.apiKey;
-        else delete auth[p.provider];
-        store.update({ auth } as Settings);
+        // The pinned daemon reads API keys from auth.json; never echo them through
+        // the general settings store or return them through settings IPC.
+        const p = requireParams<{ provider: string; apiKey: string }>(params, ["provider", "apiKey"]);
+        if (typeof p.apiKey !== "string" || p.apiKey.trim().length === 0) {
+          throw rpcError(JSON_RPC_ERROR.invalidParams, "apiKey must be a non-empty string");
+        }
         writeAuthKey(p.provider, p.apiKey);
         return { provider: p.provider, stored: Boolean(p.apiKey) };
       }
 
       case "logout": {
-        // Remove only the target provider's key — settings store + auth.json mirror.
+        // Remove only the selected provider from the daemon auth store.
         const p = requireParams<{ provider: string }>(params, ["provider"]);
-        const store = this.holder.getSettingsStore();
-        const current = store.get();
-        const auth = { ...(current.auth ?? {}) };
-        delete auth[p.provider];
-        store.update({ auth } as Settings);
         writeAuthKey(p.provider);
         return { provider: p.provider, stored: false };
       }

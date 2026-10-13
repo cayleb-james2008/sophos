@@ -34,6 +34,7 @@ const mockClient = vi.hoisted(() => ({
 
 vi.mock("../../../ipc/client", async () => ({
   useIpc: () => mockClient,
+  isDemoMode: () => true,
   useIpcEvent: () => undefined,
   useConnectionState: () => ({
     status: { kind: "connected" },

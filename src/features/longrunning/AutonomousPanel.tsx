@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Card, Text, Badge, Button } from "../../design";
-import { useIpc, useConnectionState } from "../../ipc/client";
+import { isDemoMode, useIpc, useConnectionState } from "../../ipc/client";
 import type { CheckpointEntry } from "../../ipc/contract";
 import { ShieldIcon, PlayIcon, CheckIcon, XIcon, RefreshIcon } from "../sessions/icons";
 import { useActionError, ActionErrorBanner } from "./useActionError";
@@ -62,7 +62,7 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
   const { error, run } = useActionError();
 
   const loadCheckpoints = useCallback(async () => {
-    if (typeof ipc.listCheckpoints !== "function") return;
+    if (!isDemoMode() || typeof ipc.listCheckpoints !== "function") return;
     try {
       const list = await ipc.listCheckpoints(conn.activeSessionId);
       setCheckpoints(list ?? []);
@@ -321,72 +321,74 @@ export function AutonomousPanel({ defaultActive = false, gates = [] }: Autonomou
         )}
       </div>
 
-      {/* Durable session checkpoints (LangGraph / Temporal) */}
-      <div className="lr-section">
-        <div className="lr-headrow">
-          <div>
-            <Text variant="micro" tone="dim" uppercase>
-              Durable session checkpoints
-            </Text>
-            <Text variant="micro" tone="muted">
-              Atomic state snapshots before autonomous execution and multi-turn refactors.
-            </Text>
+      {/* Checkpoint preview is separate from live session recovery. */}
+      {isDemoMode() ? (
+        <div className="lr-section">
+          <div className="lr-headrow">
+            <div>
+              <Text variant="micro" tone="dim" uppercase>
+                Durable session checkpoints
+              </Text>
+              <Text variant="micro" tone="muted">
+                Atomic state snapshots before autonomous execution and multi-turn refactors.
+              </Text>
+            </div>
+            <div className="lr-row">
+              <Button variant="outline" size="sm" onClick={() => void createCheckpointNow()} disabled={busy}>
+                + Create checkpoint
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<RefreshIcon size={12} />}
+                onClick={() => void loadCheckpoints()}
+              >
+                Refresh
+              </Button>
+            </div>
           </div>
-          <div className="lr-row">
-            <Button variant="outline" size="sm" onClick={() => void createCheckpointNow()} disabled={busy}>
-              + Create checkpoint
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<RefreshIcon size={12} />}
-              onClick={() => void loadCheckpoints()}
-            >
-              Refresh
-            </Button>
-          </div>
-        </div>
 
-        {checkpoints.length === 0 ? (
-          <Text variant="micro" tone="dim">
-            No checkpoints recorded for this session yet.
-          </Text>
-        ) : (
-          <div className="lr-list">
-            {checkpoints.map((ckpt) => (
-              <div key={ckpt.id} className="lr-harness-ref">
-                <div className="lr-harness-refmain">
-                  <div className="lr-row">
-                    <Text variant="label" weight="medium">
-                      {ckpt.label}
-                    </Text>
-                    <Badge tone={ckpt.verifiedStatus === "GREEN" ? "success" : "neutral"}>
-                      {ckpt.verifiedStatus}
-                    </Badge>
-                    <Text variant="micro" tone="dim" mono>
-                      step #{ckpt.turnIndex} · {new Date(ckpt.timestamp).toLocaleTimeString()}
-                    </Text>
+          {checkpoints.length === 0 ? (
+            <Text variant="micro" tone="dim">
+              No checkpoints recorded for this session yet.
+            </Text>
+          ) : (
+            <div className="lr-list">
+              {checkpoints.map((ckpt) => (
+                <div key={ckpt.id} className="lr-harness-ref">
+                  <div className="lr-harness-refmain">
+                    <div className="lr-row">
+                      <Text variant="label" weight="medium">
+                        {ckpt.label}
+                      </Text>
+                      <Badge tone={ckpt.verifiedStatus === "GREEN" ? "success" : "neutral"}>
+                        {ckpt.verifiedStatus}
+                      </Badge>
+                      <Text variant="micro" tone="dim" mono>
+                        step #{ckpt.turnIndex} · {new Date(ckpt.timestamp).toLocaleTimeString()}
+                      </Text>
+                    </div>
+                    {ckpt.summary ? (
+                      <Text variant="micro" tone="dim">
+                        {ckpt.summary}
+                      </Text>
+                    ) : null}
                   </div>
-                  {ckpt.summary ? (
-                    <Text variant="micro" tone="dim">
-                      {ckpt.summary}
-                    </Text>
-                  ) : null}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void rollbackCheckpoint(ckpt.id)}
+                    disabled={busy}
+                    title="Restore state to this checkpoint"
+                  >
+                    Rollback
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void rollbackCheckpoint(ckpt.id)}
-                  disabled={busy}
-                  title="Restore state to this checkpoint"
-                >
-                  Rollback
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
     </Card>
   );
 }

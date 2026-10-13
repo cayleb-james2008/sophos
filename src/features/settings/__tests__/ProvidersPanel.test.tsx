@@ -101,9 +101,9 @@ describe("ProvidersPanel", () => {
     await waitFor(() => expect(screen.getByText("Ollama Cloud")).toBeInTheDocument());
     expect(screen.getByText("OpenRouter")).toBeInTheDocument();
     expect(screen.getByText("ollama-cloud")).toBeInTheDocument();
-    expect(screen.getByText("Connected")).toBeInTheDocument();
+    expect(screen.getAllByText("Configured")[0]).toBeInTheDocument();
     // "Offline" appears for both the disconnected cloud provider and the unconnected local card.
-    expect(screen.getAllByText("Offline").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Not configured").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("API key")).toBeInTheDocument();
     expect(screen.getByText("Managed")).toBeInTheDocument();
   });
@@ -118,12 +118,27 @@ describe("ProvidersPanel", () => {
     await user.click(connectButtons[1]);
 
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(/Sign in with OAuth/i)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Sign in with OAuth/i)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Connect" })).toBeDisabled();
+    await user.type(within(dialog).getByLabelText("API key"), "fixture-key");
 
     await user.click(within(dialog).getByRole("button", { name: "Connect" }));
 
-    await waitFor(() => expect(mockClient.login).toHaveBeenCalledWith("openrouter", undefined));
+    await waitFor(() => expect(mockClient.login).toHaveBeenCalledWith("openrouter", "fixture-key"));
     expect(mockModels.reload).toHaveBeenCalled();
+  });
+
+  it("keeps the key modal open and reports a save failure", async () => {
+    const user = userEvent.setup();
+    mockClient.login.mockRejectedValue(new Error("private detail"));
+    render(<ProvidersPanel />);
+    await user.click(screen.getAllByRole("button", { name: /^connect$/i })[1]);
+    const dialog = screen.getByRole("dialog");
+    await user.type(within(dialog).getByLabelText("API key"), "fixture-key");
+    await user.click(within(dialog).getByRole("button", { name: "Connect" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save the API key");
+    expect(mockModels.reload).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("expands a model row and applies a runtime config via setModelConfig", async () => {
@@ -154,6 +169,19 @@ describe("ProvidersPanel", () => {
 
     await waitFor(() => expect(mockClient.logout).toHaveBeenCalledWith("ollama-cloud"));
     expect(mockModels.reload).toHaveBeenCalled();
+  });
+
+  it("removes only the selected local endpoint when logging out", async () => {
+    const user = userEvent.setup();
+    const endpoints = [
+      { id: "first", name: "First", kind: "ollama", baseUrl: "http://localhost:11434/v1" },
+      { id: "second", name: "Second", kind: "ollama", baseUrl: "http://localhost:11435/v1" },
+    ];
+    mockClient.getSettings.mockResolvedValue({ localProviders: endpoints });
+    render(<ProvidersPanel />);
+    await screen.findByText("First");
+    await user.click(screen.getAllByRole("button", { name: /log out/i })[0]);
+    expect(mockClient.setSettings).toHaveBeenCalledWith({ localProviders: [endpoints[1]] });
   });
 
   it("connects a local endpoint from the local card modal", async () => {

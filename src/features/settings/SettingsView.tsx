@@ -3,6 +3,7 @@
 // Skills (discovery + management), and Advanced (context + RLM children +
 // agents + daemon diagnostics + MCP + extensions). Wired to the IPC client.
 
+import { isDemoMode } from "../../ipc/client";
 import { Tabs } from "../../design";
 import { useAppState } from "../../state/AppState";
 import { GeneralPanel } from "./GeneralPanel";
@@ -23,7 +24,10 @@ import { ThoughtTreePanel } from "../tree";
 import { TwinSandboxPanel } from "../sandbox";
 import "./settings.css";
 
+const PREVIEW_TABS = new Set(["mcp", "security", "cua", "twins", "distill", "tree"]);
+
 export function SettingsView() {
+  const preview = isDemoMode();
   const { settingsTab: tab, setSettingsTab: setTab } = useAppState();
 
   return (
@@ -31,10 +35,7 @@ export function SettingsView() {
       <header className="settings__header">
         <div className="settings__eyebrow">CONTROL ROOM</div>
         <h1>Settings</h1>
-        <p>
-          Providers, models, preferences, skills, skill distillation, tree of thoughts, workspace twins,
-          extensions, MCP, security sandbox, desktop CUA, migration, and runtime telemetry.
-        </p>
+        <p>Providers, models, preferences, skills, extensions, migration, and runtime telemetry.</p>
       </header>
 
       <FleetStrip />
@@ -57,20 +58,21 @@ export function SettingsView() {
           { id: "longrunning", label: "Long-running" },
           { id: "migration", label: "Import" },
           { id: "about", label: "About" },
-        ]}
+        ].filter((item) => preview || !PREVIEW_TABS.has(item.id))}
         activeId={tab}
         onChange={setTab}
       />
 
       <div className="settings__body">
+        {!preview && PREVIEW_TABS.has(tab) ? <p>Select a settings category above.</p> : null}
         {tab === "general" ? <GeneralPanel /> : null}
         {tab === "providers" ? <ProvidersPanel /> : null}
-        {tab === "mcp" ? <McpExplorer /> : null}
-        {tab === "security" ? <SecuritySandboxPanel /> : null}
-        {tab === "cua" ? <CuaControlPanel /> : null}
-        {tab === "twins" ? <TwinSandboxPanel /> : null}
-        {tab === "distill" ? <SkillDistillationPanel /> : null}
-        {tab === "tree" ? <ThoughtTreePanel /> : null}
+        {preview && tab === "mcp" ? <McpExplorer /> : null}
+        {preview && tab === "security" ? <SecuritySandboxPanel /> : null}
+        {preview && tab === "cua" ? <CuaControlPanel /> : null}
+        {preview && tab === "twins" ? <TwinSandboxPanel /> : null}
+        {preview && tab === "distill" ? <SkillDistillationPanel /> : null}
+        {preview && tab === "tree" ? <ThoughtTreePanel /> : null}
         {tab === "subagents" ? <SubagentPolicyPanel /> : null}
         {tab === "skills" ? <SkillsPanel /> : null}
         {tab === "extensions" ? <ExtensionsPanel /> : null}

@@ -41,13 +41,12 @@ pub fn classify_stale_lease(
         // Unknown owner -> keep. Never delete on uncertainty.
         return false;
     };
-    age_ms > grace_ms && !pid_alive(pid)
+    pid > 0 && age_ms > grace_ms && !pid_alive(pid)
 }
 
-/// True when a directory name is an unambiguous crash leftover from the
-/// daemon's lease reclaim/acquire path (`*.stale-*` / `*.candidate-*`).
+/// Recognize temporary lease names; the name alone does not prove a crash.
 pub fn is_lease_leftover(name: &str) -> bool {
-    name.contains(".stale-") || name.contains(".candidate-")
+    name.contains(".lock.stale-") || name.contains(".lock.candidate-")
 }
 
 /// Extract the owner PID from a lease directory's `owner.json` (best-effort).
@@ -56,7 +55,7 @@ pub fn read_lease_owner_pid(dir: &Path) -> Option<u32> {
     let raw = fs::read_to_string(dir.join("owner.json")).ok()?;
     let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
     let pid = value.get("pid")?.as_u64()?;
-    u32::try_from(pid).ok()
+    u32::try_from(pid).ok().filter(|pid| *pid > 0)
 }
 
 /// Age of a directory in milliseconds, derived from its mtime (best-effort).
@@ -95,14 +94,8 @@ pub fn sweep_stale_leases(
         let name = entry.file_name().to_string_lossy().to_string();
         let path = entry.path();
 
-        if is_lease_leftover(&name) {
-            if fs::remove_dir_all(&path).is_ok() {
-                summary.leftovers_removed += 1;
-            }
-            continue;
-        }
-
-        if !name.ends_with(".lock") {
+        let leftover = is_lease_leftover(&name);
+        if !leftover && !name.ends_with(".lock") {
             continue;
         }
 
@@ -116,13 +109,16 @@ pub fn sweep_stale_leases(
         }
 
         let owner_pid = read_lease_owner_pid(&path);
-        // `u64::MAX` age on unreadable metadata -> past grace, but the dead-PID
-        // check still gates the removal, so an unreadable lease is never
-        // deleted merely because its age is unknown.
-        let age_ms = dir_age_ms(&path, now).unwrap_or(u64::MAX);
-        if classify_stale_lease(owner_pid, age_ms, grace_ms, pid_alive) {
+        let stale = dir_age_ms(&path, now)
+            .map(|age| classify_stale_lease(owner_pid, age, grace_ms, pid_alive))
+            .unwrap_or(false);
+        if stale {
             if fs::remove_dir_all(&path).is_ok() {
-                summary.stale_leases_removed += 1;
+                if leftover {
+                    summary.leftovers_removed += 1;
+                } else {
+                    summary.stale_leases_removed += 1;
+                }
             }
         } else {
             summary.kept += 1;
@@ -137,8 +133,12 @@ pub fn sweep_stale_leases(
 /// provably gone.
 #[cfg(windows)]
 pub fn pid_alive(pid: u32) -> bool {
-    use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_INVALID_PARAMETER, STILL_ACTIVE};
-    use windows_sys::Win32::System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    use windows_sys::Win32::Foundation::{
+        CloseHandle, GetLastError, ERROR_INVALID_PARAMETER, STILL_ACTIVE,
+    };
+    use windows_sys::Win32::System::Threading::{
+        GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
 
     unsafe {
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
@@ -173,32 +173,62 @@ mod tests {
     #[test]
     fn classifies_dead_old_lease_as_stale() {
         let dead = |_pid: u32| false;
-        assert!(classify_stale_lease(Some(123), 2 * 60 * 60 * 1000, 60 * 60 * 1000, &dead));
+        assert!(classify_stale_lease(
+            Some(123),
+            2 * 60 * 60 * 1000,
+            60 * 60 * 1000,
+            &dead
+        ));
     }
 
     #[test]
     fn keeps_lease_still_inside_grace() {
         let dead = |_pid: u32| false;
-        assert!(!classify_stale_lease(Some(123), 30 * 60 * 1000, 60 * 60 * 1000, &dead));
+        assert!(!classify_stale_lease(
+            Some(123),
+            30 * 60 * 1000,
+            60 * 60 * 1000,
+            &dead
+        ));
     }
 
     #[test]
     fn keeps_lease_with_live_owner() {
         let alive = |_pid: u32| true;
-        assert!(!classify_stale_lease(Some(123), 2 * 60 * 60 * 1000, 60 * 60 * 1000, &alive));
+        assert!(!classify_stale_lease(
+            Some(123),
+            2 * 60 * 60 * 1000,
+            60 * 60 * 1000,
+            &alive
+        ));
     }
 
     #[test]
     fn keeps_lease_with_unknown_owner() {
         let dead = |_pid: u32| false;
-        assert!(!classify_stale_lease(None, 2 * 60 * 60 * 1000, 60 * 60 * 1000, &dead));
+        assert!(!classify_stale_lease(
+            None,
+            2 * 60 * 60 * 1000,
+            60 * 60 * 1000,
+            &dead
+        ));
+    }
+
+    #[test]
+    fn keeps_invalid_zero_pid_owner() {
+        assert!(!classify_stale_lease(Some(0), 7200000, 3600000, &|_| false));
     }
 
     #[test]
     fn grace_boundary_is_strictly_greater() {
         let dead = |_pid: u32| false;
         // Exactly at the grace window is still kept (strictly greater).
-        assert!(!classify_stale_lease(Some(123), 60 * 60 * 1000, 60 * 60 * 1000, &dead));
+        assert!(!classify_stale_lease(
+            Some(123),
+            60 * 60 * 1000,
+            60 * 60 * 1000,
+            &dead
+        ));
     }
 
     #[test]
@@ -207,5 +237,41 @@ mod tests {
         assert!(is_lease_leftover("abc.lock.candidate-5678-x"));
         assert!(!is_lease_leftover("abc.lock"));
         assert!(!is_lease_leftover("owner.json"));
+        assert!(!is_lease_leftover("unrelated.candidate-1234"));
+    }
+
+    #[test]
+    fn sweep_preserves_in_progress_and_unknown_temporary_leases() {
+        let root = std::env::temp_dir().join(format!(
+            "sophos-lease-sweep-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let leases = root.join("session-leases");
+        for name in [
+            "a.lock.candidate-live",
+            "b.lock.stale-recent",
+            "c.lock.candidate-unknown",
+        ] {
+            fs::create_dir_all(leases.join(name)).unwrap();
+        }
+        fs::write(
+            leases.join("a.lock.candidate-live/owner.json"),
+            r#"{"pid":123}"#,
+        )
+        .unwrap();
+        fs::write(
+            leases.join("b.lock.stale-recent/owner.json"),
+            r#"{"pid":456}"#,
+        )
+        .unwrap();
+        let sweep = sweep_stale_leases(&root, DEFAULT_LEASE_GRACE_MS, &|pid| pid == 123);
+        assert_eq!(sweep.leftovers_removed, 0);
+        assert_eq!(sweep.kept, 3);
+        assert_eq!(fs::read_dir(&leases).unwrap().count(), 3);
+        fs::remove_dir_all(root).unwrap();
     }
 }

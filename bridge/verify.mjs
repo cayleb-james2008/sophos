@@ -10,7 +10,7 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -40,6 +40,12 @@ function isolatedSocketPath() {
 }
 
 const SOCKET_PATH = process.env.BRIDGE_VERIFY_SOCKET || isolatedSocketPath();
+const VERIFY_HOME = mkdtempSync(join(tmpdir(), `sophos-bridge-verify-${process.pid}-`));
+process.env.HOME = VERIFY_HOME;
+process.env.USERPROFILE = VERIFY_HOME;
+process.env.APPDATA = join(VERIFY_HOME, "AppData", "Roaming");
+process.env.LOCALAPPDATA = join(VERIFY_HOME, "AppData", "Local");
+
 function terminateProcessTree(proc) {
   if (!proc?.pid || proc.exitCode !== null) return;
   if (process.platform === "win32") {
@@ -304,6 +310,7 @@ async function startDaemon(onSpawn, signal) {
   const diagnostics = [];
   const proc = spawn(process.execPath, [DAEMON_CLI, "--mode", "daemon", "--daemon-socket", SOCKET_PATH, "--offline"], {
     stdio: ["ignore", "pipe", "pipe"],
+    env: process.env,
   });
   onSpawn?.(proc);
   proc.stdout.on("data", (chunk) => diagnostics.push(`[daemon] ${chunk.toString()}`));
@@ -433,7 +440,10 @@ async function run() {
     if (signalCleanupPromise) {
       void forceCleanup()
         .catch((error) => console.error("[signal-cleanup] forced cleanup failed:", error))
-        .finally(() => process.exit(130));
+        .finally(() => {
+          rmSync(VERIFY_HOME, { recursive: true, force: true });
+          process.exit(130);
+        });
       return;
     }
     signalCleanupPromise = (async () => {
@@ -446,6 +456,7 @@ async function run() {
         console.error("[signal-cleanup] graceful cleanup failed:", error);
         await forceCleanup().catch((forceError) => console.error("[signal-cleanup] forced cleanup failed:", forceError));
       }
+      rmSync(VERIFY_HOME, { recursive: true, force: true });
       process.exit(130);
     })();
   };
@@ -465,11 +476,13 @@ async function run() {
       startBridge: () => {
         bridge = spawn(process.execPath, [BRIDGE, "--daemon-socket", SOCKET_PATH], {
           stdio: ["pipe", "pipe", "pipe"],
+          env: process.env,
         });
       },
     });
     if (!startupCompleted || startupAbort.signal.aborted) {
       await startCleanup();
+      rmSync(VERIFY_HOME, { recursive: true, force: true });
       return;
     }
   } catch (err) {
@@ -480,6 +493,7 @@ async function run() {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     process.off("message", onLifecycleCancellation);
+    rmSync(VERIFY_HOME, { recursive: true, force: true });
     return;
   }
 
@@ -749,14 +763,34 @@ async function run() {
       notificationResponses.length === 0,
       `responseCount=${notificationResponses.length}`);
 
-    // 16. login/logout stubs
-    const loginResp = await send({ id: "c17", method: "login", params: { provider: "openrouter" } });
-    record("login acknowledges without mutating a key",
-      loginResp.result?.provider === "openrouter" && loginResp.result?.stored === false);
+    // 16. Login requires a key and only explicit logout removes it.
+    const authPath = join(VERIFY_HOME, ".prime", "agent", "auth.json");
+    const missingKeyLogin = await send({ id: "c17a", method: "login", params: { provider: "openrouter" } });
+    const blankKeyLogin = await send({ id: "c17b", method: "login", params: { provider: "openrouter", apiKey: "   " } });
+    record("login rejects missing or blank keys without creating auth state",
+      missingKeyLogin.error?.code === -32602 && blankKeyLogin.error?.code === -32602 && !existsSync(authPath));
+
+    const fixtureKey = "test-key-never-sent-to-a-provider";
+    const loginResp = await send({ id: "c17", method: "login", params: { provider: "openrouter", apiKey: fixtureKey } });
+    const storedAuth = existsSync(authPath) ? JSON.parse(readFileSync(authPath, "utf8")) : {};
+    record("login stores a supplied key in the isolated auth store",
+      loginResp.result?.provider === "openrouter" && loginResp.result?.stored === true
+        && storedAuth.openrouter?.key === fixtureKey);
+
+    const blankReplacementLogin = await send({ id: "c17c", method: "login", params: { provider: "openrouter", apiKey: " " } });
+    const preservedAuth = existsSync(authPath) ? JSON.parse(readFileSync(authPath, "utf8")) : {};
+    record("blank login cannot delete or replace an existing key",
+      blankReplacementLogin.error?.code === -32602 && preservedAuth.openrouter?.key === fixtureKey);
+
+    const settingsResp = await send({ id: "c17d", method: "getSettings", params: {} });
+    record("getSettings does not expose provider credentials",
+      settingsResp.result?.auth === undefined && !JSON.stringify(settingsResp.result).includes(fixtureKey));
 
     const logoutResp = await send({ id: "c18", method: "logout", params: { provider: "openrouter" } });
-    record("logout acknowledges",
-      logoutResp.result?.provider === "openrouter" && logoutResp.result?.stored === false);
+    const loggedOutAuth = existsSync(authPath) ? JSON.parse(readFileSync(authPath, "utf8")) : {};
+    record("explicit logout removes the stored provider key",
+      logoutResp.result?.provider === "openrouter" && logoutResp.result?.stored === false
+        && !Object.hasOwn(loggedOutAuth, "openrouter"));
 
     // 17. listInbox / markMessageRead
     const inboxResp = await send({ id: "c19", method: "listInbox", params: {} });
@@ -1025,6 +1059,7 @@ async function run() {
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
     process.off("message", onLifecycleCancellation);
+    rmSync(VERIFY_HOME, { recursive: true, force: true });
   }
 
   if (signalReceived) return;
@@ -1046,5 +1081,6 @@ async function run() {
 
 run().catch((err) => {
   console.error("harness fatal:", err);
+  rmSync(VERIFY_HOME, { recursive: true, force: true });
   process.exit(2);
 });

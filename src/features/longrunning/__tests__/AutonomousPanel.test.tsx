@@ -21,6 +21,7 @@ const mockConn = vi.hoisted(() => ({
 
 vi.mock("../../../ipc/client", () => ({
   useIpc: () => mockClient,
+  isDemoMode: () => true,
   useConnectionState: () => mockConn,
 }));
 

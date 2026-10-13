@@ -115,6 +115,7 @@ export function ModelSelector() {
       await ipc.setSettings({
         ...settings,
         localProviders: [
+          ...(settings.localProviders ?? []).filter((entry) => entry.id !== provider),
           {
             id: provider,
             name: endpoint.name,

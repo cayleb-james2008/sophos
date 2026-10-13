@@ -3,6 +3,7 @@
 // keyboard-shortcuts overlay so the `?` and `Cmd/Ctrl+/` shortcuts stay
 // discoverable everywhere in the app.
 
+import { isDemoMode } from "../ipc/client";
 import React, { useMemo, useState } from "react";
 import { SystemBar } from "./SystemBar";
 import { Sidebar } from "./Sidebar";
@@ -59,8 +60,8 @@ export function Shell({
   return (
     <div className="sophos-shell">
       <SystemBar engineOpen={engineOpen} onToggleEngine={() => setEngineOpen((open) => !open)} />
-      <RefinementGateProvider />
-      <RefinementGateBanner />
+      {isDemoMode() ? <RefinementGateProvider /> : null}
+      {isDemoMode() ? <RefinementGateBanner /> : null}
       <RunGuardBanner />
       <UpdateBanner />
       <div className="shell__body">

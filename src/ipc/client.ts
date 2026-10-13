@@ -205,7 +205,7 @@ export interface IpcClient {
   getTokenBudget(): Promise<TokenBudgetBreakdown>;
   compactContext(
     strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
-  ): Promise<{ beforeTokens: number; afterTokens: number; savedTokens: number }>;
+  ): Promise<{ beforeTokens: number | null; afterTokens: number | null; savedTokens: number | null }>;
 
   // Native Windows Computer-Use Action Space (CUA & UIA)
   listDesktopWindows(): Promise<DesktopWindowInfo[]>;
@@ -612,11 +612,11 @@ export class TauriIpcClient implements IpcClient {
   }
   compactContext(
     strategy: "semantic-summarize" | "prune-oldest" | "evict-tools",
-  ): Promise<{ beforeTokens: number; afterTokens: number; savedTokens: number }> {
+  ): Promise<{ beforeTokens: number | null; afterTokens: number | null; savedTokens: number | null }> {
     return this.send("compactContext", { strategy }) as Promise<{
-      beforeTokens: number;
-      afterTokens: number;
-      savedTokens: number;
+      beforeTokens: number | null;
+      afterTokens: number | null;
+      savedTokens: number | null;
     }>;
   }
   listDesktopWindows(): Promise<DesktopWindowInfo[]> {

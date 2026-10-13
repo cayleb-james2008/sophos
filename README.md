@@ -77,6 +77,17 @@ the verification boundary.
 
 ## Verification status
 
+**Current local source checks (not release evidence).** The working tree now
+covers daemon-backed sessions and persisted transcripts across restart, saved
+profiles whose instructions apply to new sessions, loopback local-model
+discovery and catalog registration, and real daemon token-budget and semantic
+compaction calls. Profile tool/skill/safety choices remain descriptive; they do
+not grant permissions. The source passed 1,224 Vitest tests across 147 files,
+82 Node tests, and eight Rust lease tests locally. Fresh GitHub CI is pending.
+This does not establish current-source installer acceptance or live provider
+inference. The CI and installer records below remain tied to their named
+historical commits and packages.
+
 The PR #16 source-publication baseline is
 [`48d6cbdc011fcf762a872f1353f926419c994e29`](https://github.com/cayleb-james2008/sophos/commit/48d6cbdc011fcf762a872f1353f926419c994e29).
 Its [Windows CI run](https://github.com/cayleb-james2008/sophos/actions/runs/37765204065)
@@ -251,86 +262,25 @@ field. Flat, minimal, legible from 16px to 512px. Source: `public/sophos-icon.sv
 
 ---
 
-## Code Mode — the typed tool SDK
+## Code Mode — interface preview
 
-Code Mode (selectable from the header profile chip, next to Standard /
-Minimal / Creator) exposes the agent's tools through a **typed TypeScript
-SDK**: the agent writes ONE program that calls many tools in a single step
-instead of dozens of separate tool round-trips — exactly what DeepSeek
-Harness's Code mode does.
+Code Mode renders a typed SDK and a `run_code` program view, but the pinned
+Prime Agent daemon does not execute Sophos `run_code` programs. The program,
+tool-call cards, and demo responses are simulated previews, not native tool
+execution. MCP server/resource/prompt, CUA/UIA, workspace-security, squad,
+thought-tree, distilled-skill, workspace-twin, and checkpoint-restore bridge
+operations are unsupported in this build and return an explicit error; their
+related UI is preview-only.
 
-- **Deterministic SDK renderer** — turns a live tool registry into typed
-  TypeScript stubs: lexicographic tool order, byte-identical output for an
-  unchanged tool set, and unsupported schemas degrade to a permissive
-  contract instead of throwing. Only erasable TypeScript is emitted, so
-  stripping types yields valid JavaScript.
-- **Live tool registry** — built from the same sources the rest of the app
-  already uses: built-in tools, extension tools (`getExtensions`), MCP tools
-  (enabled servers in Settings → Advanced, probed via `testMcpServer`), and
-  skills (`getRuntimeInfo`).
-- **run_code program view** — a right-side drawer decomposes each program
-  into its individual tool-call cards (the same cards the chat renders) and
-  records the program + every call in the Trajectory log, so runs are
-  searchable, resumable, and forkable like any session.
+## Profiles — saved instructions with preview-only controls
 
-> **Known limitation:** `run_code` is **demo-mode only** for now. The daemon
-> contract has no seam for a sandboxed TypeScript runtime, so programs are
-> simulated and every output is clearly labeled — a real runtime needs a
-> daemon/bridge contract change (see CHANGELOG).
-
----
-
-## Profile Studio — build your own agent
-
-The Profile Studio (opens from the header profile chip → **Profile Studio —
-build your own**) is the DeepSeek Harness **Creator mode made visual**: inspect
-the live runtime, compose capabilities, and test in memory — no restart, no
-Save required to see the effect.
-
-- **Inspect the live runtime** — the editor composes from the same live tool
-  registry the Code Mode SDK renders (built-in tools + extension/MCP tools +
-  discovered skills, with per-category counts). A source that is absent — no
-  MCP servers configured, no extensions, the runtime not reporting skills —
-  degrades honestly: the group renders its count and a plain note instead of
-  pretending.
-- **Compose** — name, tagline, description, working style (one chip per
-  line), base mode (Standard / Minimal / Creator / Code), tool toggles per
-  category, skill toggles, and a safety posture (auto-approve safe tools vs.
-  a confirm list). A live composition summary updates with every toggle.
-- **Test in memory (hot reload)** — every edit applies to the running app
-  immediately: the header chip, the composer hint, and (in demo mode) the
-  simulated responses all follow the draft. **Save** persists to settings and
-  selects a new profile; **Discard** drops the draft; **Delete** removes the
-  profile and falls back to Standard defaults if it was active. A malformed
-  or empty profile (no name / no tools) degrades to Standard defaults
-  instead of crashing.
-- **Picker integration** — custom profiles live in a **Custom** section
-  beside the five built-ins (Gauntlet / Standard / Minimal / Creator / Code),
-  each with Edit / Export / Delete actions; the selection and the store survive
-  restarts.
-- **Portability (export / import)** — save any custom profile to a
-  **human-readable JSON file** (`*.sophos-profile.json`, a pretty-printed
-  `sophos-custom-profile` envelope) and load it back or share it: **Export**
-  from the studio footer (the live draft, even before Save) or a profile's
-  card in the picker writes through the **native save dialog**; **Import** via
-  the **native open dialog** re-parses the file through the same guarded
-  store sanitizer settings use, so an export → import round-trip reproduces
-  the identical composition. Parsing never crashes — malformed JSON, a
-  foreign file, a future version, or a broken field shape each produce a
-  clear error — and a name collision is **never silently overwritten**: the
-  incoming profile becomes a unique copy (`"Name (copy)"`) with a visible
-  notice saying nothing was overwritten.
-
-**Live-session behavior:** when creating a new session, Sophos appends the
-selected profile's instructions to the daemon system prompt. Existing sessions
-keep their original setup. Profile tool, skill, and safety composition remains
-descriptive guidance in Sophos and does not change daemon permissions.
-
-Local model connections are restricted to HTTP loopback endpoints. Sophos
-discovers their model list and registers those models in Prime Agent's local
-catalog so they can be selected through the normal daemon path. Catalog
-registration is covered by the staged bridge/daemon checks; live inference
-against a local model server has not been accepted as release evidence.
+Custom profiles persist locally and can be selected for new sessions; Sophos
+adds the selected profile's instructions to the daemon system prompt when the
+session is created. Existing sessions keep their original setup. Tool, skill,
+and safety choices in Profile Studio describe the profile and its UI preview;
+they do not change daemon capabilities or enforce approval rules. Loopback
+local-model discovery and catalog registration are supported, but a registered
+model is not evidence of successful live inference.
 
 ---
 

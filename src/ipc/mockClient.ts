@@ -48,6 +48,7 @@ import type {
   SquadWorkflowState,
   SquadWorkflowType,
   TokenBudgetBreakdown,
+  TokenBudgetTiers,
   TranscriptMessage,
   WorkspaceSecurityPolicy,
   BlastRadiusReport,
@@ -1845,7 +1846,7 @@ export class MockIpcClient implements IpcClient {
   // Token Budget & Context Optimizer Mock (DSPy / MemGPT)
   // -------------------------------------------------------------------------
 
-  private mockTokenBudget: TokenBudgetBreakdown = {
+  private mockTokenBudget: TokenBudgetBreakdown & { tiers: TokenBudgetTiers } = {
     totalTokens: 31200,
     contextLimit: 128000,
     usagePercent: 24.38,
@@ -1862,7 +1863,7 @@ export class MockIpcClient implements IpcClient {
     compactionSavingsTokens: 0,
   };
 
-  async getTokenBudget(): Promise<TokenBudgetBreakdown> {
+  async getTokenBudget(): Promise<TokenBudgetBreakdown & { tiers: TokenBudgetTiers }> {
     return this.mockTokenBudget;
   }
 

@@ -7,31 +7,29 @@ source, retains its MIT notice, and adds the desktop shell, views, packaging
 and reliability work described here. These additions do not establish
 independent authorship of the upstream agent engine.
 
-This account is based on merged source
-`48d6cbdc011fcf762a872f1353f926419c994e29` (2026-10-08). The earlier version
-of this document described dated research and development snapshots. Its
-issue counts, visual scores and installed-runtime claims are historical
-records, not current acceptance results. The original text remains in Git
-history; the underlying research remains in `research/`.
+This account describes the local source candidate after merged baseline
+`48d6cbdc011fcf762a872f1353f926419c994e29` (2026-10-08). Fresh GitHub CI for
+the current changes is pending. Earlier issue counts, visual scores, and
+installed-runtime claims are dated records, not current acceptance results;
+the original text remains in Git history and the research remains in
+`research/`.
 
 ## What the desktop adds
 
 | Surface | Source-backed behavior | Evidence boundary |
 |---|---|---|
-| Windows desktop shell | Tauri/Rust hosts the React interface and manages the packaged Node daemon and bridge. | Windows is the supported product target. Source guards and hosted Windows tests do not certify macOS/Linux desktop support or all Windows versions. |
-| Sessions and agents | Graphical views expose sessions, agent children, details and relevant actions through the bridge. | Frontend tests and demo CUA exercise the interface. A populated demo is simulated IPC, not a live provider session. |
-| Setup and provider controls | Onboarding, Settings and provider controls make runtime setup accessible through the interface. | Provider choices and OAuth UI do not prove successful authentication or inference for every provider. |
-| Refinement review | Client controls present refinement proposals and Apply/Discard actions. | The client gate is not a security sandbox or a certificate for every upstream refinement path. |
-| Runtime reliability | The shell uses hidden child-process startup and fail-closed Windows job containment; recovery and cancellation have regression coverage. | Tests cover assigned processes and descendants. A hard kill between process creation and job assignment can leave a suspended process; hostile same-user interference is outside the verified guarantee. |
-| Packaging and attribution | Build tooling stages the pinned upstream runtime and checks the embedded MIT notice. | Building a candidate MSI is separate from installing it. The signed public updater-feed package is not proven to contain this exact source revision. |
+| Sessions and transcripts | Sophos exposes daemon-backed sessions and persisted transcripts, with session state available again after restart. | Local source tests cover these paths; they do not establish live provider inference or a new Windows release. |
+| Profiles and local models | Saved profiles persist; their instructions are added to new-session prompts. Loopback model discovery registers models in the daemon catalog. | Tool, skill, and safety selections are descriptive UI metadata. Catalog registration does not prove that a model can complete live inference. |
+| Context budget and compaction | The panel reads measured token totals from the active daemon session and calls the daemon's semantic compactor. | Per-tier estimates are not reported. The daemon may not return before/after totals; savings remain unknown until a later model response. Prune/evict controls are unavailable outside demo mode. |
+| Advanced panels | Code Mode, MCP access, CUA/UIA actions, workspace-security policy, squad workflows, thought-tree operations, distilled-skill mutation, workspace twins, and checkpoint restore are not native capabilities in this build. | The bridge explicitly rejects unsupported operations. Related panels and program cards are UI previews, not evidence that those actions ran. |
+| Profile safety and refinement UI | Profile Studio saves profile text and shows composition previews; refinement events can be displayed. | Tool/safety toggles do not enforce permissions, and Apply/Discard controls are not a verified native approval gate. Sophos is not a security sandbox. |
+| Runtime, packaging and attribution | The Rust shell and bundler stage the pinned upstream runtime and preserve its MIT notice. | Current changes await fresh GitHub CI. A candidate MSI build is not an install; the signed public updater-feed package is not proven to contain this source revision. Windows is the supported product target; macOS/Linux and all Windows versions are not certified. |
 
-New sessions can carry the selected profile's instructions into the daemon system
-prompt. This does not retroactively change existing sessions or grant the tool,
-skill, and safety controls composed in the UI. Local-model discovery accepts
-HTTP loopback endpoints and registers their models in the daemon catalog; the
-staged verifier checks registration and cleanup without calling a model server.
-Live inference against a local endpoint is not part of the current acceptance
-evidence.
+The current working tree passed 1,224 Vitest tests across 147 files, 82 Node
+tests, and eight Rust lease tests locally. This is source-tree evidence only;
+fresh GitHub CI is pending, as are current-source installer acceptance and live
+provider inference. The source does include real session/profile persistence,
+loopback model registration, and daemon-backed semantic compaction.
 
 The corresponding source is in `src/features/`, `src-tauri/src/`, `bridge/`
 and `scripts/`. The [README verification status](../README.md#verification-status)
@@ -58,7 +56,7 @@ links the exact CI evidence and preserves earlier failed runs and their limits.
 
 ## Current verification and remaining limits
 
-The exact baseline's
+The historical baseline's
 [Windows CI run 37765204065](https://github.com/cayleb-james2008/sophos/actions/runs/37765204065)
 passed 1,126 frontend tests, seven native containment regressions, staged and
 standalone lifecycle checks (50/50 each), and eight CUA demo suites. Three
@@ -66,8 +64,9 @@ keyboard subchecks were skipped because background WebView2 input delivery
 was unreliable. The public-package console check includes a no-op placeholder,
 so it is not independent proof of a clean console.
 
-Current-source MSI installation, real provider inference, broader native
-compatibility and unresolved dependency audit findings remain separate work.
-Earlier failed or conflicting PR heads retain their own status; a passing
-successor on master does not approve their unique changes. Model-generated
-code runs with the user's permissions. Sophos is not a security sandbox.
+Current-source MSI installation, real provider inference, native UI/CUA and
+security acceptance, broader compatibility, and unresolved dependency audit
+findings remain separate. Earlier failed or conflicting PR heads retain their
+own status; a passing successor on master does not approve their unique
+changes. Model-generated code runs with the user's permissions. Sophos is not
+a security sandbox.

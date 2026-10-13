@@ -14,6 +14,7 @@ const mockClient = vi.hoisted(() => ({
 
 vi.mock("../../../ipc/client", () => ({
   useIpc: () => mockClient,
+  isDemoMode: () => true,
 }));
 
 const harnessState = {
