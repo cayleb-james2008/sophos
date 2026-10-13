@@ -225,10 +225,14 @@ test("bridge auth updates share the daemon lock and preserve concurrent credenti
   const lockAcquired = new Promise((resolve) => {
     signalLockAcquired = resolve;
   });
+  let releaseDaemonLock;
+  const holdDaemonLock = new Promise((resolve) => {
+    releaseDaemonLock = resolve;
+  });
   const daemonRefresh = backend.withLockAsync(async (current) => {
     const currentAuth = JSON.parse(current ?? "{}");
     signalLockAcquired();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await holdDaemonLock;
     currentAuth.anthropic = {
       type: "oauth",
       access: "refreshed-access-token",
@@ -240,19 +244,82 @@ test("bridge auth updates share the daemon lock and preserve concurrent credenti
   await lockAcquired;
 
   const connectionModuleUrl = new URL("./dist/bridge/src/connection.js", import.meta.url).href;
-  const childSource = `import { writeAuthKey } from ${JSON.stringify(connectionModuleUrl)}; writeAuthKey("openai", "fixture-key");`;
-  const writer = spawn(process.execPath, ["--input-type=module", "-e", childSource], {
-    env: process.env,
-    stdio: ["ignore", "ignore", "pipe"],
-  });
+  const childSource = `const { writeAuthKey } = await import(${JSON.stringify(connectionModuleUrl)}); process.stdout.write("BRIDGE_READY\\n"); writeAuthKey("openai", "fixture-key");`;
+  let writer;
   let childStderr = "";
-  writer.stderr.on("data", (chunk) => {
-    childStderr += chunk.toString();
-  });
-  const [exitCode] = await once(writer, "exit");
-  await daemonRefresh;
+  let childExit;
+  let childReachedWrite = false;
+  let safetyTimeout;
+  try {
+    safetyTimeout = setTimeout(() => releaseDaemonLock(), 8000);
+    writer = spawn(process.execPath, ["--input-type=module", "-e", childSource], {
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    writer.stderr.on("data", (chunk) => {
+      childStderr += chunk.toString();
+    });
+    childExit = once(writer, "exit");
 
-  assert.equal(exitCode, 0, `concurrent bridge writer failed: ${childStderr.slice(0, 240)}`);
+    const childReady = new Promise((resolve, reject) => {
+      let output = "";
+      const timer = setTimeout(
+        () => finish(reject, new Error("child did not import the bridge before timeout")),
+        5000,
+      );
+      const onData = (chunk) => {
+        output += chunk.toString();
+        if (output.includes("BRIDGE_READY")) finish(resolve);
+      };
+      const onError = (error) => finish(reject, error);
+      const finish = (settle, value) => {
+        clearTimeout(timer);
+        writer.stdout.off("data", onData);
+        writer.off("error", onError);
+        settle(value);
+      };
+      writer.stdout.on("data", onData);
+      writer.once("error", onError);
+      childExit.then(([code, signal]) => {
+        if (!output.includes("BRIDGE_READY")) {
+          finish(
+            reject,
+            new Error(
+              `child exited before bridge import completed (${code ?? signal ?? "unknown"}): ${childStderr.slice(0, 240)}`,
+            ),
+          );
+        }
+      });
+    });
+
+    await childReady;
+    childReachedWrite = true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  } finally {
+    clearTimeout(safetyTimeout);
+    releaseDaemonLock();
+    if (writer && !childReachedWrite && writer.exitCode === null && writer.signalCode === null) {
+      writer.kill("SIGTERM");
+      if (childExit) await Promise.race([childExit, new Promise((resolve) => setTimeout(resolve, 1000))]);
+      if (writer.exitCode === null && writer.signalCode === null) {
+        writer.kill("SIGKILL");
+        if (childExit) await childExit;
+      }
+    }
+    await daemonRefresh;
+  }
+
+  const childDeadline = setTimeout(() => {
+    if (writer.exitCode === null && writer.signalCode === null) writer.kill("SIGKILL");
+  }, 5000);
+  const [exitCode, exitSignal] = await childExit;
+  clearTimeout(childDeadline);
+
+  assert.equal(
+    exitCode,
+    0,
+    `concurrent bridge writer failed (${exitSignal ?? "no signal"}): ${childStderr.slice(0, 240)}`,
+  );
   const savedAuth = JSON.parse(readFileSync(authPath, "utf8"));
   assert.deepEqual(savedAuth.anthropic, {
     type: "oauth",
