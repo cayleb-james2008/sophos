@@ -40,15 +40,20 @@ test(
   async (t) => {
     let activeDataSocket;
     let passiveServer;
+    const fixtureSocketErrors = [];
     let retrievalAcknowledged = false;
     let resolveControlClosed;
     const controlClosed = new Promise((resolve) => {
       resolveControlClosed = resolve;
     });
     const controlServer = createServer((control) => {
-      // basic-ftp destroys its sockets after completion; Windows can report
-      // that peer shutdown as ECONNRESET on the fixture side.
-      control.on("error", () => {});
+      control.on("error", (error) => {
+        fixtureSocketErrors.push({
+          socket: "control",
+          error,
+          afterRetrievalAcknowledgment: retrievalAcknowledged,
+        });
+      });
       control.once("close", resolveControlClosed);
       control.setEncoding("utf8");
       control.write("220 local fixture ready\r\n");
@@ -73,7 +78,13 @@ test(
           } else if (upper === "EPSV") {
             passiveServer = createServer((socket) => {
               activeDataSocket = socket;
-              socket.on("error", () => {});
+              socket.on("error", (error) => {
+                fixtureSocketErrors.push({
+                  socket: "data",
+                  error,
+                  afterRetrievalAcknowledgment: retrievalAcknowledged,
+                });
+              });
             });
             passiveServer.listen(0, "127.0.0.1", () => {
               const address = passiveServer.address();
@@ -147,6 +158,15 @@ test(
     } finally {
       clearTimeout(closeTimeout);
     }
+    const unexpectedSocketError = fixtureSocketErrors.find(
+      ({ socket, error, afterRetrievalAcknowledgment }) =>
+        socket !== "control" || error.code !== "ECONNRESET" || !afterRetrievalAcknowledgment,
+    );
+    assert.equal(
+      unexpectedSocketError,
+      undefined,
+      `FTP fixture socket failed: ${unexpectedSocketError?.socket} ${unexpectedSocketError?.error?.message}`,
+    );
     assert.equal(retrievalAcknowledged, true, "FTP client must receive the final RETR completion reply");
 
     assert.equal(Buffer.concat(chunks).toString("utf8"), "local fixture payload");
