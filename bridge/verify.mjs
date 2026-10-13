@@ -799,7 +799,7 @@ async function run() {
       `result=${JSON.stringify(ns2.result)} err=${ns2.error ? ns2.error.code + " " + ns2.error.message : "none"}`);
 
     if (typeof ns2.result?.activeSessionId === "string") {
-      const { DaemonAgentConnection, DaemonClient } = await import("@earendil-works/pi-coding-agent");
+      const { DaemonAgentConnection, DaemonClient } = await import(pathToFileURL(join(REF_ROOT, "dist", "index.js")).href);
       const profileClient = new DaemonClient(SOCKET_PATH);
       let profileConnection;
       try {
